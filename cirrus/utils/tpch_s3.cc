@@ -2,9 +2,17 @@
 #include <nanodbc/nanodbc.h>
 
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 
 #include "connection.h"
+
+DEFINE_uint32(sf, 1, "Scale factor.");
+DEFINE_bool(drop, false, "Set to drop the tables instead.");
+
+DEFINE_string(bucket, "geoffxy-research",
+              "The S3 bucket where the data is stored.");
+DEFINE_string(iam_role, "", "The IAM role to use for copying from S3");
 
 namespace {
 
@@ -167,22 +175,60 @@ void DropTPCHTables(nanodbc::connection& connection, uint32_t sf) {
   txn.commit();
 }
 
-}  // namespace
+std::string GenerateCopyCommand(const std::string& table_name, uint32_t sf) {
+  std::stringstream builder;
+  builder << "COPY " << table_name << "_" << PaddedScaleFactor(sf);
+  builder << " FROM 's3://" << FLAGS_bucket << "/tpch/sf"
+          << PaddedScaleFactor(sf) << "/" << table_name << ".tbl'";
+  builder << " IAM_ROLE '" << FLAGS_iam_role << "'";
+  builder << " REGION 'us-east-1'";
+  return builder.str();
+}
 
-DEFINE_uint32(sf, 1, "Scale factor.");
-DEFINE_bool(drop, false, "Set to drop the tables instead.");
+void LoadData(nanodbc::connection& connection, uint32_t sf) {
+  std::cerr << "> Loading part..." << std::endl;
+  nanodbc::execute(connection, GenerateCopyCommand("part", sf));
+  std::cerr << "> Loading supplier..." << std::endl;
+  nanodbc::execute(connection, GenerateCopyCommand("supplier", sf));
+  std::cerr << "> Loading partsupp..." << std::endl;
+  nanodbc::execute(connection, GenerateCopyCommand("partsupp", sf));
+  std::cerr << "> Loading customer..." << std::endl;
+  nanodbc::execute(connection, GenerateCopyCommand("customer", sf));
+  std::cerr << "> Loading orders..." << std::endl;
+  nanodbc::execute(connection, GenerateCopyCommand("orders", sf));
+  std::cerr << "> Loading lineitem..." << std::endl;
+  nanodbc::execute(connection, GenerateCopyCommand("lineitem", sf));
+  std::cerr << "> Loading nation..." << std::endl;
+  nanodbc::execute(connection, GenerateCopyCommand("nation", sf));
+  std::cerr << "> Loading region..." << std::endl;
+  nanodbc::execute(connection, GenerateCopyCommand("region", sf));
+}
+
+}  // namespace
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Used to load TPC-H data (on S3) into Redshift.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
+
+  if (!FLAGS_drop && FLAGS_iam_role.empty()) {
+    std::cerr << "ERROR: Must specify --iam_role to copy data from S3."
+              << std::endl;
+    return 1;
+  }
 
   Connection::InitConnectionString();
   auto const connstr = NANODBC_TEXT(Connection::GetConnectionString());
   nanodbc::connection c(connstr);
 
   if (!FLAGS_drop) {
+    std::cerr << "> Creating the tables..." << std::endl;
     CreateTPCHTables(c, FLAGS_sf);
+
+    std::cerr << "> Loading data from s3://" << FLAGS_bucket << std::endl;
+    LoadData(c, FLAGS_sf);
+
   } else {
+    std::cerr << "> Dropping the tables..." << std::endl;
     DropTPCHTables(c, FLAGS_sf);
   }
 
