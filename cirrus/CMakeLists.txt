@@ -23,12 +23,19 @@ FetchContent_MakeAvailable(nanodbc)
 
 add_executable(driver
   main.cc
-  connection.cc
-  connection.h
   datasets/store.cc
   datasets/store.h
+  utils/connection.cc
+  utils/connection.h
   workloads/state.h
   workloads/store.cc
   workloads/store.h
 )
 target_link_libraries(driver PRIVATE nanodbc gflags)
+
+add_executable(tpch_s3_loader
+  utils/connection.cc
+  utils/connection.h
+  utils/tpch_s3.cc
+)
+target_link_libraries(tpch_s3_loader PRIVATE nanodbc gflags)

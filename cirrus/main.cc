@@ -7,7 +7,7 @@
 #include <sstream>
 #include <unordered_map>
 
-#include "connection.h"
+#include "utils/connection.h"
 #include "datasets/store.h"
 #include "workloads/state.h"
 #include "workloads/store.h"
@@ -23,34 +23,11 @@ DEFINE_double(read_latest_prob, 0.05,
 DEFINE_uint64(warmup, 10, "Number of warm up iterations to run.");
 DEFINE_uint32(run_for, 10, "How long to let the experiment run (in seconds).");
 
-DEFINE_string(host, "", "Database server.");
-DEFINE_string(dbname, "dev", "Database name.");
-DEFINE_string(user, "awsuser", "Database username.");
-DEFINE_string(pwdvar, "",
-              "Name of the environment variable where the password is saved.");
-
-namespace {
-
-std::string GenerateOptionsString() {
-  std::stringstream builder;
-  builder << "Driver={Amazon Redshift (x64)};";
-  builder << " Database=" << FLAGS_dbname << ";";
-  builder << " Server=" << FLAGS_host << ";";
-  builder << " UID=" << FLAGS_user << ";";
-  if (!FLAGS_pwdvar.empty()) {
-    builder << " PWD=" << std::getenv(FLAGS_pwdvar.c_str()) << ";";
-  }
-  return builder.str();
-}
-
-}  // namespace
-
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Run data orchestration experiments using ODBC.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
 
-  Connection::SetConnectionString(GenerateOptionsString());
-
+  Connection::InitConnectionString();
   auto const connstr = NANODBC_TEXT(Connection::GetConnectionString());
   nanodbc::connection c(connstr);
 

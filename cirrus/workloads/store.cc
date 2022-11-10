@@ -4,7 +4,7 @@
 #include <string>
 #include <iostream>
 
-#include "../connection.h"
+#include "../utils/connection.h"
 
 SalesReporting::SalesReporting(uint64_t num_warmup, uint64_t max_datetime,
                                std::shared_ptr<BenchmarkState> state)

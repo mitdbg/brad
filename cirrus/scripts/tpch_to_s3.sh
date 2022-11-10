@@ -21,4 +21,3 @@ files=(
 for f in "${files[@]}"; do
   aws s3 cp $1/$f s3://geoffxy-research/tpch/sf$2/$f
 done
-
