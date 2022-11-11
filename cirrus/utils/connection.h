@@ -1,6 +1,7 @@
 #pragma once
 
 #include <gflags/gflags.h>
+#include <nanodbc/nanodbc.h>
 
 #include <string>
 
@@ -14,6 +15,7 @@ DECLARE_string(pwdvar);
 class Connection {
  public:
   static const std::string& GetConnectionString(DBType dbtype);
+  static const nanodbc::connection GetConnection(DBType dbtype);
 
  private:
   static std::string redshift_connection_str_;

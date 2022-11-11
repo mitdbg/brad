@@ -28,7 +28,6 @@ std::string GenerateAuroraConnectionString() {
   builder << "Driver={PostgreSQL};";
   builder << " Server=" << FLAGS_host << ";";
   builder << " Port=5432;";
-  //builder << " Database=" << FLAGS_dbname << ";";
   builder << " UID=" << FLAGS_user << ";";
   if (!FLAGS_pwdvar.empty()) {
     builder << " PWD=" << std::getenv(FLAGS_pwdvar.c_str()) << ";";
@@ -40,6 +39,22 @@ std::string GenerateAuroraConnectionString() {
 
 std::string Connection::redshift_connection_str_;
 std::string Connection::aurora_connection_str_;
+
+const nanodbc::connection Connection::GetConnection(DBType dbtype) {
+  switch (dbtype) {
+    case DBType::kRedshift: {
+      return nanodbc::connection(GetConnectionString(dbtype));
+    }
+    case DBType::kAurora: {
+      // Temporary workaround. You need to define a data source name called
+      // "Aurora" in your local `~/.odbc.ini` file.
+      return nanodbc::connection(
+          "Aurora", FLAGS_user,
+          !FLAGS_pwdvar.empty() ? std::getenv(FLAGS_pwdvar.c_str()) : "");
+    }
+  }
+  __builtin_unreachable();
+}
 
 const std::string& Connection::GetConnectionString(DBType dbtype) {
   switch (dbtype) {

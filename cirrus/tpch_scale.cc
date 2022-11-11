@@ -44,23 +44,19 @@ int main(int argc, char* argv[]) {
 
   DBType db = *maybe_db;
 
-  auto const connstr = NANODBC_TEXT(Connection::GetConnectionString(db));
-  nanodbc::connection c(connstr);
+  nanodbc::connection c = Connection::GetConnection(db);
 
   {
     // Print out the version string.
     auto r = nanodbc::execute(c, "SELECT version();");
     r.next();
-    std::cerr << "Connected to: " << r.get<std::string>(0) << std::endl;
+    std::cerr << "> Connected to: " << r.get<std::string>(0) << std::endl;
   }
 
   if (db == DBType::kRedshift) {
     // Disable result caching.
+    // TODO: Is there something equivalent for Aurora?
     nanodbc::execute(c, "SET enable_result_cache_for_session = off;");
-  } else {
-    std::cout << "Connected to Aurora PostgreSQL." << std::endl;
-    // Temporary.
-    return 0;
   }
 
   auto state = BenchmarkState::Create();
