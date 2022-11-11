@@ -85,25 +85,25 @@ std::string Query5(uint32_t sf) {
 
 std::string Query3(uint32_t sf) {
   std::stringstream builder;
-  builder << "SELECT"
-             "l_orderkey,"
-             "SUM(l_extendedprice * (1 - l_discount)) as revenue,"
-             "o_orderdate,"
-             "o_shippriority"
-             "FROM";
+  builder << "SELECT "
+             "l_orderkey, "
+             "SUM(l_extendedprice * (1 - l_discount)) as revenue, "
+             "o_orderdate, "
+             "o_shippriority "
+             "FROM ";
   builder << "customer_" << PaddedScaleFactor(sf) << ",";
   builder << "orders_" << PaddedScaleFactor(sf) << ",";
-  builder << "lineitem_" << PaddedScaleFactor(sf) << ",";
-  builder << "WHERE"
-             "c_mktsegment = 'BUILDING'"
-             "AND c_custkey = o_custkey"
-             "AND l_orderkey = o_orderkey"
-             "AND o_orderdate < date '1995-03-15'"
-             "AND l_shipdate > date '1995-03-15'"
-             "GROUP BY"
-             "l_orderkey,"
-             "o_orderdate,"
-             "o_shippriority";
+  builder << "lineitem_" << PaddedScaleFactor(sf) << " ";
+  builder << "WHERE "
+             "c_mktsegment = 'BUILDING' "
+             "AND c_custkey = o_custkey "
+             "AND l_orderkey = o_orderkey "
+             "AND o_orderdate < date '1995-03-15' "
+             "AND l_shipdate > date '1995-03-15' "
+             "GROUP BY "
+             "l_orderkey, "
+             "o_orderdate, "
+             "o_shippriority; ";
   return builder.str();
 }
 

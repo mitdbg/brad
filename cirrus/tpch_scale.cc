@@ -13,8 +13,12 @@
 
 DEFINE_uint32(sf, 0, "Specifies the dataset scale factor.");
 DEFINE_uint32(batch_size, 10, "Set the batch size.");
-DEFINE_uint64(warmup, 10, "Number of warm up iterations to run.");
+DEFINE_uint64(warmup, 3, "Number of warm up iterations to run.");
 DEFINE_uint32(run_for, 10, "How long to let the experiment run (in seconds).");
+
+DEFINE_bool(print_query, false,
+            "If set, this tool will print out the query text (for debugging "
+            "purposes) and exit.");
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Run TPC-H experiments using ODBC.");
@@ -23,6 +27,11 @@ int main(int argc, char* argv[]) {
   if (FLAGS_sf == 0) {
     std::cerr << "ERROR: Please set the scale factor --sf." << std::endl;
     return 1;
+  }
+
+  if (FLAGS_print_query) {
+    std::cout << tpch::Query3(FLAGS_sf) << std::endl;
+    return 0;
   }
 
   Connection::InitConnectionString();
@@ -38,6 +47,7 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<RunQuery> reader = std::make_unique<RunQuery>(
       FLAGS_warmup, FLAGS_batch_size, tpch::Query3(FLAGS_sf), state);
   state->SpinWaitUntilAllReady(/*expected=*/1);
+  std::cerr << "> Warm up complete. Running the benchmark now..." << std::endl;
 
   const auto start = std::chrono::steady_clock::now();
   state->AllowStart();
