@@ -29,6 +29,9 @@ int main(int argc, char* argv[]) {
   auto const connstr = NANODBC_TEXT(Connection::GetConnectionString());
   nanodbc::connection c(connstr);
 
+  // Disable result caching.
+  nanodbc::execute(c, "SET enable_result_cache_for_session = off;");
+
   auto state = BenchmarkState::Create();
 
   std::cerr << "> Warming up reader..." << std::endl;
