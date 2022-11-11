@@ -35,8 +35,8 @@ int main(int argc, char* argv[]) {
   auto state = BenchmarkState::Create();
 
   std::cerr << "> Warming up reader..." << std::endl;
-  std::unique_ptr<RunQ5> reader =
-      std::make_unique<RunQ5>(FLAGS_warmup, FLAGS_batch_size, FLAGS_sf, state);
+  std::unique_ptr<RunQuery> reader = std::make_unique<RunQuery>(
+      FLAGS_warmup, FLAGS_batch_size, tpch::Query3(FLAGS_sf), state);
   state->SpinWaitUntilAllReady(/*expected=*/1);
 
   const auto start = std::chrono::steady_clock::now();

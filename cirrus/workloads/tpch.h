@@ -3,15 +3,16 @@
 #include <nanodbc/nanodbc.h>
 
 #include <memory>
+#include <string>
 #include <thread>
 
 #include "state.h"
 
-class RunQ5 {
+class RunQuery {
  public:
-  RunQ5(uint64_t num_warmup, uint64_t batch_size, uint32_t scale_factor,
-        std::shared_ptr<BenchmarkState> state);
-  ~RunQ5();
+  RunQuery(uint64_t num_warmup, uint64_t batch_size, std::string query,
+           std::shared_ptr<BenchmarkState> state);
+  ~RunQuery();
 
   void Wait();
   uint64_t NumQueriesRun() const { return num_queries_run_; }
@@ -19,12 +20,19 @@ class RunQ5 {
  private:
   void Run();
 
+  std::string query_;
   uint64_t num_warmup_;
   uint64_t batch_size_;
-  uint32_t scale_factor_;
   uint64_t num_queries_run_;
   std::shared_ptr<BenchmarkState> state_;
   nanodbc::connection connection_;
   bool joined_;
   std::thread thread_;
 };
+
+namespace tpch {
+
+std::string Query5(uint32_t sf);
+std::string Query3(uint32_t sf);
+
+}  // namespace tpch
