@@ -1,0 +1,15 @@
+SCALE_FACTORS = [1, 10, 20]
+
+run_experiment_group(
+  name="redshift",
+  run="./run_redshift.sh",
+  experiments=[
+    ExperimentInstance(
+      name="redshift-{}".format(scale_factor),
+      options={
+        "sf": scale_factor,
+      },
+    )
+    for scale_factor in SCALE_FACTORS
+  ],
+)
