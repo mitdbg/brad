@@ -16,6 +16,8 @@ DEFINE_string(bucket, "geoffxy-research",
               "The S3 bucket where the data is stored.");
 DEFINE_string(iam_role, "", "The IAM role to use for copying from S3");
 
+DEFINE_string(db, "redshift", "The DBMS to use.");
+
 namespace {
 
 std::string CreatePart(uint32_t sf) {
@@ -30,7 +32,8 @@ std::string CreatePart(uint32_t sf) {
          "  p_size     INTEGER,"
          "  p_container    CHAR(10),"
          "  p_retailprice  DECIMAL,"
-         "  p_comment  VARCHAR(23)"
+         "  p_comment  VARCHAR(23),"
+         "  p_extra  CHAR(1)"
          ");";
 }
 
@@ -44,7 +47,8 @@ std::string CreateSupplier(uint32_t sf) {
          "  s_nationkey BIGINT NOT NULL,"
          "  s_phone     CHAR(15),"
          "  s_acctbal   DECIMAL,"
-         "  s_comment   VARCHAR(101)"
+         "  s_comment   VARCHAR(101),"
+         "  s_extra  CHAR(1)"
          ");";
 }
 
@@ -57,6 +61,7 @@ std::string CreatePartSupp(uint32_t sf) {
          "  ps_availqty    INTEGER,"
          "  ps_supplycost  DECIMAL,"
          "  ps_comment     VARCHAR(199),"
+         "  ps_extra  CHAR(1),"
          "  PRIMARY KEY (ps_partkey, ps_suppkey)"
          ");";
 }
@@ -72,7 +77,8 @@ std::string CreateCustomer(uint32_t sf) {
          "  c_phone      CHAR(15),"
          "  c_acctbal    DECIMAL,"
          "  c_mktsegment CHAR(10),"
-         "  c_comment    VARCHAR(117)"
+         "  c_comment    VARCHAR(117),"
+         "  c_extra  CHAR(1)"
          ");";
 }
 
@@ -88,7 +94,8 @@ std::string CreateOrders(uint32_t sf) {
          "  o_orderpriority	CHAR(15),"
          "  o_clerk        CHAR(15),"
          "  o_shippriority INTEGER,"
-         "  o_comment      VARCHAR(79)"
+         "  o_comment      VARCHAR(79),"
+         "  o_extra  CHAR(1)"
          ");";
 }
 
@@ -112,6 +119,7 @@ std::string CreateLineItem(uint32_t sf) {
          "  l_shipinstruct	  CHAR(25),"
          "  l_shipmode       CHAR(10),"
          "  l_comment        VARCHAR(44),"
+         "  l_extra  CHAR(1),"
          "PRIMARY KEY (l_orderkey, l_linenumber)"
          ");";
 }
@@ -123,7 +131,8 @@ std::string CreateNation(uint32_t sf) {
          "  n_nationkey    INTEGER PRIMARY KEY,"
          "  n_name         CHAR(25),"
          "  n_regionkey    BIGINT NOT NULL,"
-         "  n_comment      VARCHAR(152)"
+         "  n_comment      VARCHAR(152),"
+         "  n_extra  CHAR(1)"
          ");";
 }
 
@@ -133,7 +142,8 @@ std::string CreateRegion(uint32_t sf) {
          "("
          "  r_regionkey  INTEGER PRIMARY KEY,"
          "  r_name       CHAR(25),"
-         "  r_comment    VARCHAR(152)"
+         "  r_comment    VARCHAR(152),"
+         "  r_extra  CHAR(1)"
          ");";
 }
 
@@ -181,6 +191,29 @@ std::string GenerateCopyCommand(const std::string& table_name, uint32_t sf) {
   return builder.str();
 }
 
+std::string GenerateAuroraCopyCommand(const std::string& table_name,
+                                      uint32_t sf) {
+  /*
+  SELECT aws_s3.table_import_from_s3(
+    'region_001',
+    '',
+    'DELIMITER ''|''',
+    aws_commons.create_s3_uri('geoffxy-research', 'tpch/sf001/region.tbl',
+  'us-east-1')
+  );
+  */
+  std::stringstream builder;
+  builder << "SELECT aws_s3.table_import_from_s3(";
+  builder << "'" << table_name << "_" << PaddedScaleFactor(sf) << "',";
+  builder << "'',";
+  builder << "'DELIMITER ''|''',";
+  builder << "aws_commons.create_s3_uri('geoffxy-research', 'tpch/sf"
+          << PaddedScaleFactor(sf) << "/" << table_name
+          << ".tbl', 'us-east-1')";
+  builder << ");";
+  return builder.str();
+}
+
 void LoadData(nanodbc::connection& connection, uint32_t sf) {
   std::cerr << "> Loading part..." << std::endl;
   nanodbc::execute(connection, GenerateCopyCommand("part", sf));
@@ -200,10 +233,30 @@ void LoadData(nanodbc::connection& connection, uint32_t sf) {
   nanodbc::execute(connection, GenerateCopyCommand("region", sf));
 }
 
+void LoadDataAurora(nanodbc::connection& connection, uint32_t sf) {
+  std::cerr << "> Loading part..." << std::endl;
+  nanodbc::execute(connection, GenerateAuroraCopyCommand("part", sf));
+  std::cerr << "> Loading supplier..." << std::endl;
+  nanodbc::execute(connection, GenerateAuroraCopyCommand("supplier", sf));
+  std::cerr << "> Loading partsupp..." << std::endl;
+  nanodbc::execute(connection, GenerateAuroraCopyCommand("partsupp", sf));
+  std::cerr << "> Loading customer..." << std::endl;
+  nanodbc::execute(connection, GenerateAuroraCopyCommand("customer", sf));
+  std::cerr << "> Loading orders..." << std::endl;
+  nanodbc::execute(connection, GenerateAuroraCopyCommand("orders", sf));
+  std::cerr << "> Loading lineitem..." << std::endl;
+  nanodbc::execute(connection, GenerateAuroraCopyCommand("lineitem", sf));
+  std::cerr << "> Loading nation..." << std::endl;
+  nanodbc::execute(connection, GenerateAuroraCopyCommand("nation", sf));
+  std::cerr << "> Loading region..." << std::endl;
+  nanodbc::execute(connection, GenerateAuroraCopyCommand("region", sf));
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
-  gflags::SetUsageMessage("Used to load TPC-H data (on S3) into Redshift.");
+  gflags::SetUsageMessage(
+      "Used to load TPC-H data (on S3) into AWS databases.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
 
   if (!FLAGS_drop && FLAGS_iam_role.empty()) {
@@ -212,15 +265,25 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  auto const connstr = NANODBC_TEXT(Connection::GetConnectionString(DBType::kRedshift));
-  nanodbc::connection c(connstr);
+  const auto maybe_db = FromString(FLAGS_db);
+  if (!maybe_db.has_value()) {
+    std::cerr << "ERROR: Unrecognized database " << FLAGS_db << std::endl;
+    return 1;
+  }
+
+  DBType db = *maybe_db;
+  nanodbc::connection c(Connection::GetConnection(db));
 
   if (!FLAGS_drop) {
     std::cerr << "> Creating the tables..." << std::endl;
     CreateTPCHTables(c, FLAGS_sf);
 
     std::cerr << "> Loading data from s3://" << FLAGS_bucket << std::endl;
-    LoadData(c, FLAGS_sf);
+    if (db == DBType::kRedshift) {
+      LoadData(c, FLAGS_sf);
+    } else {
+      LoadDataAurora(c, FLAGS_sf);
+    }
 
   } else {
     std::cerr << "> Dropping the tables..." << std::endl;

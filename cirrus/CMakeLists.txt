@@ -38,6 +38,8 @@ target_link_libraries(driver PRIVATE nanodbc gflags)
 add_executable(tpch_s3_loader
   utils/connection.cc
   utils/connection.h
+  utils/dbtype.cc
+  utils/dbtype.h
   utils/tpch_s3.cc
 )
 target_link_libraries(tpch_s3_loader PRIVATE nanodbc gflags)
