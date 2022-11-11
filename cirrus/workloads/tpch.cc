@@ -20,13 +20,13 @@ std::string RepeatQuery(const std::string& query, uint32_t times) {
 }  // namespace
 
 RunQuery::RunQuery(uint64_t num_warmup, uint64_t batch_size, std::string query,
-                   std::shared_ptr<BenchmarkState> state)
+                   std::shared_ptr<BenchmarkState> state, DBType dbtype)
     : query_(std::move(query)),
       num_warmup_(num_warmup),
       batch_size_(batch_size),
       num_queries_run_(0),
       state_(std::move(state)),
-      connection_(Connection::GetConnectionString(DBType::kRedshift)),
+      connection_(Connection::GetConnection(dbtype)),
       joined_(false) {
   thread_ = std::thread(&RunQuery::Run, this);
 }

@@ -7,11 +7,12 @@
 #include <thread>
 
 #include "state.h"
+#include "../utils/dbtype.h"
 
 class RunQuery {
  public:
   RunQuery(uint64_t num_warmup, uint64_t batch_size, std::string query,
-           std::shared_ptr<BenchmarkState> state);
+           std::shared_ptr<BenchmarkState> state, DBType dbtype);
   ~RunQuery();
 
   void Wait();

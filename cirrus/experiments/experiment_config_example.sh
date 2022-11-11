@@ -5,3 +5,7 @@ RDS_DBNAME="dev"
 # Put your user password into an environment variable called RPWD. This is used
 # to avoid passing your password directly as a command line argument.
 RDS_PWDVAR="RPWD"
+
+# Aurora host needs to be specified in `~/.odbc.ini`.
+AUR_USER="postgres"
+AUR_PWDVAR="RPWD"

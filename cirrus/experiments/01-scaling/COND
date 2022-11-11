@@ -13,3 +13,18 @@ run_experiment_group(
     for scale_factor in SCALE_FACTORS
   ],
 )
+
+run_experiment_group(
+  name="aurora",
+  run="./run_aurora.sh",
+  experiments=[
+    ExperimentInstance(
+      name="aurora-{}".format(scale_factor),
+      options={
+        "sf": scale_factor,
+        "warmup": 1,
+      },
+    )
+    for scale_factor in SCALE_FACTORS
+  ],
+)

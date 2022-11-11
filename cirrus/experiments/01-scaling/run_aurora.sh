@@ -5,9 +5,7 @@ cd $script_loc
 source ../experiment_config.sh
 
 ../../build/tpch_scale \
-  --host=$RDS_HOST \
-  --user=$RDS_USER \
-  --dbname=$RDS_DBNAME \
-  --pwdvar=$RDS_PWDVAR \
-  --db="redshift" \
+  --db="aurora" \
+  --user=$AUR_USER \
+  --pwdvar=$AUR_PWDVAR \
   $@ > $COND_OUT/results.csv
