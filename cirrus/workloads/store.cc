@@ -5,13 +5,14 @@
 #include <iostream>
 
 #include "../utils/connection.h"
+#include "../utils/dbtype.h"
 
 SalesReporting::SalesReporting(uint64_t num_warmup, uint64_t max_datetime,
                                std::shared_ptr<BenchmarkState> state)
     : num_warmup_(num_warmup),
       max_datetime_(max_datetime),
       num_reports_run_(0),
-      connection_(Connection::GetConnectionString()),
+      connection_(Connection::GetConnectionString(DBType::kRedshift)),
       prng_(42),
       joined_(false),
       state_(std::move(state)) {

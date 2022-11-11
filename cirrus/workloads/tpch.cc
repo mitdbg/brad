@@ -3,6 +3,7 @@
 #include <sstream>
 
 #include "../utils/connection.h"
+#include "../utils/dbtype.h"
 #include "../utils/sf.h"
 
 namespace {
@@ -25,7 +26,7 @@ RunQuery::RunQuery(uint64_t num_warmup, uint64_t batch_size, std::string query,
       batch_size_(batch_size),
       num_queries_run_(0),
       state_(std::move(state)),
-      connection_(Connection::GetConnectionString()),
+      connection_(Connection::GetConnectionString(DBType::kRedshift)),
       joined_(false) {
   thread_ = std::thread(&RunQuery::Run, this);
 }

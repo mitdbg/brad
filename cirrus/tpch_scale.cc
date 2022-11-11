@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "utils/connection.h"
+#include "utils/dbtype.h"
 #include "workloads/state.h"
 #include "workloads/tpch.h"
 
@@ -15,6 +16,7 @@ DEFINE_uint32(sf, 0, "Specifies the dataset scale factor.");
 DEFINE_uint32(batch_size, 10, "Set the batch size.");
 DEFINE_uint64(warmup, 3, "Number of warm up iterations to run.");
 DEFINE_uint32(run_for, 10, "How long to let the experiment run (in seconds).");
+DEFINE_string(db, "redshift", "The database to use.");
 
 DEFINE_bool(print_query, false,
             "If set, this tool will print out the query text (for debugging "
@@ -34,12 +36,32 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  Connection::InitConnectionString();
-  auto const connstr = NANODBC_TEXT(Connection::GetConnectionString());
+  const auto maybe_db = FromString(FLAGS_db);
+  if (!maybe_db.has_value()) {
+    std::cerr << "ERROR: Unrecognized database " << FLAGS_db << std::endl;
+    return 1;
+  }
+
+  DBType db = *maybe_db;
+
+  auto const connstr = NANODBC_TEXT(Connection::GetConnectionString(db));
   nanodbc::connection c(connstr);
 
-  // Disable result caching.
-  nanodbc::execute(c, "SET enable_result_cache_for_session = off;");
+  {
+    // Print out the version string.
+    auto r = nanodbc::execute(c, "SELECT version();");
+    r.next();
+    std::cerr << "Connected to: " << r.get<std::string>(0) << std::endl;
+  }
+
+  if (db == DBType::kRedshift) {
+    // Disable result caching.
+    nanodbc::execute(c, "SET enable_result_cache_for_session = off;");
+  } else {
+    std::cout << "Connected to Aurora PostgreSQL." << std::endl;
+    // Temporary.
+    return 0;
+  }
 
   auto state = BenchmarkState::Create();
 

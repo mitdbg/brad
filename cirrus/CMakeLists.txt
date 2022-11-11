@@ -21,6 +21,8 @@ FetchContent_Declare(
 set(NANODBC_DISABLE_TESTS ON)
 FetchContent_MakeAvailable(nanodbc)
 
+# TODO: Clean up the sources.
+
 add_executable(driver
   main.cc
   datasets/store.cc
@@ -46,6 +48,8 @@ add_executable(tpch_scale
   workloads/state.h
   utils/connection.cc
   utils/connection.h
+  utils/dbtype.cc
+  utils/dbtype.h
   tpch_scale.cc
 )
 target_link_libraries(tpch_scale PRIVATE nanodbc gflags)

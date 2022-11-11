@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include "connection.h"
+#include "dbtype.h"
 #include "sf.h"
 
 DEFINE_uint32(sf, 1, "Scale factor.");
@@ -211,8 +212,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  Connection::InitConnectionString();
-  auto const connstr = NANODBC_TEXT(Connection::GetConnectionString());
+  auto const connstr = NANODBC_TEXT(Connection::GetConnectionString(DBType::kRedshift));
   nanodbc::connection c(connstr);
 
   if (!FLAGS_drop) {

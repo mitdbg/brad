@@ -4,6 +4,8 @@
 
 #include <string>
 
+#include "dbtype.h"
+
 DECLARE_string(host);
 DECLARE_string(dbname);
 DECLARE_string(user);
@@ -11,9 +13,9 @@ DECLARE_string(pwdvar);
 
 class Connection {
  public:
-  static void InitConnectionString();
-  static const std::string& GetConnectionString();
+  static const std::string& GetConnectionString(DBType dbtype);
 
  private:
-  static std::string connection_str_;
+  static std::string redshift_connection_str_;
+  static std::string aurora_connection_str_;
 };

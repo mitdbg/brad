@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "utils/connection.h"
+#include "utils/dbtype.h"
 #include "datasets/store.h"
 #include "workloads/state.h"
 #include "workloads/store.h"
@@ -27,8 +28,7 @@ int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Run data orchestration experiments using ODBC.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
 
-  Connection::InitConnectionString();
-  auto const connstr = NANODBC_TEXT(Connection::GetConnectionString());
+  auto const connstr = NANODBC_TEXT(Connection::GetConnectionString(DBType::kRedshift));
   nanodbc::connection c(connstr);
 
   StoreDataset store(c);
