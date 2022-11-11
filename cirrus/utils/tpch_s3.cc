@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include "connection.h"
+#include "sf.h"
 
 DEFINE_uint32(sf, 1, "Scale factor.");
 DEFINE_bool(drop, false, "Set to drop the tables instead.");
@@ -15,12 +16,6 @@ DEFINE_string(bucket, "geoffxy-research",
 DEFINE_string(iam_role, "", "The IAM role to use for copying from S3");
 
 namespace {
-
-std::string PaddedScaleFactor(uint32_t sf) {
-  std::stringstream builder;
-  builder << std::setfill('0') << std::setw(3) << sf;
-  return builder.str();
-}
 
 std::string CreatePart(uint32_t sf) {
   static const std::string prefix = "CREATE TABLE IF NOT EXISTS part_";

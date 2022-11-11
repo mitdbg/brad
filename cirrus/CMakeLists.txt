@@ -39,3 +39,13 @@ add_executable(tpch_s3_loader
   utils/tpch_s3.cc
 )
 target_link_libraries(tpch_s3_loader PRIVATE nanodbc gflags)
+
+add_executable(tpch_scale
+  workloads/tpch.cc
+  workloads/tpch.h
+  workloads/state.h
+  utils/connection.cc
+  utils/connection.h
+  tpch_scale.cc
+)
+target_link_libraries(tpch_scale PRIVATE nanodbc gflags)
