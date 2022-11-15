@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
   auto const connstr = NANODBC_TEXT(Connection::GetConnectionString(DBType::kRedshift));
   nanodbc::connection c(connstr);
 
-  StoreDataset store(c);
+  StoreDataset store(FLAGS_sf);
 
   if (FLAGS_sf == 0) {
     std::cerr << "ERROR: Please set the scale factor --sf." << std::endl;
@@ -40,16 +40,16 @@ int main(int argc, char* argv[]) {
 
   if (FLAGS_load) {
     // Set up the database for experiments.
-    store.DropAll();
-    store.CreateTables();
-    store.LoadData(FLAGS_sf);
+    store.DropAll(c);
+    store.CreateTables(c);
+    store.GenerateAndLoad(c);
 
   } else if (FLAGS_drop_all) {
-    store.DropAll();
+    store.DropAll(c);
   }
 
   if (!FLAGS_exp.empty()) {
-    const uint64_t max_datetime = store.GetMaxDatetime();
+    const uint64_t max_datetime = store.GetMaxDatetime(c);
     auto state = BenchmarkState::Create();
 
     std::cerr << "Warming up reader..." << std::endl;
