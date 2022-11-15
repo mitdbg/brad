@@ -5,9 +5,9 @@
 #include <iostream>
 #include <sstream>
 
-#include "connection.h"
-#include "dbtype.h"
-#include "sf.h"
+#include "utils/connection.h"
+#include "utils/dbtype.h"
+#include "utils/sf.h"
 
 DEFINE_uint32(sf, 1, "Scale factor.");
 DEFINE_bool(drop, false, "Set to drop the tables instead.");

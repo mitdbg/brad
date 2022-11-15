@@ -5,53 +5,23 @@ set(CMAKE_CXX_STANDARD 17)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-include(FetchContent)
-FetchContent_Declare(
-  gflags
-  GIT_REPOSITORY https://github.com/gflags/gflags
-  GIT_TAG        v2.2.2
-)
-FetchContent_MakeAvailable(gflags)
+add_subdirectory(third_party)
 
-FetchContent_Declare(
-  nanodbc
-  GIT_REPOSITORY https://github.com/nanodbc/nanodbc.git
-  GIT_TAG        v2.14.0
-)
-set(NANODBC_DISABLE_TESTS ON)
-FetchContent_MakeAvailable(nanodbc)
+# All Cirrus utilities.
+add_library(cirrus STATIC)
+target_include_directories(cirrus PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(cirrus PUBLIC nanodbc gflags)
 
-# TODO: Clean up the sources.
+add_subdirectory(datasets)
+add_subdirectory(utils)
+add_subdirectory(workloads)
 
-add_executable(driver
-  main.cc
-  datasets/store.cc
-  datasets/store.h
-  utils/connection.cc
-  utils/connection.h
-  workloads/state.h
-  workloads/store.cc
-  workloads/store.h
-)
-target_link_libraries(driver PRIVATE nanodbc gflags)
+# Benchmark executables.
+add_executable(driver exe/driver.cc)
+target_link_libraries(driver PRIVATE cirrus)
 
-add_executable(tpch_s3_loader
-  utils/connection.cc
-  utils/connection.h
-  utils/dbtype.cc
-  utils/dbtype.h
-  utils/tpch_s3.cc
-)
-target_link_libraries(tpch_s3_loader PRIVATE nanodbc gflags)
+add_executable(tpch_s3_loader exe/tpch_s3.cc)
+target_link_libraries(tpch_s3_loader PRIVATE cirrus)
 
-add_executable(tpch_scale
-  workloads/tpch.cc
-  workloads/tpch.h
-  workloads/state.h
-  utils/connection.cc
-  utils/connection.h
-  utils/dbtype.cc
-  utils/dbtype.h
-  tpch_scale.cc
-)
-target_link_libraries(tpch_scale PRIVATE nanodbc gflags)
+add_executable(tpch_scale exe/tpch_scale.cc)
+target_link_libraries(tpch_scale PRIVATE cirrus)
