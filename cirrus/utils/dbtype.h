@@ -5,8 +5,12 @@
 
 enum class DBType {
   kRedshift,
-  kAurora,
+  kRDSPostgreSQL,
 };
+
+namespace dbtype {
 
 std::optional<DBType> FromString(const std::string& candidate);
 std::string ToString(DBType dbtype);
+
+}  // namespace dbtype

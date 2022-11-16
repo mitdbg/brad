@@ -14,16 +14,18 @@
 #include "workloads/state.h"
 #include "workloads/store.h"
 
-DEFINE_string(load_s3, "", "S3 path where the generated data is stored.");
+DEFINE_string(
+    action, "",
+    "What to do {generate, load_from_s3, generate_load_directly, drop}.");
+
 DEFINE_string(gen_out, "",
               "Path to where the generated data should be written.");
-DEFINE_bool(drop_all, false, "Set this flag to drop all state.");
 DEFINE_string(db, "", "The database type. Needs to be set when loading data.");
 
 DEFINE_uint32(sf, 0, "Specifies the dataset scale factor.");
 
 DEFINE_string(iam_role, "", "Needs to be set for Redshift loads.");
-DEFINE_string(s3_bucket, "", "Needs to be set when loading.");
+DEFINE_string(s3_bucket, "", "Needs to be set when loading from S3.");
 
 namespace {
 
@@ -75,48 +77,64 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if (FLAGS_load_s3.empty() && FLAGS_gen_out.empty() && !FLAGS_drop_all) {
-    // No-op.
-    return 0;
-  }
-
   StoreDataset store(FLAGS_sf);
 
-  if (!FLAGS_gen_out.empty()) {
+  if (FLAGS_action == "generate") {
+    // Generate the dataset and save it in text files.
+    if (FLAGS_gen_out.empty()) {
+      return 1;
+    }
     std::filesystem::path out(FLAGS_gen_out);
     store.GenerateDataFiles(out);
     return 0;
   }
 
-  if (FLAGS_db.empty()) {
-    std::cerr << "ERROR: Need to specify the DB." << std::endl;
-    return 1;
-  }
-
-  const auto maybe_db = FromString(FLAGS_db);
-  if (!maybe_db.has_value()) {
-    std::cerr << "ERROR: Unrecognized DB " << FLAGS_db << std::endl;
+  nanodbc::connection c(utils::GetConnection());
+  if (FLAGS_action == "connect") {
+    std::cout << "Connected using ODBC DSN: " << FLAGS_odbc_dsn << std::endl;
     return 0;
   }
 
-  DBType db = *maybe_db;
-  nanodbc::connection c(utils::GetConnection());
+  if (FLAGS_action == "load_from_s3") {
+    if (FLAGS_db.empty()) {
+      std::cerr << "ERROR: Need to specify the DB." << std::endl;
+      return 1;
+    }
+    const auto maybe_db = dbtype::FromString(FLAGS_db);
+    if (!maybe_db.has_value()) {
+      std::cerr << "ERROR: Unrecognized DB " << FLAGS_db << std::endl;
+      return 0;
+    }
+    DBType db = *maybe_db;
 
-  if (!FLAGS_load_s3.empty()) {
     store.CreateTables(c);
     nanodbc::transaction txn(c);
     if (db == DBType::kRedshift) {
-      nanodbc::execute(c, GenerateRedshiftS3LoadCommand("store/", "inventory", FLAGS_sf));
-      nanodbc::execute(c, GenerateRedshiftS3LoadCommand("store/", "sales", FLAGS_sf));
+      nanodbc::execute(
+          c, GenerateRedshiftS3LoadCommand("store/", "inventory", FLAGS_sf));
+      nanodbc::execute(
+          c, GenerateRedshiftS3LoadCommand("store/", "sales", FLAGS_sf));
     } else {
-      nanodbc::execute(c, GenerateRDSS3LoadCommand("store/", "inventory", FLAGS_sf));
-      nanodbc::execute(c, GenerateRDSS3LoadCommand("store/", "sales", FLAGS_sf));
+      nanodbc::execute(
+          c, GenerateRDSS3LoadCommand("store/", "inventory", FLAGS_sf));
+      nanodbc::execute(c,
+                       GenerateRDSS3LoadCommand("store/", "sales", FLAGS_sf));
     }
     txn.commit();
-
-  } else if (FLAGS_drop_all) {
-    store.DropAll(c);
+    return 0;
   }
 
-  return 0;
+  if (FLAGS_action == "generate_load_directly") {
+    store.CreateTables(c);
+    store.GenerateAndLoad(c);
+    return 0;
+  }
+
+  if (FLAGS_action == "drop") {
+    store.DropAll(c);
+    return 0;
+  }
+
+  std::cerr << "Unrecognized action: " << FLAGS_action << std::endl;
+  return 1;
 }

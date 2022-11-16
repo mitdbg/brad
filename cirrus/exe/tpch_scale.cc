@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  const auto maybe_db = FromString(FLAGS_db);
+  const auto maybe_db = dbtype::FromString(FLAGS_db);
   if (!maybe_db.has_value()) {
     std::cerr << "ERROR: Unrecognized database " << FLAGS_db << std::endl;
     return 1;

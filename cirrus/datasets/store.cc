@@ -3,23 +3,31 @@
 #include <fstream>
 #include <iostream>
 #include <random>
+#include <sstream>
 #include <string>
+
+#include "utils/sf.h"
 
 StoreDataset::StoreDataset(uint32_t scale_factor)
     : scale_factor_(scale_factor) {}
 
 void StoreDataset::CreateTables(nanodbc::connection& connection) {
-  nanodbc::transaction txn(connection);
-  nanodbc::execute(
-      connection,
-      "CREATE TABLE IF NOT EXISTS inventory (i_id INT, i_name TEXT, "
-      "i_category INT, i_stock INT, i_price INT)");
+  std::stringstream inventory, sales;
+  inventory << "CREATE TABLE IF NOT EXISTS inventory_"
+            << PaddedScaleFactor(scale_factor_);
+  inventory
+      << " (i_id INT, i_name TEXT, i_category INT, i_stock INT, i_price INT);";
+
+  sales << "CREATE TABLE IF NOT EXISTS sales_"
+        << PaddedScaleFactor(scale_factor_);
   // NOTE: s_datetime represents a timestamp. For now, we use an integer for
   // simplicity.
-  nanodbc::execute(
-      connection,
-      "CREATE TABLE IF NOT EXISTS sales (s_id INT, s_datetime INT, s_i_id INT, "
-      "s_quantity INT, s_price INT)");
+  sales << " (s_id INT, s_datetime INT, s_i_id INT, s_quantity INT, s_price "
+           "INT);";
+
+  nanodbc::transaction txn(connection);
+  nanodbc::execute(connection, inventory.str());
+  nanodbc::execute(connection, sales.str());
   txn.commit();
 }
 
@@ -47,10 +55,20 @@ void StoreDataset::GenerateAndLoad(nanodbc::connection& connection,
   // datetime:   monotonically increasing; uniformly spaced gaps of 1-10
 
   const uint64_t batch_size = 10000ULL;
-
   nanodbc::statement stmt(connection);
-
   std::mt19937 prng(seed);
+
+  std::stringstream inventory_builder, sales_builder;
+  inventory_builder << "INSERT INTO inventory_"
+                    << PaddedScaleFactor(scale_factor_);
+  inventory_builder << " (i_id, i_name, i_category, i_stock, i_price) VALUES "
+                       "(?, ?, ?, ?, ?);";
+  sales_builder << "INSERT INTO sales_" << PaddedScaleFactor(scale_factor_);
+  sales_builder << " (s_id, s_datetime, s_i_id, s_quantity, s_price) VALUES "
+                   "(?, ?, ?, ?, ?);";
+
+  const std::string inventory = inventory_builder.str();
+  const std::string sales = sales_builder.str();
 
   // Inventory columns (for batching).
   std::vector<uint64_t> i_id;
@@ -66,10 +84,7 @@ void StoreDataset::GenerateAndLoad(nanodbc::connection& connection,
   i_price.reserve(batch_size);
 
   const auto write_inventory_batch = [&]() {
-    nanodbc::prepare(
-        stmt,
-        "INSERT INTO inventory (i_id, i_name, i_category, i_stock, "
-        "i_price) VALUES (?, ?, ?, ?, ?);");
+    nanodbc::prepare(stmt, inventory);
     stmt.bind(0, i_id.data(), i_id.size());
     stmt.bind_strings(1, i_name);
     stmt.bind(2, i_category.data(), i_category.size());
@@ -111,9 +126,7 @@ void StoreDataset::GenerateAndLoad(nanodbc::connection& connection,
   s_price.reserve(batch_size);
 
   const auto write_sales_batch = [&]() {
-    nanodbc::prepare(stmt,
-                     "INSERT INTO sales (s_id, s_datetime, s_i_id, "
-                     "s_quantity, s_price) VALUES (?, ?, ?, ?, ?);");
+    nanodbc::prepare(stmt, sales);
     stmt.bind(0, s_id.data(), s_id.size());
     stmt.bind(1, s_datetime.data(), s_datetime.size());
     stmt.bind(2, s_i_id.data(), s_i_id.size());
@@ -236,7 +249,8 @@ void StoreDataset::GenerateData(uint32_t scale_factor, uint32_t seed,
 }
 
 uint64_t StoreDataset::GetMaxDatetime(nanodbc::connection& connection) const {
-  auto result = nanodbc::execute(connection, "SELECT MAX(s_datetime) FROM sales;");
+  auto result =
+      nanodbc::execute(connection, "SELECT MAX(s_datetime) FROM sales;");
   result.next();
   return result.get<uint64_t>(0);
 }
