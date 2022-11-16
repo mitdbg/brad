@@ -2,7 +2,6 @@
 
 #include <random>
 #include <string>
-#include <iostream>
 
 #include "../utils/connection.h"
 #include "../utils/dbtype.h"
@@ -12,7 +11,7 @@ SalesReporting::SalesReporting(uint64_t num_warmup, uint64_t max_datetime,
     : num_warmup_(num_warmup),
       max_datetime_(max_datetime),
       num_reports_run_(0),
-      connection_(Connection::GetConnectionString(DBType::kRedshift)),
+      connection_(utils::GetConnection()),
       prng_(42),
       joined_(false),
       state_(std::move(state)) {
@@ -46,9 +45,7 @@ void SalesReporting::RunBaseReporting() {
   stmt.bind(0, &start, 1);
   stmt.bind(1, &end, 1);
 
-  const auto run_txn = [&]() {
-    stmt.execute();
-  };
+  const auto run_txn = [&]() { stmt.execute(); };
 
   for (uint64_t i = 0; i < num_warmup_; ++i) {
     run_txn();

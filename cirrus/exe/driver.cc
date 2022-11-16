@@ -28,8 +28,7 @@ int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Run data orchestration experiments using ODBC.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
 
-  auto const connstr = NANODBC_TEXT(Connection::GetConnectionString(DBType::kRedshift));
-  nanodbc::connection c(connstr);
+  nanodbc::connection c(utils::GetConnection());
 
   StoreDataset store(FLAGS_sf);
 

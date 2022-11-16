@@ -7,17 +7,21 @@
 
 #include "dbtype.h"
 
-DECLARE_string(host);
-DECLARE_string(dbname);
+// The data source name specified in ~/.odbc.ini.
+DECLARE_string(odbc_dsn);
+
+// The username to use to connect.
 DECLARE_string(user);
+
+// The environment variable that stores the user's password. We use an
+// environment variable to avoid passing the password in plaintext as a command
+// line argument.
 DECLARE_string(pwdvar);
 
-class Connection {
- public:
-  static const std::string& GetConnectionString(DBType dbtype);
-  static const nanodbc::connection GetConnection(DBType dbtype);
+namespace utils {
 
- private:
-  static std::string redshift_connection_str_;
-  static std::string aurora_connection_str_;
-};
+// Establishes a connection to the database specified by the gflags. This is a
+// convenience function used to simplify gflags-based connection setup.
+nanodbc::connection GetConnection();
+
+}  // namespace utils

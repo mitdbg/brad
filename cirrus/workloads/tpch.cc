@@ -26,7 +26,7 @@ RunQuery::RunQuery(uint64_t num_warmup, uint64_t batch_size, std::string query,
       batch_size_(batch_size),
       num_queries_run_(0),
       state_(std::move(state)),
-      connection_(Connection::GetConnection(dbtype)),
+      connection_(utils::GetConnection()),
       joined_(false) {
   thread_ = std::thread(&RunQuery::Run, this);
 }

@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
   }
 
   DBType db = *maybe_db;
-  nanodbc::connection c = Connection::GetConnection(db);
+  nanodbc::connection c = utils::GetConnection();
 
   {
     // Print out the version string.
