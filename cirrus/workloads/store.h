@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "state.h"
+#include "workload_base.h"
 
 // Runs the analytical query.
 class SalesReporting {
@@ -39,4 +40,21 @@ class SalesReporting {
   bool joined_;
   std::shared_ptr<BenchmarkState> state_;
   std::thread thread_;
+};
+
+class MakeSale : public WorkloadBase {
+ public:
+  MakeSale(uint64_t num_warmup, uint32_t seed, std::shared_ptr<BenchmarkState> state);
+  virtual ~MakeSale() = default;
+
+  uint64_t NumTxnsRun() const;
+
+ private:
+  virtual void RunImpl() override;
+  uint64_t GetMaxItemId();
+
+  uint64_t num_warmup_;
+  uint64_t num_txns_;
+  uint32_t seed_;
+  nanodbc::connection connection_;
 };
