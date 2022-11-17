@@ -12,6 +12,7 @@ class WorkloadBase {
   void Wait();
 
  protected:
+  void Start();
   void WarmedUpAndReadyToRun();
   bool KeepRunning() const;
 

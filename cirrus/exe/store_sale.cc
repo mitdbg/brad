@@ -22,19 +22,20 @@ int main(int argc, char* argv[]) {
   auto state = BenchmarkState::Create();
   std::vector<std::unique_ptr<MakeSale>> clients;
 
-  std::cerr << "Dropping extraneous sales records..." << std::endl;
+  std::cerr << "> Dropping extraneous sales records..." << std::endl;
   {
     StoreDataset dataset(FLAGS_sf);
     nanodbc::connection c(utils::GetConnection());
     dataset.DropWorkloadGeneratedRecords(c);
   }
 
-  std::cerr << "Starting up and warming up clients..." << std::endl;
+  std::cerr << "> Starting up and warming up clients..." << std::endl;
   for (uint32_t i = 0; i < FLAGS_clients; ++i) {
     clients.push_back(std::make_unique<MakeSale>(FLAGS_sf, FLAGS_warmup,
                                                  /*client_id=*/i, state));
   }
   state->WaitUntilAllReady(/*expected=*/FLAGS_clients);
+  std::cerr << "> Warm up done. Starting the workload." << std::endl;
 
   const auto start = std::chrono::steady_clock::now();
   state->AllowStart();
@@ -50,17 +51,21 @@ int main(int argc, char* argv[]) {
 
   // Compute throughput.
   uint64_t total_sales = 0;
+  uint64_t aborts = 0;
   for (auto& client : clients) {
     total_sales += client->NumTxnsRun();
+    aborts += client->NumAborts();
   }
   const double thpt = total_sales / (elapsed.count() / 1e9);
   const double avg_latency = 1.0 / thpt;
+  const double avg_abort_rate = static_cast<double>(aborts) / (aborts + total_sales);
 
   std::cerr << "> Throughput: " << thpt << " sales/s" << std::endl;
   std::cerr << "> Average latency: " << avg_latency << " s" << std::endl;
+  std::cerr << "> Average abort rate: " << avg_abort_rate << std::endl;
 
-  std::cout << "thpt,avg_lat_s" << std::endl;
-  std::cout << thpt << "," << avg_latency << std::endl;
+  std::cout << "thpt,avg_lat_s,avg_abort_rate" << std::endl;
+  std::cout << thpt << "," << avg_latency << "," << avg_abort_rate << std::endl;
 
   return 0;
 }

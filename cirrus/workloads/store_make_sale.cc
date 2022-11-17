@@ -1,20 +1,26 @@
+#include <iostream>
 #include <random>
 
 #include "store.h"
 #include "utils/connection.h"
 #include "utils/sf.h"
 
-MakeSale::MakeSale(uint32_t scale_factor, uint64_t num_warmup, uint32_t client_id,
-                   std::shared_ptr<BenchmarkState> state)
+MakeSale::MakeSale(uint32_t scale_factor, uint64_t num_warmup,
+                   uint32_t client_id, std::shared_ptr<BenchmarkState> state)
     : WorkloadBase(std::move(state)),
       num_warmup_(num_warmup),
       num_txns_(0),
+      num_aborts_(0),
       scale_factor_(scale_factor),
       client_id_(client_id),
       next_id_(0),
-      connection_(utils::GetConnection()) {}
+      connection_(utils::GetConnection()) {
+  Start();
+}
 
 uint64_t MakeSale::NumTxnsRun() const { return num_txns_; }
+
+uint64_t MakeSale::NumAborts() const { return num_aborts_; }
 
 void MakeSale::RunImpl() {
   const uint64_t max_id = GetMaxItemId();
@@ -32,11 +38,11 @@ void MakeSale::RunImpl() {
                    "SERIALIZABLE");
 
   const std::string select_inventory =
-      "SELECT i_quantity, i_price FROM inventory_" +
+      "SELECT i_stock, i_price FROM inventory_" +
       PaddedScaleFactor(scale_factor_) + " WHERE i_id = ?;";
   const std::string update_inventory = "UPDATE inventory_" +
                                        PaddedScaleFactor(scale_factor_) +
-                                       " SET i_quantity = ? WHERE i_id = ?;";
+                                       " SET i_stock = ? WHERE i_id = ?;";
   const std::string insert_sales =
       "INSERT INTO sales_" + PaddedScaleFactor(scale_factor_) +
       " (s_id, s_datetime, s_i_id, s_quantity, s_price) VALUES (?, ?, ?, ?, ?)";
@@ -53,18 +59,19 @@ void MakeSale::RunImpl() {
     // quantity.
     nanodbc::prepare(stmt, select_inventory);
     stmt.bind(0, &id, 1);
+    // TODO: This assumes the item always exists.
     auto result = nanodbc::execute(stmt);
     result.next();
-    const uint32_t i_quantity = result.get<uint32_t>(0);
+    const uint32_t i_stock = result.get<uint32_t>(0);
     const uint32_t i_price = result.get<uint32_t>(1);
-    if (i_quantity < quantity) {
+    if (i_stock < quantity) {
       // Not enough stock to make a sale.
       txn.commit();
       return;
     }
 
     // Make the purchase.
-    const uint64_t new_quantity = i_quantity - quantity;
+    const uint64_t new_quantity = i_stock - quantity;
     nanodbc::prepare(stmt, update_inventory);
     stmt.bind(0, &new_quantity, 1);
     stmt.bind(1, &id, 1);
@@ -73,7 +80,7 @@ void MakeSale::RunImpl() {
 
     // Insert into sales. This does not need to run as part of the transaction.
     nanodbc::prepare(stmt, insert_sales);
-    const uint32_t datetime = 1; // TODO: Generate something more plausible.
+    const uint32_t datetime = 1;  // TODO: Generate something more plausible.
     const uint32_t sale_id = GenerateSaleId();
     stmt.bind(0, &sale_id, 1);
     stmt.bind(1, &datetime, 1);
@@ -84,20 +91,46 @@ void MakeSale::RunImpl() {
   };
 
   for (uint64_t i = 0; i < num_warmup_; ++i) {
-    run_txn();
+    while (true) {
+      try {
+        run_txn();
+        break;
+      } catch (nanodbc::database_error& ex) {
+        // Forced abort. We will retry.
+        // TODO: Aborts via an exception are not the best idea, according to the
+        // discussion in "Opportunities for Optimism in Contended Main-Memory
+        // Multicore Transactions (VLDB 2020)."
+        // TODO: We should have exponential back off here instead of retrying
+        // immediately.
+      }
+    }
   }
 
   WarmedUpAndReadyToRun();
 
   while (KeepRunning()) {
-    run_txn();
+    while (true) {
+      try {
+        run_txn();
+        break;
+      } catch (nanodbc::database_error& ex) {
+        // Forced abort. We will retry.
+        // TODO: Aborts via an exception are not the best idea, according to the
+        // discussion in "Opportunities for Optimism in Contended Main-Memory
+        // Multicore Transactions (VLDB 2020)."
+        // TODO: We should have exponential back off here instead of retrying
+        // immediately.
+        ++num_aborts_;
+      }
+    }
     ++num_txns_;
   }
 }
 
 uint64_t MakeSale::GetMaxItemId() const {
   auto result =
-      nanodbc::execute(connection_, "SELECT MAX(i_id) FROM inventory;");
+      nanodbc::execute(connection_, "SELECT MAX(i_id) FROM inventory_" +
+                                        PaddedScaleFactor(scale_factor_) + ";");
   result.next();
   return result.get<uint64_t>(0);
 }
