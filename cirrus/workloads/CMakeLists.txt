@@ -2,7 +2,7 @@ target_sources(cirrus
   PRIVATE
     state.h
     store_make_sale.cc
-    store.cc
+    store_reporting.cc
     store.h
     tpch.cc
     tpch.h

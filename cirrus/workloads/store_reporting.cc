@@ -1,0 +1,96 @@
+#include <random>
+#include <sstream>
+#include <string>
+
+#include "store.h"
+#include "utils/connection.h"
+#include "utils/dbtype.h"
+#include "utils/sf.h"
+
+SalesReporting::SalesReporting(uint32_t scale_factor, uint64_t num_warmup,
+                               uint32_t client_id,
+                               std::shared_ptr<BenchmarkState> state)
+    : WorkloadBase(std::move(state)),
+      num_warmup_(num_warmup),
+      num_reports_run_(0),
+      scale_factor_(scale_factor),
+      connection_(utils::GetConnection()),
+      prng_(42 ^ client_id) {
+  Start();
+}
+
+void SalesReporting::RunImpl() {
+  // Run this many reports per query, to amortize the cost of sending the query
+  // over the network.
+  static constexpr uint32_t kRepetitions = 10;
+  max_datetime_ = GetMaxDatetime();
+
+  // NOTE: This is PostgreSQL-specific syntax. Postgres implements repeatable
+  // read using snapshot isolation. We want this query to run over a
+  // transactionally consistent snapshot of the data.
+  nanodbc::execute(connection_,
+                   "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL "
+                   "REPEATABLE READ READ ONLY");
+
+  for (uint64_t i = 0; i < num_warmup_; ++i) {
+    nanodbc::execute(connection_, GenerateQuery(1));
+  }
+
+  WarmedUpAndReadyToRun();
+
+  while (KeepRunning()) {
+    nanodbc::execute(connection_, GenerateQuery(kRepetitions));
+    num_reports_run_ += 10;
+  }
+}
+
+std::pair<uint64_t, uint64_t> SalesReporting::GenerateDatetimeRange() const {
+  // The datetime range usually starts in the first quarter.
+  std::normal_distribution<double> start_dist(max_datetime_ / 4.0,
+                                              /*stddev=*/2.0);
+  // The length of a scan is usually a fifth of the dataset, but with wide
+  // tails.
+  std::normal_distribution<double> length_dist(max_datetime_ / 5.0,
+                                               /*stddev=*/4.0);
+
+  std::uniform_real_distribution<double> read_recent(0, 1.0);
+
+  const double length_dbl = length_dist(prng_);
+  const uint64_t length =
+      length_dbl < 0 ? 1 : static_cast<uint64_t>(length_dbl);
+
+  const double start_dbl = start_dist(prng_);
+  const uint64_t start = start_dbl < 0 ? 0 : static_cast<uint64_t>(start_dbl);
+  return {start, std::min(max_datetime_, start + length)};
+}
+
+std::string SalesReporting::GenerateQuery(uint32_t repetitions) const {
+  const auto [start, end] = GenerateDatetimeRange();
+  const std::string psf = PaddedScaleFactor(scale_factor_);
+
+  std::stringstream query;
+  query << "SELECT i_id, i_category, SUM(s_price * s_quantity) AS volume ";
+  query << "FROM sales_" << psf;
+  query << ", inventory_" << psf;
+  query << " WHERE s_datetime >= " << start;
+  query << " AND s_datetime <= " << end;
+  query << " AND i_id = s_i_id GROUP BY i_id, i_category; ";
+
+  const std::string query_str = query.str();
+  std::stringstream query_batch;
+  for (uint32_t i = 0; i < repetitions; ++i) {
+    query_batch << query_str;
+  }
+
+  return query_batch.str();
+}
+
+uint64_t SalesReporting::NumReportsRun() const { return num_reports_run_; }
+
+uint64_t SalesReporting::GetMaxDatetime() const {
+  auto result =
+      nanodbc::execute(connection_, "SELECT MAX(s_datetime) FROM sales_" +
+                                        PaddedScaleFactor(scale_factor_));
+  result.next();
+  return result.get<uint64_t>(0);
+}

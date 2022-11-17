@@ -11,35 +11,27 @@
 #include "state.h"
 #include "workload_base.h"
 
-// Runs the analytical query.
-class SalesReporting {
+class SalesReporting : public WorkloadBase {
  public:
-  SalesReporting(uint64_t num_warmup, uint64_t max_datetime,
+  SalesReporting(uint32_t scale_factor, uint64_t num_warmup, uint32_t client_id,
                  std::shared_ptr<BenchmarkState> state);
-  ~SalesReporting();
+  virtual ~SalesReporting() = default;
 
-  void Wait();
-  uint64_t NumReportsRun() const { return num_reports_run_; }
+  uint64_t NumReportsRun() const;
 
  private:
-  void Run();
-
-  void RunBaseReporting();
-  void RunEagerReporting();
-  void RunDeferredReporting();
-  void RunPartitionedReporting();
-
-  std::pair<uint64_t, uint64_t> GenerateDatetimeRange();
+  virtual void RunImpl() override;
+  std::string GenerateQuery(uint32_t repetitions) const;
+  std::pair<uint64_t, uint64_t> GenerateDatetimeRange() const;
+  uint64_t GetMaxDatetime() const;
 
   uint64_t num_warmup_;
   uint64_t max_datetime_;
   uint64_t num_reports_run_;
+  uint32_t scale_factor_;
 
-  nanodbc::connection connection_;
-  std::mt19937 prng_;
-  bool joined_;
-  std::shared_ptr<BenchmarkState> state_;
-  std::thread thread_;
+  mutable nanodbc::connection connection_;
+  mutable std::mt19937 prng_;
 };
 
 class MakeSale : public WorkloadBase {

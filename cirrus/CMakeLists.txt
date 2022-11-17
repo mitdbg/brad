@@ -17,9 +17,6 @@ add_subdirectory(utils)
 add_subdirectory(workloads)
 
 # Benchmark executables.
-add_executable(driver exe/driver.cc)
-target_link_libraries(driver PRIVATE cirrus)
-
 add_executable(tpch_s3_loader exe/tpch_s3.cc)
 target_link_libraries(tpch_s3_loader PRIVATE cirrus)
 
