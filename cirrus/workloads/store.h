@@ -44,17 +44,21 @@ class SalesReporting {
 
 class MakeSale : public WorkloadBase {
  public:
-  MakeSale(uint64_t num_warmup, uint32_t seed, std::shared_ptr<BenchmarkState> state);
+  MakeSale(uint32_t scale_factor, uint64_t num_warmup, uint32_t client_id,
+           std::shared_ptr<BenchmarkState> state);
   virtual ~MakeSale() = default;
 
   uint64_t NumTxnsRun() const;
 
  private:
   virtual void RunImpl() override;
-  uint64_t GetMaxItemId();
+  uint64_t GetMaxItemId() const;
+  uint32_t GenerateSaleId();
 
   uint64_t num_warmup_;
   uint64_t num_txns_;
-  uint32_t seed_;
-  nanodbc::connection connection_;
+  uint32_t scale_factor_;
+  uint32_t client_id_;
+  uint32_t next_id_;
+  mutable nanodbc::connection connection_;
 };

@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "Warming up reader..." << std::endl;
     std::unique_ptr<SalesReporting> reader = std::make_unique<SalesReporting>(
         FLAGS_warmup, max_datetime, state);
-    state->SpinWaitUntilAllReady(/*expected=*/1);
+    state->WaitUntilAllReady(/*expected=*/1);
 
     const auto start = std::chrono::steady_clock::now();
     state->AllowStart();

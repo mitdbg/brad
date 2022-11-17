@@ -1,8 +1,10 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <future>
 #include <memory>
+#include <mutex>
 
 class BenchmarkState {
  public:
@@ -15,12 +17,21 @@ class BenchmarkState {
         keep_running_(true),
         future_(promise_.get_future().share()) {}
 
-  void SpinWaitUntilAllReady(uint64_t expected) {
+  void WaitUntilAllReady(uint64_t expected) {
+    std::unique_lock<std::mutex> lock(mutex_);
     while (num_ready_ < expected) {
+      not_ready_.wait(lock);
     }
   }
 
-  void BumpReady() { ++num_ready_; }
+  void BumpReady() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    ++num_ready_;
+    // Ideally we notify only after `num_ready_` reaches `expected`. But
+    // `expected` is a local variable. This approach is fine since we are just
+    // using it to coordinate starting a workload.
+    not_ready_.notify_all();
+  }
 
   void WaitToStart() { future_.get(); }
 
@@ -30,18 +41,12 @@ class BenchmarkState {
 
   void SetStopRunning() { keep_running_ = false; }
 
-  void SetMaxDatetime(uint64_t value) {
-    max_datetime_.store(value, std::memory_order::memory_order_release);
-  }
-
-  uint64_t GetMaxDatetime() const { return max_datetime_; }
-
  private:
-  std::atomic<uint64_t> num_ready_;
   std::atomic<bool> keep_running_;
 
-  // Updated by the writer, read by the reader.
-  std::atomic<uint64_t> max_datetime_;
+  std::mutex mutex_;
+  std::condition_variable not_ready_;
+  uint64_t num_ready_;
 
   std::promise<void> promise_;
   std::shared_future<void> future_;

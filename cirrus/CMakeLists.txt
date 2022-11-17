@@ -28,3 +28,6 @@ target_link_libraries(tpch_scale PRIVATE cirrus)
 
 add_executable(store_gen exe/store_gen.cc)
 target_link_libraries(store_gen PRIVATE cirrus)
+
+add_executable(store_sale exe/store_sale.cc)
+target_link_libraries(store_sale PRIVATE cirrus)

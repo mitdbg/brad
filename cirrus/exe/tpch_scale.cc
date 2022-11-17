@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
   std::cerr << "> Warming up reader..." << std::endl;
   std::unique_ptr<RunQuery> reader = std::make_unique<RunQuery>(
       FLAGS_warmup, FLAGS_batch_size, tpch::Query3(FLAGS_sf), state, db);
-  state->SpinWaitUntilAllReady(/*expected=*/1);
+  state->WaitUntilAllReady(/*expected=*/1);
   std::cerr << "> Warm up complete. Running the benchmark now..." << std::endl;
 
   const auto start = std::chrono::steady_clock::now();

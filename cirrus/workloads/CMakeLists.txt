@@ -6,4 +6,6 @@ target_sources(cirrus
     store.h
     tpch.cc
     tpch.h
+    workload_base.cc
+    workload_base.h
 )
