@@ -54,13 +54,15 @@ class MakeSale : public WorkloadBase {
  private:
   virtual void RunImpl() override;
   uint64_t GetMaxItemId() const;
-  uint32_t GenerateSaleId();
+  uint64_t GetMaxSaleDatetime() const;
+  uint64_t GenerateSaleId();
 
   uint64_t num_warmup_;
   uint64_t num_txns_;
   uint64_t num_aborts_;
   uint32_t scale_factor_;
   uint32_t client_id_;
-  uint32_t next_id_;
+  uint64_t next_id_;
+  uint64_t next_datetime_;
   mutable nanodbc::connection connection_;
 };

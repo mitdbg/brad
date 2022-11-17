@@ -57,15 +57,13 @@ int main(int argc, char* argv[]) {
     aborts += client->NumAborts();
   }
   const double thpt = total_sales / (elapsed.count() / 1e9);
-  const double avg_latency = 1.0 / thpt;
   const double avg_abort_rate = static_cast<double>(aborts) / (aborts + total_sales);
 
   std::cerr << "> Throughput: " << thpt << " sales/s" << std::endl;
-  std::cerr << "> Average latency: " << avg_latency << " s" << std::endl;
   std::cerr << "> Average abort rate: " << avg_abort_rate << std::endl;
 
-  std::cout << "thpt,avg_lat_s,avg_abort_rate" << std::endl;
-  std::cout << thpt << "," << avg_latency << "," << avg_abort_rate << std::endl;
+  std::cout << "thpt,avg_abort_rate" << std::endl;
+  std::cout << thpt << "," << avg_abort_rate << std::endl;
 
   return 0;
 }

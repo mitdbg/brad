@@ -15,6 +15,7 @@ MakeSale::MakeSale(uint32_t scale_factor, uint64_t num_warmup,
       scale_factor_(scale_factor),
       client_id_(client_id),
       next_id_(0),
+      next_datetime_(0),
       connection_(utils::GetConnection()) {
   Start();
 }
@@ -25,11 +26,13 @@ uint64_t MakeSale::NumAborts() const { return num_aborts_; }
 
 void MakeSale::RunImpl() {
   const uint64_t max_id = GetMaxItemId();
+  next_datetime_ = GetMaxSaleDatetime();
 
   std::mt19937 prng(42 ^ client_id_);
   // TODO: We should have a skewed workload.
   std::uniform_int_distribution<uint64_t> item_id(0, max_id);
-  std::uniform_int_distribution<uint32_t> num_items(1, 3);
+  std::uniform_int_distribution<uint64_t> num_items(1, 3);
+  std::uniform_int_distribution<uint64_t> datetime_gap(1, 10);
 
   // NOTE: This is PostgreSQL-specific syntax. We need serializable isolation
   // because this transaction simulates a purchase transaction and we want to
@@ -51,7 +54,7 @@ void MakeSale::RunImpl() {
   const auto run_txn = [&]() {
     // For simplicity, we buy one item.
     const uint64_t id = item_id(prng);
-    const uint32_t quantity = num_items(prng);
+    const uint64_t quantity = num_items(prng);
 
     nanodbc::transaction txn(connection_);
     nanodbc::statement stmt(connection_);
@@ -63,8 +66,8 @@ void MakeSale::RunImpl() {
     // TODO: This assumes the item always exists.
     auto result = nanodbc::execute(stmt);
     result.next();
-    const uint32_t i_stock = result.get<uint32_t>(0);
-    const uint32_t i_price = result.get<uint32_t>(1);
+    const uint64_t i_stock = result.get<uint64_t>(0);
+    const uint64_t i_price = result.get<uint64_t>(1);
     if (i_stock < quantity) {
       // Not enough stock to make a sale.
       txn.commit();
@@ -81,8 +84,9 @@ void MakeSale::RunImpl() {
 
     // Insert into sales. This does not need to run as part of the transaction.
     nanodbc::prepare(stmt, insert_sales);
-    const uint32_t datetime = 1;  // TODO: Generate something more plausible.
-    const uint32_t sale_id = GenerateSaleId();
+    const uint64_t datetime = next_datetime_ + datetime_gap(prng);
+    next_datetime_ = datetime;
+    const uint64_t sale_id = GenerateSaleId();
     stmt.bind(0, &sale_id, 1);
     stmt.bind(1, &datetime, 1);
     stmt.bind(2, &id, 1);
@@ -136,10 +140,19 @@ uint64_t MakeSale::GetMaxItemId() const {
   return result.get<uint64_t>(0);
 }
 
-uint32_t MakeSale::GenerateSaleId() {
+uint64_t MakeSale::GenerateSaleId() {
   // To generate unique IDs without clashing with other transactions, we reserve
   // the most significant byte for the client ID.
-  const uint32_t id = (((client_id_ + 1) & 0xFF) << 24) | next_id_;
+  const uint64_t id =
+      (((static_cast<uint64_t>(client_id_) + 1) & 0xFF) << 56) | next_id_;
   ++next_id_;
   return id;
+}
+
+uint64_t MakeSale::GetMaxSaleDatetime() const {
+  auto result =
+      nanodbc::execute(connection_, "SELECT MAX(s_datetime) FROM sales_" +
+                                        PaddedScaleFactor(scale_factor_));
+  result.next();
+  return result.get<uint64_t>(0);
 }

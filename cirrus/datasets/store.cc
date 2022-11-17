@@ -16,15 +16,15 @@ void StoreDataset::CreateTables(nanodbc::connection& connection) {
   inventory << "CREATE TABLE IF NOT EXISTS inventory_"
             << PaddedScaleFactor(scale_factor_);
   inventory
-      << " (i_id INT, i_name TEXT, i_category INT, i_stock INT, i_price INT,"
+      << " (i_id BIGINT, i_name TEXT, i_category BIGINT, i_stock BIGINT, i_price BIGINT,"
       << " PRIMARY KEY (i_id));";
 
   sales << "CREATE TABLE IF NOT EXISTS sales_"
         << PaddedScaleFactor(scale_factor_);
   // NOTE: s_datetime represents a timestamp. For now, we use an integer for
   // simplicity.
-  sales << " (s_id INT, s_datetime INT, s_i_id INT, s_quantity INT, s_price";
-  sales << " INT, PRIMARY KEY (s_id));";
+  sales << " (s_id BIGINT, s_datetime BIGINT, s_i_id BIGINT, s_quantity BIGINT, s_price";
+  sales << " BIGINT, PRIMARY KEY (s_id));";
 
   nanodbc::transaction txn(connection);
   nanodbc::execute(connection, inventory.str());
@@ -40,11 +40,11 @@ void StoreDataset::DropAll(nanodbc::connection& connection) {
 }
 
 uint64_t StoreDataset::SalesBaseCardinality(uint32_t scale_factor) {
-  return scale_factor * 1'000'000ULL;
+  return scale_factor * 16'000'000ULL;
 }
 
 uint64_t StoreDataset::InventoryBaseCardinality(uint32_t scale_factor) {
-  return scale_factor * 100'000ULL;
+  return scale_factor * 1'000'000ULL;
 }
 
 void StoreDataset::GenerateAndLoad(nanodbc::connection& connection,
