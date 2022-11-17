@@ -254,3 +254,14 @@ uint64_t StoreDataset::GetMaxDatetime(nanodbc::connection& connection) const {
   result.next();
   return result.get<uint64_t>(0);
 }
+
+void StoreDataset::DropWorkloadGeneratedRecords(
+    nanodbc::connection& connection) {
+  // The generator generates IDs sequentially in the range `[0, num_sales)`.
+  const uint64_t num_sales = SalesBaseCardinality(scale_factor_);
+  nanodbc::execute(connection,
+                   "DELETE FROM sales_" + PaddedScaleFactor(scale_factor_) +
+                       " WHERE s_id >= " + std::to_string(num_sales));
+  // Ideally we reset the item counts in `inventory` too, but this is trickier
+  // to do.
+}

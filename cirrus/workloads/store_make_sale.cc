@@ -105,7 +105,7 @@ uint64_t MakeSale::GetMaxItemId() const {
 uint32_t MakeSale::GenerateSaleId() {
   // To generate unique IDs without clashing with other transactions, we reserve
   // the most significant byte for the client ID.
-  const uint32_t id = ((client_id_ & 0xFF) << 28) | next_id_;
+  const uint32_t id = (((client_id_ + 1) & 0xFF) << 28) | next_id_;
   ++next_id_;
   return id;
 }

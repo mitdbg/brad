@@ -15,6 +15,7 @@ class StoreDataset {
 
   void CreateTables(nanodbc::connection& connection);
   void DropAll(nanodbc::connection& connection);
+  void DropWorkloadGeneratedRecords(nanodbc::connection& connection);
 
   void GenerateDataFiles(std::filesystem::path out, uint32_t seed = 42);
   void GenerateAndLoad(nanodbc::connection& connection, uint32_t seed = 42);
