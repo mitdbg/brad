@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iostream>
 #include <random>
 
@@ -114,6 +115,7 @@ void MakeSale::RunImpl() {
   WarmedUpAndReadyToRun();
 
   while (KeepRunning()) {
+    const auto start = std::chrono::steady_clock::now();
     while (true) {
       utils::BackoffManager backoff;
       try {
@@ -128,7 +130,9 @@ void MakeSale::RunImpl() {
         backoff.Wait();
       }
     }
+    const auto end = std::chrono::steady_clock::now();
     ++num_txns_;
+    AddLatency(end - start);
   }
 }
 

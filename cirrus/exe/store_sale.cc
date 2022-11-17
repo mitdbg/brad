@@ -80,21 +80,44 @@ int main(int argc, char* argv[]) {
   for (auto& client : tclients) {
     total_sales += client->NumTxnsRun();
     aborts += client->NumAborts();
+    client->SortLatency();
   }
   for (auto& client : aclients) {
     reports += client->NumReportsRun();
+    client->SortLatency();
   }
   const double t_thpt = total_sales / (write_elapsed.count() / 1e9);
   const double avg_abort_rate =
       static_cast<double>(aborts) / (aborts + total_sales);
   const double a_thpt = reports / (read_elapsed.count() / 1e9);
 
+  // TODO: Should consider latency across all clients.
+  const auto t_lat_p50_ms =
+      tclients.empty() ? 0 : tclients.front()->LatencyP50().count();
+  const auto t_lat_p99_ms =
+      tclients.empty() ? 0 : tclients.front()->LatencyP99().count();
+  const auto a_lat_p50_ms =
+      aclients.empty() ? 0 : aclients.front()->LatencyP50().count();
+  const auto a_lat_p99_ms =
+      aclients.empty() ? 0 : aclients.front()->LatencyP99().count();
+
+  std::cerr << std::endl;
   std::cerr << "> T Throughput: " << t_thpt << " sales/s" << std::endl;
   std::cerr << "> A Throughput: " << a_thpt << " reports/s" << std::endl;
   std::cerr << "> Average abort rate: " << avg_abort_rate << std::endl;
+  std::cerr << std::endl;
+  std::cerr << "> T p50 Latency: " << t_lat_p50_ms << " ms" << std::endl;
+  std::cerr << "> T p99 Latency: " << t_lat_p99_ms << " ms" << std::endl;
+  std::cerr << "> A p50 Latency: " << a_lat_p50_ms << " ms" << std::endl;
+  std::cerr << "> A p99 Latency: " << a_lat_p99_ms << " ms" << std::endl;
+  std::cerr << std::endl;
 
-  std::cout << "t_thpt,avg_abort_rate,a_thpt" << std::endl;
-  std::cout << t_thpt << "," << avg_abort_rate << "," << a_thpt << std::endl;
+  std::cout
+      << "t_thpt,avg_abort_rate,a_thpt,t_p50_ms,t_p99_ms,a_p50_ms,a_p99_ms"
+      << std::endl;
+  std::cout << t_thpt << "," << avg_abort_rate << "," << a_thpt << ","
+            << t_lat_p50_ms << "," << t_lat_p99_ms << "," << a_lat_p50_ms << ","
+            << a_lat_p99_ms << std::endl;
 
   return 0;
 }

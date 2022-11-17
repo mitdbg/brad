@@ -1,6 +1,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <chrono>
 
 #include "store.h"
 #include "utils/connection.h"
@@ -40,7 +41,10 @@ void SalesReporting::RunImpl() {
 
   uint64_t num_iters = 0;
   while (KeepRunning()) {
+    const auto start = std::chrono::steady_clock::now();
     nanodbc::execute(connection_, GenerateQuery(kRepetitions));
+    const auto end = std::chrono::steady_clock::now();
+    AddLatency((end - start) / kRepetitions);
     num_reports_run_ += 10;
 
     // Refresh the max datetime for the analytical queries.

@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "state.h"
+#include "utils/latency_manager.h"
 
 class WorkloadBase {
  public:
@@ -11,10 +12,15 @@ class WorkloadBase {
   virtual ~WorkloadBase();
   void Wait();
 
+  void SortLatency();
+  std::chrono::milliseconds LatencyP50() const;
+  std::chrono::milliseconds LatencyP99() const;
+
  protected:
   void Start();
   void WarmedUpAndReadyToRun();
   bool KeepRunning() const;
+  void AddLatency(std::chrono::nanoseconds latency);
 
  private:
   void Run();
@@ -23,4 +29,5 @@ class WorkloadBase {
   bool joined_;
   std::thread thread_;
   std::shared_ptr<BenchmarkState> state_;
+  utils::LatencyManager latency_;
 };

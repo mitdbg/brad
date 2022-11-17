@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "state.h"
+#include "utils/latency_manager.h"
 #include "workload_base.h"
 
 class SalesReporting : public WorkloadBase {
@@ -56,5 +57,6 @@ class MakeSale : public WorkloadBase {
   uint32_t client_id_;
   uint64_t next_id_;
   uint64_t next_datetime_;
+
   mutable nanodbc::connection connection_;
 };
