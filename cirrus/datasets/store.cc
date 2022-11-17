@@ -16,14 +16,15 @@ void StoreDataset::CreateTables(nanodbc::connection& connection) {
   inventory << "CREATE TABLE IF NOT EXISTS inventory_"
             << PaddedScaleFactor(scale_factor_);
   inventory
-      << " (i_id INT, i_name TEXT, i_category INT, i_stock INT, i_price INT);";
+      << " (i_id INT, i_name TEXT, i_category INT, i_stock INT, i_price INT,"
+      << " PRIMARY KEY (i_id));";
 
   sales << "CREATE TABLE IF NOT EXISTS sales_"
         << PaddedScaleFactor(scale_factor_);
   // NOTE: s_datetime represents a timestamp. For now, we use an integer for
   // simplicity.
-  sales << " (s_id INT, s_datetime INT, s_i_id INT, s_quantity INT, s_price "
-           "INT);";
+  sales << " (s_id INT, s_datetime INT, s_i_id INT, s_quantity INT, s_price";
+  sales << " INT, PRIMARY KEY (s_id));";
 
   nanodbc::transaction txn(connection);
   nanodbc::execute(connection, inventory.str());
@@ -33,8 +34,8 @@ void StoreDataset::CreateTables(nanodbc::connection& connection) {
 
 void StoreDataset::DropAll(nanodbc::connection& connection) {
   nanodbc::transaction txn(connection);
-  nanodbc::execute(connection, "DROP TABLE IF EXISTS inventory");
-  nanodbc::execute(connection, "DROP TABLE IF EXISTS sales");
+  nanodbc::execute(connection, "DROP TABLE IF EXISTS inventory_" + PaddedScaleFactor(scale_factor_));
+  nanodbc::execute(connection, "DROP TABLE IF EXISTS sales_" + PaddedScaleFactor(scale_factor_));
   txn.commit();
 }
 

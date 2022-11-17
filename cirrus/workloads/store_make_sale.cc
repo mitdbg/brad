@@ -2,6 +2,7 @@
 #include <random>
 
 #include "store.h"
+#include "utils/backoff_manager.h"
 #include "utils/connection.h"
 #include "utils/sf.h"
 
@@ -25,7 +26,7 @@ uint64_t MakeSale::NumAborts() const { return num_aborts_; }
 void MakeSale::RunImpl() {
   const uint64_t max_id = GetMaxItemId();
 
-  std::mt19937 prng(client_id_);
+  std::mt19937 prng(42 ^ client_id_);
   // TODO: We should have a skewed workload.
   std::uniform_int_distribution<uint64_t> item_id(0, max_id);
   std::uniform_int_distribution<uint32_t> num_items(1, 3);
@@ -92,6 +93,7 @@ void MakeSale::RunImpl() {
 
   for (uint64_t i = 0; i < num_warmup_; ++i) {
     while (true) {
+      utils::BackoffManager backoff;
       try {
         run_txn();
         break;
@@ -100,8 +102,7 @@ void MakeSale::RunImpl() {
         // TODO: Aborts via an exception are not the best idea, according to the
         // discussion in "Opportunities for Optimism in Contended Main-Memory
         // Multicore Transactions (VLDB 2020)."
-        // TODO: We should have exponential back off here instead of retrying
-        // immediately.
+        backoff.Wait();
       }
     }
   }
@@ -110,6 +111,7 @@ void MakeSale::RunImpl() {
 
   while (KeepRunning()) {
     while (true) {
+      utils::BackoffManager backoff;
       try {
         run_txn();
         break;
@@ -118,9 +120,8 @@ void MakeSale::RunImpl() {
         // TODO: Aborts via an exception are not the best idea, according to the
         // discussion in "Opportunities for Optimism in Contended Main-Memory
         // Multicore Transactions (VLDB 2020)."
-        // TODO: We should have exponential back off here instead of retrying
-        // immediately.
         ++num_aborts_;
+        backoff.Wait();
       }
     }
     ++num_txns_;
@@ -138,7 +139,7 @@ uint64_t MakeSale::GetMaxItemId() const {
 uint32_t MakeSale::GenerateSaleId() {
   // To generate unique IDs without clashing with other transactions, we reserve
   // the most significant byte for the client ID.
-  const uint32_t id = (((client_id_ + 1) & 0xFF) << 28) | next_id_;
+  const uint32_t id = (((client_id_ + 1) & 0xFF) << 24) | next_id_;
   ++next_id_;
   return id;
 }
