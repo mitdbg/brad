@@ -38,9 +38,15 @@ void SalesReporting::RunImpl() {
 
   WarmedUpAndReadyToRun();
 
+  uint64_t num_iters = 0;
   while (KeepRunning()) {
     nanodbc::execute(connection_, GenerateQuery(kRepetitions));
     num_reports_run_ += 10;
+
+    // Refresh the max datetime for the analytical queries.
+    if (num_iters % 5 == 0) {
+      max_datetime_ = GetMaxDatetime();
+    }
   }
 }
 
