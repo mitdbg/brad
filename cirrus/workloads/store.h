@@ -15,6 +15,7 @@
 class SalesReporting : public WorkloadBase {
  public:
   SalesReporting(uint32_t scale_factor, uint64_t num_warmup, uint32_t client_id,
+                 nanodbc::connection connection,
                  std::shared_ptr<BenchmarkState> state);
   virtual ~SalesReporting() = default;
 
@@ -38,6 +39,7 @@ class SalesReporting : public WorkloadBase {
 class MakeSale : public WorkloadBase {
  public:
   MakeSale(uint32_t scale_factor, uint64_t num_warmup, uint32_t client_id,
+           nanodbc::connection connection,
            std::shared_ptr<BenchmarkState> state);
   virtual ~MakeSale() = default;
 

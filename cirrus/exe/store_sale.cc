@@ -17,6 +17,10 @@ DEFINE_uint32(sf, 1, "Dataset scale factor.");
 DEFINE_uint64(warmup, 10, "Number of warm up iterations to run.");
 DEFINE_uint32(run_for, 10, "How long to let the experiment run (in seconds).");
 
+DEFINE_string(
+    read_db, "rdspg",
+    "Which system to use for the analytical queries {rdspg, redshift}.");
+
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Runs the 'sale' workload.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
@@ -26,6 +30,13 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  auto maybe_read_db = dbtype::FromString(FLAGS_read_db);
+  if (!maybe_read_db.has_value()) {
+    std::cerr << "ERROR: Unrecognized DB " << FLAGS_read_db << std::endl;
+    return 1;
+  }
+  const DBType read_db = *maybe_read_db;
+
   auto state = BenchmarkState::Create();
   std::vector<std::unique_ptr<MakeSale>> tclients;
   std::vector<std::unique_ptr<SalesReporting>> aclients;
@@ -33,22 +44,23 @@ int main(int argc, char* argv[]) {
   std::cerr << "> Dropping extraneous sales records..." << std::endl;
   {
     StoreDataset dataset(FLAGS_sf);
-    nanodbc::connection c(utils::GetConnection());
+    nanodbc::connection c(utils::GetConnection(DBType::kRDSPostgreSQL));
     dataset.DropWorkloadGeneratedRecords(c);
   }
 
   std::cerr << "> Starting up and warming up aclients..." << std::endl;
   for (uint32_t i = 0; i < FLAGS_aclients; ++i) {
-    aclients.push_back(std::make_unique<SalesReporting>(FLAGS_sf, FLAGS_warmup,
-                                                        /*client_id=*/i,
-                                                        state));
+    aclients.push_back(std::make_unique<SalesReporting>(
+        FLAGS_sf, FLAGS_warmup,
+        /*client_id=*/i, utils::GetConnection(read_db), state));
   }
   state->WaitUntilAllReady(/*expected=*/FLAGS_aclients);
 
   std::cerr << "> Starting up and warming up tclients..." << std::endl;
   for (uint32_t i = 0; i < FLAGS_tclients; ++i) {
-    tclients.push_back(std::make_unique<MakeSale>(FLAGS_sf, FLAGS_warmup,
-                                                  /*client_id=*/i, state));
+    tclients.push_back(std::make_unique<MakeSale>(
+        FLAGS_sf, FLAGS_warmup,
+        /*client_id=*/i, utils::GetConnection(DBType::kRDSPostgreSQL), state));
   }
   state->WaitUntilAllReady(/*expected=*/FLAGS_tclients + FLAGS_aclients);
   std::cerr << "> Warm up done. Starting the workload." << std::endl;

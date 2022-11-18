@@ -8,7 +8,8 @@
 #include "utils/sf.h"
 
 MakeSale::MakeSale(uint32_t scale_factor, uint64_t num_warmup,
-                   uint32_t client_id, std::shared_ptr<BenchmarkState> state)
+                   uint32_t client_id, nanodbc::connection connection,
+                   std::shared_ptr<BenchmarkState> state)
     : WorkloadBase(std::move(state)),
       num_warmup_(num_warmup),
       num_txns_(0),
@@ -17,7 +18,7 @@ MakeSale::MakeSale(uint32_t scale_factor, uint64_t num_warmup,
       client_id_(client_id),
       next_id_(0),
       next_datetime_(0),
-      connection_(utils::GetConnection()) {
+      connection_(std::move(connection)) {
   Start();
 }
 

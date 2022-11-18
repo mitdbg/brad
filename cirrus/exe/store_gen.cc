@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
 
   nanodbc::connection c(utils::GetConnection());
   if (FLAGS_action == "connect") {
-    std::cout << "Connected using ODBC DSN: " << FLAGS_odbc_dsn << std::endl;
+    std::cout << "Connected using ODBC DSN: " << FLAGS_default_odbc_dsn << std::endl;
     return 0;
   }
 
