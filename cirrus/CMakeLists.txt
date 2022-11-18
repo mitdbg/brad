@@ -28,3 +28,6 @@ target_link_libraries(store_gen PRIVATE cirrus)
 
 add_executable(store_sale exe/store_sale.cc)
 target_link_libraries(store_sale PRIVATE cirrus)
+
+add_executable(store_etl_test exe/store_etl_test.cc)
+target_link_libraries(store_etl_test PRIVATE cirrus)

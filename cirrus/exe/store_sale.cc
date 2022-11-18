@@ -20,6 +20,7 @@ DEFINE_uint32(run_for, 10, "How long to let the experiment run (in seconds).");
 DEFINE_string(
     read_db, "rdspg",
     "Which system to use for the analytical queries {rdspg, redshift}.");
+DEFINE_uint32(etl_period_ms, 10000, "How often to run the ETL.");
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Runs the 'sale' workload.");
@@ -40,12 +41,19 @@ int main(int argc, char* argv[]) {
   auto state = BenchmarkState::Create();
   std::vector<std::unique_ptr<MakeSale>> tclients;
   std::vector<std::unique_ptr<SalesReporting>> aclients;
+  std::unique_ptr<SalesETL> etl;
 
   std::cerr << "> Dropping extraneous sales records..." << std::endl;
   {
     StoreDataset dataset(FLAGS_sf);
-    nanodbc::connection c(utils::GetConnection(DBType::kRDSPostgreSQL));
-    dataset.DropWorkloadGeneratedRecords(c);
+    {
+      nanodbc::connection c(utils::GetConnection(DBType::kRDSPostgreSQL));
+      dataset.DropWorkloadGeneratedRecords(c);
+    }
+    if (read_db == DBType::kRedshift) {
+      nanodbc::connection c(utils::GetConnection(DBType::kRedshift));
+      dataset.DropWorkloadGeneratedRecords(c);
+    }
   }
 
   std::cerr << "> Starting up and warming up aclients..." << std::endl;
@@ -63,6 +71,16 @@ int main(int argc, char* argv[]) {
         /*client_id=*/i, utils::GetConnection(DBType::kRDSPostgreSQL), state));
   }
   state->WaitUntilAllReady(/*expected=*/FLAGS_tclients + FLAGS_aclients);
+
+  if (read_db == DBType::kRedshift) {
+    std::cerr << "> Starting up the ETL orchestrator..." << std::endl;
+    etl = std::make_unique<SalesETL>(
+        FLAGS_sf, std::chrono::milliseconds(FLAGS_etl_period_ms),
+        /*source=*/utils::GetConnection(DBType::kRDSPostgreSQL),
+        /*dest=*/utils::GetConnection(DBType::kRedshift), state);
+    state->WaitUntilAllReady(/*expected=*/FLAGS_tclients + FLAGS_aclients + 1);
+  }
+
   std::cerr << "> Warm up done. Starting the workload." << std::endl;
 
   const auto start = std::chrono::steady_clock::now();
@@ -77,6 +95,9 @@ int main(int argc, char* argv[]) {
     client->Wait();
   }
   const auto read_end = std::chrono::steady_clock::now();
+  if (etl != nullptr) {
+    etl->Wait();
+  }
   const auto write_elapsed = write_end - start;
   const auto read_elapsed = read_end - start;
 
@@ -124,12 +145,29 @@ int main(int argc, char* argv[]) {
   std::cerr << "> A p99 Latency: " << a_lat_p99_ms << " ms" << std::endl;
   std::cerr << std::endl;
 
-  std::cout
-      << "t_thpt,avg_abort_rate,a_thpt,t_p50_ms,t_p99_ms,a_p50_ms,a_p99_ms"
-      << std::endl;
+  if (etl != nullptr) {
+    etl->SortLatency();
+    std::cerr << "> ETL runs: " << etl->NumRuns() << std::endl;
+    std::cerr << "> ETL p50 Latency: " << etl->LatencyP50().count() << " ms"
+              << std::endl;
+    std::cerr << "> ETL p99 Latency: " << etl->LatencyP50().count() << " ms"
+              << std::endl;
+    std::cerr << std::endl;
+  }
+
+  std::cout << "t_thpt,avg_abort_rate,a_thpt,t_p50_ms,t_p99_ms,a_p50_ms,a_p99_"
+               "ms,etl_runs,etl_p50_ms,etl_p99_ms"
+            << std::endl;
   std::cout << t_thpt << "," << avg_abort_rate << "," << a_thpt << ","
             << t_lat_p50_ms << "," << t_lat_p99_ms << "," << a_lat_p50_ms << ","
-            << a_lat_p99_ms << std::endl;
+            << a_lat_p99_ms << ",";
+  if (etl != nullptr) {
+    std::cout << etl->NumRuns() << "," << etl->LatencyP50().count() << ","
+              << etl->LatencyP99().count();
+  } else {
+    std::cout << "0,0,0";
+  }
+  std::cout << std::endl;
 
   return 0;
 }

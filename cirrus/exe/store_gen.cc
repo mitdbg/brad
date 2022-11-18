@@ -24,7 +24,7 @@ DEFINE_string(db, "", "The database type. Needs to be set when loading data.");
 
 DEFINE_uint32(sf, 0, "Specifies the dataset scale factor.");
 
-DEFINE_string(iam_role, "", "Needs to be set for Redshift loads.");
+DEFINE_string(redshift_iam_role, "", "Needs to be set for Redshift loads.");
 DEFINE_string(s3_bucket, "", "Needs to be set when loading from S3.");
 
 namespace {
@@ -36,7 +36,7 @@ std::string GenerateRedshiftS3LoadCommand(const std::string& prefix,
   builder << "COPY " << table_name;
   builder << " FROM 's3://" << FLAGS_s3_bucket << "/" << prefix << "sf"
           << PaddedScaleFactor(sf) << "/" << table_name << ".tbl'";
-  builder << " IAM_ROLE '" << FLAGS_iam_role << "'";
+  builder << " IAM_ROLE '" << FLAGS_redshift_iam_role << "'";
   builder << " REGION 'us-east-1'";
   return builder.str();
 }
