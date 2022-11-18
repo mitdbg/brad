@@ -1,6 +1,7 @@
 target_sources(cirrus
   PRIVATE
     state.h
+    store_etl.cc
     store_make_sale.cc
     store_reporting.cc
     store.h

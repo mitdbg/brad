@@ -1,5 +1,8 @@
 target_sources(cirrus
   PRIVATE
+    backoff_manager.h
+    config.cc
+    config.h
     connection.cc
     connection.h
     dbtype.cc

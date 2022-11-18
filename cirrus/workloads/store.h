@@ -60,3 +60,29 @@ class MakeSale : public WorkloadBase {
 
   mutable nanodbc::connection connection_;
 };
+
+// Implements an ETL of the sales table.
+// This workload is hardcoded to use AWS S3 for data transfer.
+class SalesETL : public WorkloadBase {
+ public:
+  // The ETL will run every `period` milliseconds.
+  SalesETL(uint32_t scale_factor, std::chrono::milliseconds period,
+           nanodbc::connection source, nanodbc::connection dest,
+           std::shared_ptr<BenchmarkState> state);
+
+  uint64_t NumRuns() const;
+
+ private:
+  uint64_t GetMaxSynced() const;
+  std::string GenerateExtractQuery(uint64_t seq) const;
+  std::string GenerateImportQuery(uint64_t seq) const;
+
+  virtual void RunImpl() override;
+
+  uint64_t num_runs_;
+  uint32_t scale_factor_;
+  uint64_t synced_datetime_;
+  uint64_t sequence_number_;
+  std::chrono::milliseconds period_;
+  mutable nanodbc::connection source_, dest_;
+};
