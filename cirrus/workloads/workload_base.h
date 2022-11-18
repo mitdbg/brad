@@ -21,6 +21,7 @@ class WorkloadBase {
   void WarmedUpAndReadyToRun();
   bool KeepRunning() const;
   void AddLatency(std::chrono::nanoseconds latency);
+  std::shared_ptr<BenchmarkState>& GetState();
 
  private:
   void Run();

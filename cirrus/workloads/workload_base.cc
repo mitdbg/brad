@@ -40,3 +40,5 @@ std::chrono::milliseconds WorkloadBase::LatencyP99() const {
 void WorkloadBase::AddLatency(std::chrono::nanoseconds latency) {
   latency_.Add(latency);
 }
+
+std::shared_ptr<BenchmarkState>& WorkloadBase::GetState() { return state_; }

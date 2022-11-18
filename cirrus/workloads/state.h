@@ -1,10 +1,12 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <future>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 class BenchmarkState {
  public:
@@ -41,12 +43,36 @@ class BenchmarkState {
 
   void SetStopRunning() { keep_running_ = false; }
 
+  void SetSimulatedETLTimes(std::chrono::milliseconds freshness,
+                            std::chrono::milliseconds sim_etl_time) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    freshness_ = freshness;
+    sim_etl_time_ = sim_etl_time;
+    last_sync_ = std::chrono::steady_clock::now();
+  }
+
+  void MaybeRunSimulatedETL() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (std::chrono::steady_clock::now() - last_sync_ > freshness_) {
+      // Need to run ETL. This thead will fall asleep with this lock. All
+      // analytical clients call this method, so they will block and wait if
+      // they arrive while the ETL is in progress.
+      std::this_thread::sleep_for(sim_etl_time_);
+      last_sync_ = std::chrono::steady_clock::now();
+    }
+  }
+
  private:
   std::atomic<bool> keep_running_;
 
-  std::mutex mutex_;
+  mutable std::mutex mutex_;
   std::condition_variable not_ready_;
   uint64_t num_ready_;
+
+  // Used for simulating ETLs.
+  std::chrono::steady_clock::time_point last_sync_;
+  std::chrono::milliseconds freshness_;
+  std::chrono::milliseconds sim_etl_time_;
 
   std::promise<void> promise_;
   std::shared_future<void> future_;

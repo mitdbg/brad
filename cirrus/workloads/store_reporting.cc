@@ -11,11 +11,13 @@
 SalesReporting::SalesReporting(uint32_t scale_factor, uint64_t num_warmup,
                                uint32_t client_id,
                                nanodbc::connection connection,
-                               std::shared_ptr<BenchmarkState> state)
+                               std::shared_ptr<BenchmarkState> state,
+                               bool run_sim_etl)
     : WorkloadBase(std::move(state)),
       num_warmup_(num_warmup),
       num_reports_run_(0),
       scale_factor_(scale_factor),
+      run_sim_etl_(run_sim_etl),
       connection_(std::move(connection)),
       prng_(42 ^ client_id) {
   Start();
@@ -47,6 +49,12 @@ void SalesReporting::RunImpl() {
     const auto end = std::chrono::steady_clock::now();
     AddLatency((end - start) / kRepetitions);
     num_reports_run_ += 10;
+
+    if (!KeepRunning()) break;
+
+    if (run_sim_etl_) {
+      GetState()->MaybeRunSimulatedETL();
+    }
 
     // Refresh the max datetime for the analytical queries.
     if (num_iters % 5 == 0) {

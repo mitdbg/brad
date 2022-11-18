@@ -16,7 +16,7 @@ class SalesReporting : public WorkloadBase {
  public:
   SalesReporting(uint32_t scale_factor, uint64_t num_warmup, uint32_t client_id,
                  nanodbc::connection connection,
-                 std::shared_ptr<BenchmarkState> state);
+                 std::shared_ptr<BenchmarkState> state, bool run_sim_etl);
   virtual ~SalesReporting() = default;
 
   uint64_t NumReportsRun() const;
@@ -31,6 +31,7 @@ class SalesReporting : public WorkloadBase {
   uint64_t max_datetime_;
   uint64_t num_reports_run_;
   uint32_t scale_factor_;
+  bool run_sim_etl_;
 
   mutable nanodbc::connection connection_;
   mutable std::mt19937 prng_;
@@ -71,6 +72,7 @@ class SalesETL : public WorkloadBase {
   SalesETL(uint32_t scale_factor, std::chrono::milliseconds period,
            nanodbc::connection source, nanodbc::connection dest,
            std::shared_ptr<BenchmarkState> state);
+  virtual ~SalesETL() = default;
 
   uint64_t NumRuns() const;
 
