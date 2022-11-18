@@ -33,7 +33,7 @@ std::string GenerateRedshiftS3LoadCommand(const std::string& prefix,
                                           const std::string& table_name,
                                           uint32_t sf) {
   std::stringstream builder;
-  builder << "COPY " << table_name;
+  builder << "COPY " << table_name << "_" << PaddedScaleFactor(sf);
   builder << " FROM 's3://" << FLAGS_s3_bucket << "/" << prefix << "sf"
           << PaddedScaleFactor(sf) << "/" << table_name << ".tbl'";
   builder << " IAM_ROLE '" << FLAGS_redshift_iam_role << "'";
@@ -110,13 +110,17 @@ int main(int argc, char* argv[]) {
     store.CreateTables(c);
     nanodbc::transaction txn(c);
     if (db == DBType::kRedshift) {
+      std::cerr << "Loading inventory..." << std::endl;
       nanodbc::execute(
           c, GenerateRedshiftS3LoadCommand("store/", "inventory", FLAGS_sf));
+      std::cerr << "Loading sales..." << std::endl;
       nanodbc::execute(
           c, GenerateRedshiftS3LoadCommand("store/", "sales", FLAGS_sf));
     } else {
+      std::cerr << "Loading inventory..." << std::endl;
       nanodbc::execute(
           c, GenerateRDSS3LoadCommand("store/", "inventory", FLAGS_sf));
+      std::cerr << "Loading sales..." << std::endl;
       nanodbc::execute(c,
                        GenerateRDSS3LoadCommand("store/", "sales", FLAGS_sf));
     }
