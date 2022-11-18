@@ -40,21 +40,32 @@ void SalesETL::RunImpl() {
     const auto start = std::chrono::steady_clock::now();
     const std::string extract = GenerateExtractQuery(sequence_number_);
     nanodbc::execute(source_, extract);
+    const auto extract_done = std::chrono::steady_clock::now();
+    const auto extract_elapsed = extract_done - start;
     if (FLAGS_verbose) {
-      std::cerr << "> Extract phase done" << std::endl;
+      std::cerr << "> Extract phase done "
+                << std::chrono::duration_cast<std::chrono::seconds>(
+                       extract_elapsed)
+                       .count()
+                << " s" << std::endl;
     }
     const std::string import = GenerateImportQuery(sequence_number_);
+    const auto import_elapsed = std::chrono::steady_clock::now() - extract_done;
     nanodbc::execute(dest_, import);
     if (FLAGS_verbose) {
-      std::cerr << "> Import phase done" << std::endl;
+      std::cerr << "> Import phase done "
+                << std::chrono::duration_cast<std::chrono::seconds>(
+                       import_elapsed)
+                       .count()
+                << " s" << std::endl;
     }
     // TODO: Probably not a good idea to run vacuum/analyze on each load.
-    //nanodbc::execute(dest_, "VACUUM;");
-    //if (FLAGS_verbose) {
+    // nanodbc::execute(dest_, "VACUUM;");
+    // if (FLAGS_verbose) {
     //  std::cerr << "> Vacuum done" << std::endl;
     //}
-    //nanodbc::execute(dest_, "ANALYZE;");
-    //if (FLAGS_verbose) {
+    // nanodbc::execute(dest_, "ANALYZE;");
+    // if (FLAGS_verbose) {
     //  std::cerr << "> Analyze done" << std::endl;
     //}
     synced_datetime_ = GetMaxSynced();
