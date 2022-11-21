@@ -107,7 +107,9 @@ int main(int argc, char* argv[]) {
     }
     DBType db = *maybe_db;
 
-    store.CreateTables(c);
+    // We create a special column that _should_ help reduce the cost of
+    // extracting new entries from the sales table.
+    store.CreateTables(c, /*for_postgres_extraction=*/true);
     nanodbc::transaction txn(c);
     if (db == DBType::kRedshift) {
       std::cerr << "Loading inventory..." << std::endl;
@@ -129,7 +131,7 @@ int main(int argc, char* argv[]) {
   }
 
   if (FLAGS_action == "generate_load_directly") {
-    store.CreateTables(c);
+    store.CreateTables(c, /*for_postgres_extraction=*/true);
     store.GenerateAndLoad(c);
     return 0;
   }

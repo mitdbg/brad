@@ -13,7 +13,7 @@ class StoreDataset {
  public:
   StoreDataset(uint32_t scale_factor);
 
-  void CreateTables(nanodbc::connection& connection);
+  void CreateTables(nanodbc::connection& connection, bool for_postgres_extraction);
   void DropAll(nanodbc::connection& connection);
   void DropWorkloadGeneratedRecords(nanodbc::connection& connection);
 
