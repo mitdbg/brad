@@ -26,7 +26,8 @@ SalesReporting::SalesReporting(uint32_t scale_factor, uint64_t num_warmup,
 void SalesReporting::RunImpl() {
   // Run this many reports per query, to amortize the cost of sending the query
   // over the network.
-  static constexpr uint32_t kRepetitions = 10;
+  // Originally this value was set to 10, but it seemed to be too intense.
+  static constexpr uint32_t kRepetitions = 1;
   max_datetime_ = GetMaxDatetime();
 
   // NOTE: This is PostgreSQL-specific syntax. Postgres implements repeatable
@@ -64,9 +65,9 @@ std::pair<uint64_t, uint64_t> SalesReporting::GenerateDatetimeRange() const {
   // The datetime range usually starts in the first quarter.
   std::normal_distribution<double> start_dist(max_datetime_ / 4.0,
                                               /*stddev=*/2.0);
-  // The length of a scan is usually a fifth of the dataset, but with wide
+  // The length of a scan is usually a tenth of the dataset, but with wide
   // tails.
-  std::normal_distribution<double> length_dist(max_datetime_ / 5.0,
+  std::normal_distribution<double> length_dist(max_datetime_ / 10.0,
                                                /*stddev=*/4.0);
 
   std::uniform_real_distribution<double> read_recent(0, 1.0);

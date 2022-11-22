@@ -44,6 +44,15 @@ void StoreDataset::CreateTables(nanodbc::connection& connection,
     phys_id_index << " ON sales_" << PaddedScaleFactor(scale_factor_)
                   << " USING btree (s_phys_id);";
     nanodbc::execute(connection, phys_id_index.str());
+
+    // This index helps accelerate the analytical queries that run against
+    // PostgreSQL.
+    std::stringstream datetime_index;
+    datetime_index << "CREATE INDEX IF NOT EXISTS sales_"
+                   << PaddedScaleFactor(scale_factor_) << "_datetime";
+    datetime_index << " ON sales_" << PaddedScaleFactor(scale_factor_)
+                   << " USING btree (s_datetime);";
+    nanodbc::execute(connection, datetime_index.str());
   }
   txn.commit();
 }
@@ -271,12 +280,21 @@ void StoreDataset::GenerateData(uint32_t scale_factor, uint32_t seed,
   }
 }
 
-uint64_t StoreDataset::GetMaxDatetime(nanodbc::connection& connection) const {
+void StoreDataset::UpdateMaxStats(nanodbc::connection& connection) {
   auto result =
-      nanodbc::execute(connection, "SELECT MAX(s_datetime) FROM sales;");
+      nanodbc::execute(connection, "SELECT MAX(s_datetime) FROM sales_" +
+                                       PaddedScaleFactor(scale_factor_));
   result.next();
-  return result.get<uint64_t>(0);
+  max_s_datetime_ = result.get<uint64_t>(0);
+
+  result = nanodbc::execute(connection, "SELECT MAX(i_id) FROM inventory_" +
+                                            PaddedScaleFactor(scale_factor_));
+  result.next();
+  max_i_id_ = result.get<uint64_t>(0);
 }
+
+uint64_t StoreDataset::MaxDatetime() const { return max_s_datetime_; }
+uint64_t StoreDataset::MaxId() const { return max_i_id_; }
 
 void StoreDataset::DropWorkloadGeneratedRecords(
     nanodbc::connection& connection) {

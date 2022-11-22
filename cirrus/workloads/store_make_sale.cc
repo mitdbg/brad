@@ -9,6 +9,7 @@
 
 MakeSale::MakeSale(uint32_t scale_factor, uint64_t num_warmup,
                    uint32_t client_id, nanodbc::connection connection,
+                   uint64_t max_s_datetime, uint64_t max_i_id,
                    std::shared_ptr<BenchmarkState> state)
     : WorkloadBase(std::move(state)),
       num_warmup_(num_warmup),
@@ -17,7 +18,8 @@ MakeSale::MakeSale(uint32_t scale_factor, uint64_t num_warmup,
       scale_factor_(scale_factor),
       client_id_(client_id),
       next_id_(0),
-      next_datetime_(0),
+      next_datetime_(max_s_datetime),
+      max_i_id_(max_i_id),
       connection_(std::move(connection)) {
   Start();
 }
@@ -27,8 +29,7 @@ uint64_t MakeSale::NumTxnsRun() const { return num_txns_; }
 uint64_t MakeSale::NumAborts() const { return num_aborts_; }
 
 void MakeSale::RunImpl() {
-  const uint64_t max_id = GetMaxItemId();
-  next_datetime_ = GetMaxSaleDatetime();
+  const uint64_t max_id = max_i_id_;
 
   std::mt19937 prng(42 ^ client_id_);
   // TODO: We should have a skewed workload.
@@ -137,14 +138,6 @@ void MakeSale::RunImpl() {
   }
 }
 
-uint64_t MakeSale::GetMaxItemId() const {
-  auto result =
-      nanodbc::execute(connection_, "SELECT MAX(i_id) FROM inventory_" +
-                                        PaddedScaleFactor(scale_factor_) + ";");
-  result.next();
-  return result.get<uint64_t>(0);
-}
-
 uint64_t MakeSale::GenerateSaleId() {
   // To generate unique IDs without clashing with other transactions, we reserve
   // the most significant byte for the client ID.
@@ -152,12 +145,4 @@ uint64_t MakeSale::GenerateSaleId() {
       (((static_cast<uint64_t>(client_id_) + 1) & 0xFF) << 56) | next_id_;
   ++next_id_;
   return id;
-}
-
-uint64_t MakeSale::GetMaxSaleDatetime() const {
-  auto result =
-      nanodbc::execute(connection_, "SELECT MAX(s_datetime) FROM sales_" +
-                                        PaddedScaleFactor(scale_factor_));
-  result.next();
-  return result.get<uint64_t>(0);
 }

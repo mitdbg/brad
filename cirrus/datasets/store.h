@@ -21,7 +21,10 @@ class StoreDataset {
   void GenerateDataFiles(std::filesystem::path out, uint32_t seed = 42);
   void GenerateAndLoad(nanodbc::connection& connection, uint32_t seed = 42);
 
-  uint64_t GetMaxDatetime(nanodbc::connection& connection) const;
+  // Used to initialize the workers.
+  void UpdateMaxStats(nanodbc::connection& connection);
+  uint64_t MaxDatetime() const;
+  uint64_t MaxId() const;
 
  private:
   using Inventory =
@@ -40,4 +43,7 @@ class StoreDataset {
   static uint64_t InventoryBaseCardinality(uint32_t scale_factor);
 
   uint32_t scale_factor_;
+
+  uint64_t max_s_datetime_;
+  uint64_t max_i_id_;
 };

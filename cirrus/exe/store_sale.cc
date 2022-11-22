@@ -44,12 +44,14 @@ int main(int argc, char* argv[]) {
   std::vector<std::unique_ptr<SalesReporting>> aclients;
   std::unique_ptr<SalesETL> etl;
 
-  std::cerr << "> Dropping extraneous sales records..." << std::endl;
+  std::cerr << "> Dropping extraneous sales records and retrieving stats..."
+            << std::endl;
+  StoreDataset dataset(FLAGS_sf);
   {
-    StoreDataset dataset(FLAGS_sf);
     {
       nanodbc::connection c(utils::GetConnection(DBType::kRDSPostgreSQL));
       dataset.DropWorkloadGeneratedRecords(c);
+      dataset.UpdateMaxStats(c);
     }
     if (read_db == DBType::kRedshift) {
       nanodbc::connection c(utils::GetConnection(DBType::kRedshift));
@@ -70,7 +72,8 @@ int main(int argc, char* argv[]) {
   for (uint32_t i = 0; i < FLAGS_tclients; ++i) {
     tclients.push_back(std::make_unique<MakeSale>(
         FLAGS_sf, FLAGS_warmup,
-        /*client_id=*/i, utils::GetConnection(DBType::kRDSPostgreSQL), state));
+        /*client_id=*/i, utils::GetConnection(DBType::kRDSPostgreSQL),
+        dataset.MaxDatetime(), dataset.MaxId(), state));
   }
   state->WaitUntilAllReady(/*expected=*/FLAGS_tclients + FLAGS_aclients);
 
