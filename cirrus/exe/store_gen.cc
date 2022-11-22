@@ -109,7 +109,7 @@ int main(int argc, char* argv[]) {
 
     // We create a special column that _should_ help reduce the cost of
     // extracting new entries from the sales table.
-    store.CreateTables(c, /*for_postgres_extraction=*/true);
+    store.CreateTables(c, /*for_postgres_extraction=*/db == DBType::kRDSPostgreSQL);
     nanodbc::transaction txn(c);
     if (db == DBType::kRedshift) {
       std::cerr << "Loading inventory..." << std::endl;

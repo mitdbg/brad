@@ -32,7 +32,7 @@ void SalesETL::RunImpl() {
     if (!KeepRunning()) break;
 
     if (FLAGS_verbose) {
-      std::cerr << "> Starting ETL" << std::endl;
+      std::cerr << "> Starting ETL sync from " << synced_phys_id_ << std::endl;
     }
 
     // Run the ETL.
@@ -45,20 +45,20 @@ void SalesETL::RunImpl() {
     const auto extract_elapsed = extract_done - start;
     if (FLAGS_verbose) {
       std::cerr << "> Extract phase done "
-                << std::chrono::duration_cast<std::chrono::seconds>(
+                << std::chrono::duration_cast<std::chrono::milliseconds>(
                        extract_elapsed)
                        .count()
-                << " s" << std::endl;
+                << " ms" << std::endl;
     }
     const std::string import = GenerateImportQuery(sequence_number_);
     const auto import_elapsed = std::chrono::steady_clock::now() - extract_done;
     nanodbc::execute(dest_, import);
     if (FLAGS_verbose) {
       std::cerr << "> Import phase done "
-                << std::chrono::duration_cast<std::chrono::seconds>(
+                << std::chrono::duration_cast<std::chrono::milliseconds>(
                        import_elapsed)
                        .count()
-                << " s" << std::endl;
+                << " ms" << std::endl;
     }
     // TODO: Probably not a good idea to run vacuum/analyze on each load.
     // nanodbc::execute(dest_, "VACUUM;");
