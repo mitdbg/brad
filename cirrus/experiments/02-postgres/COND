@@ -4,7 +4,7 @@ SCALE_FACTORS = [1]
 T_CLIENTS = [1, 4, 16, 64]
 A_CLIENTS = [0, 1, 2, 4]
 
-RUN_FOR = 10
+RUN_FOR = 30
 WARMUP = 1
 
 def custom_workload_factor(wf):
