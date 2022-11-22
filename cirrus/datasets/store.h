@@ -13,7 +13,8 @@ class StoreDataset {
  public:
   StoreDataset(uint32_t scale_factor);
 
-  void CreateTables(nanodbc::connection& connection, bool for_postgres_extraction);
+  void CreateTables(nanodbc::connection& connection,
+                    bool for_postgres_extraction);
   void DropAll(nanodbc::connection& connection);
   void DropWorkloadGeneratedRecords(nanodbc::connection& connection);
 
@@ -27,7 +28,8 @@ class StoreDataset {
       std::tuple<uint64_t, std::string, uint64_t, uint64_t, uint64_t>;
   using InventoryCallback = std::function<void(Inventory)>;
 
-  using Sales = std::tuple<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t>;
+  using Sales =
+      std::tuple<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t>;
   using SalesCallback = std::function<void(Sales)>;
 
   static void GenerateData(uint32_t scale_factor, uint32_t seed,

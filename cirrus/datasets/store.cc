@@ -161,12 +161,14 @@ void StoreDataset::GenerateAndLoad(nanodbc::connection& connection,
   };
 
   const auto handle_sales = [&](auto sales_row) {
-    auto [id, datetime, i_id, quantity, price] = sales_row;
+    auto [id, datetime, i_id, quantity, price, phys_id] = sales_row;
     s_id.emplace_back(id);
     s_datetime.emplace_back(datetime);
     s_i_id.emplace_back(i_id);
     s_quantity.emplace_back(quantity);
     s_price.emplace_back(price);
+    // We rely on PostgreSQL to automatically choose the physical ID. So it is
+    // unused here.
 
     if (s_id.size() >= batch_size) {
       write_sales_batch();
@@ -198,12 +200,13 @@ void StoreDataset::GenerateDataFiles(std::filesystem::path out, uint32_t seed) {
   };
 
   const auto handle_sales = [&](auto sales_row) {
-    auto [id, datetime, i_id, quantity, price] = sales_row;
+    auto [id, datetime, i_id, quantity, price, phys_id] = sales_row;
     sales << id << "|";
     sales << datetime << "|";
     sales << i_id << "|";
     sales << quantity << "|";
-    sales << price << std::endl;
+    sales << price << "|";
+    sales << phys_id << std::endl;
   };
 
   GenerateData(scale_factor_, seed, handle_inventory, handle_sales);
@@ -262,7 +265,8 @@ void StoreDataset::GenerateData(uint32_t scale_factor, uint32_t seed,
   for (uint64_t id = 0; id < sales_cardinality; ++id) {
     uint64_t next_datetime = last_datetime + datetime_gap_dist(prng);
     handle_sales(std::make_tuple(id, next_datetime, item_id_dist(prng),
-                                 quantity_dist(prng), price_dist(prng)));
+                                 quantity_dist(prng), price_dist(prng),
+                                 /*s_phys_id=*/id));
     last_datetime = next_datetime;
   }
 }
