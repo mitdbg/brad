@@ -88,5 +88,6 @@ class SalesETL : public WorkloadBase {
   uint64_t synced_phys_id_;
   uint64_t sequence_number_;
   std::chrono::milliseconds period_;
+  std::chrono::steady_clock::time_point run_next_;
   mutable nanodbc::connection source_, dest_;
 };

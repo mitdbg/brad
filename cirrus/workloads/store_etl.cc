@@ -27,8 +27,10 @@ void SalesETL::RunImpl() {
   synced_phys_id_ = GetMaxSynced();
   WarmedUpAndReadyToRun();
 
+  run_next_ = std::chrono::steady_clock::now() + period_;
+
   while (KeepRunning()) {
-    std::this_thread::sleep_for(period_);
+    std::this_thread::sleep_until(run_next_);
     if (!KeepRunning()) break;
 
     if (FLAGS_verbose) {
@@ -51,8 +53,8 @@ void SalesETL::RunImpl() {
                 << " ms" << std::endl;
     }
     const std::string import = GenerateImportQuery(sequence_number_);
-    const auto import_elapsed = std::chrono::steady_clock::now() - extract_done;
     nanodbc::execute(dest_, import);
+    const auto import_elapsed = std::chrono::steady_clock::now() - extract_done;
     if (FLAGS_verbose) {
       std::cerr << "> Import phase done "
                 << std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -76,11 +78,23 @@ void SalesETL::RunImpl() {
     ++sequence_number_;
     ++num_runs_;
     AddLatency(end - start);
+
+    // To maintain freshness under `period_`, we assume that writes continue to
+    // happen during the ETL. Thus the next time the ETL should run is `start +
+    // period_` (we need to include the amount of time that has elapsed since
+    // the extract phase began).
+    run_next_ = start + period_;
+    const auto now = std::chrono::steady_clock::now();
+    if (now > run_next_) {
+      std::cerr << "WARNING: ETL running longer than its restart interval."
+                << std::endl;
+    }
   }
 }
 
 uint64_t SalesETL::GetMaxSynced() const {
-  // `s_phys_id` is a monotonically increasing sequence (PostgreSQL specific concept).
+  // `s_phys_id` is a monotonically increasing sequence (PostgreSQL specific
+  // concept).
   auto result = nanodbc::execute(dest_, "SELECT MAX(s_phys_id) FROM sales_" +
                                             PaddedScaleFactor(scale_factor_));
   result.next();

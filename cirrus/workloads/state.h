@@ -56,6 +56,8 @@ class BenchmarkState {
   }
 
   void WaitIfETLInProgress() {
+    // We rely on the ETL runner to mark/unmark `etl_in_progress_`. We assume
+    // that the ETL's run time is less than the freshness requirement.
     std::unique_lock<std::mutex> lock(mutex_);
     while (etl_in_progress_) {
       not_ready_.wait(lock);
