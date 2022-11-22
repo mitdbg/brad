@@ -9,3 +9,8 @@ RDS_PWDVAR="RPWD"
 # Aurora host needs to be specified in `~/.odbc.ini`.
 AUR_USER="postgres"
 AUR_PWDVAR="RPWD"
+
+# ODBC config
+PG_ODBC_DSN="RDS PostgreSQL"
+PG_ODBC_USER="postgres"
+PWDVAR="DBPWD"

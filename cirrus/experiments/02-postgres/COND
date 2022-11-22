@@ -1,0 +1,26 @@
+from itertools import product
+
+SCALE_FACTORS = [1, 10]
+T_CLIENTS = [1, 4, 16, 64]
+A_CLIENTS = [0, 1, 4, 16, 64]
+
+RUN_FOR = 30
+WARMUP = 1
+
+run_experiment_group(
+  name="postgres_only",
+  run="./run_postgres.sh",
+  experiments=[
+    ExperimentInstance(
+      name="postgres_only-{}-T{}-A{}".format(scale_factor, t_clients, a_clients),
+      options={
+        "sf": scale_factor,
+        "tclients": t_clients,
+        "aclients": a_clients,
+        "run_for": RUN_FOR,
+        "warmup": WARMUP,
+      },
+    )
+    for scale_factor, t_clients, a_clients in product(SCALE_FACTORS, T_CLIENTS, A_CLIENTS)
+  ],
+)
