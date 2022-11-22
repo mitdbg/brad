@@ -45,16 +45,13 @@ void SalesReporting::RunImpl() {
   uint64_t num_iters = 0;
   while (KeepRunning()) {
     const auto start = std::chrono::steady_clock::now();
+    GetState()->WaitIfETLInProgress();
     nanodbc::execute(connection_, GenerateQuery(kRepetitions));
     const auto end = std::chrono::steady_clock::now();
     AddLatency((end - start) / kRepetitions);
     num_reports_run_ += 10;
 
     if (!KeepRunning()) break;
-
-    if (run_sim_etl_) {
-      GetState()->MaybeRunSimulatedETL();
-    }
 
     // Refresh the max datetime for the analytical queries.
     if (num_iters % 5 == 0) {

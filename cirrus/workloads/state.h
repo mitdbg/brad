@@ -17,7 +17,8 @@ class BenchmarkState {
   BenchmarkState()
       : num_ready_(0),
         keep_running_(true),
-        future_(promise_.get_future().share()) {}
+        future_(promise_.get_future().share()),
+        etl_in_progress_(false) {}
 
   void WaitUntilAllReady(uint64_t expected) {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -43,22 +44,21 @@ class BenchmarkState {
 
   void SetStopRunning() { keep_running_ = false; }
 
-  void SetSimulatedETLTimes(std::chrono::milliseconds freshness,
-                            std::chrono::milliseconds sim_etl_time) {
+  void MarkETLStart() {
     std::unique_lock<std::mutex> lock(mutex_);
-    freshness_ = freshness;
-    sim_etl_time_ = sim_etl_time;
-    last_sync_ = std::chrono::steady_clock::now();
+    etl_in_progress_ = true;
   }
 
-  void MaybeRunSimulatedETL() {
+  void MarkETLFinish() {
     std::unique_lock<std::mutex> lock(mutex_);
-    if (std::chrono::steady_clock::now() - last_sync_ > freshness_) {
-      // Need to run ETL. This thead will fall asleep with this lock. All
-      // analytical clients call this method, so they will block and wait if
-      // they arrive while the ETL is in progress.
-      std::this_thread::sleep_for(sim_etl_time_);
-      last_sync_ = std::chrono::steady_clock::now();
+    etl_in_progress_ = false;
+    not_ready_.notify_all();
+  }
+
+  void WaitIfETLInProgress() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    while (etl_in_progress_) {
+      not_ready_.wait(lock);
     }
   }
 
@@ -68,11 +68,7 @@ class BenchmarkState {
   mutable std::mutex mutex_;
   std::condition_variable not_ready_;
   uint64_t num_ready_;
-
-  // Used for simulating ETLs.
-  std::chrono::steady_clock::time_point last_sync_;
-  std::chrono::milliseconds freshness_;
-  std::chrono::milliseconds sim_etl_time_;
+  bool etl_in_progress_;
 
   std::promise<void> promise_;
   std::shared_future<void> future_;

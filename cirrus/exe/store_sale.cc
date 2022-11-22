@@ -21,7 +21,6 @@ DEFINE_string(
     read_db, "rdspg",
     "Which system to use for the analytical queries {rdspg, redshift}.");
 DEFINE_uint32(etl_period_ms, 10000, "How often to run the ETL.");
-DEFINE_uint32(etl_sim_runtime_ms, 2000, "How long the ETL takes to run.");
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Runs the 'sale' workload.");
@@ -75,8 +74,7 @@ int main(int argc, char* argv[]) {
   }
   state->WaitUntilAllReady(/*expected=*/FLAGS_tclients + FLAGS_aclients);
 
-  // TODO: Run the actual ETL.
-  if (false && read_db == DBType::kRedshift) {
+  if (read_db == DBType::kRedshift) {
     std::cerr << "> Starting up the ETL orchestrator..." << std::endl;
     etl = std::make_unique<SalesETL>(
         FLAGS_sf, std::chrono::milliseconds(FLAGS_etl_period_ms),
@@ -84,9 +82,6 @@ int main(int argc, char* argv[]) {
         /*dest=*/utils::GetConnection(DBType::kRedshift), state);
     state->WaitUntilAllReady(/*expected=*/FLAGS_tclients + FLAGS_aclients + 1);
   }
-  state->SetSimulatedETLTimes(
-      std::chrono::milliseconds(FLAGS_etl_period_ms + 200),
-      std::chrono::milliseconds(FLAGS_etl_sim_runtime_ms));
   std::cerr << "> Warm up done. Starting the workload." << std::endl;
 
   const auto start = std::chrono::steady_clock::now();

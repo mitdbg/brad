@@ -28,6 +28,9 @@ void StoreDataset::CreateTables(nanodbc::connection& connection,
            "BIGINT, s_price BIGINT,";
   if (for_postgres_extraction) {
     sales << " s_phys_id BIGSERIAL,";
+  } else {
+    // For Redshift.
+    sales << " s_phys_id BIGINT,";
   }
   sales << " PRIMARY KEY (s_id));";
 
@@ -39,7 +42,7 @@ void StoreDataset::CreateTables(nanodbc::connection& connection,
     phys_id_index << "CREATE INDEX IF NOT EXISTS sales_"
                   << PaddedScaleFactor(scale_factor_) << "_phys_id";
     phys_id_index << " ON sales_" << PaddedScaleFactor(scale_factor_)
-                  << " USING btree ON (s_phys_id);";
+                  << " USING btree (s_phys_id);";
     nanodbc::execute(connection, phys_id_index.str());
   }
   txn.commit();

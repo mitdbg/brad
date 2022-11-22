@@ -13,7 +13,7 @@ SalesETL::SalesETL(uint32_t scale_factor, std::chrono::milliseconds period,
     : WorkloadBase(std::move(state)),
       num_runs_(0),
       scale_factor_(scale_factor),
-      synced_datetime_(0),
+      synced_phys_id_(0),
       period_(period),
       sequence_number_(0),
       source_(std::move(source)),
@@ -24,7 +24,7 @@ SalesETL::SalesETL(uint32_t scale_factor, std::chrono::milliseconds period,
 uint64_t SalesETL::NumRuns() const { return num_runs_; }
 
 void SalesETL::RunImpl() {
-  synced_datetime_ = GetMaxSynced();
+  synced_phys_id_ = GetMaxSynced();
   WarmedUpAndReadyToRun();
 
   while (KeepRunning()) {
@@ -37,6 +37,7 @@ void SalesETL::RunImpl() {
 
     // Run the ETL.
     // TODO: This might need to be tuned.
+    GetState()->MarkETLStart();
     const auto start = std::chrono::steady_clock::now();
     const std::string extract = GenerateExtractQuery(sequence_number_);
     nanodbc::execute(source_, extract);
@@ -68,8 +69,9 @@ void SalesETL::RunImpl() {
     // if (FLAGS_verbose) {
     //  std::cerr << "> Analyze done" << std::endl;
     //}
-    synced_datetime_ = GetMaxSynced();
+    synced_phys_id_ = GetMaxSynced();
     const auto end = std::chrono::steady_clock::now();
+    GetState()->MarkETLFinish();
 
     ++sequence_number_;
     ++num_runs_;
@@ -78,7 +80,8 @@ void SalesETL::RunImpl() {
 }
 
 uint64_t SalesETL::GetMaxSynced() const {
-  auto result = nanodbc::execute(dest_, "SELECT MAX(s_datetime) FROM sales_" +
+  // `s_phys_id` is a monotonically increasing sequence (PostgreSQL specific concept).
+  auto result = nanodbc::execute(dest_, "SELECT MAX(s_phys_id) FROM sales_" +
                                             PaddedScaleFactor(scale_factor_));
   result.next();
   return result.get<uint64_t>(0);
@@ -88,7 +91,7 @@ std::string SalesETL::GenerateExtractQuery(uint64_t seq) const {
   std::stringstream builder;
   builder << "SELECT * from aws_s3.query_export_to_s3(";
   builder << "'SELECT * FROM sales_" << PaddedScaleFactor(scale_factor_);
-  builder << " WHERE s_datetime > " << synced_datetime_ << "'";
+  builder << " WHERE s_phys_id > " << synced_phys_id_ << "'";
   builder << ", aws_commons.create_s3_uri('geoffxy-research', 'etl/store-"
           << seq
           << ".tbl', 'us-east-1'), options :='FORMAT text, DELIMITER ''|''');";
