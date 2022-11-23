@@ -65,9 +65,8 @@ std::pair<uint64_t, uint64_t> SalesReporting::GenerateDatetimeRange() const {
   // The datetime range usually starts in the first quarter.
   std::normal_distribution<double> start_dist(max_datetime_ / 4.0,
                                               /*stddev=*/2.0);
-  // The length of a scan is usually a tenth of the dataset, but with wide
-  // tails.
-  std::normal_distribution<double> length_dist(max_datetime_ / 10.0,
+  // The length of a scan is usually 1/20 of the dataset, but with wide tails.
+  std::normal_distribution<double> length_dist(max_datetime_ / 20.0,
                                                /*stddev=*/4.0);
 
   std::uniform_real_distribution<double> read_recent(0, 1.0);
