@@ -15,7 +15,7 @@ def custom_workload_factor(wf):
 
 WORKLOAD_FACTORS = {
   "m6i_large": [1, 4, 8, 12, 16],
-  "m6i_xlarge": [16, 20, 24, 28, 32],
+  "m6i_xlarge": [1, 4, 8, 12, 16, 20, 24, 28, 32],
 }
 
 for config, factors in WORKLOAD_FACTORS.items():
