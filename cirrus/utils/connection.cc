@@ -20,6 +20,10 @@ DEFINE_string(
     "~/.odbc.ini.");
 DEFINE_string(pg_user, "postgres", "The PostgreSQL username.");
 
+DEFINE_string(pg_replica_odbc_dsn, "RDS PostgreSQL Replica",
+              "The data source name to use to connect to a PostgreSQL read "
+              "replica, defined in ~/.odbc.ini.");
+
 namespace utils {
 
 nanodbc::connection GetConnection() {
@@ -33,6 +37,11 @@ nanodbc::connection GetConnection(DBType dbtype) {
     case DBType::kRDSPostgreSQL: {
       return nanodbc::connection(
           FLAGS_pg_odbc_dsn, FLAGS_pg_user,
+          !FLAGS_pwdvar.empty() ? std::getenv(FLAGS_pwdvar.c_str()) : "");
+    }
+    case DBType::kRDSPostgreSQLReplica: {
+      return nanodbc::connection(
+          FLAGS_pg_replica_odbc_dsn, FLAGS_pg_user,
           !FLAGS_pwdvar.empty() ? std::getenv(FLAGS_pwdvar.c_str()) : "");
     }
     case DBType::kRedshift: {

@@ -6,6 +6,7 @@
 enum class DBType {
   kRedshift,
   kRDSPostgreSQL,
+  kRDSPostgreSQLReplica,
 };
 
 namespace dbtype {

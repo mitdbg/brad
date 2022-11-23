@@ -12,5 +12,6 @@ AUR_PWDVAR="RPWD"
 
 # ODBC config
 PG_ODBC_DSN="RDS PostgreSQL"
+PG_REPLICA_ODBC_DSN="RDS PostgreSQL Replica"
 PG_ODBC_USER="postgres"
 PWDVAR="DBPWD"

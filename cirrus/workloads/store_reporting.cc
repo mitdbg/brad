@@ -11,13 +11,11 @@
 SalesReporting::SalesReporting(uint32_t scale_factor, uint64_t num_warmup,
                                uint32_t client_id,
                                nanodbc::connection connection,
-                               std::shared_ptr<BenchmarkState> state,
-                               bool run_sim_etl)
+                               std::shared_ptr<BenchmarkState> state)
     : WorkloadBase(std::move(state)),
       num_warmup_(num_warmup),
       num_reports_run_(0),
       scale_factor_(scale_factor),
-      run_sim_etl_(run_sim_etl),
       connection_(std::move(connection)),
       prng_(42 ^ client_id) {
   Start();

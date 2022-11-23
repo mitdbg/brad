@@ -63,8 +63,7 @@ int main(int argc, char* argv[]) {
   for (uint32_t i = 0; i < FLAGS_aclients; ++i) {
     aclients.push_back(std::make_unique<SalesReporting>(
         FLAGS_sf, FLAGS_warmup,
-        /*client_id=*/i, utils::GetConnection(read_db), state,
-        /*run_sim_etl=*/read_db == DBType::kRedshift));
+        /*client_id=*/i, utils::GetConnection(read_db), state));
   }
   state->WaitUntilAllReady(/*expected=*/FLAGS_aclients);
 
