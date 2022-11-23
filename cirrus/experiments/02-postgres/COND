@@ -9,8 +9,8 @@ WARMUP = 1
 
 def custom_workload_factor(wf):
   # "workload factor" represents the number of transactional clients.
-  # We have 1 analytical client per 16 transactional clients.
-  a_clients = wf // 16
+  # We have 1 analytical client per 8 transactional clients.
+  a_clients = wf // 8
   return {
     "tclients": wf,
     "aclients": a_clients,
@@ -34,8 +34,45 @@ run_experiment_group(
   ],
 )
 
+MAIN_SF = [10]
 WORKLOAD_FACTORS = [1, 4, 8, 16, 32, 64]
+WORKLOAD_FACTORS_2 = [96, 128]
+WORKLOAD_FACTORS_3 = [160, 192]
+WORKLOAD_FACTORS_4 = [224, 256]
 
+combine(
+  name="wf1",
+  deps=[
+    ":postgres_wf",
+    ":postgres_t",
+  ],
+)
+
+combine(
+  name="wf2",
+  deps=[
+    ":postgres_wf_2",
+    ":postgres_t_2",
+  ],
+)
+
+combine(
+  name="wf3",
+  deps=[
+    ":postgres_wf_3",
+    ":postgres_t_3",
+  ],
+)
+
+combine(
+  name="wf4",
+  deps=[
+    ":postgres_wf_4",
+    ":postgres_t_4",
+  ],
+)
+
+# T clients with analytical clients.
 run_experiment_group(
   name="postgres_wf",
   run="./run_postgres.sh",
@@ -49,6 +86,133 @@ run_experiment_group(
         "warmup": WARMUP,
       },
     )
-    for scale_factor, wf in product([10], WORKLOAD_FACTORS)
+    for scale_factor, wf in product(MAIN_SF, WORKLOAD_FACTORS)
+  ],
+)
+
+# T clients only.
+run_experiment_group(
+  name="postgres_t",
+  run="./run_postgres.sh",
+  experiments=[
+    ExperimentInstance(
+      name="postgres_t-{}-{}".format(scale_factor, wf),
+      options={
+        "sf": scale_factor,
+        "tclients": wf,
+        "aclients": 0,
+        "run_for": RUN_FOR,
+        "warmup": WARMUP,
+      },
+    )
+    for scale_factor, wf in product(MAIN_SF, WORKLOAD_FACTORS)
+  ],
+)
+
+run_experiment_group(
+  name="postgres_wf_2",
+  run="./run_postgres.sh",
+  experiments=[
+    ExperimentInstance(
+      name="postgres_wf_2-{}-{}".format(scale_factor, wf),
+      options={
+        "sf": scale_factor,
+        **custom_workload_factor(wf),
+        "run_for": RUN_FOR,
+        "warmup": WARMUP,
+      },
+    )
+    for scale_factor, wf in product(MAIN_SF, WORKLOAD_FACTORS_2)
+  ],
+)
+
+# T clients only.
+run_experiment_group(
+  name="postgres_t_2",
+  run="./run_postgres.sh",
+  experiments=[
+    ExperimentInstance(
+      name="postgres_t_2-{}-{}".format(scale_factor, wf),
+      options={
+        "sf": scale_factor,
+        "tclients": wf,
+        "aclients": 0,
+        "run_for": RUN_FOR,
+        "warmup": WARMUP,
+      },
+    )
+    for scale_factor, wf in product(MAIN_SF, WORKLOAD_FACTORS_2)
+  ],
+)
+
+run_experiment_group(
+  name="postgres_wf_3",
+  run="./run_postgres.sh",
+  experiments=[
+    ExperimentInstance(
+      name="postgres_wf_3-{}-{}".format(scale_factor, wf),
+      options={
+        "sf": scale_factor,
+        **custom_workload_factor(wf),
+        "run_for": RUN_FOR,
+        "warmup": WARMUP,
+      },
+    )
+    for scale_factor, wf in product(MAIN_SF, WORKLOAD_FACTORS_3)
+  ],
+)
+
+# T clients only.
+run_experiment_group(
+  name="postgres_t_3",
+  run="./run_postgres.sh",
+  experiments=[
+    ExperimentInstance(
+      name="postgres_t_3-{}-{}".format(scale_factor, wf),
+      options={
+        "sf": scale_factor,
+        "tclients": wf,
+        "aclients": 0,
+        "run_for": RUN_FOR,
+        "warmup": WARMUP,
+      },
+    )
+    for scale_factor, wf in product(MAIN_SF, WORKLOAD_FACTORS_3)
+  ],
+)
+
+run_experiment_group(
+  name="postgres_wf_4",
+  run="./run_postgres.sh",
+  experiments=[
+    ExperimentInstance(
+      name="postgres_wf_4-{}-{}".format(scale_factor, wf),
+      options={
+        "sf": scale_factor,
+        **custom_workload_factor(wf),
+        "run_for": RUN_FOR,
+        "warmup": WARMUP,
+      },
+    )
+    for scale_factor, wf in product(MAIN_SF, WORKLOAD_FACTORS_4)
+  ],
+)
+
+# T clients only.
+run_experiment_group(
+  name="postgres_t_4",
+  run="./run_postgres.sh",
+  experiments=[
+    ExperimentInstance(
+      name="postgres_t_4-{}-{}".format(scale_factor, wf),
+      options={
+        "sf": scale_factor,
+        "tclients": wf,
+        "aclients": 0,
+        "run_for": RUN_FOR,
+        "warmup": WARMUP,
+      },
+    )
+    for scale_factor, wf in product(MAIN_SF, WORKLOAD_FACTORS_4)
   ],
 )
