@@ -24,7 +24,7 @@ combine(
   name="all",
   deps=[
     ":both-m6i_large",
-    ":both-m6i_2xlarge",
+    ":both-m6i_xlarge_dc2_large_2",
   ],
 )
 
