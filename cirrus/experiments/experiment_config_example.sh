@@ -15,3 +15,7 @@ PG_ODBC_DSN="RDS PostgreSQL"
 PG_REPLICA_ODBC_DSN="RDS PostgreSQL Replica"
 PG_ODBC_USER="postgres"
 PWDVAR="DBPWD"
+
+RSFT_ODBC_DSN="Redshift"
+RSFT_USER="awsuser"
+RSFT_IAM_ROLE=""
