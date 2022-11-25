@@ -21,7 +21,7 @@ WORKLOAD_FACTORS = {
 }
 
 combine(
-  name="all",
+  name="postgres_redshift",
   deps=[
     ":both-m6i_large",
     ":both-m6i_xlarge_dc2_large_2",

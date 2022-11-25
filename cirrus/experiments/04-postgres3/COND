@@ -22,7 +22,7 @@ WORKLOAD_FACTORS = {
 }
 
 combine(
-  name="all",
+  name="postgres_only",
   deps=[
     ":pg-m6i_large",
     ":pg-m6i_2xlarge",
