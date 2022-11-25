@@ -306,3 +306,14 @@ void StoreDataset::DropWorkloadGeneratedRecords(
   // Ideally we reset the item counts in `inventory` too, but this is trickier
   // to do.
 }
+
+void StoreDataset::ResetPhysIdSequence(nanodbc::connection& connection) {
+  // Makes sure that newly inserted rows have a `s_phys_id` greater than all
+  // previous rows. This change is used to extract new rows.
+  std::stringstream reset_cmd;
+  reset_cmd << "ALTER SEQUENCE sales_";
+  reset_cmd << PaddedScaleFactor(scale_factor_);
+  reset_cmd << "_s_phys_id_seq RESTART WITH ";
+  reset_cmd << (SalesBaseCardinality(scale_factor_) + 1);
+  nanodbc::execute(connection, reset_cmd.str());
+}

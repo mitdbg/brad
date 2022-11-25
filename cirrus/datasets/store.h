@@ -17,6 +17,8 @@ class StoreDataset {
                     bool for_postgres_extraction);
   void DropAll(nanodbc::connection& connection);
   void DropWorkloadGeneratedRecords(nanodbc::connection& connection);
+  // Only relevant for workloads that run on PostgreSQL.
+  void ResetPhysIdSequence(nanodbc::connection& connection);
 
   void GenerateDataFiles(std::filesystem::path out, uint32_t seed = 42);
   void GenerateAndLoad(nanodbc::connection& connection, uint32_t seed = 42);

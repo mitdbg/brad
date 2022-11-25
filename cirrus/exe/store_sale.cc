@@ -51,6 +51,7 @@ int main(int argc, char* argv[]) {
     {
       nanodbc::connection c(utils::GetConnection(DBType::kRDSPostgreSQL));
       dataset.DropWorkloadGeneratedRecords(c);
+      dataset.ResetPhysIdSequence(c);
       dataset.UpdateMaxStats(c);
     }
     if (read_db == DBType::kRedshift) {

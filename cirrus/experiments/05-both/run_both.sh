@@ -14,5 +14,6 @@ for i in $(seq 1 3); do
     --redshift_iam_role="$RSFT_IAM_ROLE" \
     --pwdvar=$PWDVAR \
     --read_db=redshift \
+    --verbose \
     $@ > $COND_OUT/results-$i.csv
 done
