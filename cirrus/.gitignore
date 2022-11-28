@@ -1,6 +1,5 @@
 build
-cond-out
+cond-out*
 *.swp
 .DS_Store
 ._.DS_Store
-experiments/experiment_config.sh
