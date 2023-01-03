@@ -1,0 +1,11 @@
+target_sources(cirrus
+  PRIVATE
+    cirrus_impl.cc
+    cirrus_impl.h
+    connector.cc
+    connector.h
+    odbc.cc
+    odbc.h
+    table_version.cc
+    table_version.h
+)

@@ -1,0 +1,11 @@
+add_executable(run_tests)
+target_sources(run_tests
+  PRIVATE
+    cirrus.cc
+)
+target_link_libraries(run_tests
+  PRIVATE
+    cirrus
+    gtest
+    gtest_main
+)
