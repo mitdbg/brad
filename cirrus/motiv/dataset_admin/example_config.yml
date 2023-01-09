@@ -8,7 +8,7 @@ name: store
 
 tables:
   - name: inventory
-    size: 1000
+    multiplier: 1000
     columns:
       - name: i_id
         type: int
@@ -71,5 +71,5 @@ tables:
         type: int
         dist:
           type: increasing
-          min: 0
+          start_from: 0
           max_gap: 10
