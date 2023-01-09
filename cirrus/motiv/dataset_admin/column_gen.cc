@@ -16,8 +16,4 @@ void IncreasingColumnGenerator::WriteNext(std::ostream& out, PRNG& prng) {
   last_ += gap_dist_(prng);
 }
 
-void UniformForeignColumnGenerator::WriteNext(std::ostream& out, PRNG& prng) {
-  out << source_[index_dist_(prng)];
-}
-
 }  // namespace cirrus

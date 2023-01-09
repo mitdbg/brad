@@ -12,10 +12,8 @@ tables:
     columns:
       - name: i_id
         type: int
-        primary_key: true
         dist:
-          type: increment
-          start_from: 1
+          type: primary_key
       - name: i_name
         type: int
         dist:
@@ -46,15 +44,12 @@ tables:
     columns:
       - name: s_id
         type: int
-        primary_key: true
         dist:
           type: increment
-          start_from: 1
       - name: s_i_id
-        type: foreign_key
-        references: inventory.i_id
         dist:
-          type: uniform
+          type: foreign_key
+          references: inventory.i_id
       - name: s_quantity
         type: int
         dist:
