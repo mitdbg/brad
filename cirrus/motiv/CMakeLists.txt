@@ -32,6 +32,7 @@ target_include_directories(cirrus
 target_link_libraries(cirrus PUBLIC nanodbc yaml-cpp)
 
 add_subdirectory(cirrus)
+add_subdirectory(dataset_admin)
 add_subdirectory(config)
 add_subdirectory(datasets)
 add_subdirectory(utils)

@@ -1,0 +1,75 @@
+name: store
+
+# Data distribution types
+# - increment
+# - uniform
+# - increasing
+# - foreign_key
+
+tables:
+  - name: inventory
+    size: 1000
+    columns:
+      - name: i_id
+        type: int
+        primary_key: true
+        dist:
+          type: increment
+          start_from: 1
+      - name: i_name
+        type: int
+        dist:
+          type: uniform
+          min: 0
+          max: 100
+      - name: i_category
+        type: int
+        dist:
+          type: uniform
+          min: 0
+          max: 100
+      - name: i_quantity
+        type: int
+        dist:
+          type: uniform
+          min: 0
+          max: 100
+      - name: i_price
+        type: int
+        dist:
+          type: uniform
+          min: 0
+          max: 100
+
+  - name: sales
+    multiplier: 1000
+    columns:
+      - name: s_id
+        type: int
+        primary_key: true
+        dist:
+          type: increment
+          start_from: 1
+      - name: s_i_id
+        type: foreign_key
+        references: inventory.i_id
+        dist:
+          type: uniform
+      - name: s_quantity
+        type: int
+        dist:
+          type: uniform
+          min: 0
+          max: 100
+      - name: s_price
+        type: int
+        dist:
+          type: uniform
+          min: 0
+          max: 100
+      - name: s_datetime
+        type: int
+        dist:
+          type: increasing
+          min: 0
+          max_gap: 10
