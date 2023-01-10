@@ -45,7 +45,7 @@ tables:
       - name: s_id
         type: int
         dist:
-          type: increment
+          type: primary_key
       - name: s_i_id
         dist:
           type: foreign_key

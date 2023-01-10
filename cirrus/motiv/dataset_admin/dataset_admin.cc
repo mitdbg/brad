@@ -65,6 +65,8 @@ void DatasetAdmin::GenerateTo(const std::filesystem::path& output_path,
         }
         generator = std::unique_ptr<ColumnGenerator>(
             new UniformColumnGenerator(1, it->second));
+      } else {
+        throw std::runtime_error("Unknown column type: " + dist_type);
       }
       gens.push_back(std::move(generator));
     }
@@ -72,7 +74,7 @@ void DatasetAdmin::GenerateTo(const std::filesystem::path& output_path,
     std::ofstream out(output_path / (table_name + ".tbl"));
     for (uint64_t i = 0; i < num_rows; ++i) {
       for (uint64_t j = 0; j < gens.size(); ++j) {
-        gens[i]->WriteNext(out, prng);
+        gens[j]->WriteNext(out, prng);
         if (j < gens.size() - 1) {
           out << "|";
         }
