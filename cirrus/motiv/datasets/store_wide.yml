@@ -1,0 +1,151 @@
+name: inventory_wide
+
+tables:
+  - name: inventory_wide
+    multiplier: 1000000
+    columns:
+      - name: i_id
+        type: bigint
+        dist:
+          type: primary_key
+      - name: i_category
+        type: bigint
+        dist:
+          type: uniform
+          min: 0
+          max: 99
+      - name: i_quantity
+        type: bigint
+        dist:
+          type: uniform
+          min: 20000
+          max: 30000
+      - name: i_price
+        type: bigint
+        dist:
+          type: uniform
+          min: 10
+          max: 100
+
+      # 20 "dummy" metadata columns
+      - name: i_meta0
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta1
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta2
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta3
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta4
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta5
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta6
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta7
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta8
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta9
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+
+      - name: i_meta10
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta11
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta12
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta13
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta14
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta15
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta16
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta17
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta18
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000
+      - name: i_meta19
+        type: bigint
+        dist:
+          type: uniform
+          min: 1000
+          max: 1000000

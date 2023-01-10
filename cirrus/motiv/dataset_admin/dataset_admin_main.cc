@@ -50,6 +50,7 @@ int main(int argc, char* argv[]) {
             : cirrus::CirrusConfig::Local(FLAGS_dsn, FLAGS_user, FLAGS_pwdvar);
     nanodbc::connection c = cirrus::GetOdbcConnection(*config, db);
 
+    dataset.CreateTables(c, db);
     dataset.LoadFromS3(c, db, FLAGS_bucket, FLAGS_iam_role);
 
   } else {

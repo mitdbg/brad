@@ -110,7 +110,7 @@ void DatasetAdmin::CreateTables(nanodbc::connection& db, DBType dbtype) {
     for (const auto& col : columns) {
       query << col.first << " " << col.second << ", ";
     }
-    query << "PRIMARY KEY " << pkey_column << ");";
+    query << "PRIMARY KEY (" << pkey_column << "));";
 
     nanodbc::execute(db, query.str());
   }
@@ -123,7 +123,7 @@ void DatasetAdmin::LoadFromS3(nanodbc::connection& db, DBType dbtype,
                               const std::string& iam_role) const {
   nanodbc::transaction txn(db);
   const std::string dataset_name =
-      state_->config_["dataset_name"].as<std::string>();
+      state_->config_["name"].as<std::string>();
   for (const auto& table : state_->config_["tables"]) {
     const std::string table_name = table["name"].as<std::string>();
 
