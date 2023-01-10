@@ -2,10 +2,13 @@
 
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <random>
+#include <sstream>
 #include <vector>
 
 #include "column_gen.h"
+#include "utils/sf.h"
 #include "yaml-cpp/yaml.h"
 
 namespace cirrus {
@@ -84,10 +87,102 @@ void DatasetAdmin::GenerateTo(const std::filesystem::path& output_path,
   }
 }
 
+void DatasetAdmin::CreateTables(nanodbc::connection& db, DBType dbtype) {
+  nanodbc::transaction txn(db);
+
+  for (const auto& table : state_->config_["tables"]) {
+    const std::string table_name = table["name"].as<std::string>();
+    std::vector<std::pair<std::string, std::string>> columns;
+    std::string pkey_column;  // TODO: Assumes a single primary key column.
+
+    // Parse all columns.
+    for (const auto& col : table["columns"]) {
+      const std::string col_name = col["name"].as<std::string>();
+      columns.push_back({col_name, col["type"].as<std::string>()});
+      if (col["dist"]["type"].as<std::string>() == "primary_key") {
+        pkey_column = col_name;
+      }
+    }
+
+    // Generate the create table SQL.
+    std::stringstream query;
+    query << "CREATE TABLE IF NOT EXISTS " << table_name << " (";
+    for (const auto& col : columns) {
+      query << col.first << " " << col.second << ", ";
+    }
+    query << "PRIMARY KEY " << pkey_column << ");";
+
+    nanodbc::execute(db, query.str());
+  }
+
+  txn.commit();
+}
+
 void DatasetAdmin::LoadFromS3(nanodbc::connection& db, DBType dbtype,
-                              const std::string& bucket) const {}
+                              const std::string& bucket,
+                              const std::string& iam_role) const {
+  nanodbc::transaction txn(db);
+  const std::string dataset_name =
+      state_->config_["dataset_name"].as<std::string>();
+  for (const auto& table : state_->config_["tables"]) {
+    const std::string table_name = table["name"].as<std::string>();
+
+    if (dbtype == DBType::kRDSPostgreSQL) {
+      std::stringstream cmd;
+      cmd << "SELECT aws_s3.table_import_from_s3(";
+      cmd << "'" << table_name << "',";
+      cmd << "'',";
+      cmd << "'DELIMITER ''|''',";
+      cmd << "aws_commons.create_s3_uri('" << bucket << "', '" << dataset_name
+          << "/sf" << PaddedScaleFactor(scale_factor_) << "/" << table_name
+          << ".tbl', 'us-east-1')";
+      cmd << ");";
+      nanodbc::execute(db, cmd.str());
+
+    } else if (dbtype == DBType::kRedshift) {
+      std::stringstream cmd;
+      cmd << "COPY " << table_name;
+      cmd << " FROM 's3://" << bucket << "/" << dataset_name << "/sf"
+          << PaddedScaleFactor(scale_factor_) << "/" << table_name << ".tbl'";
+      cmd << " IAM_ROLE '" << iam_role << "'";
+      cmd << " REGION 'us-east-1'";
+      nanodbc::execute(db, cmd.str());
+
+    } else {
+      throw std::runtime_error("Unsupported DBType.");
+    }
+  }
+  txn.commit();
+}
 
 void DatasetAdmin::ResetToGenerated(nanodbc::connection& db,
-                                    DBType dbtype) const {}
+                                    DBType dbtype) const {
+  nanodbc::transaction txn(db);
+  for (const auto& table : state_->config_["tables"]) {
+    const std::string table_name = table["name"].as<std::string>();
+    const uint64_t multiplier = table["multiplier"].as<uint64_t>();
+    const uint64_t num_rows = multiplier * scale_factor_;
+    std::optional<std::string>
+        pkey_column;  // TODO: Assumes a single primary key column.
+
+    // Find the primary key column.
+    for (const auto& col : table["columns"]) {
+      if (col["dist"]["type"].as<std::string>() == "primary_key") {
+        pkey_column = col["name"].as<std::string>();
+      }
+      break;
+    }
+
+    if (!pkey_column.has_value()) {
+      throw std::runtime_error("Table missing primary key: " + table_name);
+    }
+
+    std::stringstream query;
+    query << "DELETE FROM " << table_name << " WHERE " << *pkey_column << " > "
+          << num_rows;
+    nanodbc::execute(db, query.str());
+  }
+  txn.commit();
+}
 
 }  // namespace cirrus
