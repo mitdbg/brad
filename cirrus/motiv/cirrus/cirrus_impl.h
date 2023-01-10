@@ -31,6 +31,9 @@ class CirrusImpl : public Cirrus {
 
   uint64_t GetMaxDatetime() const override;
 
+  void NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory) override {}
+  size_t RunCategoryStockQuery() override { return 0; }
+
  private:
   std::string GenerateReportingQuery(uint64_t datetime_start,
                                      uint64_t datetime_end) const;

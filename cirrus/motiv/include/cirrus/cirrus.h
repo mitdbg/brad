@@ -43,6 +43,13 @@ class Cirrus {
   virtual size_t RunStockFeatureQuery() = 0;
 
   virtual uint64_t GetMaxDatetime() const = 0;
+
+  ////////////////////////////////////////////////////////////////////////////
+
+  // Inventory-wide dataset specific methods follow.
+
+  virtual void NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory) = 0;
+  virtual size_t RunCategoryStockQuery() = 0;
 };
 
 }  // namespace cirrus

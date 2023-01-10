@@ -14,7 +14,7 @@ tables:
           type: uniform
           min: 0
           max: 99
-      - name: i_quantity
+      - name: i_stock
         type: bigint
         dist:
           type: uniform

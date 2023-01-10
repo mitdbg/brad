@@ -31,6 +31,9 @@ class CirrusWriteLogger : public Cirrus {
 
   uint64_t GetMaxDatetime() const override { return 0; }
 
+  void NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory) override {}
+  size_t RunCategoryStockQuery() override { return 0; }
+
  private:
   std::ofstream inventory_out_, sales_out_;
 };
