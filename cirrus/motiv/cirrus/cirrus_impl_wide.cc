@@ -177,15 +177,30 @@ size_t CirrusImpl::WideHotPlacement() {
   auto write_result = nanodbc::execute(write_store, kHotQueryWrite);
 
   // TODO: Properly merge the results.
-  size_t num_results = 0;
+  // Used to simulate merging.
+  std::unordered_map<uint64_t, uint64_t> merged;
   while (read_result.next()) {
-    ++num_results;
+    const uint64_t category = read_result.get<uint64_t>(0);
+    const uint64_t stock = read_result.get<uint64_t>(1);
+    const auto it = merged.find(category);
+    if (it == merged.end()) {
+      merged.insert({category, stock});
+    } else {
+      it->second += stock;
+    }
   }
   while (write_result.next()) {
-    ++num_results;
+    const uint64_t category = write_result.get<uint64_t>(0);
+    const uint64_t stock = write_result.get<uint64_t>(1);
+    const auto it = merged.find(category);
+    if (it == merged.end()) {
+      merged.insert({category, stock});
+    } else {
+      it->second += stock;
+    }
   }
 
-  return num_results;
+  return merged.size();
 }
 
 }  // namespace cirrus
