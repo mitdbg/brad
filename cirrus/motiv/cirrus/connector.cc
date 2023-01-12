@@ -24,6 +24,11 @@ void Connector::Connect(const std::shared_ptr<CirrusConfig>& config) {
         "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL "
         "REPEATABLE READ READ WRITE");
   }
+
+  if (config->read_store_type() == DBType::kRedshift) {
+    // Disable result caching.
+    nanodbc::execute(read_store_, "SET enable_result_cache_for_session = off;");
+  }
 }
 
 }  // namespace cirrus

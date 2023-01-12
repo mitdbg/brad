@@ -175,7 +175,20 @@ int main(int argc, char* argv[]) {
   std::cerr << "> Waiting for background workers to finish..." << std::endl;
   cirrus.reset();
 
-  // TODO: Write out any new stats we need.
+  // Write out the stats
+  {
+    const char* out_path = std::getenv("COND_OUT");
+    std::ofstream out(out_path != nullptr
+                          ? std::filesystem::path(out_path) / "stats.csv"
+                          : "stats.csv");
+    Stats::RunOnGlobal([&out](auto& stats) {
+      out << "counter,value" << std::endl;
+      out << "inv_notifs," << stats.GetInventoryNotifications() << std::endl;
+      out << "hot_inv_drops," << stats.GetHotInventoryDrops() << std::endl;
+      out << "read_with_pause," << stats.GetReadWithPause() << std::endl;
+      out << "read_without_pause," << stats.GetReadWithoutPause() << std::endl;
+    });
+  }
 
   return 0;
 }
