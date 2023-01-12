@@ -1,5 +1,6 @@
 target_sources(cirrus
   PRIVATE
+    cirrus_impl_wide.cc
     cirrus_impl.cc
     cirrus_impl.h
     connector.cc

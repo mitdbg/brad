@@ -31,6 +31,11 @@ enum class Strategy {
   // TODO: Also explore batched updates? I think the latency will highly likely
   // be worse than the "latest stream" approaches, but perhaps the throughput
   // will be better.
+
+  // These strategies are for the "wide inventory" workload.
+  kWideAllOnWrite,
+  kWideAllOnRead,
+  kWideHotPlacement,
 };
 
 Strategy StrategyFromString(const std::string& strategy);

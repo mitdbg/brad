@@ -16,7 +16,7 @@ MakeSale::MakeSale(MakeSaleOptions options, nanodbc::connection connection,
       options_(options),
       num_txns_(0),
       num_aborts_(0),
-      next_id_(0),
+      next_version_(1),
       cirrus_(std::move(cirrus)),
       connection_(std::move(connection)),
       // We assume IDs are densely assigned (which should be the case for our
@@ -82,8 +82,11 @@ void MakeSale::RunImpl() {
     NotifyInventoryUpdate notify_inv;
     notify_inv.i_id = result.get<uint64_t>(0);
     notify_inv.i_stock = result.get<uint64_t>(1);
-    notify_inv.i_phys_id = 0;
+    notify_inv.i_phys_id = next_version_;
     txn.commit();
+
+    // We set the transaction timestamp.
+    ++next_version_;
 
     cirrus_->NotifyUpdateInventoryWide(notify_inv);
   };

@@ -34,7 +34,7 @@ DEFINE_uint32(tclients, 0, "Number of clients used to make the write requests");
 DEFINE_uint32(aclients, 0,
               "Number of clients used to make the analytical requests");
 
-DEFINE_string(strategy, "all_on_one", "The experiment strategy to use.");
+DEFINE_string(strategy, "wide_write", "The experiment strategy to use.");
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Runs workloads on the sales-inventory dataset.");

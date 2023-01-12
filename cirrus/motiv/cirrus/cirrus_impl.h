@@ -31,8 +31,8 @@ class CirrusImpl : public Cirrus {
 
   uint64_t GetMaxDatetime() const override;
 
-  void NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory) override {}
-  size_t RunCategoryStockQuery() override { return 0; }
+  void NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory);
+  size_t RunCategoryStockQuery() override;
 
  private:
   std::string GenerateReportingQuery(uint64_t datetime_start,
@@ -44,6 +44,10 @@ class CirrusImpl : public Cirrus {
   size_t StockFeatureHotPlacement();
 
   void RunWriteStoreMVUpdate();
+
+  // Different query execution strategies for the wide inventory dataset.
+  size_t WideAllOnOne();
+  size_t WideHotPlacement();
 
   std::shared_ptr<CirrusConfig> config_;
   ThreadPool bg_workers_;

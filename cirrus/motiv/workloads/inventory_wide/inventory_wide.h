@@ -71,7 +71,7 @@ class MakeSale : public WorkloadBase {
   uint64_t num_txns_;
   uint64_t num_aborts_;
 
-  uint64_t next_id_;
+  uint64_t next_version_;
 
   std::shared_ptr<Cirrus> cirrus_;
   mutable nanodbc::connection connection_;
