@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
 
   cirrus->EstablishThreadLocalConnections();
 
-  std::vector<std::unique_ptr<MakeSale>> tclients;
+  std::vector<std::unique_ptr<InvMakeSale>> tclients;
   std::vector<std::unique_ptr<CategoryStock>> aclients;
 
   // Start up the clients.
@@ -90,9 +90,11 @@ int main(int argc, char* argv[]) {
   toptions.scale_factor = FLAGS_sf;
   toptions.num_warmup = FLAGS_warmup;
   toptions.theta = FLAGS_theta;
+  // TODO: Number of items
+  toptions.max_i_id = 10000000;
   for (uint32_t i = 0; i < FLAGS_tclients; ++i) {
     toptions.client_id = i;
-    tclients.push_back(std::make_unique<MakeSale>(
+    tclients.push_back(std::make_unique<InvMakeSale>(
         toptions,
         /*connection=*/GetOdbcConnection(*config, DBType::kRDSPostgreSQL),
         cirrus, state));

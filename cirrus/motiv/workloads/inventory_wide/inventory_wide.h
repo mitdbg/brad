@@ -26,7 +26,7 @@ struct CategoryStockOptions {
 class CategoryStock : public WorkloadBase {
  public:
   CategoryStock(CategoryStockOptions options, std::shared_ptr<Cirrus> cirrus,
-                 std::shared_ptr<BenchmarkState> state);
+                std::shared_ptr<BenchmarkState> state);
   virtual ~CategoryStock() = default;
 
   uint64_t NumReportsRun() const;
@@ -52,13 +52,13 @@ struct MakeSaleOptions {
 };
 
 // Runs sales transactions.
-class MakeSale : public WorkloadBase {
+class InvMakeSale : public WorkloadBase {
  public:
   // `connection` represents a connection to the write store.
-  MakeSale(MakeSaleOptions options, nanodbc::connection connection,
-           std::shared_ptr<Cirrus> cirrus,
-           std::shared_ptr<BenchmarkState> state);
-  virtual ~MakeSale() = default;
+  InvMakeSale(MakeSaleOptions options, nanodbc::connection connection,
+              std::shared_ptr<Cirrus> cirrus,
+              std::shared_ptr<BenchmarkState> state);
+  virtual ~InvMakeSale() = default;
 
   uint64_t NumTxnsRun() const;
   uint64_t NumAborts() const;

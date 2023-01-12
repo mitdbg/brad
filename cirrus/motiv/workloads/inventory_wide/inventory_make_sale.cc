@@ -9,9 +9,10 @@
 
 namespace cirrus {
 
-MakeSale::MakeSale(MakeSaleOptions options, nanodbc::connection connection,
-                   std::shared_ptr<Cirrus> cirrus,
-                   std::shared_ptr<BenchmarkState> state)
+InvMakeSale::InvMakeSale(MakeSaleOptions options,
+                         nanodbc::connection connection,
+                         std::shared_ptr<Cirrus> cirrus,
+                         std::shared_ptr<BenchmarkState> state)
     : WorkloadBase(std::move(state)),
       options_(options),
       num_txns_(0),
@@ -25,11 +26,11 @@ MakeSale::MakeSale(MakeSaleOptions options, nanodbc::connection connection,
   Start();
 }
 
-uint64_t MakeSale::NumTxnsRun() const { return num_txns_; }
+uint64_t InvMakeSale::NumTxnsRun() const { return num_txns_; }
 
-uint64_t MakeSale::NumAborts() const { return num_aborts_; }
+uint64_t InvMakeSale::NumAborts() const { return num_aborts_; }
 
-void MakeSale::RunImpl() {
+void InvMakeSale::RunImpl() {
   const uint64_t max_id = options_.max_i_id;
 
   std::mt19937 prng(42 ^ options_.client_id);
@@ -43,9 +44,9 @@ void MakeSale::RunImpl() {
                    "SERIALIZABLE");
 
   const std::string select_inventory =
-      "SELECT i_stock, i_price FROM inventory WHERE i_id = ?;";
+      "SELECT i_stock, i_price FROM inventory_wide WHERE i_id = ?;";
   const std::string update_inventory =
-      "UPDATE inventory SET i_stock = ? WHERE i_id = ? RETURNING i_id, i_stock";
+      "UPDATE inventory_wide SET i_stock = ? WHERE i_id = ? RETURNING i_id, i_stock";
 
   const auto run_txn = [&]() {
     // For simplicity, we buy one item.
@@ -77,11 +78,11 @@ void MakeSale::RunImpl() {
     nanodbc::prepare(stmt, update_inventory);
     stmt.bind(0, &new_quantity, 1);
     stmt.bind(1, &id, 1);
-    nanodbc::execute(stmt);
-    result.next();
+    auto result2 = nanodbc::execute(stmt);
+    result2.next();
     NotifyInventoryUpdate notify_inv;
-    notify_inv.i_id = result.get<uint64_t>(0);
-    notify_inv.i_stock = result.get<uint64_t>(1);
+    notify_inv.i_id = result2.get<uint64_t>(0);
+    notify_inv.i_stock = result2.get<uint64_t>(1);
     notify_inv.i_phys_id = next_version_;
     txn.commit();
 

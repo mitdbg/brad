@@ -46,7 +46,7 @@ static const std::string kAllOnOneQuery = MULTILINE(
     i_category,
     SUM(i_stock) AS total
   FROM
-    inventory
+    inventory_wide
   GROUP BY
     i_category
 );
@@ -54,7 +54,7 @@ static const std::string kAllOnOneQuery = MULTILINE(
 
 static const std::string kHotQueryWrite = ([]() {
   std::stringstream query;
-  query << "SELECT i_category, SUM(i_stock) AS total FROM inventory WHERE i_id "
+  query << "SELECT i_category, SUM(i_stock) AS total FROM inventory_wide WHERE i_id "
            "IN ";
   query << kHotIdString;
   query << " GROUP BY i_category";
@@ -64,7 +64,7 @@ static const std::string kHotQueryWrite = ([]() {
 static const std::string kHotQueryRead = ([]() {
   std::stringstream query;
   // Note the negation.
-  query << "SELECT i_category, SUM(i_stock) AS total FROM inventory WHERE i_id "
+  query << "SELECT i_category, SUM(i_stock) AS total FROM inventory_wide WHERE i_id "
            "NOT IN ";
   query << kHotIdString;
   query << " GROUP BY i_category";
@@ -72,7 +72,7 @@ static const std::string kHotQueryRead = ([]() {
 })();
 
 static const std::string kUpdateInventory =
-    "UPDATE inventory SET i_stock = ? WHERE i_id = ?";
+    "UPDATE inventory_wide SET i_stock = ? WHERE i_id = ?";
 
 }  // namespace
 
