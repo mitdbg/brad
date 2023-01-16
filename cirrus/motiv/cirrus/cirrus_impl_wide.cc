@@ -54,8 +54,8 @@ static const std::string kAllOnOneQuery = MULTILINE(
 
 static const std::string kHotQueryWrite = ([]() {
   std::stringstream query;
-  query << "SELECT i_category, SUM(i_stock) AS total FROM inventory_wide WHERE i_id "
-           "IN ";
+  query << "SELECT i_category, SUM(i_stock) AS total FROM inventory_wide WHERE "
+           "i_id IN ";
   query << kHotIdString;
   query << " GROUP BY i_category";
   return query.str();
@@ -64,8 +64,8 @@ static const std::string kHotQueryWrite = ([]() {
 static const std::string kHotQueryRead = ([]() {
   std::stringstream query;
   // Note the negation.
-  query << "SELECT i_category, SUM(i_stock) AS total FROM inventory_wide WHERE i_id "
-           "NOT IN ";
+  query << "SELECT i_category, SUM(i_stock) AS total FROM inventory_wide WHERE "
+           "i_id NOT IN ";
   query << kHotIdString;
   query << " GROUP BY i_category";
   return query.str();
@@ -73,6 +73,73 @@ static const std::string kHotQueryRead = ([]() {
 
 static const std::string kUpdateInventory =
     "UPDATE inventory_wide SET i_stock = ? WHERE i_id = ?";
+
+static const std::string kExtractHot = ([]() {
+  std::stringstream query;
+  query << "SELECT * from aws_s3.query_export_to_s3(";
+  query << "'SELECT * FROM inventory_wide";
+  query << " WHERE i_id IN " << kHotIdString << "'";
+  query << ", aws_commons.create_s3_uri('geoffxy-research', "
+           "'etl/inventory_wide.tbl', 'us-east-1'), options :='FORMAT text, "
+           "DELIMITER ''|''');";
+  return query.str();
+})();
+
+std::string GenerateImportQuery(const std::string& iam_role) {
+  std::stringstream query;
+  query << "COPY inventory_wide_hot"
+        << " FROM 's3://geoffxy-research/etl/inventory_wide.tbl'"
+        << " IAM_ROLE '" << iam_role << "' REGION 'us-east-1'";
+  return query.str();
+}
+
+// clang-format off
+static const std::string kHotQueryReadWithImport = MULTILINE(
+  WITH full_results AS (
+    SELECT i_id, i_category, i_stock FROM inventory_wide
+  ),
+  new_results AS (
+    SELECT
+      i_id AS n_id,
+      i_category AS n_category,
+      i_stock AS n_stock
+    FROM
+      inventory_wide_hot
+  ),
+  combined AS (
+    SELECT
+      (CASE
+        WHEN ISNULL(i_id) THEN n_id
+        WHEN ISNULL(n_id) THEN i_id
+        ELSE n_id
+      END) AS i_id,
+      (CASE
+        WHEN ISNULL(i_id) THEN n_category
+        WHEN ISNULL(n_id) THEN i_category
+        ELSE n_category
+      END) AS i_category,
+      (CASE
+        WHEN ISNULL(i_id) THEN n_stock
+        WHEN ISNULL(n_id) THEN i_stock
+        ELSE n_stock
+      END) AS i_stock
+    FROM
+      full_results FULL OUTER JOIN new_results
+      ON i_id = n_id
+  )
+  SELECT
+    i_category,
+    SUM(i_stock) AS total
+  FROM combined
+  GROUP BY i_category
+);
+// clang-format on
+
+static const std::string kCreateImportTable = MULTILINE(
+    CREATE TABLE IF NOT EXISTS inventory_wide_hot(LIKE inventory_wide));
+
+static const std::string kTruncateImportTable =
+    MULTILINE(TRUNCATE TABLE inventory_wide_hot);
 
 }  // namespace
 
@@ -115,6 +182,8 @@ size_t CirrusImpl::RunCategoryStockQuery() {
     return WideAllOnOne();
   } else if (strategy_ == Strategy::kWideHotPlacement) {
     return WideHotPlacement();
+  } else if (strategy_ == Strategy::kWideExtractImport) {
+    return WideExtractImport();
   } else {
     throw std::runtime_error("Unsupported strategy.");
   }
@@ -201,6 +270,42 @@ size_t CirrusImpl::WideHotPlacement() {
   }
 
   return merged.size();
+}
+
+size_t CirrusImpl::WideExtractImport() {
+  // May need to wait.
+  const auto latest_inventory = inventory_version_.LatestKnown();
+  const auto [inv_waited, _] =
+      inventory_version_.WaitUntilAtLeast(latest_inventory);
+  // We assume the write store is always up to date. But we may need to wait for
+  // the read store.
+  // TODO: We need stronger transactional consistency guarantees. This benchmark
+  // approach is sloppy. We should add a versioning column and filter for it.
+  if (inv_waited) {
+    Stats::Local().BumpReadWithPause();
+  } else {
+    Stats::Local().BumpReadWithoutPause();
+  }
+
+  // Pull out the hot data
+  auto& write_store = connections_.write();
+  nanodbc::execute(write_store, kExtractHot);
+
+  // Import the hot data
+  auto& read_store = connections_.read();
+  nanodbc::execute(read_store, kCreateImportTable);
+  nanodbc::execute(read_store, kTruncateImportTable);
+  nanodbc::execute(read_store, GenerateImportQuery(config_->iam_role()));
+
+  // Run the query
+  auto result = nanodbc::execute(read_store, kHotQueryReadWithImport);
+
+  size_t num_results = 0;
+  while (result.next()) {
+    ++num_results;
+  }
+
+  return num_results;
 }
 
 }  // namespace cirrus

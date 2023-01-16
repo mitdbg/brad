@@ -14,7 +14,8 @@ Strategy StrategyFromString(const std::string& strategy) {
       {"hot_mv", Strategy::kHotPlacementWithMV},
       {"wide_write", Strategy::kWideAllOnWrite},
       {"wide_read", Strategy::kWideAllOnRead},
-      {"wide_hot", Strategy::kWideHotPlacement}};
+      {"wide_hot", Strategy::kWideHotPlacement},
+      {"wide_extract", Strategy::kWideExtractImport}};
   const auto it = kStrategies.find(strategy);
   if (it == kStrategies.end()) {
     throw std::runtime_error("Unrecognized strategy: " + strategy);

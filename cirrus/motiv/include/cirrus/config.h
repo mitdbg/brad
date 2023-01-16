@@ -28,6 +28,8 @@ class CirrusConfig {
   virtual std::string odbc_pwd(DBType dbtype) const = 0;
 
   virtual size_t bg_workers() const = 0;
+
+  virtual std::string iam_role() const = 0;
 };
 
 }  // namespace cirrus

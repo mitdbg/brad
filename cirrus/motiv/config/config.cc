@@ -46,6 +46,8 @@ class CirrusYAMLConfig : public CirrusConfig {
 
   size_t bg_workers() const override;
 
+  std::string iam_role() const override;
+
  private:
   mutable std::mutex mutex_;
   YAML::Node raw_config_;
@@ -64,6 +66,8 @@ class CirrusLocalConfig : public CirrusConfig {
   std::string odbc_pwd(DBType dbtype) const override;
 
   size_t bg_workers() const override { return 1; }
+
+  std::string iam_role() const override;
 
  private:
   std::string dsn_, username_, pwdvar_;
@@ -135,6 +139,11 @@ size_t CirrusYAMLConfig::bg_workers() const {
   return raw_config_[kBgWorkers].as<size_t>();
 }
 
+std::string CirrusYAMLConfig::iam_role() const {
+  std::unique_lock<std::mutex> lock(mutex_);
+  return raw_config_["iam_role"].as<std::string>();
+}
+
 CirrusLocalConfig::CirrusLocalConfig(const std::string& dsn,
                                      const std::string& username,
                                      const std::string& pwdvar)
@@ -156,5 +165,7 @@ std::string CirrusLocalConfig::odbc_user(DBType dbtype) const {
 std::string CirrusLocalConfig::odbc_pwd(DBType dbtype) const {
   return ExtractEnvVar(pwdvar_);
 }
+
+std::string CirrusLocalConfig::iam_role() const { return ""; }
 
 }  // namespace cirrus

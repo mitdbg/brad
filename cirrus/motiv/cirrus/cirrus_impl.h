@@ -48,6 +48,7 @@ class CirrusImpl : public Cirrus {
   // Different query execution strategies for the wide inventory dataset.
   size_t WideAllOnOne();
   size_t WideHotPlacement();
+  size_t WideExtractImport();
 
   std::shared_ptr<CirrusConfig> config_;
   ThreadPool bg_workers_;
