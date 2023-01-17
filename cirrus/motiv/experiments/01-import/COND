@@ -6,9 +6,9 @@ run_experiment_group(
       name="import_sweep-{}".format(sf),
       options={
         "sf": sf,
-        "trials": 3,
+        "trials": 10,
       },
     )
-    for sf in [1, 2, 4, 8, 16, 32]
+    for sf in [1, 2, 4, 8, 16, 32, 64, 128, 512, 1024, 2048, 4096]
   ],
 )
