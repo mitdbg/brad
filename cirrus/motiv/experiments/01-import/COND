@@ -1,0 +1,14 @@
+run_experiment_group(
+  name="import_sweep",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="import_sweep-{}".format(sf),
+      options={
+        "sf": sf,
+        "trials": 3,
+      },
+    )
+    for sf in [1, 2, 4, 8, 16, 32]
+  ],
+)

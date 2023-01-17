@@ -14,22 +14,28 @@ DEFINE_string(user, "", "ODBC username for local connections.");
 DEFINE_string(pwdvar, "", "ODBC password variable for local connections.");
 
 DEFINE_uint32(sf, 0, "Specifies the dataset scale factor.");
-DEFINE_uint32(trials, 3, "Number of trials.");
+DEFINE_uint32(trials, 5, "Number of trials.");
 DEFINE_string(iam_role, "", "Used for Redshift importing.");
 
 namespace {
 
 static const std::string kCreateImportTable =
-    "CREATE TABLE IF NOT EXISTS inventory_wide_hot(LIKE inventory_wide))";
+    "CREATE TABLE IF NOT EXISTS inventory_wide_hot(LIKE inventory_wide)";
 
 static const std::string kTruncateImportTable =
     "TRUNCATE TABLE inventory_wide_hot";
 
+inline std::string PaddedScaleFactor(uint32_t sf) {
+  std::stringstream builder;
+  builder << std::setfill('0') << std::setw(2) << sf;
+  return builder.str();
+}
+
 std::string GenerateImportQuery(const std::string& iam_role, uint32_t sf) {
   std::stringstream query;
   query << "COPY inventory_wide_hot"
-        << " FROM 's3://geoffxy-research/etl/invslide/invslide-" << sf
-        << ".tbl'"
+        << " FROM 's3://geoffxy-research/etl/invslide/invslide-"
+        << PaddedScaleFactor(sf) << ".tbl'"
         << " IAM_ROLE '" << iam_role << "' REGION 'us-east-1'";
   return query.str();
 }
@@ -52,7 +58,8 @@ int main(int argc, char* argv[]) {
 
   nanodbc::connection c = GetOdbcConnection(*config, config->read_store_type());
 
-  const std::string import_query = GenerateImportQuery(FLAGS_iam_role, FLAGS_sf);
+  const std::string import_query =
+      GenerateImportQuery(FLAGS_iam_role, FLAGS_sf);
   std::cerr << "> Starting experiment..." << std::endl;
   nanodbc::execute(c, kCreateImportTable);
 
