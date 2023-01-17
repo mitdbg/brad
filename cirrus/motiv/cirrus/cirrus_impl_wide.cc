@@ -133,6 +133,19 @@ static const std::string kHotQueryReadWithImport = MULTILINE(
   FROM combined
   GROUP BY i_category
 );
+
+static const std::string kHotQueryReadDisjointWithImport = MULTILINE(
+  WITH combined AS (
+    SELECT i_id, i_category, i_stock FROM inventory_wide
+    UNION ALL
+    SELECT i_id, i_category, i_stock FROM inventory_wide_hot
+  )
+  SELECT
+    i_category,
+    SUM(i_stock) AS total
+  FROM combined
+  GROUP BY i_category
+);
 // clang-format on
 
 static const std::string kCreateImportTable = MULTILINE(

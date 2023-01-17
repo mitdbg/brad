@@ -7,7 +7,7 @@
 #include "cirrus/odbc.h"
 #include "dataset_admin.h"
 
-DEFINE_string(action, "generate", "What to do. One of {generate, load}.");
+DEFINE_string(action, "generate", "What to do. One of {generate, load, create}.");
 
 DEFINE_string(config, "", "Path to the dataset configuration file.");
 DEFINE_uint32(sf, 1, "The scale factor to use.");
@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
   if (FLAGS_action == "generate") {
     dataset.GenerateTo(FLAGS_out_path);
 
-  } else if (FLAGS_action == "load") {
+  } else if (FLAGS_action == "load" || FLAGS_action == "create") {
     const auto maybe_db = cirrus::DBTypeFromString(FLAGS_db);
     if (!maybe_db.has_value()) {
       std::cerr << "ERROR: Unrecognized DB " << FLAGS_db << std::endl;
@@ -51,7 +51,9 @@ int main(int argc, char* argv[]) {
     nanodbc::connection c = cirrus::GetOdbcConnection(*config, db);
 
     dataset.CreateTables(c, db);
-    dataset.LoadFromS3(c, db, FLAGS_bucket, FLAGS_iam_role);
+    if (FLAGS_action == "load") {
+      dataset.LoadFromS3(c, db, FLAGS_bucket, FLAGS_iam_role);
+    }
 
   } else {
     std::cerr << "ERROR: Unrecognized action " << FLAGS_action << std::endl;
