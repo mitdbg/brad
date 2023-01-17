@@ -25,5 +25,8 @@ target_link_libraries(gen_store PRIVATE cirrus gflags)
 add_executable(bench_ivm bench_ivm.cc)
 target_link_libraries(bench_ivm PRIVATE cirrus gflags ycsbr)
 
+add_executable(bench_import bench_import.cc)
+target_link_libraries(bench_import PRIVATE cirrus gflags ycsbr)
+
 add_subdirectory(store)
 add_subdirectory(inventory_wide)
