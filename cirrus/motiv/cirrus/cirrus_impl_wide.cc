@@ -2,6 +2,8 @@
 #include <sstream>
 #include <unordered_set>
 #include <vector>
+#include <iostream>
+#include <chrono>
 
 #include "cirrus/stats.h"
 #include "cirrus_impl.h"
@@ -24,8 +26,24 @@ static const std::vector<uint64_t> kHotIds = {
     9651043, 861184,  5129356,
 };
 
+// Based on a zipfian, theta = 0.9, scale factor 100, workload (100 million
+// keys).
+static const std::vector<uint64_t> kHotIds100 = {
+    6593012, 9013293, 7803152, 1752450, 4172731, 542309,  2962590, 1433575,
+    6274137, 8694418, 7484277, 3853856, 8375543, 223434,  2643715, 5063996,
+    7165402, 2324840, 1114700, 5955262, 4238091, 6846527, 3534981, 4745121,
+    9585683, 4426246, 795824,  6339497, 7868512, 9078653, 9969918, 5636386,
+    8056667, 2709075, 6658372, 5448231, 3919216, 7991307, 2005965, 1180060,
+    1498935, 3027950, 1302855, 5252151, 1817810, 8122027, 9904558, 8759778,
+    2831870, 4491606, 5129356, 288794,  9651043, 6781167, 9266808, 9332168,
+    1621730,
+};
+
 static const std::unordered_set<uint64_t> kHotIdSet(kHotIds.begin(),
                                                     kHotIds.end());
+
+static const std::unordered_set<uint64_t> kHotId100Set(kHotIds100.begin(),
+                                                       kHotIds100.end());
 
 static const std::string kHotIdString = ([](const std::vector<uint64_t>& ids) {
   std::stringstream result;
@@ -39,6 +57,19 @@ static const std::string kHotIdString = ([](const std::vector<uint64_t>& ids) {
   result << ")";
   return result.str();
 })(kHotIds);
+
+static const std::string kHotId100String = ([](const std::vector<uint64_t>& ids) {
+  std::stringstream result;
+  result << "(";
+  for (size_t i = 0; i < ids.size(); ++i) {
+    result << ids[i];
+    if (i != ids.size() - 1) {
+      result << ", ";
+    }
+  }
+  result << ")";
+  return result.str();
+})(kHotIds100);
 
 // clang-format off
 static const std::string kAllOnOneQuery = MULTILINE(
@@ -78,7 +109,7 @@ static const std::string kExtractHot = ([]() {
   std::stringstream query;
   query << "SELECT * from aws_s3.query_export_to_s3(";
   query << "'SELECT * FROM inventory_wide";
-  query << " WHERE i_id IN " << kHotIdString << "'";
+  query << " WHERE i_id IN " << kHotId100String << "'";
   query << ", aws_commons.create_s3_uri('geoffxy-research', "
            "'etl/inventory_wide.tbl', 'us-east-1'), options :='FORMAT text, "
            "DELIMITER ''|''');";
@@ -162,12 +193,15 @@ void CirrusImpl::NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory) {
   Stats::Local().BumpInventoryNotifications();
   if (strategy_ == Strategy::kWideAllOnWrite) return;
 
-  if (strategy_ == Strategy::kWideHotPlacement) {
+  if (strategy_ == Strategy::kWideHotPlacement || strategy_ == Strategy::kWideExtractImport) {
     // Check if the key is hot. If it is, we drop the update! We never modify
     // the hot set in this implementation, so we do not need to take any locks.
     // We ignore the versioning - we use it only for tracking updates that
     // actually made to the table in the read store.
-    if (kHotIdSet.count(inventory.i_id) == 0) {
+    //
+    // N.B. Hardcoded for a 100 million row dataset with a Zipfian distribution
+    // where theta = 0.9.
+    if (kHotId100Set.count(inventory.i_id) == 0) {
       Stats::Local().BumpHotInventoryDrops();
       return;
     }
@@ -221,6 +255,7 @@ size_t CirrusImpl::WideAllOnOne() {
     const auto [inv_waited, _] =
         inventory_version_.WaitUntilAtLeast(latest_inventory);
     if (inv_waited) {
+      std::cerr << "Versions waited for: " << _ << std::endl;
       Stats::Local().BumpReadWithPause();
     } else {
       Stats::Local().BumpReadWithoutPause();
@@ -286,6 +321,8 @@ size_t CirrusImpl::WideHotPlacement() {
 }
 
 size_t CirrusImpl::WideExtractImport() {
+  static const std::string import_query = GenerateImportQuery(config_->iam_role());
+
   // May need to wait.
   const auto latest_inventory = inventory_version_.LatestKnown();
   const auto [inv_waited, _] =
@@ -295,23 +332,40 @@ size_t CirrusImpl::WideExtractImport() {
   // TODO: We need stronger transactional consistency guarantees. This benchmark
   // approach is sloppy. We should add a versioning column and filter for it.
   if (inv_waited) {
+    //std::cerr << "Versions waited for: " << _ << std::endl;
     Stats::Local().BumpReadWithPause();
   } else {
+    //std::cerr << "Data is current." << std::endl;
     Stats::Local().BumpReadWithoutPause();
   }
 
   // Pull out the hot data
   auto& write_store = connections_.write();
+  const auto p1 = std::chrono::steady_clock::now();
   nanodbc::execute(write_store, kExtractHot);
+  const auto p2 = std::chrono::steady_clock::now();
 
   // Import the hot data
   auto& read_store = connections_.read();
   nanodbc::execute(read_store, kCreateImportTable);
+  const auto p3 = std::chrono::steady_clock::now();
   nanodbc::execute(read_store, kTruncateImportTable);
-  nanodbc::execute(read_store, GenerateImportQuery(config_->iam_role()));
+  const auto p4 = std::chrono::steady_clock::now();
+  nanodbc::execute(read_store, import_query);
+  const auto p5 = std::chrono::steady_clock::now();
 
   // Run the query
-  auto result = nanodbc::execute(read_store, kHotQueryReadWithImport);
+  auto result = nanodbc::execute(read_store, kHotQueryReadDisjointWithImport);
+  const auto p6 = std::chrono::steady_clock::now();
+
+  /*
+  std::cerr << "> Extract: " << (p2 - p1).count() / 1e6 << std::endl;
+  std::cerr << "> Create table: " << (p3 - p2).count() / 1e6 << std::endl;
+  std::cerr << "> Truncate: " << (p4 - p3).count() / 1e6 << std::endl;
+  std::cerr << "> Import: " << (p5 - p4).count() / 1e6 << std::endl;
+  std::cerr << "> Run: " << (p6 - p5).count() / 1e6 << std::endl;
+  std::cerr << "----------" << std::endl;
+  */
 
   size_t num_results = 0;
   while (result.next()) {

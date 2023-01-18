@@ -51,6 +51,7 @@ int main(int argc, char* argv[]) {
 
   auto dataset = DatasetAdmin(FLAGS_dataset_config_file, FLAGS_sf);
 
+  /*
   std::cerr << "> Dropping extraneous records..." << std::endl;
   {
     nanodbc::connection c =
@@ -62,6 +63,7 @@ int main(int argc, char* argv[]) {
         GetOdbcConnection(*config, config->read_store_type());
     dataset.ResetToGenerated(c, config->read_store_type());
   }
+  */
 
   const Strategy strategy = StrategyFromString(FLAGS_strategy);
 

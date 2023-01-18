@@ -39,11 +39,15 @@ uint64_t TableVersion::LatestKnown() const {
 std::pair<bool, uint64_t> TableVersion::WaitUntilAtLeast(uint64_t version) {
   std::unique_lock<std::mutex> lock(mutex_);
   bool had_to_wait = false;
+  uint64_t diff = 0;
+  if (version > updated_to_) {
+    diff = version - updated_to_ + 1;
+  }
   while (version > updated_to_) {
     had_to_wait = true;
     wait_.wait(lock);
   }
-  return {had_to_wait, updated_to_};
+  return {had_to_wait, diff};
 }
 
 }  // namespace cirrus
