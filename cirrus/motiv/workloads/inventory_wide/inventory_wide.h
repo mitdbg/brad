@@ -76,4 +76,33 @@ class InvMakeSale : public WorkloadBase {
   ycsbr::gen::ScatteredZipfianChooser item_id_chooser_;
 };
 
+// Implements an ETL of the inventory table.
+// This workload is hardcoded to use AWS S3 for data transfer.
+class InvETL : public WorkloadBase {
+ public:
+  // The ETL will run every `period` milliseconds.
+  InvETL(uint32_t scale_factor, std::chrono::milliseconds period,
+         nanodbc::connection source, std::shared_ptr<Cirrus> cirrus,
+         std::shared_ptr<BenchmarkState> state);
+  virtual ~InvETL() = default;
+
+  uint64_t NumRuns() const;
+
+ private:
+  uint64_t GetMaxSynced() const;
+  std::string GenerateExtractQuery(uint64_t seq, uint64_t max_seq) const;
+  std::string GenerateImportQuery(uint64_t seq) const;
+
+  virtual void RunImpl() override;
+
+  uint64_t num_runs_;
+  uint32_t scale_factor_;
+  uint64_t synced_phys_id_;
+  uint64_t sequence_number_;
+  std::chrono::milliseconds period_;
+  std::chrono::steady_clock::time_point run_next_;
+  mutable nanodbc::connection source_;
+  std::shared_ptr<Cirrus> cirrus_;
+};
+
 }  // namespace cirrus

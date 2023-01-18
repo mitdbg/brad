@@ -375,4 +375,8 @@ size_t CirrusImpl::WideExtractImport() {
   return num_results;
 }
 
+void CirrusImpl::RunETLSync(uint64_t up_to_version) {}
+
+uint64_t CirrusImpl::GetMaxSyncedInv() { return 0; }
+
 }  // namespace cirrus

@@ -34,6 +34,9 @@ class CirrusImpl : public Cirrus {
   void NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory);
   size_t RunCategoryStockQuery() override;
 
+  void RunETLSync(uint64_t up_to_version) override;
+  uint64_t GetMaxSyncedInv() override;
+
  private:
   std::string GenerateReportingQuery(uint64_t datetime_start,
                                      uint64_t datetime_end) const;
