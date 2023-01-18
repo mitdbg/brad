@@ -106,7 +106,13 @@ void DatasetAdmin::CreateTables(nanodbc::connection& db, DBType dbtype) {
     // Parse all columns.
     for (const auto& col : table["columns"]) {
       const std::string col_name = col["name"].as<std::string>();
-      columns.push_back({col_name, col["type"].as<std::string>()});
+      const std::string col_type = col["type"].as<std::string>();
+      if (dbtype == DBType::kRedshift && col_type == "bigserial") {
+        // `bigserial` is not supported in Redshift (and we don't use it anyways)
+        columns.push_back({col_name, "bigint"});
+      } else {
+        columns.push_back({col_name, col_type});
+      }
       if (col["dist"]["type"].as<std::string>() == "primary_key") {
         pkey_column = col_name;
       }
