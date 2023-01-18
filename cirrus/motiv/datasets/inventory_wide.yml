@@ -27,6 +27,11 @@ tables:
           min: 10
           max: 100
 
+      - name: i_seq
+        type: bigserial
+        dist:
+          type: sequence
+
       # 20 "dummy" metadata columns
       - name: i_meta0
         type: bigint

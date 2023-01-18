@@ -48,6 +48,10 @@ void DatasetAdmin::GenerateTo(const std::filesystem::path& output_path,
             table_name + "." + col["name"].as<std::string>();
         pkey_max[full_name] = num_rows;
 
+      } else if (dist_type == "sequence") {
+        generator = std::unique_ptr<ColumnGenerator>(
+            new IncrementColumnGenerator(/*start_from=*/1));
+
       } else if (dist_type == "uniform") {
         generator = std::unique_ptr<ColumnGenerator>(
             new UniformColumnGenerator(col["dist"]["min"].as<uint64_t>(),
@@ -68,6 +72,7 @@ void DatasetAdmin::GenerateTo(const std::filesystem::path& output_path,
         }
         generator = std::unique_ptr<ColumnGenerator>(
             new UniformColumnGenerator(1, it->second));
+
       } else {
         throw std::runtime_error("Unknown column type: " + dist_type);
       }
@@ -90,6 +95,9 @@ void DatasetAdmin::GenerateTo(const std::filesystem::path& output_path,
 void DatasetAdmin::CreateTables(nanodbc::connection& db, DBType dbtype) {
   nanodbc::transaction txn(db);
 
+  // (table, column name)
+  std::vector<std::pair<std::string, std::string>> sequence_cols;
+
   for (const auto& table : state_->config_["tables"]) {
     const std::string table_name = table["name"].as<std::string>();
     std::vector<std::pair<std::string, std::string>> columns;
@@ -101,6 +109,10 @@ void DatasetAdmin::CreateTables(nanodbc::connection& db, DBType dbtype) {
       columns.push_back({col_name, col["type"].as<std::string>()});
       if (col["dist"]["type"].as<std::string>() == "primary_key") {
         pkey_column = col_name;
+      }
+
+      if (col["dist"]["type"].as<std::string>() == "sequence") {
+        sequence_cols.push_back({table_name, col["name"].as<std::string>()});
       }
     }
 
@@ -115,6 +127,16 @@ void DatasetAdmin::CreateTables(nanodbc::connection& db, DBType dbtype) {
     nanodbc::execute(db, query.str());
   }
 
+  // Create indexes on the sequence columns.
+  if (dbtype != DBType::kRedshift) {
+    for (const auto& [table_name, column_name] : sequence_cols) {
+      std::stringstream create;
+      create << "CREATE INDEX " << table_name << "_seq ON " << table_name
+             << " using btree (" << column_name << ")";
+      nanodbc::execute(db, create.str());
+    }
+  }
+
   txn.commit();
 }
 
@@ -122,8 +144,7 @@ void DatasetAdmin::LoadFromS3(nanodbc::connection& db, DBType dbtype,
                               const std::string& bucket,
                               const std::string& iam_role) const {
   nanodbc::transaction txn(db);
-  const std::string dataset_name =
-      state_->config_["name"].as<std::string>();
+  const std::string dataset_name = state_->config_["name"].as<std::string>();
   for (const auto& table : state_->config_["tables"]) {
     const std::string table_name = table["name"].as<std::string>();
 
@@ -183,6 +204,33 @@ void DatasetAdmin::ResetToGenerated(nanodbc::connection& db,
     nanodbc::execute(db, query.str());
   }
   txn.commit();
+
+  ResetSequences(db, dbtype);
+}
+
+void DatasetAdmin::ResetSequences(nanodbc::connection& db,
+                                  DBType dbtype) const {
+  if (dbtype == DBType::kRedshift) return;
+
+  // Makes sure that newly inserted rows have a `seq` greater than all
+  // previous rows. This change is used to extract new rows.
+  // TODO: This can be made less sloppy.
+  for (const auto& table : state_->config_["tables"]) {
+    const std::string table_name = table["name"].as<std::string>();
+    const uint64_t multiplier = table["multiplier"].as<uint64_t>();
+    const uint64_t num_rows = multiplier * scale_factor_;
+
+    for (const auto& col : table["columns"]) {
+      const std::string col_name = col["name"].as<std::string>();
+      if (col["dist"]["type"].as<std::string>() != "sequence") continue;
+
+      std::stringstream reset;
+      reset << "ALTER SEQUENCE " << table_name << "_" << col_name
+            << "_seq RESTART WITH ";
+      reset << (num_rows + 1);
+      nanodbc::execute(db, reset.str());
+    }
+  }
 }
 
 }  // namespace cirrus

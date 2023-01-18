@@ -17,7 +17,6 @@ InvMakeSale::InvMakeSale(MakeSaleOptions options,
       options_(options),
       num_txns_(0),
       num_aborts_(0),
-      next_version_(1),
       cirrus_(std::move(cirrus)),
       connection_(std::move(connection)),
       // We assume IDs are densely assigned (which should be the case for our
@@ -46,7 +45,8 @@ void InvMakeSale::RunImpl() {
   const std::string select_inventory =
       "SELECT i_stock, i_price FROM inventory_wide WHERE i_id = ?;";
   const std::string update_inventory =
-      "UPDATE inventory_wide SET i_stock = ? WHERE i_id = ? RETURNING i_id, i_stock";
+      "UPDATE inventory_wide SET i_stock = ?, i_seq = DEFAULT WHERE i_id = ? "
+      "RETURNING i_id, i_stock, i_seq";
 
   const auto run_txn = [&]() {
     // For simplicity, we buy one item.
@@ -83,11 +83,8 @@ void InvMakeSale::RunImpl() {
     NotifyInventoryUpdate notify_inv;
     notify_inv.i_id = result2.get<uint64_t>(0);
     notify_inv.i_stock = result2.get<uint64_t>(1);
-    notify_inv.i_phys_id = next_version_;
+    notify_inv.i_phys_id = result2.get<uint64_t>(2);
     txn.commit();
-
-    // We set the transaction timestamp.
-    ++next_version_;
 
     cirrus_->NotifyUpdateInventoryWide(notify_inv);
   };

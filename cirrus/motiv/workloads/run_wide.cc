@@ -51,19 +51,17 @@ int main(int argc, char* argv[]) {
 
   auto dataset = DatasetAdmin(FLAGS_dataset_config_file, FLAGS_sf);
 
-  /*
-  std::cerr << "> Dropping extraneous records..." << std::endl;
+  std::cerr << "> Resetting the tables..." << std::endl;
   {
     nanodbc::connection c =
         GetOdbcConnection(*config, config->write_store_type());
-    dataset.ResetToGenerated(c, config->write_store_type());
+    dataset.ResetSequences(c, config->write_store_type());
   }
   if (config->read_store_type() != config->write_store_type()) {
     nanodbc::connection c =
         GetOdbcConnection(*config, config->read_store_type());
-    dataset.ResetToGenerated(c, config->read_store_type());
+    dataset.ResetSequences(c, config->read_store_type());
   }
-  */
 
   const Strategy strategy = StrategyFromString(FLAGS_strategy);
 
@@ -92,8 +90,8 @@ int main(int argc, char* argv[]) {
   toptions.scale_factor = FLAGS_sf;
   toptions.num_warmup = FLAGS_warmup;
   toptions.theta = FLAGS_theta;
-  // TODO: Number of items
-  toptions.max_i_id = 10000000;
+  // TODO: Number of items should come from the dataset config.
+  toptions.max_i_id = 100'000'000;
   for (uint32_t i = 0; i < FLAGS_tclients; ++i) {
     toptions.client_id = i;
     tclients.push_back(std::make_unique<InvMakeSale>(

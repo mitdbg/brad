@@ -29,6 +29,7 @@ class DatasetAdmin {
                   const std::string& iam_role = "") const;
 
   void ResetToGenerated(nanodbc::connection& db, DBType dbtype) const;
+  void ResetSequences(nanodbc::connection& db, DBType dbtype) const;
 
  private:
   class State;
