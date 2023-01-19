@@ -54,18 +54,6 @@ int main(int argc, char* argv[]) {
 
   auto dataset = DatasetAdmin(FLAGS_dataset_config_file, FLAGS_sf);
 
-  std::cerr << "> Resetting the tables..." << std::endl;
-  {
-    nanodbc::connection c =
-        GetOdbcConnection(*config, config->write_store_type());
-    dataset.ResetSequences(c, config->write_store_type());
-  }
-  if (config->read_store_type() != config->write_store_type()) {
-    nanodbc::connection c =
-        GetOdbcConnection(*config, config->read_store_type());
-    dataset.ResetSequences(c, config->read_store_type());
-  }
-
   const Strategy strategy = StrategyFromString(FLAGS_strategy);
 
   auto state = BenchmarkState::Create();
@@ -131,6 +119,7 @@ int main(int argc, char* argv[]) {
   }
   const auto read_end = std::chrono::steady_clock::now();
   if (etl != nullptr) {
+    etl->StopETL();
     etl->Wait();
   }
   const auto write_elapsed = write_end - start;

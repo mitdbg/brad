@@ -13,7 +13,7 @@ namespace {
 static const std::string kGetMaxSequenceId =
     "SELECT MAX(i_seq) FROM inventory_wide";
 
-}
+}  // namespace
 
 namespace cirrus {
 
@@ -27,21 +27,25 @@ InvETL::InvETL(uint32_t scale_factor, std::chrono::milliseconds period,
       period_(period),
       sequence_number_(0),
       source_(std::move(source)),
-      cirrus_(std::move(cirrus)) {
+      cirrus_(std::move(cirrus)),
+      keep_running_(true) {
   Start();
 }
 
 uint64_t InvETL::NumRuns() const { return num_runs_; }
 
+void InvETL::StopETL() { keep_running_ = false; }
+
 void InvETL::RunImpl() {
+  cirrus_->EstablishThreadLocalConnections();
   synced_phys_id_ = cirrus_->GetMaxSyncedInv();
   WarmedUpAndReadyToRun();
 
   run_next_ = std::chrono::steady_clock::now() + period_;
 
-  while (KeepRunning()) {
+  while (keep_running_) {
     std::this_thread::sleep_until(run_next_);
-    if (!KeepRunning()) break;
+    if (!keep_running_) break;
 
     if (false /* verbose */) {
       std::cerr << "> Starting ETL sync from " << synced_phys_id_ << std::endl;

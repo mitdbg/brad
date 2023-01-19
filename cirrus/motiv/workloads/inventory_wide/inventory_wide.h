@@ -87,6 +87,7 @@ class InvETL : public WorkloadBase {
   virtual ~InvETL() = default;
 
   uint64_t NumRuns() const;
+  void StopETL();
 
  private:
   std::string GenerateExtractQuery(uint64_t seq, uint64_t max_seq) const;
@@ -101,6 +102,7 @@ class InvETL : public WorkloadBase {
   std::chrono::steady_clock::time_point run_next_;
   mutable nanodbc::connection source_;
   std::shared_ptr<Cirrus> cirrus_;
+  std::atomic<bool> keep_running_;
 };
 
 }  // namespace cirrus

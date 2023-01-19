@@ -210,8 +210,6 @@ void DatasetAdmin::ResetToGenerated(nanodbc::connection& db,
     nanodbc::execute(db, query.str());
   }
   txn.commit();
-
-  ResetSequences(db, dbtype);
 }
 
 void DatasetAdmin::ResetSequences(nanodbc::connection& db,

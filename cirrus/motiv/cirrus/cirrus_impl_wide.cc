@@ -211,6 +211,10 @@ void CirrusImpl::NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory) {
 
   inventory_version_.BumpLatestKnown(inventory.i_phys_id);
 
+  // Just need to bump the latest known version. We update the version via an
+  // ETL.
+  if (strategy_ == Strategy::kWideAllOnReadWithETL) return;
+
   bg_workers_.SubmitNoWait([this, inventory = std::move(inventory)]() {
     auto& read_store = connections_.read();
     nanodbc::statement stmt(read_store);
@@ -258,7 +262,7 @@ size_t CirrusImpl::WideAllOnOne() {
     const auto [inv_waited, _] =
         inventory_version_.WaitUntilAtLeast(latest_inventory);
     if (inv_waited) {
-      std::cerr << "Versions waited for: " << _ << std::endl;
+      // std::cerr << "Versions waited for: " << _ << std::endl;
       Stats::Local().BumpReadWithPause();
     } else {
       Stats::Local().BumpReadWithoutPause();
@@ -387,6 +391,10 @@ void CirrusImpl::RunETLSync(uint64_t sequence_num,
   auto& read_store = connections_.read();
   nanodbc::transaction txn(read_store);
 
+  // Apparently table lock commands need to be at the beginning of the
+  // transaction. Though we don't need an exclusive lock until step 4.
+  nanodbc::execute(read_store, "LOCK TABLE inventory_wide");
+
   // 2. Create temporary table.
   nanodbc::execute(
       read_store, "CREATE TEMP TABLE inventory_wide_etl (LIKE inventory_wide)");
@@ -401,8 +409,8 @@ void CirrusImpl::RunETLSync(uint64_t sequence_num,
 
   // 4. Delete old data from the original table.
   nanodbc::execute(read_store,
-                   "DELETE FROM inventory_wide AS old USING inventory_wide_etl "
-                   "AS new WHERE old.i_id = new.i_id");
+                   "DELETE FROM inventory_wide USING inventory_wide_etl WHERE "
+                   "inventory_wide.i_id = inventory_wide_etl.i_id");
 
   // 5. Insert new data into the table.
   nanodbc::execute(
@@ -428,13 +436,36 @@ uint64_t CirrusImpl::GetMaxSyncedInv() {
 }
 
 void CirrusImpl::SyncWideTableVersions() {
-  auto& read_store = connections_.read();
-  auto result =
-      nanodbc::execute(read_store, "SELECT MAX(i_seq) FROM inventory_wide;");
-  result.next();
-  const uint64_t inventory_version = result.get<uint64_t>(0);
-  inventory_version_.BumpLatestKnown(inventory_version);
-  inventory_version_.BumpUpdatedTo(inventory_version);
+  {
+    auto& read_store = connections_.read();
+    auto result =
+        nanodbc::execute(read_store, "SELECT MAX(i_seq) FROM inventory_wide");
+    result.next();
+    const uint64_t inventory_version = result.get<uint64_t>(0);
+    inventory_version_.BumpLatestKnown(inventory_version);
+    inventory_version_.BumpUpdatedTo(inventory_version);
+  }
+  {
+    auto& write_store = connections_.write_writer();
+    auto result =
+        nanodbc::execute(write_store, "SELECT MAX(i_seq) FROM inventory_wide");
+    result.next();
+    const uint64_t inventory_version = result.get<uint64_t>(0);
+    // `inventory_version_` is the (monotonically increasing) version of the
+    // table on the read store. It should never be newer than the version on the
+    // write store.
+    if (inventory_version_.LatestKnown() > inventory_version) {
+      throw std::runtime_error(
+          "Invalid table versions. Write store: " +
+          std::to_string(inventory_version) +
+          " Read store: " + std::to_string(inventory_version_.LatestKnown()));
+    }
+
+    std::stringstream reset;
+    reset << "ALTER SEQUENCE inventory_wide_i_seq_seq RESTART WITH "
+          << inventory_version + 1;
+    nanodbc::execute(write_store, reset.str());
+  }
 }
 
 }  // namespace cirrus
