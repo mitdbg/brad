@@ -113,6 +113,8 @@ int main(int argc, char* argv[]) {
         GetOdbcConnection(*config, DBType::kRDSPostgreSQL), cirrus, state);
     state->WaitUntilAllReady(FLAGS_aclients + FLAGS_tclients + 1);
   }
+
+  cirrus->SyncWideTableVersions();
   std::cerr << "> Warm up done. Starting the workload." << std::endl;
 
   // Run the workload.

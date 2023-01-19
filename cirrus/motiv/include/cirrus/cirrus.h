@@ -48,6 +48,7 @@ class Cirrus {
 
   // Inventory-wide dataset specific methods follow.
 
+  virtual void SyncWideTableVersions() = 0;
   virtual void NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory) = 0;
   virtual size_t RunCategoryStockQuery() = 0;
   virtual void RunETLSync(uint64_t sequence_num, uint64_t max_synced_version) = 0;

@@ -427,4 +427,14 @@ uint64_t CirrusImpl::GetMaxSyncedInv() {
   return result.get<uint64_t>(0);
 }
 
+void CirrusImpl::SyncWideTableVersions() {
+  auto& read_store = connections_.read();
+  auto result =
+      nanodbc::execute(read_store, "SELECT MAX(i_seq) FROM inventory_wide;");
+  result.next();
+  const uint64_t inventory_version = result.get<uint64_t>(0);
+  inventory_version_.BumpLatestKnown(inventory_version);
+  inventory_version_.BumpUpdatedTo(inventory_version);
+}
+
 }  // namespace cirrus

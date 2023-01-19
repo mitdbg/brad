@@ -36,6 +36,7 @@ class CirrusImpl : public Cirrus {
 
   void RunETLSync(uint64_t sequence_num, uint64_t max_synced_version) override;
   uint64_t GetMaxSyncedInv() override;
+  void SyncWideTableVersions() override;
 
  private:
   std::string GenerateReportingQuery(uint64_t datetime_start,

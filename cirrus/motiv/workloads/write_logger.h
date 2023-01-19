@@ -37,6 +37,8 @@ class CirrusWriteLogger : public Cirrus {
   void RunETLSync(uint64_t sequence_num, uint64_t max_synced_version) override {}
   uint64_t GetMaxSyncedInv() override { return 0; }
 
+  void SyncWideTableVersions() override {}
+
  private:
   std::ofstream inventory_out_, sales_out_;
 };
