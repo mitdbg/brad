@@ -30,6 +30,7 @@ class Stats {
   uint64_t GetReadWithPause() const { return read_with_pause_; }
   uint64_t GetReadWithoutPause() const { return read_without_pause_; }
   uint64_t GetManualViewMaints() const { return manual_view_maints_; }
+  uint64_t GetNumETLs() const { return num_etls_; }
 
   void BumpInventoryNotifications() { ++inventory_notifications_; }
   void BumpSalesNotifications() { ++sales_notifications_; }
@@ -39,6 +40,7 @@ class Stats {
   void BumpReadWithPause() { ++read_with_pause_; }
   void BumpReadWithoutPause() { ++read_without_pause_; }
   void BumpManualViewMaints() { ++manual_view_maints_; }
+  void BumpNumETLs() { ++num_etls_; }
 
   // Threads must call this method to post their counter values to the global
   // `Stats` instance.
@@ -62,6 +64,8 @@ class Stats {
 
   uint64_t read_with_pause_;
   uint64_t read_without_pause_;
+
+  uint64_t num_etls_;
 };
 
 }  // namespace cirrus

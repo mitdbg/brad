@@ -36,6 +36,9 @@ DEFINE_uint32(aclients, 0,
 
 DEFINE_string(strategy, "wide_write", "The experiment strategy to use.");
 
+DEFINE_uint32(etl_period_ms, 1000,
+              "How frequently to run the ETL, in milliseconds");
+
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Runs workloads on the sales-inventory dataset.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
@@ -73,6 +76,7 @@ int main(int argc, char* argv[]) {
 
   std::vector<std::unique_ptr<InvMakeSale>> tclients;
   std::vector<std::unique_ptr<CategoryStock>> aclients;
+  std::unique_ptr<InvETL> etl;
 
   // Start up the clients.
   std::cerr << "> Starting up and warming up aclients..." << std::endl;
@@ -81,7 +85,8 @@ int main(int argc, char* argv[]) {
   aoptions.scale_factor = FLAGS_sf;
   for (uint32_t i = 0; i < FLAGS_aclients; ++i) {
     aoptions.client_id = i;
-    aclients.push_back(std::make_unique<CategoryStock>(aoptions, cirrus, state));
+    aclients.push_back(
+        std::make_unique<CategoryStock>(aoptions, cirrus, state));
   }
   state->WaitUntilAllReady(/*expected=*/FLAGS_aclients);
 
@@ -100,6 +105,14 @@ int main(int argc, char* argv[]) {
         cirrus, state));
   }
   state->WaitUntilAllReady(/*expected=*/FLAGS_aclients + FLAGS_tclients);
+
+  if (strategy == Strategy::kWideAllOnReadWithETL) {
+    etl = std::make_unique<InvETL>(
+        FLAGS_sf, std::chrono::milliseconds(FLAGS_etl_period_ms),
+        /*source_connection=*/
+        GetOdbcConnection(*config, DBType::kRDSPostgreSQL), cirrus, state);
+    state->WaitUntilAllReady(FLAGS_aclients + FLAGS_tclients + 1);
+  }
   std::cerr << "> Warm up done. Starting the workload." << std::endl;
 
   // Run the workload.
@@ -115,6 +128,9 @@ int main(int argc, char* argv[]) {
     client->Wait();
   }
   const auto read_end = std::chrono::steady_clock::now();
+  if (etl != nullptr) {
+    etl->Wait();
+  }
   const auto write_elapsed = write_end - start;
   const auto read_elapsed = read_end - start;
 
@@ -137,6 +153,9 @@ int main(int argc, char* argv[]) {
     reports += client->NumReportsRun();
     client->SortLatency();
   }
+  if (etl != nullptr) {
+    etl->SortLatency();
+  }
   const double t_thpt = total_sales / (write_elapsed.count() / 1e9);
   const double avg_abort_rate =
       static_cast<double>(aborts) / (aborts + total_sales);
@@ -151,6 +170,8 @@ int main(int argc, char* argv[]) {
       aclients.empty() ? 0 : aclients.front()->LatencyP50().count();
   const auto a_lat_p99_ms =
       aclients.empty() ? 0 : aclients.front()->LatencyP99().count();
+  const auto e_lat_p50_ms = etl == nullptr ? 0 : etl->LatencyP50().count();
+  const auto e_lat_p99_ms = etl == nullptr ? 0 : etl->LatencyP99().count();
 
   std::cerr << std::endl;
   std::cerr << "> T Throughput: " << t_thpt << " sales/s" << std::endl;
@@ -161,14 +182,17 @@ int main(int argc, char* argv[]) {
   std::cerr << "> T p99 Latency: " << t_lat_p99_ms << " ms" << std::endl;
   std::cerr << "> A p50 Latency: " << a_lat_p50_ms << " ms" << std::endl;
   std::cerr << "> A p99 Latency: " << a_lat_p99_ms << " ms" << std::endl;
+  std::cerr << "> E p50 Latency: " << e_lat_p50_ms << " ms" << std::endl;
+  std::cerr << "> E p99 Latency: " << e_lat_p99_ms << " ms" << std::endl;
   std::cerr << std::endl;
 
-  std::cout
-      << "t_thpt,avg_abort_rate,a_thpt,t_p50_ms,t_p99_ms,a_p50_ms,a_p99_ms"
-      << std::endl;
+  std::cout << "t_thpt,avg_abort_rate,a_thpt,t_p50_ms,t_p99_ms,a_p50_ms,a_p99_"
+               "ms,e_p50_ms,e_p99_ms"
+            << std::endl;
   std::cout << t_thpt << "," << avg_abort_rate << "," << a_thpt << ","
             << t_lat_p50_ms << "," << t_lat_p99_ms << "," << a_lat_p50_ms << ","
-            << a_lat_p99_ms << std::endl;
+            << a_lat_p99_ms << "," << e_lat_p50_ms << ","
+            << e_lat_p99_ms << std::endl;
 
   // Make sure all background workers finish before writing out the stats.
   std::cerr << std::endl;
@@ -187,6 +211,7 @@ int main(int argc, char* argv[]) {
       out << "hot_inv_drops," << stats.GetHotInventoryDrops() << std::endl;
       out << "read_with_pause," << stats.GetReadWithPause() << std::endl;
       out << "read_without_pause," << stats.GetReadWithoutPause() << std::endl;
+      out << "num_etls," << stats.GetNumETLs() << std::endl;
     });
   }
 

@@ -89,9 +89,7 @@ class InvETL : public WorkloadBase {
   uint64_t NumRuns() const;
 
  private:
-  uint64_t GetMaxSynced() const;
   std::string GenerateExtractQuery(uint64_t seq, uint64_t max_seq) const;
-  std::string GenerateImportQuery(uint64_t seq) const;
 
   virtual void RunImpl() override;
 

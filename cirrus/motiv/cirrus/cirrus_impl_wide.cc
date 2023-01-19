@@ -378,7 +378,7 @@ size_t CirrusImpl::WideExtractImport() {
   return num_results;
 }
 
-void CirrusImpl::RunETLSync(uint64_t sequence_num) {
+void CirrusImpl::RunETLSync(uint64_t sequence_num, uint64_t max_synced_version) {
   // Recommended best practices for ETL on Redshift:
   // https://docs.aws.amazon.com/redshift/latest/dg/merge-replacing-existing-rows.html
   // 1. Start a transaction.
@@ -412,6 +412,9 @@ void CirrusImpl::RunETLSync(uint64_t sequence_num) {
 
   // 7. Commit the transaction.
   txn.commit();
+
+  // Important so that waiting readers can proceed.
+  inventory_version_.BumpUpdatedTo(max_synced_version);
 }
 
 uint64_t CirrusImpl::GetMaxSyncedInv() {

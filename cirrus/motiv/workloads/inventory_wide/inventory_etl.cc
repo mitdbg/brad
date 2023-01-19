@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "cirrus/config.h"
+#include "cirrus/stats.h"
 #include "inventory_wide.h"
 #include "utils/sf.h"
 
@@ -57,7 +58,8 @@ void InvETL::RunImpl() {
       new_max_to_sync = result.get<uint64_t>(0);
     }
 
-    const std::string extract = GenerateExtractQuery(sequence_number_, new_max_to_sync);
+    const std::string extract =
+        GenerateExtractQuery(sequence_number_, new_max_to_sync);
     nanodbc::execute(source_, extract);
     const auto extract_done = std::chrono::steady_clock::now();
     const auto extract_elapsed = extract_done - start;
@@ -68,7 +70,7 @@ void InvETL::RunImpl() {
                        .count()
                 << " ms" << std::endl;
     }
-    cirrus_->RunETLSync(sequence_number_);
+    cirrus_->RunETLSync(sequence_number_, new_max_to_sync);
     const auto import_elapsed = std::chrono::steady_clock::now() - extract_done;
     if (false /* verbose */) {
       std::cerr << "> Import phase done "
@@ -83,6 +85,7 @@ void InvETL::RunImpl() {
     ++sequence_number_;
     ++num_runs_;
     AddLatency(end - start);
+    Stats::Local().BumpNumETLs();
 
     // To maintain freshness under `period_`, we assume that writes continue to
     // happen during the ETL. Thus the next time the ETL should run is `start +

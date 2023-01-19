@@ -17,6 +17,7 @@ void Stats::PostToGlobal() const {
   global_.read_with_pause_ += read_with_pause_;
   global_.read_without_pause_ += read_without_pause_;
   global_.manual_view_maints_ += manual_view_maints_;
+  global_.num_etls_ += num_etls_;
 }
 
 void Stats::Reset() {
@@ -28,6 +29,7 @@ void Stats::Reset() {
   read_with_pause_ = 0;
   read_without_pause_ = 0;
   manual_view_maints_ = 0;
+  num_etls_ = 0;
 }
 
 }  // namespace cirrus

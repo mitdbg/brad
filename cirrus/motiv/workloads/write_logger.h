@@ -34,7 +34,7 @@ class CirrusWriteLogger : public Cirrus {
   void NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory) override {}
   size_t RunCategoryStockQuery() override { return 0; }
 
-  void RunETLSync(uint64_t up_to_version) override {}
+  void RunETLSync(uint64_t sequence_num, uint64_t max_synced_version) override {}
   uint64_t GetMaxSyncedInv() override { return 0; }
 
  private:

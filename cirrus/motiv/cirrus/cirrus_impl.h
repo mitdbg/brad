@@ -34,7 +34,7 @@ class CirrusImpl : public Cirrus {
   void NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory);
   size_t RunCategoryStockQuery() override;
 
-  void RunETLSync(uint64_t sequence_num) override;
+  void RunETLSync(uint64_t sequence_num, uint64_t max_synced_version) override;
   uint64_t GetMaxSyncedInv() override;
 
  private:

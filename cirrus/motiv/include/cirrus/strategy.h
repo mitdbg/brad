@@ -37,6 +37,7 @@ enum class Strategy {
   kWideAllOnRead,
   kWideHotPlacement,
   kWideExtractImport,
+  kWideAllOnReadWithETL,
 };
 
 Strategy StrategyFromString(const std::string& strategy);
