@@ -50,14 +50,14 @@ void InvETL::RunImpl() {
     // TODO: This might need to be tuned.
     const auto start = std::chrono::steady_clock::now();
 
-    uint64_t new_max_synced;
+    uint64_t new_max_to_sync;
     {
       auto result = nanodbc::execute(source_, kGetMaxSequenceId);
       result.next();
-      new_max_synced = result.get<uint64_t>(0);
+      new_max_to_sync = result.get<uint64_t>(0);
     }
 
-    const std::string extract = GenerateExtractQuery(sequence_number_, new_max_synced);
+    const std::string extract = GenerateExtractQuery(sequence_number_, new_max_to_sync);
     nanodbc::execute(source_, extract);
     const auto extract_done = std::chrono::steady_clock::now();
     const auto extract_elapsed = extract_done - start;
@@ -68,7 +68,7 @@ void InvETL::RunImpl() {
                        .count()
                 << " ms" << std::endl;
     }
-    cirrus_->RunETLSync(new_max_synced);
+    cirrus_->RunETLSync(sequence_number_);
     const auto import_elapsed = std::chrono::steady_clock::now() - extract_done;
     if (false /* verbose */) {
       std::cerr << "> Import phase done "
@@ -77,7 +77,7 @@ void InvETL::RunImpl() {
                        .count()
                 << " ms" << std::endl;
     }
-    synced_phys_id_ = new_max_synced;
+    synced_phys_id_ = new_max_to_sync;
     const auto end = std::chrono::steady_clock::now();
 
     ++sequence_number_;
@@ -108,17 +108,5 @@ std::string InvETL::GenerateExtractQuery(uint64_t seq, uint64_t max_seq) const {
           << ".tbl', 'us-east-1'), options :='FORMAT text, DELIMITER ''|''');";
   return builder.str();
 }
-
-/*
-std::string InvETL::GenerateImportQuery(uint64_t seq) const {
-  // TODO: Move this into Cirrus.
-  std::stringstream builder;
-  builder << "COPY sales_" << PaddedScaleFactor(scale_factor_)
-          << " FROM 's3://geoffxy-research/etl/invwide-" << seq
-          << ".tbl' IAM_ROLE '"
-          << "' REGION 'us-east-1'";
-  return builder.str();
-}
-*/
 
 }  // namespace cirrus

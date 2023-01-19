@@ -50,7 +50,7 @@ class Cirrus {
 
   virtual void NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory) = 0;
   virtual size_t RunCategoryStockQuery() = 0;
-  virtual void RunETLSync(uint64_t up_to_version) = 0;
+  virtual void RunETLSync(uint64_t sequence_num) = 0;
   virtual uint64_t GetMaxSyncedInv() = 0;
 };
 

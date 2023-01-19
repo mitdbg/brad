@@ -1,9 +1,9 @@
+#include <chrono>
 #include <cstdint>
+#include <iostream>
 #include <sstream>
 #include <unordered_set>
 #include <vector>
-#include <iostream>
-#include <chrono>
 
 #include "cirrus/stats.h"
 #include "cirrus_impl.h"
@@ -58,18 +58,19 @@ static const std::string kHotIdString = ([](const std::vector<uint64_t>& ids) {
   return result.str();
 })(kHotIds);
 
-static const std::string kHotId100String = ([](const std::vector<uint64_t>& ids) {
-  std::stringstream result;
-  result << "(";
-  for (size_t i = 0; i < ids.size(); ++i) {
-    result << ids[i];
-    if (i != ids.size() - 1) {
-      result << ", ";
-    }
-  }
-  result << ")";
-  return result.str();
-})(kHotIds100);
+static const std::string kHotId100String =
+    ([](const std::vector<uint64_t>& ids) {
+      std::stringstream result;
+      result << "(";
+      for (size_t i = 0; i < ids.size(); ++i) {
+        result << ids[i];
+        if (i != ids.size() - 1) {
+          result << ", ";
+        }
+      }
+      result << ")";
+      return result.str();
+    })(kHotIds100);
 
 // clang-format off
 static const std::string kAllOnOneQuery = MULTILINE(
@@ -193,7 +194,8 @@ void CirrusImpl::NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory) {
   Stats::Local().BumpInventoryNotifications();
   if (strategy_ == Strategy::kWideAllOnWrite) return;
 
-  if (strategy_ == Strategy::kWideHotPlacement || strategy_ == Strategy::kWideExtractImport) {
+  if (strategy_ == Strategy::kWideHotPlacement ||
+      strategy_ == Strategy::kWideExtractImport) {
     // Check if the key is hot. If it is, we drop the update! We never modify
     // the hot set in this implementation, so we do not need to take any locks.
     // We ignore the versioning - we use it only for tracking updates that
@@ -321,7 +323,8 @@ size_t CirrusImpl::WideHotPlacement() {
 }
 
 size_t CirrusImpl::WideExtractImport() {
-  static const std::string import_query = GenerateImportQuery(config_->iam_role());
+  static const std::string import_query =
+      GenerateImportQuery(config_->iam_role());
 
   // May need to wait.
   const auto latest_inventory = inventory_version_.LatestKnown();
@@ -332,10 +335,10 @@ size_t CirrusImpl::WideExtractImport() {
   // TODO: We need stronger transactional consistency guarantees. This benchmark
   // approach is sloppy. We should add a versioning column and filter for it.
   if (inv_waited) {
-    //std::cerr << "Versions waited for: " << _ << std::endl;
+    // std::cerr << "Versions waited for: " << _ << std::endl;
     Stats::Local().BumpReadWithPause();
   } else {
-    //std::cerr << "Data is current." << std::endl;
+    // std::cerr << "Data is current." << std::endl;
     Stats::Local().BumpReadWithoutPause();
   }
 
@@ -375,8 +378,48 @@ size_t CirrusImpl::WideExtractImport() {
   return num_results;
 }
 
-void CirrusImpl::RunETLSync(uint64_t up_to_version) {}
+void CirrusImpl::RunETLSync(uint64_t sequence_num) {
+  // Recommended best practices for ETL on Redshift:
+  // https://docs.aws.amazon.com/redshift/latest/dg/merge-replacing-existing-rows.html
+  // 1. Start a transaction.
+  auto& read_store = connections_.read();
+  nanodbc::transaction txn(read_store);
 
-uint64_t CirrusImpl::GetMaxSyncedInv() { return 0; }
+  // 2. Create temporary table.
+  nanodbc::execute(
+      read_store, "CREATE TEMP TABLE inventory_wide_etl (LIKE inventory_wide)");
+
+  // 3. Import new data into the temporary table.
+  std::stringstream builder;
+  builder << "COPY inventory_wide_etl"
+          << " FROM 's3://geoffxy-research/etl/invwide-" << sequence_num
+          << ".tbl' IAM_ROLE '" << config_->iam_role()
+          << "' REGION 'us-east-1'";
+  nanodbc::execute(read_store, builder.str());
+
+  // 4. Delete old data from the original table.
+  nanodbc::execute(read_store,
+                   "DELETE FROM inventory_wide AS old USING inventory_wide_etl "
+                   "AS new WHERE old.i_id = new.i_id");
+
+  // 5. Insert new data into the table.
+  nanodbc::execute(
+      read_store,
+      "INSERT INTO inventory_wide SELECT * FROM inventory_wide_etl");
+
+  // 6. Drop the temporary table.
+  nanodbc::execute(read_store, "DROP TABLE inventory_wide_etl");
+
+  // 7. Commit the transaction.
+  txn.commit();
+}
+
+uint64_t CirrusImpl::GetMaxSyncedInv() {
+  static const std::string kMaxSyncedQuery =
+      "SELECT MAX(i_seq) FROM inventory_wide";
+  auto result = nanodbc::execute(connections_.read(), kMaxSyncedQuery);
+  result.next();
+  return result.get<uint64_t>(0);
+}
 
 }  // namespace cirrus
