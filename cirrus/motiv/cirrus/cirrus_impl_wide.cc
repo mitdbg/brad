@@ -227,7 +227,8 @@ void CirrusImpl::NotifyUpdateInventoryWide(NotifyInventoryUpdate inventory) {
 
 size_t CirrusImpl::RunCategoryStockQuery() {
   if (strategy_ == Strategy::kWideAllOnRead ||
-      strategy_ == Strategy::kWideAllOnWrite) {
+      strategy_ == Strategy::kWideAllOnWrite ||
+      strategy_ == Strategy::kWideAllOnReadWithETL) {
     return WideAllOnOne();
   } else if (strategy_ == Strategy::kWideHotPlacement) {
     return WideHotPlacement();
@@ -378,7 +379,8 @@ size_t CirrusImpl::WideExtractImport() {
   return num_results;
 }
 
-void CirrusImpl::RunETLSync(uint64_t sequence_num, uint64_t max_synced_version) {
+void CirrusImpl::RunETLSync(uint64_t sequence_num,
+                            uint64_t max_synced_version) {
   // Recommended best practices for ETL on Redshift:
   // https://docs.aws.amazon.com/redshift/latest/dg/merge-replacing-existing-rows.html
   // 1. Start a transaction.
