@@ -2,11 +2,11 @@ name: Check Code
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
     paths-ignore:
     - 'cirrus/**'
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
     paths-ignore:
     - 'cirrus/**'
 
