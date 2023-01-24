@@ -1,0 +1,15 @@
+aurora:
+  odbc_driver: PostgreSQL
+  host: aurora.us-east-1.amazonaws.com
+  port: 5432
+  user: postgres
+  # An environment variable which stores the password.
+  pwdvar: DBPWD
+
+redshift:
+  odbc_driver: Redshift
+  host: redshift.us-east-1.amazonaws.com
+  port: 5439
+  database: dev
+  user: awsuser
+  pwdvar: DBPWD

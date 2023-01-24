@@ -27,6 +27,7 @@ ENTRY_POINTS = {
 
 INSTALL_REQUIRES = [
     "pyodbc",
+    "pyyaml",
 ]
 
 DEV_REQUIRES = [
