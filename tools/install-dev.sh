@@ -24,5 +24,4 @@ if [ "$1" == "--virtualenv" ]; then
 fi
 
 pip3 install --editable ".[dev]"
-mypy --install-types --non-interactive
 echo_green "✓ Done"

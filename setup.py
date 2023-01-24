@@ -34,6 +34,7 @@ DEV_REQUIRES = [
     "black",
     "mypy",
     "pylint",
+    "types-PyYAML",
 ]
 
 KEYWORDS = []
