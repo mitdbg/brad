@@ -25,7 +25,9 @@ ENTRY_POINTS = {
     ],
 }
 
-INSTALL_REQUIRES = []
+INSTALL_REQUIRES = [
+    "pyodbc",
+]
 
 DEV_REQUIRES = [
     "black",
