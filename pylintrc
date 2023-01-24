@@ -1,3 +1,5 @@
 [MESSAGES CONTROL]
 disable=R,C
 enable=useless-suppression
+
+extension-pkg-whitelist=pyodbc

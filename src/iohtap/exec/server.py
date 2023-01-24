@@ -1,4 +1,5 @@
 from iohtap.config import DEFAULT_IOHTAP_SERVER_PORT
+from iohtap.server.server import IOHTAPServer
 
 
 def register_command(subparsers):
@@ -28,4 +29,5 @@ def register_command(subparsers):
 
 
 def main(args):
-    print("Would listen for connections on {}:{}".format(args.host, args.port))
+    server = IOHTAPServer(args.host, args.port, args.config_file)
+    server.run_test()

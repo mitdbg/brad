@@ -27,12 +27,14 @@ ENTRY_POINTS = {
 
 INSTALL_REQUIRES = [
     "pyodbc",
+    "pyyaml",
 ]
 
 DEV_REQUIRES = [
     "black",
     "mypy",
     "pylint",
+    "types-PyYAML",
 ]
 
 KEYWORDS = []
