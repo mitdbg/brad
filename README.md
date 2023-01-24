@@ -26,3 +26,14 @@ Note that these instructions are written for a Debian based machine (e.g., Ubunt
 - **PostgreSQL**:
   - Install `odbc-postgresql`: `sudo apt install odbc-postgresql`
   - The driver should be installed to `/usr/lib/x86_64-linux-gnu/odbc/psqlodbcw.so`
+  - You will use this driver to connect to Aurora PostgreSQL
+- **Athena**
+  - Download the 64-bit Linux driver: https://docs.aws.amazon.com/athena/latest/ug/connect-with-odbc.html
+  - Install `alien`: `sudo apt install alien` (it converts `*.rpm` files into `*.deb` files for installation on Ubuntu)
+  - Install the driver: `sudo alien -i path/to/downloaded/athena_driver.rpm`
+  - Add the following snippet to `~/.odbcinst.ini`
+    ```ini
+    [Athena]
+    Description=Amazon Athena Driver
+    Driver=/opt/simba/athenaodbc/lib/64/libathenaodbc_sb64.so
+    ```
