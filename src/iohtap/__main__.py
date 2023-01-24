@@ -4,6 +4,7 @@ import sys
 import iohtap
 import iohtap.exec.cli
 import iohtap.exec.server
+import iohtap.exec.daemon
 
 
 def main():
@@ -19,6 +20,7 @@ def main():
     subparsers = parser.add_subparsers(title="Commands")
     iohtap.exec.cli.register_command(subparsers)
     iohtap.exec.server.register_command(subparsers)
+    iohtap.exec.daemon.register_command(subparsers)
     args = parser.parse_args()
 
     if args.version:

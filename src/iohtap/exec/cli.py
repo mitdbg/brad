@@ -22,4 +22,4 @@ def register_command(subparsers):
 
 
 def main(args):
-    pass
+    print("Would connect to {}:{}".format(args.host, args.port))
