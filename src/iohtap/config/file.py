@@ -1,26 +1,41 @@
-import os
 import yaml
 
 from iohtap.config.dbtype import DBType
 
 
-class Config:
+class ConfigFile:
     def __init__(self, path: str):
         with open(path, "r", encoding="UTF-8") as file:
             self._raw = yaml.load(file, Loader=yaml.Loader)
+
+    @property
+    def server_interface(self) -> str:
+        return self._raw["server_interface"]
+
+    def server_port(self) -> int:
+        return int(self._raw["server_port"])
 
     def get_odbc_connection_string(self, db: DBType) -> str:
         if db not in self._raw:
             raise AssertionError("Unhandled database type: " + str(db))
 
         config = self._raw[db]
-        if db is DBType.Aurora:
+        if db is DBType.Athena:
+            return "Driver={{{}}}; AwsRegion={}; S3OutputLocation={}; AuthenticationType=IAM Credentials; UID={}; PWD={};".format(
+                config["odbc_driver"],
+                config["aws_region"],
+                config["s3_output_path"],
+                config["access_key"],
+                config["access_key_secret"],
+            )
+
+        elif db is DBType.Aurora:
             return "Driver={{{}}}; Server={}; Port={}; Uid={}; Pwd={}".format(
                 config["odbc_driver"],
                 config["host"],
                 config["port"],
                 config["user"],
-                os.environ[config["pwdvar"]],
+                config["password"],
             )
 
         elif db is DBType.Redshift:
@@ -29,5 +44,5 @@ class Config:
                 config["host"],
                 config["port"],
                 config["user"],
-                os.environ[config["pwdvar"]],
+                config["password"],
             )

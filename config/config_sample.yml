@@ -1,10 +1,24 @@
+# NOTE: These are sample values. Create a copy of this file and replace the
+# values with your own credentials where needed.
+
+# **DO NOT** check in your config.yml file!
+
+server_interface: "0.0.0.0"
+server_port: 6583
+
+athena:
+  odbc_driver: Athena
+  aws_region: us-east-1
+  s3_output_path: s3://your-bucket/output/path
+  access_key: ABCABCABC123ABCABC45
+  access_key_secret: abCD+E1f2Gxhi3J4klmN/OP5QrSTuvwXYzabcdEF
+
 aurora:
   odbc_driver: PostgreSQL
   host: aurora.us-east-1.amazonaws.com
   port: 5432
   user: postgres
-  # An environment variable which stores the password.
-  pwdvar: DBPWD
+  password: postgres_password
 
 redshift:
   odbc_driver: Redshift
@@ -12,4 +26,4 @@ redshift:
   port: 5439
   database: dev
   user: awsuser
-  pwdvar: DBPWD
+  password: awsuser_password
