@@ -19,4 +19,4 @@ def register_command(subparsers):
 def main(args):
     config = ConfigFile(args.config_file)
     server = IOHTAPServer(config)
-    server.run_test()
+    server.handle_query("SELECT 1, 2, 3")
