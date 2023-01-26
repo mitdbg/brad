@@ -1,4 +1,7 @@
 import socket
+import time
+
+import iohtap
 
 
 def register_command(subparsers):
@@ -22,10 +25,33 @@ def register_command(subparsers):
 
 
 def main(args):
-    req_socket = socket.create_connection((args.host, args.port))
-    with req_socket.makefile("rw") as io:
-        print("SELECT * FROM demo", file=io, flush=True)
-        # Wait for and print the results.
-        for line in io:
-            print(line, end="")
-    req_socket.close()
+    print("IOHTAP Interactive CLI v{}".format(iohtap.__version__))
+    print()
+    print("Sending queries to IOHTAP at {}:{}.".format(args.host, args.port))
+    print("Terminate all SQL queries with a semicolon (;). Hit Ctrl-D to exit.")
+    print()
+
+    while True:
+        # Allow multiline input.
+        try:
+            pieces = []
+            pieces.append(input(">>> ").strip())
+            while not pieces[-1].endswith(";"):
+                pieces.append(input("--> "))
+            query = " ".join(pieces)
+        except (EOFError, KeyboardInterrupt):
+            break
+
+        req_socket = socket.create_connection((args.host, args.port))
+        with req_socket.makefile("rw") as io:
+            start = time.time()
+            print(query, file=io, flush=True)
+            # Wait for and print the results.
+            print()
+            for line in io:
+                print(line, end="")
+            end = time.time()
+            print()
+            print("Took {:.3f} seconds.".format(end - start))
+        req_socket.close()
+        print()

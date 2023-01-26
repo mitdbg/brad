@@ -1,4 +1,5 @@
 import logging
+import pyodbc
 import socket
 from concurrent.futures import ThreadPoolExecutor
 
@@ -57,30 +58,35 @@ class IOHTAPServer:
         # - The server closes the connection after it finishes transmitting the
         #   results back.
         try:
-            io = client_socket.makefile("rw")
+            with client_socket.makefile("rw") as io:
+                # 1. Receive the SQL query.
+                sql_query = io.readline().strip()
+                logger.debug("Received query: %s", sql_query)
 
-            # 1. Receive the SQL query.
-            sql_query = io.readline().strip()
-            logger.debug("Received query: %s", sql_query)
+                # 2. Predict which DBMS to use.
+                run_times = self._cost_model.predict_run_time(sql_query)
+                db_to_use, _ = run_times.min_time_ms()
 
-            # 2. Predict which DBMS to use.
-            run_times = self._cost_model.predict_run_time(sql_query)
-            db_to_use, _ = run_times.min_time_ms()
+                # 3. Actually execute the query
+                connection = self._dbs.get_connection(db_to_use)
+                cursor = connection.cursor()
+                try:
+                    cursor.execute(sql_query)
+                except pyodbc.ProgrammingError as ex:
+                    # Error when executing the query.
+                    print(str(ex), file=io, flush=True)
+                    logger.debug("Query failed with exception %s", str(ex))
+                    return
 
-            # 3. Actually execute the query
-            connection = self._dbs.get_connection(db_to_use)
-            cursor = connection.cursor()
-            cursor.execute(sql_query)
+                # 4. Extract and transmit the results.
+                num_rows = 0
+                for row in cursor:
+                    print(" | ".join(map(str, row)), file=io)
+                    num_rows += 1
+                logger.debug("Responded with %d rows.", num_rows)
 
-            # 4. Extract and transmit the results.
-            num_rows = 0
-            for row in cursor:
-                print(" | ".join(map(str, row)), file=io)
-                num_rows += 1
-            logger.debug("Responded with %d rows.", num_rows)
-
-            # 5. Close the connection to indicate the end of the result set.
-            io.close()
-            client_socket.close()
         except:  # pylint: disable=bare-except
             logger.exception("Encountered exception when handling request.")
+        finally:
+            # 5. Close the socket to indicate the end of the result set.
+            client_socket.close()
