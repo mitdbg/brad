@@ -12,6 +12,7 @@ athena:
   s3_output_path: s3://your-bucket/output/path
   access_key: ABCABCABC123ABCABC45
   access_key_secret: abCD+E1f2Gxhi3J4klmN/OP5QrSTuvwXYzabcdEF
+  database: iohtap
 
 aurora:
   odbc_driver: PostgreSQL
@@ -19,6 +20,7 @@ aurora:
   port: 5432
   user: postgres
   password: postgres_password
+  database: iohtap
 
 redshift:
   odbc_driver: Redshift
@@ -27,3 +29,4 @@ redshift:
   database: dev
   user: awsuser
   password: awsuser_password
+  database: iohtap

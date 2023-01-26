@@ -21,28 +21,31 @@ class ConfigFile:
 
         config = self._raw[db]
         if db is DBType.Athena:
-            return "Driver={{{}}}; AwsRegion={}; S3OutputLocation={}; AuthenticationType=IAM Credentials; UID={}; PWD={};".format(
+            return "Driver={{{}}};AwsRegion={};S3OutputLocation={};AuthenticationType=IAM Credentials;UID={};PWD={};Schema={};".format(
                 config["odbc_driver"],
                 config["aws_region"],
                 config["s3_output_path"],
                 config["access_key"],
                 config["access_key_secret"],
+                config["database"],
             )
 
         elif db is DBType.Aurora:
-            return "Driver={{{}}}; Server={}; Port={}; Uid={}; Pwd={}".format(
+            return "Driver={{{}}};Server={};Port={};Uid={};Pwd={};Database={};".format(
                 config["odbc_driver"],
                 config["host"],
                 config["port"],
                 config["user"],
                 config["password"],
+                config["database"],
             )
 
         elif db is DBType.Redshift:
-            return "Driver={{{}}}; Server={}; Port={}; Uid={}; Pwd={}".format(
+            return "Driver={{{}}};Server={};Port={};Uid={};Pwd={};Database={};".format(
                 config["odbc_driver"],
                 config["host"],
                 config["port"],
                 config["user"],
                 config["password"],
+                config["database"],
             )
