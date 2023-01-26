@@ -10,9 +10,9 @@ class IOHTAPDaemon:
     def connect(cls, host: str, config: ConfigFile):
         server_socket = socket.create_connection((host, config.server_daemon_port))
         logger.info(
-            "Successfully connected to the server at {}:{}".format(
-                host, config.server_daemon_port
-            )
+            "Successfully connected to the server at %s:%d",
+            host,
+            config.server_daemon_port,
         )
         return cls(config, server_socket)
 

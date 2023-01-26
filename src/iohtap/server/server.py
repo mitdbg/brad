@@ -2,7 +2,7 @@ import logging
 import pyodbc
 import socket
 from concurrent.futures import ThreadPoolExecutor
-from typing import List
+from typing import List, TextIO
 
 from iohtap.config.file import ConfigFile
 from iohtap.cost_model.model import CostModel
@@ -27,7 +27,7 @@ class IOHTAPServer:
             self._config.server_daemon_port,
             self._on_new_daemon_connection,
         )
-        self._daemon_connections: List[socket.socket] = []
+        self._daemon_connections: List[TextIO] = []
         self._main_executor = ThreadPoolExecutor(max_workers=1)
 
     def __enter__(self):
@@ -110,8 +110,8 @@ class IOHTAPServer:
         if sql_query is not None:
             try:
                 for daemon in self._daemon_connections:
-                    print(sql_query, file=daemon, flush=True)
-            except:
+                    print(str(sql_query), file=daemon, flush=True)
+            except:  # pylint: disable=bare-except
                 logger.exception("Exception when sending the query to the daemon.")
 
     def _register_daemon(self, daemon_socket: socket.socket):
