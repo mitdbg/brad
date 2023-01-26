@@ -1,6 +1,3 @@
-from iohtap.config import DEFAULT_IOHTAP_DAEMON_PORT
-
-
 def register_command(subparsers):
     parser = subparsers.add_parser(
         "daemon",
@@ -15,7 +12,7 @@ def register_command(subparsers):
     parser.add_argument(
         "--port",
         type=int,
-        default=DEFAULT_IOHTAP_DAEMON_PORT,
+        default=6586,
         help="The port on which the IOHTAP server accepts daemon connections.",
     )
     parser.add_argument(

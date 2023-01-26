@@ -10,3 +10,4 @@ iohtap.egg-info
 ._.DS_Store
 
 config/config.yml
+config/config_local.yml

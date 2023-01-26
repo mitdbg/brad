@@ -1,8 +1,13 @@
-import time
+import logging
+import socket
+from concurrent.futures import ThreadPoolExecutor
 
 from iohtap.config.file import ConfigFile
 from iohtap.cost_model.model import CostModel
 from iohtap.server.db_connection_manager import DBConnectionManager
+from iohtap.net.connection_acceptor import ConnectionAcceptor
+
+logger = logging.getLogger(__name__)
 
 
 class IOHTAPServer:
@@ -10,23 +15,72 @@ class IOHTAPServer:
         self._config = config
         self._cost_model = CostModel()
         self._dbs = DBConnectionManager(self._config)
+        self._connection_acceptor = ConnectionAcceptor(
+            self._config.server_interface,
+            self._config.server_port,
+            self._on_new_connection,
+        )
+        self._main_executor = ThreadPoolExecutor(max_workers=1)
 
-    def handle_query(self, sql_query: str):
-        # Predict which DBMS to use.
-        run_times = self._cost_model.predict_run_time(sql_query)
-        db_to_use, _ = run_times.min_time_ms()
+    def __enter__(self):
+        self.start()
+        return self
 
-        # Actually execute the query
-        connection = self._dbs.get_connection(db_to_use)
-        cursor = connection.cursor()
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.stop()
 
-        start = time.time()
-        cursor.execute(sql_query)
-        end = time.time()
+    def start(self):
+        self._connection_acceptor.start()
+        logger.info("The IOHTAP server has successfully started.")
+        logger.info("Listening on port %d.", self._config.server_port)
 
-        # Extract the results.
-        # NOTE: Send the results back to the client.
-        for row in cursor:
-            print(" | ".join(map(str, row)))
-        print()
-        print("Ran for {:.2f} seconds".format(end - start))
+    def stop(self):
+        def shutdown():
+            self._connection_acceptor.stop()
+
+        self._main_executor.submit(shutdown).result()
+        self._main_executor.shutdown()
+        logger.info("The IOHTAP server has shut down.")
+
+    def _on_new_connection(self, client_socket, _addr_info):
+        self._main_executor.submit(self._handle_request, client_socket)
+
+    def _handle_request(self, client_socket: socket.socket):
+        # Simple protocol (the intention is that we replace this with ODBC or a
+        # Postgres wire protocol compatible server):
+        # - Client establishes a new connection for each request.
+        # - Upon establishing a connection, it sends a SQL query terminated with
+        #   a newline character.
+        # - IOHTAP then routes the query to an underlying DBMS.
+        # - Upon receiving the results, the server will send the results back in
+        #   textual form.
+        # - The server closes the connection after it finishes transmitting the
+        #   results back.
+        try:
+            io = client_socket.makefile("rw")
+
+            # 1. Receive the SQL query.
+            sql_query = io.readline().strip()
+            logger.debug("Received query: %s", sql_query)
+
+            # 2. Predict which DBMS to use.
+            run_times = self._cost_model.predict_run_time(sql_query)
+            db_to_use, _ = run_times.min_time_ms()
+
+            # 3. Actually execute the query
+            connection = self._dbs.get_connection(db_to_use)
+            cursor = connection.cursor()
+            cursor.execute(sql_query)
+
+            # 4. Extract and transmit the results.
+            num_rows = 0
+            for row in cursor:
+                print(" | ".join(map(str, row)), file=io)
+                num_rows += 1
+            logger.debug("Responded with %d rows.", num_rows)
+
+            # 5. Close the connection to indicate the end of the result set.
+            io.close()
+            client_socket.close()
+        except:  # pylint: disable=bare-except
+            logger.exception("Encountered exception when handling request.")

@@ -1,4 +1,4 @@
-from iohtap.config import DEFAULT_IOHTAP_SERVER_PORT
+import socket
 
 
 def register_command(subparsers):
@@ -15,11 +15,17 @@ def register_command(subparsers):
     parser.add_argument(
         "--port",
         type=int,
-        default=DEFAULT_IOHTAP_SERVER_PORT,
+        default=6583,
         help="The port on which IOHTAP is listening for connections.",
     )
     parser.set_defaults(func=main)
 
 
 def main(args):
-    print("Would connect to {}:{}".format(args.host, args.port))
+    req_socket = socket.create_connection((args.host, args.port))
+    with req_socket.makefile("rw") as io:
+        print("SELECT * FROM demo", file=io, flush=True)
+        # Wait for and print the results.
+        for line in io:
+            print(line, end="")
+    req_socket.close()

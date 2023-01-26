@@ -12,6 +12,7 @@ class ConfigFile:
     def server_interface(self) -> str:
         return self._raw["server_interface"]
 
+    @property
     def server_port(self) -> int:
         return int(self._raw["server_port"])
 
