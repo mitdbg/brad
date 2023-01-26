@@ -5,6 +5,7 @@
 
 server_interface: "0.0.0.0"
 server_port: 6583
+server_daemon_port: 6586
 
 athena:
   odbc_driver: Athena

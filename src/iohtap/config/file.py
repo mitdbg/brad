@@ -16,6 +16,10 @@ class ConfigFile:
     def server_port(self) -> int:
         return int(self._raw["server_port"])
 
+    @property
+    def server_daemon_port(self) -> int:
+        return int(self._raw["server_daemon_port"])
+
     def get_odbc_connection_string(self, db: DBType) -> str:
         if db not in self._raw:
             raise AssertionError("Unhandled database type: " + str(db))

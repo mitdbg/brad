@@ -2,6 +2,7 @@ import logging
 import pyodbc
 import socket
 from concurrent.futures import ThreadPoolExecutor
+from typing import List
 
 from iohtap.config.file import ConfigFile
 from iohtap.cost_model.model import CostModel
@@ -21,6 +22,12 @@ class IOHTAPServer:
             self._config.server_port,
             self._on_new_connection,
         )
+        self._daemon_connection_acceptor = ConnectionAcceptor(
+            self._config.server_interface,
+            self._config.server_daemon_port,
+            self._on_new_daemon_connection,
+        )
+        self._daemon_connections: List[socket.socket] = []
         self._main_executor = ThreadPoolExecutor(max_workers=1)
 
     def __enter__(self):
@@ -32,12 +39,17 @@ class IOHTAPServer:
 
     def start(self):
         self._connection_acceptor.start()
+        self._daemon_connection_acceptor.start()
         logger.info("The IOHTAP server has successfully started.")
         logger.info("Listening on port %d.", self._config.server_port)
 
     def stop(self):
         def shutdown():
+            self._daemon_connection_acceptor.stop()
             self._connection_acceptor.stop()
+            for daemon in self._daemon_connections:
+                daemon.close()
+            self._daemon_connections.clear()
 
         self._main_executor.submit(shutdown).result()
         self._main_executor.shutdown()
@@ -45,6 +57,9 @@ class IOHTAPServer:
 
     def _on_new_connection(self, client_socket, _addr_info):
         self._main_executor.submit(self._handle_request, client_socket)
+
+    def _on_new_daemon_connection(self, daemon_socket, _addr_info):
+        self._main_executor.submit(self._register_daemon, daemon_socket)
 
     def _handle_request(self, client_socket: socket.socket):
         # Simple protocol (the intention is that we replace this with ODBC or a
@@ -90,3 +105,14 @@ class IOHTAPServer:
         finally:
             # 5. Close the socket to indicate the end of the result set.
             client_socket.close()
+
+        # NOTE: What we do here depends on the needs of the background daemon.
+        if sql_query is not None:
+            try:
+                for daemon in self._daemon_connections:
+                    print(sql_query, file=daemon, flush=True)
+            except:
+                logger.exception("Exception when sending the query to the daemon.")
+
+    def _register_daemon(self, daemon_socket: socket.socket):
+        self._daemon_connections.append(daemon_socket.makefile("w"))

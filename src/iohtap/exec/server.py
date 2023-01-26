@@ -4,6 +4,7 @@ import threading
 
 from iohtap.config.file import ConfigFile
 from iohtap.server.server import IOHTAPServer
+from iohtap.utils import set_up_logging
 
 
 def register_command(subparsers):
@@ -35,14 +36,7 @@ def main(args):
     signal.signal(signal.SIGTERM, shutdown_signal_handler)
 
     config = ConfigFile(args.config_file)
-
-    # Configure the logger.
-    logging_kwargs = {
-        "format": "%(asctime)s %(levelname)-8s %(message)s",
-        "datefmt": "%Y-%m-%d %H:%M",
-        "level": logging.DEBUG if args.debug else logging.INFO,
-    }
-    logging.basicConfig(**logging_kwargs)
+    set_up_logging(debug_mode=args.debug)
 
     with IOHTAPServer(config):
         # Run until asked to terminate.
