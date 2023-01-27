@@ -81,6 +81,7 @@ class IOHTAPServer:
                 # 2. Predict which DBMS to use.
                 run_times = self._cost_model.predict_run_time(sql_query)
                 db_to_use, _ = run_times.min_time_ms()
+                logger.debug("Routing '%s' to %s", sql_query, db_to_use)
 
                 # 3. Actually execute the query
                 connection = self._dbs.get_connection(db_to_use)

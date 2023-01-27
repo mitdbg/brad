@@ -1,5 +1,18 @@
+import math
 from iohtap.config.dbtype import DBType
 from iohtap.cost_model.prediction import RunTimePrediction
+
+_DATA_MODIFICATION_PREFIXES = [
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+]
+
+_AURORA_ONLY_PREDICTION = RunTimePrediction(
+    aurora_ms=0,
+    athena_ms=math.inf,
+    redshift_ms=math.inf,
+)
 
 
 class CostModel:
@@ -8,6 +21,10 @@ class CostModel:
 
     def predict_run_time(self, sql_query: str) -> RunTimePrediction:
         # NOTE: Something more sophisticated goes here.
+
+        # To start, we only run data modification statements on Aurora.
+        if any(map(sql_query.startswith, _DATA_MODIFICATION_PREFIXES)):
+            return _AURORA_ONLY_PREDICTION
 
         if self._next_db == DBType.Aurora:
             aurora_ms = float(len(sql_query))
