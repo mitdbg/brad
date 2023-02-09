@@ -7,10 +7,15 @@ server_interface: "0.0.0.0"
 server_port: 6583
 server_daemon_port: 6586
 
+# If you change the strategy, you will need to recreate the tables in the
+# underlying engines.
+extract_strategy: sequence_trigger
+
 athena:
   odbc_driver: Athena
   aws_region: us-east-1
   s3_output_path: s3://your-bucket/output/path
+  s3_data_path: s3://your-bucket/data/path
   access_key: ABCABCABC123ABCABC45
   access_key_secret: abCD+E1f2Gxhi3J4klmN/OP5QrSTuvwXYzabcdEF
   database: iohtap
@@ -27,7 +32,6 @@ redshift:
   odbc_driver: Redshift
   host: redshift.us-east-1.amazonaws.com
   port: 5439
-  database: dev
   user: awsuser
   password: awsuser_password
   database: iohtap

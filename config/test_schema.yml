@@ -1,0 +1,9 @@
+- table_name: demo
+  columns:
+    - name: id
+      data_type: BIGINT
+      primary_key: true
+    - name: db
+      data_type: TEXT
+    - name: value
+      data_type: BIGINT

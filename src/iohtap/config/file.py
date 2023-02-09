@@ -20,6 +20,10 @@ class ConfigFile:
     def server_daemon_port(self) -> int:
         return int(self._raw["server_daemon_port"])
 
+    @property
+    def athena_s3_data_path(self) -> str:
+        return self._raw[DBType.Athena]["s3_data_path"]
+
     def get_odbc_connection_string(self, db: DBType) -> str:
         if db not in self._raw:
             raise AssertionError("Unhandled database type: " + str(db))
