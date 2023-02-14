@@ -39,6 +39,7 @@ def tear_down_tables(args):
 
     # 4. Drop the tables.
     for table in schema.tables:
+        logger.info("Deleting table '%s'...", table.name)
         drop_main_table = drop_table_template.format(table.name)
 
         logger.debug("Running on Redshift: %s", drop_main_table)
@@ -66,3 +67,5 @@ def tear_down_tables(args):
     aurora.commit()
     redshift.commit()
     # Athena does not support the notion of committing a transaction.
+
+    logger.info("Done!")

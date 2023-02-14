@@ -43,8 +43,8 @@ def set_up_tables(args):
         "CREATE TABLE {} ({}) LOCATION '{}' TBLPROPERTIES ('table_type' = 'ICEBERG');"
     )
 
-    logger.debug("Running table set up...")
     for table in schema.tables:
+        logger.info("Setting up table '%s'...", table.name)
         _set_up_aurora_table(aurora, table)
 
         primary_key_str = _pkey_str(table.primary_key)
@@ -74,6 +74,8 @@ def set_up_tables(args):
     aurora.commit()
     redshift.commit()
     # Athena does not support the notion of committing a transaction.
+
+    logger.info("Done!")
 
 
 def _set_up_aurora_table(cursor, table: Table):

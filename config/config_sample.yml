@@ -9,7 +9,7 @@ server_daemon_port: 6586
 
 # If you change the strategy, you will need to recreate the tables in the
 # underlying engines.
-extract_strategy: sequence_trigger
+extraction_strategy: sequence_trigger
 
 athena:
   odbc_driver: Athena
