@@ -8,8 +8,9 @@ from typing import List, TextIO
 from iohtap.config.dbtype import DBType
 from iohtap.config.file import ConfigFile
 from iohtap.config.strings import AURORA_SEQ_COLUMN
-from iohtap.cost_model.model import CostModel
 from iohtap.config.schema import Schema
+from iohtap.cost_model.model import CostModel
+from iohtap.data_sync.manager import DataSyncManager
 from iohtap.server.db_connection_manager import DBConnectionManager
 from iohtap.net.connection_acceptor import ConnectionAcceptor
 
@@ -35,6 +36,7 @@ class IOHTAPServer:
             self._on_new_daemon_connection,
         )
         self._daemon_connections: List[TextIO] = []
+        self._data_sync_mgr = DataSyncManager(self._config, self._schema)
         self._main_executor = ThreadPoolExecutor(max_workers=1)
 
     def __enter__(self):
@@ -81,9 +83,15 @@ class IOHTAPServer:
         #   results back.
         try:
             with client_socket.makefile("rw") as io:
-                # 1. Receive the SQL query.
-                sql_query = io.readline().strip()
+                # 1. Receive the SQL query and strip all trailing white space
+                #    and the semicolon.
+                sql_query = io.readline().strip()[:-1]
                 logger.debug("Received query: %s", sql_query)
+
+                # Handle internal commands separately.
+                if sql_query.startswith("IOHTAP_"):
+                    self._handle_internal_command(sql_query, io)
+                    return
 
                 # 2. Predict which DBMS to use.
                 run_times = self._cost_model.predict_run_time(sql_query)
@@ -148,3 +156,15 @@ class IOHTAPServer:
         # Should ideally also handle SELECT * (to omit all iohtap_ prefixed
         # columns). But it is a bit cumbersome to do.
         return sql_query
+
+    def _handle_internal_command(self, command: str, io: TextIO):
+        """
+        This method is used to handle IOHTAP_ prefixed "queries" (i.e., commands
+        to run custom functionality like syncing data across the engines).
+        """
+        if command != "IOHTAP_SYNC":
+            print("Unknown internal command:", command, file=io, flush=True)
+            return
+
+        self._data_sync_mgr.run_sync()
+        print("Sync succeeded.", file=io, flush=True)
