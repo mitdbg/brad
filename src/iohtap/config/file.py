@@ -1,6 +1,7 @@
 import yaml
 
 from iohtap.config.dbtype import DBType
+from iohtap.config.extraction import ExtractionStrategy
 
 
 class ConfigFile:
@@ -19,6 +20,14 @@ class ConfigFile:
     @property
     def server_daemon_port(self) -> int:
         return int(self._raw["server_daemon_port"])
+
+    @property
+    def athena_s3_data_path(self) -> str:
+        return self._raw[DBType.Athena]["s3_data_path"]
+
+    @property
+    def extraction_strategy(self) -> ExtractionStrategy:
+        return ExtractionStrategy.from_str(self._raw["extraction_strategy"])
 
     def get_odbc_connection_string(self, db: DBType) -> str:
         if db not in self._raw:
