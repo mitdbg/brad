@@ -27,7 +27,7 @@ class ConfigFile:
 
     @property
     def extraction_strategy(self) -> ExtractionStrategy:
-        return ExtractionStrategy.from_str(self._raw["extraction_strategy"])
+        return ExtractionStrategy.from_str(self._raw["extract_strategy"])
 
     def get_odbc_connection_string(self, db: DBType) -> str:
         if db not in self._raw:

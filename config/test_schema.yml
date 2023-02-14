@@ -1,4 +1,5 @@
-- table_name: demo
+# Use PostgreSQL data types. Make sure the data type is supported in Athena too.
+- table_name: demo_new
   columns:
     - name: id
       data_type: BIGINT

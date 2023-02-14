@@ -1,3 +1,5 @@
+import logging
+
 from iohtap.config.dbtype import DBType
 from iohtap.config.schema import Schema
 from iohtap.config.strings import (
@@ -8,6 +10,8 @@ from iohtap.config.strings import (
 from iohtap.config.extraction import ExtractionStrategy
 from iohtap.config.file import ConfigFile
 from iohtap.server.db_connection_manager import DBConnectionManager
+
+logger = logging.getLogger(__name__)
 
 
 # This method is called by `iohtap.exec.admin.main`.
@@ -37,17 +41,26 @@ def tear_down_tables(args):
     for table in schema.tables:
         drop_main_table = drop_table_template.format(table.name)
 
+        logger.debug("Running on Redshift: %s", drop_main_table)
         redshift.execute(drop_main_table)
+        logger.debug("Running on Athena: %s", drop_main_table)
         athena.execute(drop_main_table)
 
         # Triggers and indexes are automatically dropped.
-        aurora.execute(drop_table_template.format(shadow_table_name(table)))
-        aurora.execute(drop_main_table)
-        aurora.execute(
-            drop_trigger_fn_template.format(delete_trigger_function_name(table))
-        )
+        query = drop_table_template.format(shadow_table_name(table))
+        logger.debug("Running on Aurora %s", query)
+        aurora.execute(query)
 
-    aurora.execute(drop_table_template.format(aurora_extract_progress_table_name()))
+        logger.debug("Running on Aurora: %s", drop_main_table)
+        aurora.execute(drop_main_table)
+
+        query = drop_trigger_fn_template.format(delete_trigger_function_name(table))
+        logger.debug("Running on Aurora: %s", query)
+        aurora.execute(query)
+
+    query = drop_table_template.format(aurora_extract_progress_table_name())
+    logger.debug("Running on Aurora: %s", query)
+    aurora.execute(query)
 
     # 5. Commit the changes.
     aurora.commit()

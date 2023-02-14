@@ -67,5 +67,5 @@ class Schema:
         return Column(
             raw_column["name"],
             raw_column["data_type"],
-            "primary_key" in raw_column and raw_column["primary_key"] == "true",
+            "primary_key" in raw_column and raw_column["primary_key"],
         )
