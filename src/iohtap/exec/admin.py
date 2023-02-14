@@ -3,6 +3,7 @@ import logging
 
 from iohtap.utils import set_up_logging
 from iohtap.admin.set_up_tables import set_up_tables
+from iohtap.admin.tear_down_tables import tear_down_tables
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,9 @@ def main(args):
 
     if args.action == "set_up_tables":
         set_up_tables(args)
+    elif args.action == "tear_down_tables":
+        # NOTE: This will delete the data in the tables too!
+        tear_down_tables(args)
     else:
         logger.error("Unknown admin action: %s", args.action)
         sys.exit(1)
