@@ -29,6 +29,10 @@ class Table:
         self._primary_key = list(filter(lambda c: c.is_primary, columns))
 
     @property
+    def name(self) -> str:
+        return self._name
+
+    @property
     def columns(self) -> List[Column]:
         return self._columns
 
