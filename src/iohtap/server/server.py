@@ -1,20 +1,27 @@
 import logging
 import pyodbc
 import socket
+import sqlglot
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, TextIO
 
+from iohtap.config.dbtype import DBType
 from iohtap.config.file import ConfigFile
+from iohtap.config.strings import AURORA_SEQ_COLUMN
 from iohtap.cost_model.model import CostModel
+from iohtap.config.schema import Schema
 from iohtap.server.db_connection_manager import DBConnectionManager
 from iohtap.net.connection_acceptor import ConnectionAcceptor
 
 logger = logging.getLogger(__name__)
 
+_UPDATE_SEQ_EXPR = sqlglot.parse_one("{} = DEFAULT".format(AURORA_SEQ_COLUMN))
+
 
 class IOHTAPServer:
-    def __init__(self, config: ConfigFile):
+    def __init__(self, config: ConfigFile, schema: Schema):
         self._config = config
+        self._schema = schema
         self._cost_model = CostModel()
         self._dbs = DBConnectionManager(self._config)
         self._connection_acceptor = ConnectionAcceptor(
@@ -82,6 +89,7 @@ class IOHTAPServer:
                 run_times = self._cost_model.predict_run_time(sql_query)
                 db_to_use, _ = run_times.min_time_ms()
                 logger.debug("Routing '%s' to %s", sql_query, db_to_use)
+                sql_query = self._rewrite_query_if_needed(sql_query, db_to_use)
 
                 # 3. Actually execute the query
                 connection = self._dbs.get_connection(db_to_use)
@@ -117,3 +125,26 @@ class IOHTAPServer:
 
     def _register_daemon(self, daemon_socket: socket.socket):
         self._daemon_connections.append(daemon_socket.makefile("w"))
+
+    def _rewrite_query_if_needed(self, sql_query: str, db_to_use: DBType) -> str:
+        if db_to_use != DBType.Aurora:
+            return sql_query
+
+        upper_query = sql_query.upper()
+        if upper_query.startswith("UPDATE"):
+            # NOTE: The parser we use here is written in Python, so it is likely
+            # slow. We should replace it with a C-based parser (and with a parser
+            # that handles PostgreSQL SQL). But for prototype purposes (and until we
+            # are sure that this is a bottleneck), this implementation is fine.
+            parsed = sqlglot.parse_one(sql_query)
+            # Need to make sure we update the `iohtap_seq` column so the update
+            # is picked up in the next extraction. This rewrite is specific to our
+            # current extraction strategy.
+            parsed.expressions.append(_UPDATE_SEQ_EXPR)
+            result = parsed.sql()
+            logger.debug("Rewrote query to '%s'", result)
+            return result
+
+        # Should ideally also handle SELECT * (to omit all iohtap_ prefixed
+        # columns). But it is a bit cumbersome to do.
+        return sql_query

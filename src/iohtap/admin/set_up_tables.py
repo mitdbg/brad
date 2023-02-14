@@ -8,7 +8,8 @@ from iohtap.config.strings import (
     delete_trigger_name,
     seq_index_name,
     shadow_table_name,
-    aurora_extract_progress_table_name,
+    AURORA_EXTRACT_PROGRESS_TABLE_NAME,
+    AURORA_SEQ_COLUMN,
 )
 from iohtap.config.extraction import ExtractionStrategy
 from iohtap.config.file import ConfigFile
@@ -65,7 +66,7 @@ def set_up_tables(args):
 
     # 5. Create the extraction progress table.
     query = "CREATE TABLE {} (table_name TEXT PRIMARY KEY, next_extract_seq BIGINT, next_shadow_extract_seq BIGINT)".format(
-        aurora_extract_progress_table_name(),
+        AURORA_EXTRACT_PROGRESS_TABLE_NAME,
     )
     logger.debug("Running on Aurora: %s", query)
     aurora.execute(query)
@@ -80,10 +81,10 @@ def set_up_tables(args):
 
 def _set_up_aurora_table(cursor, table: Table):
     aurora_extract_main_template = (
-        "CREATE TABLE {} ({}, iohtap_seq BIGSERIAL, PRIMARY KEY ({}));"
+        "CREATE TABLE {} ({}, " + AURORA_SEQ_COLUMN + " BIGSERIAL, PRIMARY KEY ({}));"
     )
     aurora_extract_shadow_template = (
-        "CREATE TABLE {} ({}, iohtap_seq BIGSERIAL, PRIMARY KEY ({}));"
+        "CREATE TABLE {} ({}, " + AURORA_SEQ_COLUMN + " BIGSERIAL, PRIMARY KEY ({}));"
     )
     aurora_delete_trigger_fn_template = """
         CREATE OR REPLACE FUNCTION {trigger_fn_name}()
@@ -102,7 +103,9 @@ def _set_up_aurora_table(cursor, table: Table):
         FOR EACH ROW
         EXECUTE PROCEDURE {trigger_fn_name}();
     """
-    aurora_index_template = "CREATE INDEX {} ON {} USING btree (iohtap_seq);"
+    aurora_index_template = (
+        "CREATE INDEX {} ON {} USING btree (" + AURORA_SEQ_COLUMN + ");"
+    )
 
     primary_key_col_str = _col_str(table.primary_key, DBType.Aurora)
     primary_key_str = _pkey_str(table.primary_key)

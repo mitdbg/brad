@@ -19,5 +19,5 @@ def seq_index_name(table: Table, for_shadow: bool) -> str:
     )
 
 
-def aurora_extract_progress_table_name() -> str:
-    return "iohtap_extract_progress"
+AURORA_EXTRACT_PROGRESS_TABLE_NAME = "iohtap_extract_progress"
+AURORA_SEQ_COLUMN = "iohtap_seq"

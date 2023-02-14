@@ -5,7 +5,7 @@ from iohtap.config.schema import Schema
 from iohtap.config.strings import (
     delete_trigger_function_name,
     shadow_table_name,
-    aurora_extract_progress_table_name,
+    AURORA_EXTRACT_PROGRESS_TABLE_NAME,
 )
 from iohtap.config.extraction import ExtractionStrategy
 from iohtap.config.file import ConfigFile
@@ -59,7 +59,7 @@ def tear_down_tables(args):
         logger.debug("Running on Aurora: %s", query)
         aurora.execute(query)
 
-    query = drop_table_template.format(aurora_extract_progress_table_name())
+    query = drop_table_template.format(AURORA_EXTRACT_PROGRESS_TABLE_NAME)
     logger.debug("Running on Aurora: %s", query)
     aurora.execute(query)
 

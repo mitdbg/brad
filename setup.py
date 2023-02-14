@@ -28,6 +28,7 @@ ENTRY_POINTS = {
 INSTALL_REQUIRES = [
     "pyodbc",
     "pyyaml",
+    "sqlglot",
 ]
 
 DEV_REQUIRES = [
