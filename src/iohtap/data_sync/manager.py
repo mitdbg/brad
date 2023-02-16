@@ -34,6 +34,27 @@ logger = logging.getLogger(__name__)
 _MAX_SEQ = 0xFFFFFFFF_FFFFFFFF
 
 
+class _SyncContext:
+    def __init__(self, table: Table):
+        self.table = table
+
+        self.next_extract_seq = -1
+        self.max_extract_seq = -1
+
+        self.next_shadow_extract_seq = -1
+        self.max_shadow_extract_seq = -1
+
+    def bounds_valid(self) -> bool:
+        return (
+            self.next_extract_seq > 0
+            and self.max_extract_seq > 0
+            and self.next_shadow_extract_seq > 0
+            and self.max_shadow_extract_seq > 0
+            and self.next_extract_seq <= self.max_extract_seq
+            and self.next_shadow_extract_seq <= self.max_shadow_extract_seq
+        )
+
+
 class DataSyncManager:
     def __init__(self, config: ConfigFile, schema: Schema, dbs: DBConnectionManager):
         self._config = config
@@ -61,220 +82,237 @@ class DataSyncManager:
         aurora = self._aurora.cursor()
         redshift = self._dbs.get_connection(DBType.Redshift).cursor()
         athena = self._dbs.get_connection(DBType.Athena).cursor()
-
         try:
             logger.debug("Starting sync on '%s'...", table.name)
+            ctx = _SyncContext(table)
 
             # 1. Get data range to extract.
-            #  - Select `next_extract_seq` values from the extraction progress table (lower bound)
-            #  - Select current max sequence values from the main and shadow tables (upper bound)
-            aurora.execute(GET_NEXT_EXTRACT, table.name)
-            row = aurora.fetchone()
-            if row is None:
-                # This is the first time the extraction ran.
-                next_extract_seq, next_shadow_extract_seq = 0, 0
-            else:
-                next_extract_seq, next_shadow_extract_seq = row
-
-            aurora.execute(GET_MAX_EXTRACT_TEMPLATE.format(table_name=table.name))
-            row = aurora.fetchone()
-            if row is None:
-                # The scenario when the table is empty.
-                # Ideally we should be using the DBMS' max value for BIGSERIAL.
-                max_extract_seq = _MAX_SEQ
-            else:
-                max_extract_seq = row[0]
-
-            aurora.execute(
-                GET_MAX_EXTRACT_TEMPLATE.format(table_name=shadow_table_name(table))
-            )
-            row = aurora.fetchone()
-            if row is None:
-                # The scenario when the table is empty.
-                # Ideally we should be using the DBMS' max value for BIGSERIAL.
-                max_shadow_extract_seq = _MAX_SEQ
-            else:
-                max_shadow_extract_seq = row[0]
+            self._fetch_and_set_sync_bounds(aurora, ctx)
+            assert ctx.bounds_valid()
 
             # 2. Export changes to S3.
-            extract_main_query = EXTRACT_FROM_MAIN_TEMPLATE.format(
-                table_cols=Column.comma_separated_names(table.columns),
-                main_table=table.name,
-                lower_bound=next_extract_seq,
-                upper_bound=max_extract_seq,
-            )
-            extract_shadow_query = EXTRACT_FROM_SHADOW_TEMPLATE.format(
-                pkey_cols=Column.comma_separated_names(table.primary_key),
-                main_table=shadow_table_name(table),
-                lower_bound=next_shadow_extract_seq,
-                upper_bound=max_shadow_extract_seq,
-            )
-            extract_main = EXTRACT_S3_TEMPLATE.format(
-                query=extract_main_query,
-                s3_bucket=self._config.s3_extract_bucket,
-                s3_file_path=self._get_s3_main_table_path(table),
-                s3_region=self._config.s3_extract_region,
-            )
-            extract_shadow = EXTRACT_S3_TEMPLATE.format(
-                query=extract_shadow_query,
-                s3_bucket=self._config.s3_extract_bucket,
-                s3_file_path=self._get_s3_shadow_table_path(table),
-                s3_region=self._config.s3_extract_region,
-            )
-            logger.debug("Running main export query: %s", extract_main)
-            logger.debug("Running shadow export query: %s", extract_shadow)
-            aurora.execute(extract_main)
-            aurora.execute(extract_shadow)
+            self._export_aurora_to_s3(aurora, ctx)
 
             # 3. Import into Redshift and run a merge.
-            # 3. a) Create staging tables.
-            create_redshift_staging = REDSHIFT_CREATE_STAGING_TABLE.format(
-                staging_table=imported_staging_table_name(table), base_table=table.name
-            )
-            create_redshift_shadow_staging = (
-                REDSHIFT_CREATE_SHADOW_STAGING_TABLE.format(
-                    shadow_staging_table=imported_shadow_staging_table_name(table),
-                    pkey_cols=Column.comma_separated_names_and_types(
-                        table.primary_key, DBType.Redshift
-                    ),
-                )
-            )
-            redshift.execute(create_redshift_staging)
-            redshift.execute(create_redshift_shadow_staging)
-
-            # 3. b) Import into the staging tables.
-            import_redshift_staging = REDSHIFT_IMPORT_COMMAND.format(
-                dest_table=imported_staging_table_name(table),
-                s3_file_path="s3://{}/{}".format(
-                    self._config.s3_extract_bucket, self._get_s3_main_table_path(table)
-                ),
-                s3_iam_role=self._config.redshift_s3_iam_role,
-                s3_region=self._config.s3_extract_region,
-            )
-            import_redshift_shadow_staging = REDSHIFT_IMPORT_COMMAND.format(
-                dest_table=imported_shadow_staging_table_name(table),
-                s3_file_path="s3://{}/{}".format(
-                    self._config.s3_extract_bucket,
-                    self._get_s3_shadow_table_path(table),
-                ),
-                s3_iam_role=self._config.redshift_s3_iam_role,
-                s3_region=self._config.s3_extract_region,
-            )
-            redshift.execute(import_redshift_staging)
-            redshift.execute(import_redshift_shadow_staging)
-
-            # 3. c) Delete updated and deleted rows from the main table.
-            delete_using_redshift_staging = REDSHIFT_DELETE_COMMAND.format(
-                main_table=table.name,
-                staging_table=imported_staging_table_name(table),
-                conditions=self._generate_redshift_delete_conditions(
-                    table, for_shadow_table=False
-                ),
-            )
-            delete_using_redshift_shadow_staging = REDSHIFT_DELETE_COMMAND.format(
-                main_table=table.name,
-                staging_table=imported_shadow_staging_table_name(table),
-                conditions=self._generate_redshift_delete_conditions(
-                    table, for_shadow_table=True
-                ),
-            )
-            redshift.execute(delete_using_redshift_staging)
-            redshift.execute(delete_using_redshift_shadow_staging)
-
-            # 3. d) Insert new (and updated) rows.
-            insert_using_redshift_staging = REDSHIFT_INSERT_COMMAND.format(
-                dest_table=table.name, staging_table=imported_staging_table_name(table)
-            )
-            redshift.execute(insert_using_redshift_staging)
-
-            # 3. e) Commit and clean up.
-            redshift.commit()
-            redshift.execute("DROP TABLE {}".format(imported_staging_table_name(table)))
-            redshift.execute(
-                "DROP TABLE {}".format(imported_shadow_staging_table_name(table))
-            )
-            redshift.commit()
+            self._import_s3_to_redshift(redshift, ctx)
 
             # 4. Run a merge in Athena.
-            # 4. a) Create staging tables.
-            create_athena_staging = ATHENA_CREATE_STAGING_TABLE.format(
-                staging_table=imported_staging_table_name(table),
-                columns=Column.comma_separated_names_and_types(
-                    table.columns, DBType.Athena
-                ),
-                s3_location="s3://{}/{}".format(
-                    self._config.s3_extract_bucket,
-                    self._get_s3_main_table_path(table, include_file=False),
-                ),
-            )
-            create_athena_shadow_staging = ATHENA_CREATE_STAGING_TABLE.format(
-                staging_table=imported_shadow_staging_table_name(table),
-                columns=Column.comma_separated_names_and_types(
-                    table.primary_key, DBType.Athena
-                ),
-                s3_location="s3://{}/{}".format(
-                    self._config.s3_extract_bucket,
-                    self._get_s3_shadow_table_path(table, include_file=False),
-                ),
-            )
-            athena.execute(create_athena_staging)
-            athena.execute(create_athena_shadow_staging)
-
-            # 4. b) Run the merge.
-            athena_merge_query = self._generate_athena_merge_query(table)
-            athena.execute(athena_merge_query)
-
-            # 4. c) Delete the staging tables (this deletes the schemas only, we
-            # need to run an S3 object delete to actually delete the data).
-            athena.execute("DROP TABLE {}".format(imported_staging_table_name(table)))
-            athena.execute(
-                "DROP TABLE {}".format(imported_shadow_staging_table_name(table))
-            )
+            self._merge_into_athena(athena, ctx)
 
             # 5. Commit new next_extract_seq values and remove extracted rows from the shadow table.
-            # NOTE: If any of the max extract sequence values are `_MAX_SEQ`, it
-            # indicates that there were no values to extract.
-            if max_shadow_extract_seq != _MAX_SEQ:
-                aurora_delete_shadow = DELETE_FROM_SHADOW_STAGING.format(
-                    shadow_staging_table=imported_shadow_staging_table_name(table),
-                    lower_bound=next_shadow_extract_seq,
-                    upper_bound=max_shadow_extract_seq,
-                )
-                aurora.execute(aurora_delete_shadow)
-
-            # Make sure we start at the right sequence number the next time we run an extraction.
-            if max_extract_seq != _MAX_SEQ and max_shadow_extract_seq != _MAX_SEQ:
-                aurora.execute(
-                    UPDATE_EXTRACT_PROGRESS_BOTH,
-                    max_extract_seq + 1,
-                    max_shadow_extract_seq + 1,
-                    table.name,
-                )
-            elif max_extract_seq != _MAX_SEQ:
-                aurora.execute(
-                    UPDATE_EXTRACT_PROGRESS_NON_SHADOW,
-                    max_extract_seq + 1,
-                    table.name,
-                )
-            elif max_shadow_extract_seq != _MAX_SEQ:
-                aurora.execute(
-                    UPDATE_EXTRACT_PROGRESS_SHADOW,
-                    max_shadow_extract_seq + 1,
-                    table.name,
-                )
-            else:
-                assert False
-
-            # Indicate that the sync has completed.
-            aurora.commit()
-
-            # Ideally we also delete the temporary files (via S3). It's OK if we
-            # do not delete them for now because they will be overwritten by the
-            # next sync.
+            self._complete_sync(aurora, ctx)
+            logger.debug("Completed syncing '%s'...", table.name)
 
         except:  # pylint: disable=bare-except
             logger.exception("Encountered an exception when syncing data.")
             aurora.rollback()
+
+    def _fetch_and_set_sync_bounds(self, aurora, ctx: _SyncContext):
+        #  - Select `next_extract_seq` values from the extraction progress table (lower bound)
+        #  - Select current max sequence values from the main and shadow tables (upper bound)
+        aurora.execute(GET_NEXT_EXTRACT, ctx.table.name)
+        row = aurora.fetchone()
+        if row is None:
+            # This is the first time the extraction ran.
+            ctx.next_extract_seq, ctx.next_shadow_extract_seq = 0, 0
+        else:
+            ctx.next_extract_seq, ctx.next_shadow_extract_seq = row
+
+        aurora.execute(GET_MAX_EXTRACT_TEMPLATE.format(table_name=ctx.table.name))
+        row = aurora.fetchone()
+        if row is None:
+            # The scenario when the table is empty.
+            # Ideally we should be using the DBMS' max value for BIGSERIAL.
+            ctx.max_extract_seq = _MAX_SEQ
+        else:
+            ctx.max_extract_seq = row[0]
+
+        aurora.execute(
+            GET_MAX_EXTRACT_TEMPLATE.format(table_name=shadow_table_name(ctx.table))
+        )
+        row = aurora.fetchone()
+        if row is None:
+            # The scenario when the table is empty.
+            # Ideally we should be using the DBMS' max value for BIGSERIAL.
+            ctx.max_shadow_extract_seq = _MAX_SEQ
+        else:
+            ctx.max_shadow_extract_seq = row[0]
+
+    def _export_aurora_to_s3(self, aurora, ctx: _SyncContext):
+        extract_main_query = EXTRACT_FROM_MAIN_TEMPLATE.format(
+            table_cols=Column.comma_separated_names(ctx.table.columns),
+            main_table=ctx.table.name,
+            lower_bound=ctx.next_extract_seq,
+            upper_bound=ctx.max_extract_seq,
+        )
+        extract_shadow_query = EXTRACT_FROM_SHADOW_TEMPLATE.format(
+            pkey_cols=Column.comma_separated_names(ctx.table.primary_key),
+            main_table=shadow_table_name(ctx.table),
+            lower_bound=ctx.next_shadow_extract_seq,
+            upper_bound=ctx.max_shadow_extract_seq,
+        )
+        extract_main = EXTRACT_S3_TEMPLATE.format(
+            query=extract_main_query,
+            s3_bucket=self._config.s3_extract_bucket,
+            s3_file_path=self._get_s3_main_table_path(ctx.table),
+            s3_region=self._config.s3_extract_region,
+        )
+        extract_shadow = EXTRACT_S3_TEMPLATE.format(
+            query=extract_shadow_query,
+            s3_bucket=self._config.s3_extract_bucket,
+            s3_file_path=self._get_s3_shadow_table_path(ctx.table),
+            s3_region=self._config.s3_extract_region,
+        )
+        logger.debug("Running main export query: %s", extract_main)
+        logger.debug("Running shadow export query: %s", extract_shadow)
+        aurora.execute(extract_main)
+        aurora.execute(extract_shadow)
+
+    def _import_s3_to_redshift(self, redshift, ctx: _SyncContext):
+        # a) Create staging tables.
+        create_redshift_staging = REDSHIFT_CREATE_STAGING_TABLE.format(
+            staging_table=imported_staging_table_name(ctx.table),
+            base_table=ctx.table.name,
+        )
+        create_redshift_shadow_staging = REDSHIFT_CREATE_SHADOW_STAGING_TABLE.format(
+            shadow_staging_table=imported_shadow_staging_table_name(ctx.table),
+            pkey_cols=Column.comma_separated_names_and_types(
+                ctx.table.primary_key, DBType.Redshift
+            ),
+        )
+        redshift.execute(create_redshift_staging)
+        redshift.execute(create_redshift_shadow_staging)
+
+        # b) Import into the staging tables.
+        import_redshift_staging = REDSHIFT_IMPORT_COMMAND.format(
+            dest_table=imported_staging_table_name(ctx.table),
+            s3_file_path="s3://{}/{}".format(
+                self._config.s3_extract_bucket, self._get_s3_main_table_path(ctx.table)
+            ),
+            s3_iam_role=self._config.redshift_s3_iam_role,
+            s3_region=self._config.s3_extract_region,
+        )
+        import_redshift_shadow_staging = REDSHIFT_IMPORT_COMMAND.format(
+            dest_table=imported_shadow_staging_table_name(ctx.table),
+            s3_file_path="s3://{}/{}".format(
+                self._config.s3_extract_bucket,
+                self._get_s3_shadow_table_path(ctx.table),
+            ),
+            s3_iam_role=self._config.redshift_s3_iam_role,
+            s3_region=self._config.s3_extract_region,
+        )
+        redshift.execute(import_redshift_staging)
+        redshift.execute(import_redshift_shadow_staging)
+
+        # c) Delete updated and deleted rows from the main table.
+        delete_using_redshift_staging = REDSHIFT_DELETE_COMMAND.format(
+            main_table=ctx.table.name,
+            staging_table=imported_staging_table_name(ctx.table),
+            conditions=self._generate_redshift_delete_conditions(
+                ctx.table, for_shadow_table=False
+            ),
+        )
+        delete_using_redshift_shadow_staging = REDSHIFT_DELETE_COMMAND.format(
+            main_table=ctx.table.name,
+            staging_table=imported_shadow_staging_table_name(ctx.table),
+            conditions=self._generate_redshift_delete_conditions(
+                ctx.table, for_shadow_table=True
+            ),
+        )
+        redshift.execute(delete_using_redshift_staging)
+        redshift.execute(delete_using_redshift_shadow_staging)
+
+        # d) Insert new (and updated) rows.
+        insert_using_redshift_staging = REDSHIFT_INSERT_COMMAND.format(
+            dest_table=ctx.table.name,
+            staging_table=imported_staging_table_name(ctx.table),
+        )
+        redshift.execute(insert_using_redshift_staging)
+
+        # 3. e) Commit and clean up.
+        redshift.commit()
+        redshift.execute("DROP TABLE {}".format(imported_staging_table_name(ctx.table)))
+        redshift.execute(
+            "DROP TABLE {}".format(imported_shadow_staging_table_name(ctx.table))
+        )
+        redshift.commit()
+
+    def _merge_into_athena(self, athena, ctx: _SyncContext):
+        # a) Create staging tables.
+        create_athena_staging = ATHENA_CREATE_STAGING_TABLE.format(
+            staging_table=imported_staging_table_name(ctx.table),
+            columns=Column.comma_separated_names_and_types(
+                ctx.table.columns, DBType.Athena
+            ),
+            s3_location="s3://{}/{}".format(
+                self._config.s3_extract_bucket,
+                self._get_s3_main_table_path(ctx.table, include_file=False),
+            ),
+        )
+        create_athena_shadow_staging = ATHENA_CREATE_STAGING_TABLE.format(
+            staging_table=imported_shadow_staging_table_name(ctx.table),
+            columns=Column.comma_separated_names_and_types(
+                ctx.table.primary_key, DBType.Athena
+            ),
+            s3_location="s3://{}/{}".format(
+                self._config.s3_extract_bucket,
+                self._get_s3_shadow_table_path(ctx.table, include_file=False),
+            ),
+        )
+        athena.execute(create_athena_staging)
+        athena.execute(create_athena_shadow_staging)
+
+        # b) Run the merge.
+        athena_merge_query = self._generate_athena_merge_query(ctx.table)
+        athena.execute(athena_merge_query)
+
+        # c) Delete the staging tables (this deletes the schemas only, we
+        # need to run an S3 object delete to actually delete the data).
+        athena.execute("DROP TABLE {}".format(imported_staging_table_name(ctx.table)))
+        athena.execute(
+            "DROP TABLE {}".format(imported_shadow_staging_table_name(ctx.table))
+        )
+
+    def _complete_sync(self, aurora, ctx: _SyncContext):
+        # NOTE: If any of the max extract sequence values are `_MAX_SEQ`, it
+        # indicates that there were no values to extract.
+        if ctx.max_shadow_extract_seq != _MAX_SEQ:
+            aurora_delete_shadow = DELETE_FROM_SHADOW_STAGING.format(
+                shadow_staging_table=imported_shadow_staging_table_name(ctx.table),
+                lower_bound=ctx.next_shadow_extract_seq,
+                upper_bound=ctx.max_shadow_extract_seq,
+            )
+            aurora.execute(aurora_delete_shadow)
+
+        # Make sure we start at the right sequence number the next time we run an extraction.
+        if ctx.max_extract_seq != _MAX_SEQ and ctx.max_shadow_extract_seq != _MAX_SEQ:
+            aurora.execute(
+                UPDATE_EXTRACT_PROGRESS_BOTH,
+                ctx.max_extract_seq + 1,
+                ctx.max_shadow_extract_seq + 1,
+                ctx.table.name,
+            )
+        elif ctx.max_extract_seq != _MAX_SEQ:
+            aurora.execute(
+                UPDATE_EXTRACT_PROGRESS_NON_SHADOW,
+                ctx.max_extract_seq + 1,
+                ctx.table.name,
+            )
+        elif ctx.max_shadow_extract_seq != _MAX_SEQ:
+            aurora.execute(
+                UPDATE_EXTRACT_PROGRESS_SHADOW,
+                ctx.max_shadow_extract_seq + 1,
+                ctx.table.name,
+            )
+        else:
+            assert False
+
+        # Indicate that the sync has completed.
+        aurora.commit()
+
+        # Ideally we also delete the temporary files (via S3). It's OK if we
+        # do not delete them for now because they will be overwritten by the
+        # next sync.
 
     def _get_s3_main_table_path(self, table: Table, include_file: bool = True) -> str:
         prefix = "{}/{}/main".format(self._config.s3_extract_path, table.name)
