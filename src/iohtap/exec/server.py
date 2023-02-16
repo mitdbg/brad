@@ -2,6 +2,7 @@ import signal
 import threading
 
 from iohtap.config.file import ConfigFile
+from iohtap.config.schema import Schema
 from iohtap.server.server import IOHTAPServer
 from iohtap.utils import set_up_logging
 
@@ -16,6 +17,12 @@ def register_command(subparsers):
         type=str,
         required=True,
         help="Path to IOHTAP's configuration file.",
+    )
+    parser.add_argument(
+        "--schema-file",
+        type=str,
+        required=True,
+        help="Path to the database schema.",
     )
     parser.add_argument(
         "--debug",
@@ -34,9 +41,10 @@ def main(args):
     signal.signal(signal.SIGINT, shutdown_signal_handler)
     signal.signal(signal.SIGTERM, shutdown_signal_handler)
 
-    config = ConfigFile(args.config_file)
     set_up_logging(debug_mode=args.debug)
+    config = ConfigFile(args.config_file)
+    schema = Schema.load(args.schema_file)
 
-    with IOHTAPServer(config):
+    with IOHTAPServer(config, schema):
         # Run until asked to terminate.
         should_shutdown.wait()

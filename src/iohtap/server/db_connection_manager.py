@@ -26,6 +26,9 @@ class DBConnectionManager:
             config.get_odbc_connection_string(DBType.Redshift)
         )
 
+        # NOTE: Need to set the appropriate isolation levels. Need to also test
+        # running transactions through our router.
+
     def get_connection(self, db: DBType):
         if db == DBType.Athena:
             return self._athena

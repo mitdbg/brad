@@ -11,6 +11,11 @@ server_daemon_port: 6586
 # underlying engines.
 extraction_strategy: sequence_trigger
 
+# Holds intermediate results during data syncing.
+s3_extract_bucket: your-bucket
+s3_extract_path: extract/path/
+s3_extract_region: us-east-1
+
 athena:
   odbc_driver: Athena
   aws_region: us-east-1
@@ -35,3 +40,4 @@ redshift:
   user: awsuser
   password: awsuser_password
   database: iohtap
+  s3_iam_role: arn:aws:iam:123

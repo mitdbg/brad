@@ -1,20 +1,28 @@
 import logging
 import pyodbc
 import socket
+import sqlglot
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, TextIO
 
+from iohtap.config.dbtype import DBType
 from iohtap.config.file import ConfigFile
+from iohtap.config.strings import AURORA_SEQ_COLUMN
+from iohtap.config.schema import Schema
 from iohtap.cost_model.model import CostModel
+from iohtap.data_sync.manager import DataSyncManager
 from iohtap.server.db_connection_manager import DBConnectionManager
 from iohtap.net.connection_acceptor import ConnectionAcceptor
 
 logger = logging.getLogger(__name__)
 
+_UPDATE_SEQ_EXPR = sqlglot.parse_one("{} = DEFAULT".format(AURORA_SEQ_COLUMN))  # type: ignore
+
 
 class IOHTAPServer:
-    def __init__(self, config: ConfigFile):
+    def __init__(self, config: ConfigFile, schema: Schema):
         self._config = config
+        self._schema = schema
         self._cost_model = CostModel()
         self._dbs = DBConnectionManager(self._config)
         self._connection_acceptor = ConnectionAcceptor(
@@ -28,6 +36,7 @@ class IOHTAPServer:
             self._on_new_daemon_connection,
         )
         self._daemon_connections: List[TextIO] = []
+        self._data_sync_mgr = DataSyncManager(self._config, self._schema, self._dbs)
         self._main_executor = ThreadPoolExecutor(max_workers=1)
 
     def __enter__(self):
@@ -74,14 +83,21 @@ class IOHTAPServer:
         #   results back.
         try:
             with client_socket.makefile("rw") as io:
-                # 1. Receive the SQL query.
-                sql_query = io.readline().strip()
+                # 1. Receive the SQL query and strip all trailing white space
+                #    and the semicolon.
+                sql_query = io.readline().strip()[:-1]
                 logger.debug("Received query: %s", sql_query)
+
+                # Handle internal commands separately.
+                if sql_query.startswith("IOHTAP_"):
+                    self._handle_internal_command(sql_query, io)
+                    return
 
                 # 2. Predict which DBMS to use.
                 run_times = self._cost_model.predict_run_time(sql_query)
                 db_to_use, _ = run_times.min_time_ms()
                 logger.debug("Routing '%s' to %s", sql_query, db_to_use)
+                sql_query = self._rewrite_query_if_needed(sql_query, db_to_use)
 
                 # 3. Actually execute the query
                 connection = self._dbs.get_connection(db_to_use)
@@ -117,3 +133,38 @@ class IOHTAPServer:
 
     def _register_daemon(self, daemon_socket: socket.socket):
         self._daemon_connections.append(daemon_socket.makefile("w"))
+
+    def _rewrite_query_if_needed(self, sql_query: str, db_to_use: DBType) -> str:
+        if db_to_use != DBType.Aurora:
+            return sql_query
+
+        upper_query = sql_query.upper()
+        if upper_query.startswith("UPDATE"):
+            # NOTE: The parser we use here is written in Python, so it is likely
+            # slow. We should replace it with a C-based parser (and with a parser
+            # that handles PostgreSQL SQL). But for prototype purposes (and until we
+            # are sure that this is a bottleneck), this implementation is fine.
+            parsed = sqlglot.parse_one(sql_query)  # type: ignore
+            # Need to make sure we update the `iohtap_seq` column so the update
+            # is picked up in the next extraction. This rewrite is specific to our
+            # current extraction strategy.
+            parsed.expressions.append(_UPDATE_SEQ_EXPR)
+            result = parsed.sql()
+            logger.debug("Rewrote query to '%s'", result)
+            return result
+
+        # Should ideally also handle SELECT * (to omit all iohtap_ prefixed
+        # columns). But it is a bit cumbersome to do.
+        return sql_query
+
+    def _handle_internal_command(self, command: str, io: TextIO):
+        """
+        This method is used to handle IOHTAP_ prefixed "queries" (i.e., commands
+        to run custom functionality like syncing data across the engines).
+        """
+        if command != "IOHTAP_SYNC":
+            print("Unknown internal command:", command, file=io, flush=True)
+            return
+
+        self._data_sync_mgr.run_sync()
+        print("Sync succeeded.", file=io, flush=True)

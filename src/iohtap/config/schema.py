@@ -1,6 +1,7 @@
 import yaml
 
 from typing import List
+from .dbtype import DBType
 
 
 class Column:
@@ -20,6 +21,32 @@ class Column:
     @property
     def is_primary(self):
         return self._is_primary
+
+    @staticmethod
+    def comma_separated_names(cols: List["Column"]) -> str:
+        return ", ".join(map(lambda c: c.name, cols))
+
+    @classmethod
+    def comma_separated_names_and_types(
+        cls, cols: List["Column"], for_db: DBType
+    ) -> str:
+        return ", ".join(
+            map(
+                lambda c: "{} {}".format(
+                    c.name, cls._type_converter(c.data_type, for_db)
+                ),
+                cols,
+            )
+        )
+
+    @staticmethod
+    def _type_converter(data_type: str, for_db: DBType) -> str:
+        # A hacky way to ensure we use a supported type in each DBMS (Athena does
+        # not support `TEXT` data).
+        if data_type.upper() == "TEXT" and for_db == DBType.Athena:
+            return "STRING"
+        else:
+            return data_type
 
 
 class Table:
