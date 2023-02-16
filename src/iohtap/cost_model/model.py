@@ -6,6 +6,9 @@ _DATA_MODIFICATION_PREFIXES = [
     "INSERT",
     "UPDATE",
     "DELETE",
+    "BEGIN",
+    "COMMIT",
+    "ROLLBACK",
 ]
 
 _AURORA_ONLY_PREDICTION = RunTimePrediction(

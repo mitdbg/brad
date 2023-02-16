@@ -42,7 +42,11 @@ class ConfigFile:
     @property
     def s3_extract_path(self) -> str:
         """Needed when exporting data from Aurora to S3."""
-        return self._raw["s3_extract_path"]
+        raw_path = self._raw["s3_extract_path"]
+        if not raw_path.endswith("/"):
+            return raw_path + "/"
+        else:
+            return raw_path
 
     @property
     def s3_extract_region(self) -> str:

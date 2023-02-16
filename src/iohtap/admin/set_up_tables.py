@@ -76,6 +76,9 @@ def set_up_tables(args):
     redshift.commit()
     # Athena does not support the notion of committing a transaction.
 
+    # 7. Install the `aws_s3` extension (needed for data extraction).
+    aurora.execute("CREATE EXTENSION aws_s3 CASCADE")
+
     logger.info("Done!")
 
 

@@ -46,12 +46,21 @@ class _SyncContext:
 
     def bounds_valid(self) -> bool:
         return (
-            self.next_extract_seq > 0
-            and self.max_extract_seq > 0
-            and self.next_shadow_extract_seq > 0
-            and self.max_shadow_extract_seq > 0
+            self.next_extract_seq >= 0
+            and self.max_extract_seq >= 0
+            and self.next_shadow_extract_seq >= 0
+            and self.max_shadow_extract_seq >= 0
             and self.next_extract_seq <= self.max_extract_seq
             and self.next_shadow_extract_seq <= self.max_shadow_extract_seq
+        )
+
+    def __repr__(self) -> str:
+        return "SyncContext(table={}, main_seq_range=[{}, {}], shadow_seq_range=[{}, {}])".format(
+            self.table.name,
+            self.next_extract_seq,
+            self.max_extract_seq,
+            self.next_shadow_extract_seq,
+            self.max_shadow_extract_seq,
         )
 
 
@@ -88,7 +97,9 @@ class DataSyncManager:
 
             # 1. Get data range to extract.
             self._fetch_and_set_sync_bounds(aurora, ctx)
-            assert ctx.bounds_valid()
+            if not ctx.bounds_valid():
+                logger.error("Invalid SyncContext: %s", str(ctx))
+                assert False
 
             # 2. Export changes to S3.
             self._export_aurora_to_s3(aurora, ctx)
@@ -120,7 +131,7 @@ class DataSyncManager:
 
         aurora.execute(GET_MAX_EXTRACT_TEMPLATE.format(table_name=ctx.table.name))
         row = aurora.fetchone()
-        if row is None:
+        if row is None or row[0] is None:
             # The scenario when the table is empty.
             # Ideally we should be using the DBMS' max value for BIGSERIAL.
             ctx.max_extract_seq = _MAX_SEQ
@@ -131,7 +142,7 @@ class DataSyncManager:
             GET_MAX_EXTRACT_TEMPLATE.format(table_name=shadow_table_name(ctx.table))
         )
         row = aurora.fetchone()
-        if row is None:
+        if row is None or row[0] is None:
             # The scenario when the table is empty.
             # Ideally we should be using the DBMS' max value for BIGSERIAL.
             ctx.max_shadow_extract_seq = _MAX_SEQ
@@ -147,7 +158,7 @@ class DataSyncManager:
         )
         extract_shadow_query = EXTRACT_FROM_SHADOW_TEMPLATE.format(
             pkey_cols=Column.comma_separated_names(ctx.table.primary_key),
-            main_table=shadow_table_name(ctx.table),
+            shadow_table=shadow_table_name(ctx.table),
             lower_bound=ctx.next_shadow_extract_seq,
             upper_bound=ctx.max_shadow_extract_seq,
         )
@@ -170,6 +181,8 @@ class DataSyncManager:
 
     def _import_s3_to_redshift(self, redshift, ctx: _SyncContext):
         # a) Create staging tables.
+        redshift.execute("DROP TABLE IF EXISTS {}".format(imported_staging_table_name(ctx.table)))
+        redshift.execute("DROP TABLE IF EXISTS {}".format(imported_shadow_staging_table_name(ctx.table)))
         create_redshift_staging = REDSHIFT_CREATE_STAGING_TABLE.format(
             staging_table=imported_staging_table_name(ctx.table),
             base_table=ctx.table.name,
@@ -180,7 +193,9 @@ class DataSyncManager:
                 ctx.table.primary_key, DBType.Redshift
             ),
         )
+        logger.debug("Running on Redshift: %s", create_redshift_staging)
         redshift.execute(create_redshift_staging)
+        logger.debug("Running on Redshift: %s", create_redshift_shadow_staging)
         redshift.execute(create_redshift_shadow_staging)
 
         # b) Import into the staging tables.
@@ -201,7 +216,9 @@ class DataSyncManager:
             s3_iam_role=self._config.redshift_s3_iam_role,
             s3_region=self._config.s3_extract_region,
         )
+        logger.debug("Running on Redshift: %s", import_redshift_staging)
         redshift.execute(import_redshift_staging)
+        logger.debug("Running on Redshift: %s", import_redshift_shadow_staging)
         redshift.execute(import_redshift_shadow_staging)
 
         # c) Delete updated and deleted rows from the main table.
@@ -219,7 +236,9 @@ class DataSyncManager:
                 ctx.table, for_shadow_table=True
             ),
         )
+        logger.debug("Running on Redshift: %s", delete_using_redshift_staging)
         redshift.execute(delete_using_redshift_staging)
+        logger.debug("Running on Redshift: %s", delete_using_redshift_shadow_staging)
         redshift.execute(delete_using_redshift_shadow_staging)
 
         # d) Insert new (and updated) rows.
@@ -227,6 +246,7 @@ class DataSyncManager:
             dest_table=ctx.table.name,
             staging_table=imported_staging_table_name(ctx.table),
         )
+        logger.debug("Running on Redshift: %s", insert_using_redshift_staging)
         redshift.execute(insert_using_redshift_staging)
 
         # 3. e) Commit and clean up.
@@ -239,6 +259,8 @@ class DataSyncManager:
 
     def _merge_into_athena(self, athena, ctx: _SyncContext):
         # a) Create staging tables.
+        athena.execute("DROP TABLE IF EXISTS {}".format(imported_staging_table_name(ctx.table)))
+        athena.execute("DROP TABLE IF EXISTS {}".format(imported_shadow_staging_table_name(ctx.table)))
         create_athena_staging = ATHENA_CREATE_STAGING_TABLE.format(
             staging_table=imported_staging_table_name(ctx.table),
             columns=Column.comma_separated_names_and_types(
@@ -259,11 +281,14 @@ class DataSyncManager:
                 self._get_s3_shadow_table_path(ctx.table, include_file=False),
             ),
         )
+        logger.debug("Running on Athena: %s", create_athena_staging)
         athena.execute(create_athena_staging)
+        logger.debug("Running on Athena: %s", create_athena_shadow_staging)
         athena.execute(create_athena_shadow_staging)
 
         # b) Run the merge.
         athena_merge_query = self._generate_athena_merge_query(ctx.table)
+        logger.debug("Running on Athena: %s", athena_merge_query)
         athena.execute(athena_merge_query)
 
         # c) Delete the staging tables (this deletes the schemas only, we
@@ -278,7 +303,7 @@ class DataSyncManager:
         # indicates that there were no values to extract.
         if ctx.max_shadow_extract_seq != _MAX_SEQ:
             aurora_delete_shadow = DELETE_FROM_SHADOW_STAGING.format(
-                shadow_staging_table=imported_shadow_staging_table_name(ctx.table),
+                shadow_staging_table=shadow_table_name(ctx.table),
                 lower_bound=ctx.next_shadow_extract_seq,
                 upper_bound=ctx.max_shadow_extract_seq,
             )
@@ -315,12 +340,12 @@ class DataSyncManager:
         # next sync.
 
     def _get_s3_main_table_path(self, table: Table, include_file: bool = True) -> str:
-        prefix = "{}/{}/main".format(self._config.s3_extract_path, table.name)
-        return prefix + "/table.tbl" if include_file else prefix
+        prefix = "{}{}/main/".format(self._config.s3_extract_path, table.name)
+        return prefix + "table.tbl" if include_file else prefix
 
     def _get_s3_shadow_table_path(self, table: Table, include_file: bool = True) -> str:
-        prefix = "{}/{}/shadow".format(self._config.s3_extract_path, table.name)
-        return prefix + "/table.tbl" if include_file else prefix
+        prefix = "{}{}/shadow/".format(self._config.s3_extract_path, table.name)
+        return prefix + "table.tbl" if include_file else prefix
 
     def _generate_redshift_delete_conditions(
         self, table: Table, for_shadow_table: bool
@@ -361,7 +386,7 @@ class DataSyncManager:
         update_cols = ", ".join(update_cols_list)
 
         # Insert all columns.
-        insert_cols = Column.comma_separated_names(table.columns)
+        insert_cols = ", ".join(map(lambda c: "s.{}".format(c.name), table.columns))
 
         return ATHENA_MERGE_COMMAND.format(
             pkey_cols=pkey_cols,

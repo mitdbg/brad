@@ -13,15 +13,14 @@ SELECT * from aws_s3.query_export_to_s3(
     '{query}',
     aws_commons.create_s3_uri('{s3_bucket}', '{s3_file_path}', '{s3_region}'),
     options :='FORMAT text, DELIMITER ''|'''
-);
-"""
+);"""
 EXTRACT_FROM_MAIN_TEMPLATE = "SELECT {table_cols} FROM {main_table} WHERE iohtap_seq >= {lower_bound} AND iohtap_seq <= {upper_bound}"
 EXTRACT_FROM_SHADOW_TEMPLATE = "SELECT {pkey_cols} FROM {shadow_table} WHERE iohtap_seq >= {lower_bound} AND iohtap_seq <= {upper_bound}"
 
 
 # Used to import data from S3 into Redshift.
 REDSHIFT_CREATE_STAGING_TABLE = (
-    "CREATE TEMPORARY TABLE {staging_table} LIKE {base_table}"
+    "CREATE TEMPORARY TABLE {staging_table} (LIKE {base_table})"
 )
 REDSHIFT_CREATE_SHADOW_STAGING_TABLE = (
     "CREATE TEMPORARY TABLE {shadow_staging_table} ({pkey_cols})"
@@ -38,8 +37,7 @@ ATHENA_CREATE_STAGING_TABLE = """
     CREATE EXTERNAL TABLE {staging_table} ({columns})
     ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
     STORED AS TEXTFILE
-    LOCATION '{s3_location}'
-"""
+    LOCATION '{s3_location}'"""
 ATHENA_MERGE_COMMAND = """
     MERGE INTO {main_table} AS t
     USING (
@@ -58,11 +56,12 @@ ATHENA_MERGE_COMMAND = """
     ON {merge_cond}
     WHEN MATCHED AND s.iohtap_is_delete = 1
         THEN DELETE
+    WHEN NOT MATCHED AND s.iohtap_is_delete = 1
+        THEN DELETE
     WHEN MATCHED AND s.iohtap_is_delete != 1
-        THEN UPDATE SET ({update_cols})
-    WHEN NOT MATCHED
-        THEN INSERT VALUES ({insert_cols});
-"""
+        THEN UPDATE SET {update_cols}
+    WHEN NOT MATCHED AND s.iohtap_is_delete != 1
+        THEN INSERT VALUES ({insert_cols});"""
 
 
 # Used to update the state of data synchronization (so later syncs are incremental).
