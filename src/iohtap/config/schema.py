@@ -21,6 +21,14 @@ class Column:
     def is_primary(self):
         return self._is_primary
 
+    @staticmethod
+    def comma_separated_names(cols: List["Column"]) -> str:
+        return ", ".join(map(lambda c: c.name, cols))
+
+    @staticmethod
+    def comma_separated_names_and_types(cols: List["Column"]) -> str:
+        return ", ".join(map(lambda c: "{} {}".format(c.name, c.data_type), cols))
+
 
 class Table:
     def __init__(self, name: str, columns: List[Column]):

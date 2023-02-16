@@ -19,5 +19,13 @@ def seq_index_name(table: Table, for_shadow: bool) -> str:
     )
 
 
+def redshift_staging_table_name(table: Table) -> str:
+    return "{}_iohtap_staging".format(table.name)
+
+
+def redshift_shadow_staging_table_name(table: Table) -> str:
+    return "{}_iohtap_shadow_staging".format(table.name)
+
+
 AURORA_EXTRACT_PROGRESS_TABLE_NAME = "iohtap_extract_progress"
 AURORA_SEQ_COLUMN = "iohtap_seq"
