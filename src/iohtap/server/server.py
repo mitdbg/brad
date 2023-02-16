@@ -16,7 +16,7 @@ from iohtap.net.connection_acceptor import ConnectionAcceptor
 
 logger = logging.getLogger(__name__)
 
-_UPDATE_SEQ_EXPR = sqlglot.parse_one("{} = DEFAULT".format(AURORA_SEQ_COLUMN))
+_UPDATE_SEQ_EXPR = sqlglot.parse_one("{} = DEFAULT".format(AURORA_SEQ_COLUMN))  # type: ignore
 
 
 class IOHTAPServer:
@@ -144,7 +144,7 @@ class IOHTAPServer:
             # slow. We should replace it with a C-based parser (and with a parser
             # that handles PostgreSQL SQL). But for prototype purposes (and until we
             # are sure that this is a bottleneck), this implementation is fine.
-            parsed = sqlglot.parse_one(sql_query)
+            parsed = sqlglot.parse_one(sql_query)  # type: ignore
             # Need to make sure we update the `iohtap_seq` column so the update
             # is picked up in the next extraction. This rewrite is specific to our
             # current extraction strategy.
