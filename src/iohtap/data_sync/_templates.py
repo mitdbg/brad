@@ -56,8 +56,6 @@ ATHENA_MERGE_COMMAND = """
     ON {merge_cond}
     WHEN MATCHED AND s.iohtap_is_delete = 1
         THEN DELETE
-    WHEN NOT MATCHED AND s.iohtap_is_delete = 1
-        THEN DELETE
     WHEN MATCHED AND s.iohtap_is_delete != 1
         THEN UPDATE SET {update_cols}
     WHEN NOT MATCHED AND s.iohtap_is_delete != 1

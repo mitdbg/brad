@@ -23,7 +23,7 @@ class ConfigFile:
 
     @property
     def athena_s3_data_path(self) -> str:
-        return self._raw[DBType.Athena]["s3_data_path"]
+        return _ensure_slash_terminated(self._raw[DBType.Athena]["s3_data_path"])
 
     @property
     def extraction_strategy(self) -> ExtractionStrategy:
@@ -42,11 +42,7 @@ class ConfigFile:
     @property
     def s3_extract_path(self) -> str:
         """Needed when exporting data from Aurora to S3."""
-        raw_path = self._raw["s3_extract_path"]
-        if not raw_path.endswith("/"):
-            return raw_path + "/"
-        else:
-            return raw_path
+        return _ensure_slash_terminated(self._raw["s3_extract_path"])
 
     @property
     def s3_extract_region(self) -> str:
@@ -87,3 +83,10 @@ class ConfigFile:
                 config["password"],
                 config["database"],
             )
+
+
+def _ensure_slash_terminated(candidate: str) -> str:
+    if not candidate.endswith("/"):
+        return candidate + "/"
+    else:
+        return candidate

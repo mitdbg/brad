@@ -59,7 +59,7 @@ def set_up_tables(args):
         query = athena_template.format(
             table.name,
             _col_str(table.columns, DBType.Athena),
-            config.athena_s3_data_path,
+            "{}{}".format(config.athena_s3_data_path, table.name),
         )
         logger.debug("Running on Athena: %s", query)
         athena.execute(query)
@@ -71,13 +71,23 @@ def set_up_tables(args):
     logger.debug("Running on Aurora: %s", query)
     aurora.execute(query)
 
-    # 6. Commit the changes.
+    # 6. Initialize extraction progress metadata for each table.
+    initialize_template = "INSERT INTO {} (table_name, next_extract_seq, next_shadow_extract_seq) VALUES (?, 0, 0)".format(
+        AURORA_EXTRACT_PROGRESS_TABLE_NAME
+    )
+    for table in schema.tables:
+        logger.debug(
+            "Running on Aurora: %s with value %s", initialize_template, table.name
+        )
+        aurora.execute(initialize_template, table.name)
+
+    # 7. Commit the changes.
     aurora.commit()
     redshift.commit()
     # Athena does not support the notion of committing a transaction.
 
-    # 7. Install the `aws_s3` extension (needed for data extraction).
-    aurora.execute("CREATE EXTENSION aws_s3 CASCADE")
+    # 8. Install the `aws_s3` extension (needed for data extraction).
+    aurora.execute("CREATE EXTENSION IF NOT EXISTS aws_s3 CASCADE")
 
     logger.info("Done!")
 

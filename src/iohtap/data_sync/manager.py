@@ -44,14 +44,48 @@ class _SyncContext:
         self.next_shadow_extract_seq = -1
         self.max_shadow_extract_seq = -1
 
-    def bounds_valid(self) -> bool:
+    def bounds_set(self) -> bool:
         return (
             self.next_extract_seq >= 0
             and self.max_extract_seq >= 0
             and self.next_shadow_extract_seq >= 0
             and self.max_shadow_extract_seq >= 0
-            and self.next_extract_seq <= self.max_extract_seq
-            and self.next_shadow_extract_seq <= self.max_shadow_extract_seq
+        )
+
+    def can_skip_sync(self) -> bool:
+        # These extract sequence ranges are inclusive. If both ranges are empty,
+        # there were no new writes since the last time the sync ran. So we can
+        # safely skip the sync.
+        return (
+            # _MAX_SEQ means that the table(s) are empty.
+            (
+                self.next_extract_seq > self.max_extract_seq
+                or self.max_extract_seq == _MAX_SEQ
+            )
+            and (
+                self.next_shadow_extract_seq > self.max_shadow_extract_seq
+                or self.max_shadow_extract_seq == _MAX_SEQ
+            )
+        )
+
+    def should_advance_main_seq(self) -> bool:
+        """
+        Returns true when the extraction range is non-empty (and so the next
+        extraction should start at a higher sequence number).
+        """
+        return (
+            self.max_extract_seq != _MAX_SEQ
+            and self.max_extract_seq >= self.next_extract_seq
+        )
+
+    def should_advance_shadow_seq(self) -> bool:
+        """
+        Returns true when the shadow table extraction range is non-empty (and so the next
+        extraction should start at a higher sequence number).
+        """
+        return (
+            self.max_shadow_extract_seq != _MAX_SEQ
+            and self.max_shadow_extract_seq >= self.next_shadow_extract_seq
         )
 
     def __repr__(self) -> str:
@@ -97,9 +131,17 @@ class DataSyncManager:
 
             # 1. Get data range to extract.
             self._fetch_and_set_sync_bounds(aurora, ctx)
-            if not ctx.bounds_valid():
+            if not ctx.bounds_set():
                 logger.error("Invalid SyncContext: %s", str(ctx))
                 assert False
+            if ctx.can_skip_sync():
+                logger.debug(
+                    "Skipping syncing '%s' because there are no new writes.", table.name
+                )
+                aurora.commit()
+                return
+
+            logger.debug("Syncing using context: %s", str(ctx))
 
             # 2. Export changes to S3.
             self._export_aurora_to_s3(aurora, ctx)
@@ -112,7 +154,7 @@ class DataSyncManager:
 
             # 5. Commit new next_extract_seq values and remove extracted rows from the shadow table.
             self._complete_sync(aurora, ctx)
-            logger.debug("Completed syncing '%s'...", table.name)
+            logger.debug("Completed syncing '%s'", table.name)
 
         except:  # pylint: disable=bare-except
             logger.exception("Encountered an exception when syncing data.")
@@ -123,11 +165,8 @@ class DataSyncManager:
         #  - Select current max sequence values from the main and shadow tables (upper bound)
         aurora.execute(GET_NEXT_EXTRACT, ctx.table.name)
         row = aurora.fetchone()
-        if row is None:
-            # This is the first time the extraction ran.
-            ctx.next_extract_seq, ctx.next_shadow_extract_seq = 0, 0
-        else:
-            ctx.next_extract_seq, ctx.next_shadow_extract_seq = row
+        assert row is not None
+        ctx.next_extract_seq, ctx.next_shadow_extract_seq = row
 
         aurora.execute(GET_MAX_EXTRACT_TEMPLATE.format(table_name=ctx.table.name))
         row = aurora.fetchone()
@@ -181,8 +220,14 @@ class DataSyncManager:
 
     def _import_s3_to_redshift(self, redshift, ctx: _SyncContext):
         # a) Create staging tables.
-        redshift.execute("DROP TABLE IF EXISTS {}".format(imported_staging_table_name(ctx.table)))
-        redshift.execute("DROP TABLE IF EXISTS {}".format(imported_shadow_staging_table_name(ctx.table)))
+        redshift.execute(
+            "DROP TABLE IF EXISTS {}".format(imported_staging_table_name(ctx.table))
+        )
+        redshift.execute(
+            "DROP TABLE IF EXISTS {}".format(
+                imported_shadow_staging_table_name(ctx.table)
+            )
+        )
         create_redshift_staging = REDSHIFT_CREATE_STAGING_TABLE.format(
             staging_table=imported_staging_table_name(ctx.table),
             base_table=ctx.table.name,
@@ -259,8 +304,14 @@ class DataSyncManager:
 
     def _merge_into_athena(self, athena, ctx: _SyncContext):
         # a) Create staging tables.
-        athena.execute("DROP TABLE IF EXISTS {}".format(imported_staging_table_name(ctx.table)))
-        athena.execute("DROP TABLE IF EXISTS {}".format(imported_shadow_staging_table_name(ctx.table)))
+        athena.execute(
+            "DROP TABLE IF EXISTS {}".format(imported_staging_table_name(ctx.table))
+        )
+        athena.execute(
+            "DROP TABLE IF EXISTS {}".format(
+                imported_shadow_staging_table_name(ctx.table)
+            )
+        )
         create_athena_staging = ATHENA_CREATE_STAGING_TABLE.format(
             staging_table=imported_staging_table_name(ctx.table),
             columns=Column.comma_separated_names_and_types(
@@ -310,26 +361,37 @@ class DataSyncManager:
             aurora.execute(aurora_delete_shadow)
 
         # Make sure we start at the right sequence number the next time we run an extraction.
-        if ctx.max_extract_seq != _MAX_SEQ and ctx.max_shadow_extract_seq != _MAX_SEQ:
+        # We skip updating the "next sequence number" when the extraction range is empty.
+        if ctx.should_advance_main_seq() and ctx.should_advance_shadow_seq():
+            logger.debug(
+                "Setting next main sync seq: %d, next shadow sync seq: %d",
+                ctx.max_extract_seq + 1,
+                ctx.max_shadow_extract_seq + 1,
+            )
             aurora.execute(
                 UPDATE_EXTRACT_PROGRESS_BOTH,
                 ctx.max_extract_seq + 1,
                 ctx.max_shadow_extract_seq + 1,
                 ctx.table.name,
             )
-        elif ctx.max_extract_seq != _MAX_SEQ:
+        elif ctx.should_advance_main_seq():
+            logger.debug("Setting next main sync seq: %d", ctx.max_extract_seq + 1)
             aurora.execute(
                 UPDATE_EXTRACT_PROGRESS_NON_SHADOW,
                 ctx.max_extract_seq + 1,
                 ctx.table.name,
             )
-        elif ctx.max_shadow_extract_seq != _MAX_SEQ:
+        elif ctx.should_advance_shadow_seq():
+            logger.debug(
+                "Setting next shadow sync seq: %d", ctx.max_shadow_extract_seq + 1
+            )
             aurora.execute(
                 UPDATE_EXTRACT_PROGRESS_SHADOW,
                 ctx.max_shadow_extract_seq + 1,
                 ctx.table.name,
             )
         else:
+            # This case should not happen - we skip the sync if both ranges are empty.
             assert False
 
         # Indicate that the sync has completed.
