@@ -37,3 +37,21 @@ Note that these instructions are written for a Debian based machine (e.g., Ubunt
     Description=Amazon Athena Driver
     Driver=/opt/simba/athenaodbc/lib/64/libathenaodbc_sb64.so
     ```
+
+### Creating Tables
+
+IOHTAP expects to be given your schema up front. You must also use the IOHTAP
+administrative tools `iohtap admin` to set up the tables across all the
+underlying engines.
+
+- Create a schema file (see `config/test_schema.yml` for an example). Use
+  PostgreSQL data types.
+- Run `iohtap admin set_up_tables --config-file path/to/config.yml --schema-file
+  path/to/your/schema.yml` to set up the tables across the underlying engines.
+- Start the IOHTAP server `iohtap server --config-file path/to/config.yml --schema-file path/to/schema.yml`.
+- Run queries through the CLI `iohtap cli`.
+
+To remove the tables, use `iohtap admin tear_down_tables` (e.g., `iohtap admin
+tear_down_tables --config-file path/to/config.yml --schema-file
+path/to/your/schema.yml`). Note that this command will delete the data in the
+tables (and will drop the tables)!
