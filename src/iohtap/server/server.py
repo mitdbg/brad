@@ -36,7 +36,7 @@ class IOHTAPServer:
             self._on_new_daemon_connection,
         )
         self._daemon_connections: List[TextIO] = []
-        self._data_sync_mgr = DataSyncManager(self._config, self._schema)
+        self._data_sync_mgr = DataSyncManager(self._config, self._schema, self._dbs)
         self._main_executor = ThreadPoolExecutor(max_workers=1)
 
     def __enter__(self):

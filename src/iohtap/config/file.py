@@ -29,6 +29,26 @@ class ConfigFile:
     def extraction_strategy(self) -> ExtractionStrategy:
         return ExtractionStrategy.from_str(self._raw["extraction_strategy"])
 
+    @property
+    def redshift_s3_iam_role(self) -> str:
+        """Needed when importing data from S3."""
+        return self._raw[DBType.Redshift]["s3_iam_role"]
+
+    @property
+    def s3_extract_bucket(self) -> str:
+        """Needed when exporting data from Aurora to S3."""
+        return self._raw["s3_extract_bucket"]
+
+    @property
+    def s3_extract_path(self) -> str:
+        """Needed when exporting data from Aurora to S3."""
+        return self._raw["s3_extract_path"]
+
+    @property
+    def s3_extract_region(self) -> str:
+        """Needed when exporting data from Aurora to S3."""
+        return self._raw["s3_extract_region"]
+
     def get_odbc_connection_string(self, db: DBType) -> str:
         if db not in self._raw:
             raise AssertionError("Unhandled database type: " + str(db))
