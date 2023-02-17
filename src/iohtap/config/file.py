@@ -49,6 +49,10 @@ class ConfigFile:
         """Needed when exporting data from Aurora to S3."""
         return self._raw["s3_extract_region"]
 
+    @property
+    def data_sync_period_seconds(self) -> float:
+        return float(self._raw["data_sync_period_seconds"])
+
     def get_odbc_connection_string(self, db: DBType) -> str:
         if db not in self._raw:
             raise AssertionError("Unhandled database type: " + str(db))

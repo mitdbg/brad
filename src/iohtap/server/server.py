@@ -13,6 +13,7 @@ from iohtap.cost_model.model import CostModel
 from iohtap.data_sync.manager import DataSyncManager
 from iohtap.server.db_connection_manager import DBConnectionManager
 from iohtap.net.connection_acceptor import ConnectionAcceptor
+from iohtap.utils.timer_trigger import TimerTrigger
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,18 @@ class IOHTAPServer:
             self._on_new_daemon_connection,
         )
         self._daemon_connections: List[TextIO] = []
+        # NOTE: The data sync should be invoked from the daemon. We put it here
+        # for convenience (until we implement a more robust client/daemon
+        # interaction).
         self._data_sync_mgr = DataSyncManager(self._config, self._schema, self._dbs)
+        self._auto_sync_timer = (
+            TimerTrigger(
+                period_s=self._config.data_sync_period_seconds,
+                to_run=self._schedule_sync,
+            )
+            if self._config.data_sync_period_seconds > 0
+            else None
+        )
         self._main_executor = ThreadPoolExecutor(max_workers=1)
 
     def __enter__(self):
@@ -49,11 +61,15 @@ class IOHTAPServer:
     def start(self):
         self._connection_acceptor.start()
         self._daemon_connection_acceptor.start()
+        if self._auto_sync_timer is not None:
+            self._auto_sync_timer.start()
         logger.info("The IOHTAP server has successfully started.")
         logger.info("Listening on port %d.", self._config.server_port)
 
     def stop(self):
         def shutdown():
+            if self._auto_sync_timer is not None:
+                self._auto_sync_timer.stop()
             self._daemon_connection_acceptor.stop()
             self._connection_acceptor.stop()
             for daemon in self._daemon_connections:
@@ -166,5 +182,13 @@ class IOHTAPServer:
             print("Unknown internal command:", command, file=io, flush=True)
             return
 
+        logger.debug("Manually triggered a data sync.")
         self._data_sync_mgr.run_sync()
         print("Sync succeeded.", file=io, flush=True)
+
+    def _schedule_sync(self):
+        # This method is called by the timer thread. We want it to wait until
+        # the sync completes (in case the sync takes longer than the timer
+        # period).
+        logger.debug("Scheduling an auto data sync.")
+        self._main_executor.submit(self._data_sync_mgr.run_sync).result()

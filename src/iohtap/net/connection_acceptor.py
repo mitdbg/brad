@@ -3,7 +3,7 @@ import socket
 import logging
 from threading import Thread
 from typing import Any, Callable
-from iohtap.net.sentinel import Sentinel
+from iohtap.utils.sentinel import Sentinel
 
 logger = logging.getLogger(__name__)
 

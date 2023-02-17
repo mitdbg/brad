@@ -16,6 +16,10 @@ s3_extract_bucket: your-bucket
 s3_extract_path: extract/path/
 s3_extract_region: us-east-1
 
+# Set to a non-zero value enable automatic data syncing. When this is set to 0,
+# automatic syncing is disabled.
+data_sync_period_seconds: 0
+
 athena:
   odbc_driver: Athena
   aws_region: us-east-1
