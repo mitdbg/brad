@@ -34,8 +34,8 @@ def tear_down_tables(args):
     aurora = cxns.get_connection(DBType.Aurora).cursor()
     athena = cxns.get_connection(DBType.Athena).cursor()
 
-    drop_table_template = "DROP TABLE {}"
-    drop_trigger_fn_template = "DROP FUNCTION {}"
+    drop_table_template = "DROP TABLE IF EXISTS {}"
+    drop_trigger_fn_template = "DROP FUNCTION IF EXISTS {}"
 
     # 4. Drop the tables.
     for table in schema.tables:
