@@ -12,12 +12,14 @@ from iohtap.config.schema import Schema
 from iohtap.cost_model.model import CostModel
 from iohtap.data_sync.manager import DataSyncManager
 from iohtap.server.db_connection_manager import DBConnectionManager
+from iohtap.forecasting.forecaster import WorkloadForecaster
 from iohtap.net.connection_acceptor import ConnectionAcceptor
 from iohtap.utils.timer_trigger import TimerTrigger
 
 logger = logging.getLogger(__name__)
 
-_UPDATE_SEQ_EXPR = sqlglot.parse_one("{} = DEFAULT".format(AURORA_SEQ_COLUMN))  # type: ignore
+_UPDATE_SEQ_EXPR = sqlglot.parse_one(
+    "{} = DEFAULT".format(AURORA_SEQ_COLUMN))  # type: ignore
 
 
 class IOHTAPServer:
@@ -40,7 +42,8 @@ class IOHTAPServer:
         # NOTE: The data sync should be invoked from the daemon. We put it here
         # for convenience (until we implement a more robust client/daemon
         # interaction).
-        self._data_sync_mgr = DataSyncManager(self._config, self._schema, self._dbs)
+        self._data_sync_mgr = DataSyncManager(
+            self._config, self._schema, self._dbs)
         self._auto_sync_timer = (
             TimerTrigger(
                 period_s=self._config.data_sync_period_seconds,
@@ -50,6 +53,7 @@ class IOHTAPServer:
             else None
         )
         self._main_executor = ThreadPoolExecutor(max_workers=1)
+        self.forecaster = WorkloadForecaster()
 
     def __enter__(self):
         self.start()
@@ -145,7 +149,8 @@ class IOHTAPServer:
                 for daemon in self._daemon_connections:
                     print(str(sql_query), file=daemon, flush=True)
             except:  # pylint: disable=bare-except
-                logger.exception("Exception when sending the query to the daemon.")
+                logger.exception(
+                    "Exception when sending the query to the daemon.")
 
     def _register_daemon(self, daemon_socket: socket.socket):
         self._daemon_connections.append(daemon_socket.makefile("w"))
@@ -184,7 +189,7 @@ class IOHTAPServer:
             print("Sync succeeded.", file=io, flush=True)
         elif command == "IOHTAP_FORECAST":
             logger.debug("Manually triggered a workload forecast.")
-            
+            self.forecaster.forecast()
             print("Forecast succeeded.", file=io, flush=True)
         else:
             print("Unknown internal command:", command, file=io, flush=True)
