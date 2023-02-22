@@ -178,13 +178,16 @@ class IOHTAPServer:
         This method is used to handle IOHTAP_ prefixed "queries" (i.e., commands
         to run custom functionality like syncing data across the engines).
         """
-        if command != "IOHTAP_SYNC":
+        if command == "IOHTAP_SYNC":
+            logger.debug("Manually triggered a data sync.")
+            self._data_sync_mgr.run_sync()
+            print("Sync succeeded.", file=io, flush=True)
+        elif command == "IOHTAP_FORECAST":
+            logger.debug("Manually triggered a workload forecast.")
+            
+            print("Forecast succeeded.", file=io, flush=True)
+        else:
             print("Unknown internal command:", command, file=io, flush=True)
-            return
-
-        logger.debug("Manually triggered a data sync.")
-        self._data_sync_mgr.run_sync()
-        print("Sync succeeded.", file=io, flush=True)
 
     def _schedule_sync(self):
         # This method is called by the timer thread. We want it to wait until
