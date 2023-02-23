@@ -194,7 +194,7 @@ def main():
             CREATE_EXTERNAL_TABLE_TEMPLATE.format(
                 table_name=table["name"],
                 columns=table["create_cols"],
-                s3_path="{}/{}{}.tbl".format(
+                s3_path="{}/{}{}/".format(
                     args.s3_bucket, args.tpch_path, table["name"]
                 ),
             )
@@ -212,7 +212,7 @@ def main():
                 CREATE_ICEBERG_TABLE_TEMPLATE.format(
                     table_name=iceberg_table,
                     columns=iceberg_cols,
-                    s3_path="{}/{}{}.tbl".format(
+                    s3_path="{}/{}{}_iceberg/".format(
                         args.s3_bucket, args.tpch_path, table["name"]
                     ),
                 )
