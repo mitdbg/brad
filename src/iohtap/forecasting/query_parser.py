@@ -8,6 +8,8 @@ class QueryParser:
         self._keywords = [i.lower() for i in CLAUSE_KEYWORDS]
         self._keywords.extend(CLAUSE_KEYWORDS)
 
+    # Splits a string representing a SQL query into a dictionary of clauses.
+    # The keys are keywords from CLAUSE_KEYWORDS and the values are the corresponding clauses.
     def get_clauses(self, sql_query):
         l = re.split(f"({'|'.join(self._keywords)})", sql_query)
         d = {}
