@@ -1,5 +1,4 @@
 from iohtap.forecasting.query_parser import QueryParser
-import re
 
 
 class WorkloadForecaster:
@@ -13,20 +12,7 @@ class WorkloadForecaster:
     def process(self, sql_query):
         clause_dict = self._parser.get_clauses(sql_query)
 
-        # Count number of joins in the query. Joins may either be in the FROM clause
-        # or in the WHERE clause.
-        num_joins = 0
-
-        if "FROM" in clause_dict.keys():
-            num_joins += clause_dict["FROM"].count("JOIN")
-        if "WHERE" in clause_dict.keys():
-            # Match the pattern period - equals sign - period, with the periods not inside single quotes.
-            num_joins += sum(
-                [
-                    int(bool(re.match(r"[^']*\.[^']*=[^']*\.[^']*", i)))
-                    for i in clause_dict["WHERE"].split("AND")
-                ]
-            )
+        num_joins = self._parser.get_num_joins(clause_dict)
 
         return num_joins
 

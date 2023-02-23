@@ -19,6 +19,24 @@ class QueryParser:
 
         return d
 
+    def get_num_joins(self, d):
+        # Count number of joins in the query. Joins may either be in the FROM clause
+        # or in the WHERE clause.
+        num_joins = 0
+
+        if "FROM" in d.keys():
+            num_joins += d["FROM"].count("JOIN")
+        if "WHERE" in d.keys():
+            # Match the pattern period - equals sign - period, with the periods not inside single quotes.
+            num_joins += sum(
+                [
+                    int(bool(re.match(r"[^']*\.[^']*=[^']*\.[^']*", i)))
+                    for i in d["WHERE"].split("AND")
+                ]
+            )
+
+        return num_joins
+
 
 if __name__ == "__main__":
     s = "SELECT * FROM A where A.x=2"
