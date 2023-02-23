@@ -53,7 +53,7 @@ class IOHTAPServer:
             else None
         )
         self._main_executor = ThreadPoolExecutor(max_workers=1)
-        self.forecaster = WorkloadForecaster()
+        self._forecaster = WorkloadForecaster()
 
     def __enter__(self):
         self.start()
@@ -107,6 +107,7 @@ class IOHTAPServer:
                 #    and the semicolon.
                 sql_query = io.readline().strip()[:-1]
                 logger.debug("Received query: %s", sql_query)
+                self._forecaster.process(sql_query)
 
                 # Handle internal commands separately.
                 if sql_query.startswith("IOHTAP_"):
@@ -188,7 +189,7 @@ class IOHTAPServer:
             print("Sync succeeded.", file=io, flush=True)
         elif command == "IOHTAP_FORECAST":
             logger.debug("Manually triggered a workload forecast.")
-            self.forecaster.forecast()
+            self._forecaster.forecast()
             print("Forecast succeeded.", file=io, flush=True)
         else:
             print("Unknown internal command:", command, file=io, flush=True)
