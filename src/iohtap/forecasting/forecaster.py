@@ -1,5 +1,4 @@
 class WorkloadForecaster:
-    def forecast():
+    def forecast(self):
         print("I am a placeholder")
         return
-    
