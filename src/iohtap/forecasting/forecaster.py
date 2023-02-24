@@ -1,4 +1,6 @@
 from iohtap.forecasting.query_parser import QueryParser
+import argparse
+import os
 
 
 class WorkloadForecaster:
@@ -34,11 +36,18 @@ class WorkloadForecaster:
 
 
 if __name__ == "__main__":
-    q1 = "SELECT MIN(chn.name) AS uncredited_voiced_character, MIN(t.title) AS russian_movie FROM char_name AS chn, cast_info AS ci, company_name AS cn, company_type AS ct, movie_companies AS mc, role_type AS rt, title AS  t WHERE ci.note LIKE '%(voice)%' AND ci.note LIKE '%(uncredited)%' AND cn.country_code = '[ru]' AND rt.role = 'actor' AND t.production_year > 2005 AND t.id = mc.movie_id AND t.id = ci.movie_id AND ci.movie_id = mc.movie_id AND chn.id = ci.person_role_id AND rt.id = ci.role_id AND cn.id = mc.company_id AND ct.id = mc.company_type_id;"
-    q2 = "SELECT Orders.OrderID, Customers.CustomerName, Orders.OrderDate FROM Orders INNER JOIN Customers ON Orders.CustomerID=Customers.CustomerID;"
-    f = WorkloadForecaster()
-    print(f.process(q1))
-    print(f.process(q2))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--in_dir", type=str, default=".")
+    args = parser.parse_args()
+
+    forecaster = WorkloadForecaster()
+
+    for name in os.listdir(args.in_dir):
+        filename = os.path.join(args.in_dir, name)
+        if os.path.isfile(filename) and filename.endswith(".sql"):
+            with open(filename, "r", encoding="utf8") as f:
+                for q in f:
+                    print(forecaster.process(q))
 
     for i in range(11):
-        print(f.get_template_frequency(i))
+        print(forecaster.get_template_frequency(i))
