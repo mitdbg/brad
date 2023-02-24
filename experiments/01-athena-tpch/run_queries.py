@@ -9,6 +9,56 @@ import pathlib
 CONN_STR_TEMPLATE = "Driver={{{}}};AwsRegion={};S3OutputLocation={};AuthenticationType=IAM Credentials;UID={};PWD={};Schema={};"
 
 
+QUERY_1 = """
+SELECT
+  l_returnflag,
+  l_linestatus,
+  SUM(l_quantity) AS sum_qty,
+  SUM(l_extendedprice) AS sum_base_price,
+  SUM(l_extendedprice * (1-l_discount)) AS sum_disc_price,
+  SUM(l_extendedprice * (1-l_discount) * (1+l_tax)) AS sum_charge,
+  AVG(l_quantity) AS avg_qty,
+  AVG(l_extendedprice) AS avg_price,
+  AVG(l_discount) AS avg_disc,
+  COUNT(*) AS count_order
+FROM
+  lineitem
+WHERE
+  l_shipdate <= date '1998-09-02'
+GROUP BY
+  l_returnflag,
+  l_linestatus
+ORDER BY
+  l_returnflag,
+  l_linestatus
+"""
+
+
+QUERY_1_ICEBERG = """
+SELECT
+  l_returnflag,
+  l_linestatus,
+  SUM(l_quantity) AS sum_qty,
+  SUM(l_extendedprice) AS sum_base_price,
+  SUM(l_extendedprice * (1-l_discount)) AS sum_disc_price,
+  SUM(l_extendedprice * (1-l_discount) * (1+l_tax)) AS sum_charge,
+  AVG(l_quantity) AS avg_qty,
+  AVG(l_extendedprice) AS avg_price,
+  AVG(l_discount) AS avg_disc,
+  COUNT(*) AS count_order
+FROM
+  lineitem_iceberg
+WHERE
+  l_shipdate <= date '1998-09-02'
+GROUP BY
+  l_returnflag,
+  l_linestatus
+ORDER BY
+  l_returnflag,
+  l_linestatus
+"""
+
+
 QUERY_5 = """
   SELECT
     n_name,
@@ -137,6 +187,20 @@ def main():
 
     out_file = open(out_dir / "results.csv", "w")
     print("query,table_type,run_time_s", file=out_file, flush=True)
+    print("> Running Q1...", file=sys.stderr, flush=True)
+    for _ in range(args.trials):
+        start = time.time()
+        cursor.execute(QUERY_1)
+        end = time.time()
+        print("q1,csv,{}".format(end - start), file=out_file, flush=True)
+
+    print("> Running Q1 Iceberg...", file=sys.stderr, flush=True)
+    for _ in range(args.trials):
+        start = time.time()
+        cursor.execute(QUERY_1_ICEBERG)
+        end = time.time()
+        print("q1,iceberg,{}".format(end - start), file=out_file, flush=True)
+
     print("> Running Q3...", file=sys.stderr, flush=True)
     for _ in range(args.trials):
         start = time.time()
