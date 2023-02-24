@@ -1,0 +1,7 @@
+run_experiment(
+  name="q3q5",
+  run="python3 run_queries.py",
+  options={
+    "trials": 5,
+  },
+)
