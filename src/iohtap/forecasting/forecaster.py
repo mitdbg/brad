@@ -2,11 +2,12 @@ from iohtap.forecasting.query_parser import QueryParser
 import argparse
 import os
 
+MAX_JOINS=10
 
 class WorkloadForecaster:
     def __init__(self):
         self._parser = QueryParser()
-        self._num_joins_histogram = [0 for _ in range(11)]
+        self._num_joins_histogram = [0 for _ in range(MAX_JOINS + 1)]
         self._total_queries = 0
 
     def get_template_frequency(self, num_joins):
@@ -33,6 +34,11 @@ class WorkloadForecaster:
             filtered_attributes,
             len(filtered_attributes),
         )
+    
+    def print_histogram(self):
+        for i in range(len(self._num_joins_histogram)):
+            freq_i = forecaster.get_template_frequency(i) * 100
+            print(f"{i:02d} Join(s): {freq_i:05.2f}% " + "|" * int(freq_i))
 
 
 if __name__ == "__main__":
@@ -47,7 +53,6 @@ if __name__ == "__main__":
         if os.path.isfile(filename) and filename.endswith(".sql"):
             with open(filename, "r", encoding="utf8") as f:
                 for q in f:
-                    print(forecaster.process(q))
+                    forecaster.process(q)
 
-    for i in range(11):
-        print(forecaster.get_template_frequency(i))
+    forecaster.print_histogram()
