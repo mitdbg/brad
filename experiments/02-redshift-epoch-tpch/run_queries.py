@@ -207,6 +207,10 @@ def main():
     print("> Successfully connected.", file=sys.stderr, flush=True)
     cursor = conn.cursor()
 
+    # Disable the result cache
+    cursor.execute("SET enable_result_cache_for_session = off")
+    print("> Disabled the result cache", file=sys.stderr)
+
     out_file = open(out_dir / "results.csv", "w")
     print("query,type,run_time_s", file=out_file, flush=True)
     print("> Running Q1...", file=sys.stderr, flush=True)
