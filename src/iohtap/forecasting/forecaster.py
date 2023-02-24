@@ -2,7 +2,8 @@ from iohtap.forecasting.query_parser import QueryParser
 import argparse
 import os
 
-MAX_JOINS=10
+MAX_JOINS = 10
+
 
 class WorkloadForecaster:
     def __init__(self):
@@ -34,7 +35,7 @@ class WorkloadForecaster:
             filtered_attributes,
             len(filtered_attributes),
         )
-    
+
     def print_histogram(self):
         for i in range(len(self._num_joins_histogram)):
             freq_i = forecaster.get_template_frequency(i) * 100
