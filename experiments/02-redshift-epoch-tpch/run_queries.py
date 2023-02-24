@@ -248,7 +248,7 @@ def main():
         end = time.time()
         print("q5,bare,{}".format(end - start), file=out_file, flush=True)
 
-    print("> Running Q5 Iceberg...", file=sys.stderr, flush=True)
+    print("> Running Q5 filtered...", file=sys.stderr, flush=True)
     for _ in range(args.trials):
         start = time.time()
         cursor.execute(QUERY_5_FILTERS)
