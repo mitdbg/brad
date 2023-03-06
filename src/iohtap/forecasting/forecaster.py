@@ -20,24 +20,24 @@ class WorkloadForecaster:
         print("I am a placeholder")
         return
 
-    """ def process(self, sql_query):
-        clause_dict = self._parser.get_clauses(sql_query.rstrip(";"))
+    # def process(self, sql_query):
+    #     clause_dict = self._parser.get_clauses(sql_query.rstrip(";"))
+    #
+    #     (
+    #         join_predicates,
+    #         filtered_attributes,
+    #     ) = self._parser.get_predicates_and_filtered_attributes(clause_dict)
+    #
+    #     self._num_joins_histogram[len(join_predicates)] += 1
+    #     self._total_queries += 1
+    #
+    #     return (
+    #         join_predicates,
+    #         len(join_predicates),
+    #         filtered_attributes,
+    #         len(filtered_attributes),
+    #     )
 
-        (
-            join_predicates,
-            filtered_attributes,
-        ) = self._parser.get_predicates_and_filtered_attributes(clause_dict)
-
-        self._num_joins_histogram[len(join_predicates)] += 1
-        self._total_queries += 1
-
-        return (
-            join_predicates,
-            len(join_predicates),
-            filtered_attributes,
-            len(filtered_attributes),
-        ) """
-    
     def process(self, sql_query):
         parsed = parse_one(sql_query, read="postgres")
 
@@ -49,12 +49,13 @@ class WorkloadForecaster:
         self._num_joins_histogram[tables_cnt - 1] += 1
         self._total_queries += 1
 
-
     def print_histogram(self):
         for i in range(len(self._num_joins_histogram)):
             count_i = self._num_joins_histogram[i]
             freq_i = self.get_template_frequency(i) * 100
-            print(f"{i:02d} Join(s): {count_i:06d} ({freq_i:05.2f}%) " + "|" * int(freq_i))
+            print(
+                f"{i:02d} Join(s): {count_i:06d} ({freq_i:05.2f}%) " + "|" * int(freq_i)
+            )
 
 
 if __name__ == "__main__":
@@ -70,7 +71,7 @@ if __name__ == "__main__":
             for q in f:
                 try:
                     forecaster.process(q)
-                except:
+                except:  # pylint: disable=bare-except
                     print(q)
                     sys.exit(1)
     else:
