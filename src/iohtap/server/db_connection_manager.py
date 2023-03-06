@@ -12,18 +12,22 @@ class DBConnectionManager:
     Manages connections to the underlying database systems.
     """
 
-    def __init__(self, config: ConfigFile):
+    def __init__(self, config: ConfigFile, autocommit: bool = True):
         self._config = config
         # To start, we just hold one set of connections. As things get more
         # sophisticated, we'll add connection pooling, etc.
         logger.info("Establishing connections to the underlying database systems...")
         logger.debug("Connecting to Athena...")
-        self._athena = pyodbc.connect(config.get_odbc_connection_string(DBType.Athena))
+        self._athena = pyodbc.connect(
+            config.get_odbc_connection_string(DBType.Athena), autocommit=autocommit
+        )
         logger.debug("Connecting to Aurora...")
-        self._aurora = pyodbc.connect(config.get_odbc_connection_string(DBType.Aurora))
+        self._aurora = pyodbc.connect(
+            config.get_odbc_connection_string(DBType.Aurora), autocommit=autocommit
+        )
         logger.debug("Connecting to Redshift...")
         self._redshift = pyodbc.connect(
-            config.get_odbc_connection_string(DBType.Redshift)
+            config.get_odbc_connection_string(DBType.Redshift), autocommit=autocommit
         )
 
         # NOTE: Need to set the appropriate isolation levels. Need to also test

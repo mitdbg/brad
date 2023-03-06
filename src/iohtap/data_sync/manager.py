@@ -9,7 +9,6 @@ from iohtap.config.strings import (
     imported_staging_table_name,
     imported_shadow_staging_table_name,
 )
-from iohtap.server.db_connection_manager import DBConnectionManager
 from ._templates import (
     GET_NEXT_EXTRACT,
     GET_MAX_EXTRACT_TEMPLATE,
@@ -99,16 +98,23 @@ class _SyncContext:
 
 
 class DataSyncManager:
-    def __init__(self, config: ConfigFile, schema: Schema, dbs: DBConnectionManager):
+    def __init__(self, config: ConfigFile, schema: Schema):
         self._config = config
         self._schema = schema
-        self._dbs = dbs
 
-        # This class maintains its own connection to Aurora because it has
-        # different isolation level requirements.
-        self._aurora = pyodbc.connect(config.get_odbc_connection_string(DBType.Aurora))
+        # This class maintains its own connections because it has different
+        # isolation level and autocommit requirements.
+        self._aurora = pyodbc.connect(
+            config.get_odbc_connection_string(DBType.Aurora), autocommit=False
+        )
         self._aurora.execute(
             "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL REPEATABLE READ READ WRITE"
+        )
+        self._redshift = pyodbc.connect(
+            config.get_odbc_connection_string(DBType.Redshift), autocommit=False
+        )
+        self._athena = pyodbc.connect(
+            config.get_odbc_connection_string(DBType.Athena), autocommit=False
         )
 
     def run_sync(self):
@@ -123,8 +129,8 @@ class DataSyncManager:
 
     def _sync_table(self, table: Table):
         aurora = self._aurora.cursor()
-        redshift = self._dbs.get_connection(DBType.Redshift).cursor()
-        athena = self._dbs.get_connection(DBType.Athena).cursor()
+        redshift = self._redshift.cursor()
+        athena = self._athena.cursor()
         try:
             logger.debug("Starting sync on '%s'...", table.name)
             ctx = _SyncContext(table)

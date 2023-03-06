@@ -43,7 +43,7 @@ class IOHTAPServer:
         # NOTE: The data sync should be invoked from the daemon. We put it here
         # for convenience (until we implement a more robust client/daemon
         # interaction).
-        self._data_sync_mgr = DataSyncManager(self._config, self._schema, self._dbs)
+        self._data_sync_mgr = DataSyncManager(self._config, self._schema)
         self._auto_sync_timer = (
             TimerTrigger(
                 period_s=self._config.data_sync_period_seconds,
