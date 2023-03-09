@@ -5,3 +5,13 @@ run_experiment(
     "trials": 5,
   },
 )
+
+run_experiment(
+  name="tpch_filtered",
+  run="python3 run_queries2.py",
+  options={
+    "trials": 5,
+    "exp": "run-filtered",
+    "server": "redshift-tpch-test.cv1pkocptzr2.us-east-1.redshift.amazonaws.com",
+  },
+)

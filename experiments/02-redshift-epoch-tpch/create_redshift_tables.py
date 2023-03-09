@@ -8,6 +8,7 @@ CONN_STR_TEMPLATE = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};Database={};"
 TABLES = [
     {
         "name": "part",
+        "prefix": "p",
         "create_cols": (
             "("
             "  p_partkey  INTEGER PRIMARY KEY,"
@@ -25,6 +26,7 @@ TABLES = [
     },
     {
         "name": "supplier",
+        "prefix": "s",
         "create_cols": (
             "("
             "  s_suppkey   INTEGER PRIMARY KEY,"
@@ -40,6 +42,7 @@ TABLES = [
     },
     {
         "name": "partsupp",
+        "prefix": "ps",
         "create_cols": (
             "("
             "  ps_partkey     BIGINT NOT NULL,"
@@ -54,6 +57,7 @@ TABLES = [
     },
     {
         "name": "customer",
+        "prefix": "c",
         "create_cols": (
             "("
             "  c_custkey    INTEGER PRIMARY KEY,"
@@ -70,6 +74,7 @@ TABLES = [
     },
     {
         "name": "orders",
+        "prefix": "o",
         "create_cols": (
             "("
             "  o_orderkey     INTEGER PRIMARY KEY,"
@@ -87,6 +92,7 @@ TABLES = [
     },
     {
         "name": "lineitem",
+        "prefix": "l",
         "create_cols": (
             "("
             "  l_orderkey       BIGINT NOT NULL,"
@@ -112,6 +118,7 @@ TABLES = [
     },
     {
         "name": "nation",
+        "prefix": "n",
         "create_cols": (
             "("
             "  n_nationkey    INTEGER PRIMARY KEY,"
@@ -124,6 +131,7 @@ TABLES = [
     },
     {
         "name": "region",
+        "prefix": "r",
         "create_cols": (
             "("
             "  r_regionkey  INTEGER PRIMARY KEY,"
@@ -141,15 +149,21 @@ DROP_TABLE_TEMPLATE = "DROP TABLE {table_name}"
 LOAD_TABLE_TEMPLATE = (
     "COPY {table_name} FROM '{s3_path}' IAM_ROLE '{iam_role}' REGION 'us-east-1'"
 )
+ADD_COLUMN_TEMPLATE = "ALTER TABLE {table_name} ADD COLUMN {col_name} BIGINT DEFAULT 0"
+DEL_COLUMN_TEMPLATE = "ALTER TABLE {table_name} DROP COLUMN {col_name}"
+SET_COLUMN_VALUE = "UPDATE {table_name} SET {prefix}_{col_name1} = {val1}, {prefix}_{col_name2} = {val2}"
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tpch-path", type=str, required=True)  # On S3
+    parser.add_argument("--tpch-path", type=str)  # On S3
     parser.add_argument("--drop-tables", action="store_true")
+    parser.add_argument("--add-epoch-columns", action="store_true")
+    parser.add_argument("--remove-epoch-columns", action="store_true")
     parser.add_argument("--port", type=int, default=5439)
     parser.add_argument("--host", type=str, required=True)
-    parser.add_argument("--iam-role", type=str, required=True)
+    parser.add_argument("--iam-role", type=str)
+    parser.add_argument("--database", type=str, required=True)
     args = parser.parse_args()
 
     rds_user = os.environ["RDS_UID"]
@@ -159,9 +173,9 @@ def main():
         "Amazon Redshift (x64)",
         args.host,
         args.port,
-        args.user,
         rds_user,
         rds_pass,
+        args.database,
     )
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
@@ -171,6 +185,45 @@ def main():
         for table in TABLES:
             print("Dropping", table["name"], file=sys.stderr)
             q = DROP_TABLE_TEMPLATE.format(table_name=table["name"])
+            cursor.execute(q)
+        cursor.commit()
+        return
+    elif args.add_epoch_columns:
+        for table in TABLES:
+            print("Adding columns to", table["name"], file=sys.stderr)
+            q = ADD_COLUMN_TEMPLATE.format(
+                table_name=table["name"],
+                col_name="{}_{}".format(table["prefix"], "epoch_start"),
+            )
+            cursor.execute(q)
+            q = ADD_COLUMN_TEMPLATE.format(
+                table_name=table["name"],
+                col_name="{}_{}".format(table["prefix"], "epoch_end"),
+            )
+            cursor.execute(q)
+            q = SET_COLUMN_VALUE.format(
+                table_name=table["name"],
+                prefix=table["prefix"],
+                col_name1="epoch_start",
+                col_name2="epoch_end",
+                val1=1,
+                val2=100,
+            )
+            cursor.execute(q)
+        cursor.commit()
+        return
+    elif args.remove_epoch_columns:
+        for table in TABLES:
+            print("Removing columns from", table["name"], file=sys.stderr)
+            q = DEL_COLUMN_TEMPLATE.format(
+                table_name=table["name"],
+                col_name="{}_{}".format(table["prefix"], "epoch_start"),
+            )
+            cursor.execute(q)
+            q = DEL_COLUMN_TEMPLATE.format(
+                table_name=table["name"],
+                col_name="{}_{}".format(table["prefix"], "epoch_end"),
+            )
             cursor.execute(q)
         cursor.commit()
         return
