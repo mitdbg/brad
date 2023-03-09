@@ -178,6 +178,7 @@ def main():
     parser.add_argument("--drop-tables", action="store_true")
     parser.add_argument("--add-epoch-columns", action="store_true")
     parser.add_argument("--run-vacuum", action="store_true")
+    parser.add_argument("--run-optimize", action="store_true")
     args = parser.parse_args()
 
     aws_key = os.environ["AWS_KEY"]
@@ -231,6 +232,9 @@ def main():
                 val2=100,
             )
             cursor.execute(q)
+        return
+
+    if args.run_optimize:
         for table in TABLES:
             print("> Running optimize on", table["name"], file=sys.stderr)
             cursor.execute(
