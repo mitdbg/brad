@@ -15,7 +15,7 @@ run_experiment_group(
       options={
         "trials": 5,
         "exp": "run_base",
-        "s3_bucket": "geoffxy-research",
+        "s3-bucket": "geoffxy-research",
       },
     ),
     ExperimentInstance(
@@ -23,7 +23,7 @@ run_experiment_group(
       options={
         "trials": 5,
         "exp": "run_filtered",
-        "s3_bucket": "geoffxy-research",
+        "s3-bucket": "geoffxy-research",
       },
     ),
   ]

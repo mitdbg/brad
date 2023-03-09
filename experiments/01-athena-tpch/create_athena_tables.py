@@ -177,6 +177,7 @@ def main():
     parser.add_argument("--skip-iceberg", action="store_true")
     parser.add_argument("--drop-tables", action="store_true")
     parser.add_argument("--add-epoch-columns", action="store_true")
+    parser.add_argument("--run-vacuum", action="store_true")
     args = parser.parse_args()
 
     aws_key = os.environ["AWS_KEY"]
@@ -193,6 +194,12 @@ def main():
     conn = pyodbc.connect(conn_str)
     print("> Successfully connected.", file=sys.stderr, flush=True)
     cursor = conn.cursor()
+
+    if args.run_vacuum:
+        for table in TABLES:
+            print("> Vacuuming", table["name"], file=sys.stderr, flush=True)
+            cursor.execute("VACUUM {}_iceberg".format(table["name"]))
+        return
 
     if args.drop_tables:
         for table in TABLES:
