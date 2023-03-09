@@ -6,7 +6,7 @@ import time
 import pathlib
 
 
-CONN_STR_TEMPLATE = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};Database={};"
+CONN_STR_TEMPLATE = "Driver={{{}}};AwsRegion={};S3OutputLocation={};AuthenticationType=IAM Credentials;UID={};PWD={};Schema={};"
 
 
 QUERY_1 = """
@@ -22,7 +22,7 @@ SELECT
   AVG(l_discount) AS avg_disc,
   COUNT(*) AS count_order
 FROM
-  lineitem
+  lineitem_iceberg
 WHERE
   l_shipdate <= date '1998-09-02'
 GROUP BY
@@ -34,7 +34,7 @@ ORDER BY
 """
 
 
-QUERY_1_FILTERS = """
+QUERY_1_FILTERED = """
 SELECT
   l_returnflag,
   l_linestatus,
@@ -47,7 +47,7 @@ SELECT
   AVG(l_discount) AS avg_disc,
   COUNT(*) AS count_order
 FROM
-  lineitem
+  lineitem_iceberg
 WHERE
   l_shipdate <= date '1998-09-02'
   AND l_epoch_start >= 0
@@ -66,12 +66,12 @@ QUERY_5 = """
     n_name,
     SUM(l_extendedprice * (1 - l_discount)) AS revenue
   FROM
-    customer,
-    orders,
-    lineitem,
-    supplier,
-    nation,
-    region
+    customer_iceberg,
+    orders_iceberg,
+    lineitem_iceberg,
+    supplier_iceberg,
+    nation_iceberg,
+    region_iceberg
   WHERE
    c_custkey = o_custkey
    AND l_orderkey = o_orderkey
@@ -87,17 +87,17 @@ QUERY_5 = """
 """
 
 
-QUERY_5_FILTERS = """
+QUERY_5_FILTERED = """
   SELECT
     n_name,
     SUM(l_extendedprice * (1 - l_discount)) AS revenue
   FROM
-    customer,
-    orders,
-    lineitem,
-    supplier,
-    nation,
-    region
+    customer_iceberg,
+    orders_iceberg,
+    lineitem_iceberg,
+    supplier_iceberg,
+    nation_iceberg,
+    region_iceberg
   WHERE
    c_custkey = o_custkey
    AND l_orderkey = o_orderkey
@@ -132,9 +132,9 @@ QUERY_3 = """
     o_orderdate,
     o_shippriority
   FROM
-    customer,
-    orders,
-    lineitem
+    customer_iceberg,
+    orders_iceberg,
+    lineitem_iceberg
   WHERE
     c_mktsegment = 'BUILDING'
     AND c_custkey = o_custkey
@@ -148,16 +148,16 @@ QUERY_3 = """
 """
 
 
-QUERY_3_FILTERS = """
+QUERY_3_FILTERED = """
   SELECT
     l_orderkey,
     SUM(l_extendedprice * (1 - l_discount)) as revenue,
     o_orderdate,
     o_shippriority
   FROM
-    customer,
-    orders,
-    lineitem
+    customer_iceberg,
+    orders_iceberg,
+    lineitem_iceberg
   WHERE
     c_mktsegment = 'BUILDING'
     AND c_custkey = o_custkey
@@ -186,37 +186,30 @@ def main():
         out_dir = pathlib.Path(".")
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--s3-bucket", type=str, required=True)
+    parser.add_argument("--athena-out-path", type=str, default="athena/out/")
     parser.add_argument("--trials", type=int, default=5)
-    parser.add_argument("--server", type=str, required=True)
-    parser.add_argument("--db", type=str, default="iohtap")
-    parser.add_argument("--port", type=int, default=5439)
     parser.add_argument("--exp", type=str)
     args = parser.parse_args()
 
+    aws_key = os.environ["AWS_KEY"]
+    aws_secret_key = os.environ["AWS_SECRET_KEY"]
     run_filtered = args.exp == "run_filtered"
 
-    rds_uid = os.environ["RDS_UID"]
-    rds_pwd = os.environ["RDS_PWD"]
-
     conn_str = CONN_STR_TEMPLATE.format(
-        "Amazon Redshift (x64)",
-        args.server,
-        args.port,
-        rds_uid,
-        rds_pwd,
-        args.db,
+        "Athena",
+        "us-east-1",
+        "s3://{}/{}".format(args.s3_bucket, args.athena_out_path),
+        aws_key,
+        aws_secret_key,
+        "iohtap",
     )
     conn = pyodbc.connect(conn_str)
     print("> Successfully connected.", file=sys.stderr, flush=True)
     cursor = conn.cursor()
 
-    # Disable the result cache
-    cursor.execute("SET enable_result_cache_for_session = off")
-    print("> Disabled the result cache", file=sys.stderr)
-
     out_file = open(out_dir / "results.csv", "w")
-    print("query,type,run_time_s", file=out_file, flush=True)
-
+    print("query,table_type,run_time_s", file=out_file, flush=True)
     if not run_filtered:
         print("> Running Q1 bare...", file=sys.stderr, flush=True)
         for _ in range(args.trials):
@@ -228,7 +221,7 @@ def main():
         print("> Running Q1 filtered...", file=sys.stderr, flush=True)
         for _ in range(args.trials):
             start = time.time()
-            cursor.execute(QUERY_1_FILTERS)
+            cursor.execute(QUERY_1_FILTERED)
             end = time.time()
             print("q1,filtered,{}".format(end - start), file=out_file, flush=True)
 
@@ -243,7 +236,7 @@ def main():
         print("> Running Q3 filtered...", file=sys.stderr, flush=True)
         for _ in range(args.trials):
             start = time.time()
-            cursor.execute(QUERY_3_FILTERS)
+            cursor.execute(QUERY_3_FILTERED)
             end = time.time()
             print("q3,filtered,{}".format(end - start), file=out_file, flush=True)
 
@@ -258,7 +251,7 @@ def main():
         print("> Running Q5 filtered...", file=sys.stderr, flush=True)
         for _ in range(args.trials):
             start = time.time()
-            cursor.execute(QUERY_5_FILTERS)
+            cursor.execute(QUERY_5_FILTERED)
             end = time.time()
             print("q5,filtered,{}".format(end - start), file=out_file, flush=True)
     out_file.close()

@@ -11,6 +11,7 @@ CONN_STR_TEMPLATE = "Driver={{{}}};AwsRegion={};S3OutputLocation={};Authenticati
 TABLES = [
     {
         "name": "part",
+        "prefix": "p",
         "create_cols": (
             "("
             "  p_partkey  INT,"
@@ -28,6 +29,7 @@ TABLES = [
     },
     {
         "name": "supplier",
+        "prefix": "s",
         "create_cols": (
             "("
             "  s_suppkey   INT,"
@@ -43,6 +45,7 @@ TABLES = [
     },
     {
         "name": "partsupp",
+        "prefix": "ps",
         "create_cols": (
             "("
             "  ps_partkey     BIGINT,"
@@ -56,6 +59,7 @@ TABLES = [
     },
     {
         "name": "customer",
+        "prefix": "c",
         "create_cols": (
             "("
             "  c_custkey    INT,"
@@ -72,6 +76,7 @@ TABLES = [
     },
     {
         "name": "orders",
+        "prefix": "o",
         "create_cols": (
             "("
             "  o_orderkey     INT,"
@@ -89,6 +94,7 @@ TABLES = [
     },
     {
         "name": "lineitem",
+        "prefix": "l",
         "create_cols": (
             "("
             "  l_orderkey       BIGINT,"
@@ -113,6 +119,7 @@ TABLES = [
     },
     {
         "name": "nation",
+        "prefix": "n",
         "create_cols": (
             "("
             "  n_nationkey    INT,"
@@ -125,6 +132,7 @@ TABLES = [
     },
     {
         "name": "region",
+        "prefix": "r",
         "create_cols": (
             "("
             "  r_regionkey  INT,"
@@ -155,14 +163,20 @@ POPULATE_ICEBERG_TEMPLATE = "INSERT INTO {table_name} SELECT * FROM {source_tabl
 
 CHAR_REPLACE = re.compile("VARCHAR\(\d+\)|CHAR\(\d+\)")
 
+ADD_COLUMN_TEMPLATE = "ALTER TABLE {table_name}_iceberg ADD COLUMNS ({prefix}_{col_name1} {col_type1}, {prefix}_{col_name2} {col_type2})"
+
+SET_COLUMN_VALUE = "UPDATE {table_name}_iceberg SET {prefix}_{col_name1} = {val1}, {prefix}_{col_name2} = {val2}"
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--s3-bucket", type=str, required=True)
     parser.add_argument("--athena-out-path", type=str, default="athena/out/")
     parser.add_argument("--tpch-path", type=str, required=True)  # On S3
+    parser.add_argument("--skip-raw", action="store_true")
     parser.add_argument("--skip-iceberg", action="store_true")
     parser.add_argument("--drop-tables", action="store_true")
+    parser.add_argument("--add-epoch-columns", action="store_true")
     args = parser.parse_args()
 
     aws_key = os.environ["AWS_KEY"]
@@ -188,17 +202,47 @@ def main():
         print("> Done", file=sys.stderr, flush=True)
         return
 
-    for table in TABLES:
-        print("> Creating", table["name"], file=sys.stderr, flush=True)
-        cursor.execute(
-            CREATE_EXTERNAL_TABLE_TEMPLATE.format(
+    if args.add_epoch_columns:
+        for table in TABLES:
+            print("> Adding epoch columns to", table["name"], file=sys.stderr)
+            q = ADD_COLUMN_TEMPLATE.format(
                 table_name=table["name"],
-                columns=table["create_cols"],
-                s3_path="{}/{}{}/".format(
-                    args.s3_bucket, args.tpch_path, table["name"]
-                ),
+                prefix=table["prefix"],
+                col_name1="epoch_start",
+                col_name2="epoch_end",
+                col_type1="BIGINT",
+                col_type2="BIGINT",
             )
-        )
+            print("> Adding epoch values to", table["name"], file=sys.stderr)
+            cursor.execute(q)
+            q = SET_COLUMN_VALUE.format(
+                table_name=table["name"],
+                prefix=table["prefix"],
+                col_name1="epoch_start",
+                col_name2="epoch_end",
+                val1=1,
+                val2=100,
+            )
+            cursor.execute(q)
+        for table in TABLES:
+            print("> Running optimize on", table["name"], file=sys.stderr)
+            cursor.execute(
+                "OPTIMIZE {}_iceberg REWRITE DATA USING BIN_PACK".format(table["name"])
+            )
+        return
+
+    if not args.skip_raw:
+        for table in TABLES:
+            print("> Creating", table["name"], file=sys.stderr, flush=True)
+            cursor.execute(
+                CREATE_EXTERNAL_TABLE_TEMPLATE.format(
+                    table_name=table["name"],
+                    columns=table["create_cols"],
+                    s3_path="{}/{}{}/".format(
+                        args.s3_bucket, args.tpch_path, table["name"]
+                    ),
+                )
+            )
 
     if args.skip_iceberg:
         return

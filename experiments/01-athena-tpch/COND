@@ -5,3 +5,26 @@ run_experiment(
     "trials": 5,
   },
 )
+
+run_experiment_group(
+  name="tpch",
+  run="python3 run_queries_iceberg.py",
+  experiments=[
+    ExperimentInstance(
+      name="tpch_base",
+      options={
+        "trials": 5,
+        "exp": "run_base",
+        "s3_bucket": "geoffxy-research",
+      },
+    ),
+    ExperimentInstance(
+      name="tpch_filtered",
+      options={
+        "trials": 5,
+        "exp": "run_filtered",
+        "s3_bucket": "geoffxy-research",
+      },
+    ),
+  ]
+)

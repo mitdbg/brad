@@ -6,12 +6,25 @@ run_experiment(
   },
 )
 
-run_experiment(
-  name="tpch_filtered",
+run_experiment_group(
+  name="tpch",
   run="python3 run_queries2.py",
-  options={
-    "trials": 5,
-    "exp": "run-filtered",
-    "server": "redshift-tpch-test.cv1pkocptzr2.us-east-1.redshift.amazonaws.com",
-  },
+  experiments=[
+    ExperimentInstance(
+      name="tpch_bare",
+      options={
+        "trials": 5,
+        "exp": "run_bare",
+        "server": "redshift-tpch-test.cv1pkocptzr2.us-east-1.redshift.amazonaws.com",
+      },
+    ),
+    ExperimentInstance(
+      name="tpch_filtered",
+      options={
+        "trials": 5,
+        "exp": "run_filtered",
+        "server": "redshift-tpch-test.cv1pkocptzr2.us-east-1.redshift.amazonaws.com",
+      },
+    ),
+  ]
 )
