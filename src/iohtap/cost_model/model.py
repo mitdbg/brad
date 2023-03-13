@@ -19,6 +19,11 @@ _AURORA_ONLY_PREDICTION = RunTimePrediction(
 
 
 class CostModel:
+    def predict_run_time(self, _sql_query: str) -> RunTimePrediction:
+        raise NotImplementedError
+
+
+class RoundRobinCostModel(CostModel):
     def __init__(self):
         self._next_db = DBType.Aurora
 

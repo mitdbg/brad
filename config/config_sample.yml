@@ -20,6 +20,11 @@ s3_extract_region: us-east-1
 # automatic syncing is disabled.
 data_sync_period_seconds: 0
 
+# Set to always_{aurora, athena, redshift} to force IOHTAP to route all queries
+# to the specified engine. The `default` routing policy uses a predictor to
+# select the most suitable engine.
+routing_policy: default
+
 athena:
   odbc_driver: Athena
   aws_region: us-east-1

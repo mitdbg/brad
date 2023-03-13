@@ -1,4 +1,5 @@
 CONFIG_FILE = "../../config/config.yml"
+SCHEMA_FILE = "../../config/test_schema.yml"
 DBS = ["athena", "aurora", "redshift"]
 
 run_experiment_group(
@@ -12,6 +13,22 @@ run_experiment_group(
         "config-file": CONFIG_FILE,
       },
       parallelizable=True,
+    )
+    for dbname in DBS
+  ],
+)
+
+run_experiment_group(
+  name="python_overhead",
+  run="python3 run_iohtap.py",
+  experiments=[
+    ExperimentInstance(
+      name="python_overhead-{}".format(dbname),
+      options={
+        "dbname": dbname,
+        "config-file": CONFIG_FILE,
+        "schema-file": SCHEMA_FILE,
+      },
     )
     for dbname in DBS
   ],

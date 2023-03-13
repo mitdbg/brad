@@ -2,6 +2,7 @@ import yaml
 
 from iohtap.config.dbtype import DBType
 from iohtap.config.extraction import ExtractionStrategy
+from iohtap.config.routing_policy import RoutingPolicy
 
 
 class ConfigFile:
@@ -52,6 +53,10 @@ class ConfigFile:
     @property
     def data_sync_period_seconds(self) -> float:
         return float(self._raw["data_sync_period_seconds"])
+
+    @property
+    def routing_policy(self) -> RoutingPolicy:
+        return RoutingPolicy.from_str(self._raw["routing_policy"])
 
     def get_odbc_connection_string(self, db: DBType) -> str:
         if db not in self._raw:
