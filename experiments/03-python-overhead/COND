@@ -1,0 +1,18 @@
+CONFIG_FILE = "../../config/config.yml"
+DBS = ["athena", "aurora", "redshift"]
+
+run_experiment_group(
+  name="cpp_overhead",
+  run="python3 run_cpp.py",
+  experiments=[
+    ExperimentInstance(
+      name="cpp_overhead-{}".format(dbname),
+      options={
+        "dbname": dbname,
+        "config-file": CONFIG_FILE,
+      },
+      parallelizable=True,
+    )
+    for dbname in DBS
+  ],
+)
