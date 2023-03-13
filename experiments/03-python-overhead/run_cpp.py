@@ -9,7 +9,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dbname", type=str, required=True)
     parser.add_argument("--config-file", type=str, required=True)
-    parser.add_argument("--iters", type=int, default=10)
+    parser.add_argument("--iters", type=int, default=50)
     args = parser.parse_args()
 
     config = ConfigFile(args.config_file)

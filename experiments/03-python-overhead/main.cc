@@ -7,7 +7,7 @@
 
 DEFINE_string(cstr, "", "The connection string to use.");
 DEFINE_string(dbname, "", "The name of the database (used for results).");
-DEFINE_uint32(iters, 10, "The number of requests to run in a loop in one timing session.");
+DEFINE_uint32(iters, 50, "The number of requests to run in a loop in one timing session.");
 DEFINE_uint32(trials, 5, "The number of trials to run.");
 
 int main(int argc, char* argv[]) {
@@ -24,6 +24,9 @@ int main(int argc, char* argv[]) {
   }
 
   nanodbc::connection c(FLAGS_cstr);
+  if (FLAGS_dbname == "redshift") {
+    nanodbc::execute(c, "SET enable_result_cache_for_session = off");
+  }
 
   std::cout << "dbname,iters,run_time_ns" << std::endl;
 

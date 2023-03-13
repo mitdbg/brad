@@ -29,6 +29,7 @@ class DBConnectionManager:
         self._redshift = pyodbc.connect(
             config.get_odbc_connection_string(DBType.Redshift), autocommit=autocommit
         )
+        self._redshift.execute("SET enable_result_cache_for_session = off")
 
         # NOTE: Need to set the appropriate isolation levels. Need to also test
         # running transactions through our router.

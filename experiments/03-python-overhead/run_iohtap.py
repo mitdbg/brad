@@ -35,7 +35,7 @@ def main():
     parser.add_argument("--dbname", type=str, required=True)
     parser.add_argument("--config-file", type=str, required=True)
     parser.add_argument("--schema-file", type=str, required=True)
-    parser.add_argument("--iters", type=int, default=10)
+    parser.add_argument("--iters", type=int, default=50)
     parser.add_argument("--trials", type=int, default=5)
     args = parser.parse_args()
 
