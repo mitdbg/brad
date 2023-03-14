@@ -28,3 +28,26 @@ run_experiment_group(
     ),
   ]
 )
+
+run_experiment_group(
+  name="tpch_diverse_epochs",
+  run="python3 run_queries_iceberg.py",
+  experiments=[
+    ExperimentInstance(
+      name="tpch_diverse_epochs-base",
+      options={
+        "trials": 5,
+        "exp": "run_base",
+        "s3-bucket": "geoffxy-research",
+      },
+    ),
+    ExperimentInstance(
+      name="tpch_diverse_epochs-filtered",
+      options={
+        "trials": 5,
+        "exp": "run_filtered",
+        "s3-bucket": "geoffxy-research",
+      },
+    ),
+  ]
+)

@@ -28,3 +28,26 @@ run_experiment_group(
     ),
   ]
 )
+
+run_experiment_group(
+  name="tpch_diverse_epochs",
+  run="python3 run_queries2.py",
+  experiments=[
+    ExperimentInstance(
+      name="tpch_diverse_epochs-bare",
+      options={
+        "trials": 5,
+        "exp": "run_bare",
+        "server": "redshift-tpch-test.cv1pkocptzr2.us-east-1.redshift.amazonaws.com",
+      },
+    ),
+    ExperimentInstance(
+      name="tpch_diverse_epochs-filtered",
+      options={
+        "trials": 5,
+        "exp": "run_filtered",
+        "server": "redshift-tpch-test.cv1pkocptzr2.us-east-1.redshift.amazonaws.com",
+      },
+    ),
+  ]
+)
