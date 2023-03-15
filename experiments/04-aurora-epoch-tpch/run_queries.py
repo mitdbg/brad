@@ -189,7 +189,7 @@ def main():
     parser.add_argument("--trials", type=int, default=5)
     parser.add_argument("--server", type=str, required=True)
     parser.add_argument("--db", type=str, default="iohtap")
-    parser.add_argument("--port", type=int, default=5439)
+    parser.add_argument("--port", type=int, default=5432)
     parser.add_argument("--exp", type=str)
     args = parser.parse_args()
 
