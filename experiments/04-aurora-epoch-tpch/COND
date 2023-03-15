@@ -1,0 +1,25 @@
+# NOTE: It's important to run these experiments separately because Aurora is a
+# rowstore. Run the experiment with epochs first, drop the epoch columns, then
+# run the bare experiment.
+run_experiment_group(
+  name="tpch_diverse_epochs",
+  run="python3 run_queries.py",
+  experiments=[
+    ExperimentInstance(
+      name="tpch_diverse_epochs-bare",
+      options={
+        "trials": 6,
+        "exp": "run_bare",
+        "server": "",
+      },
+    ),
+    ExperimentInstance(
+      name="tpch_diverse_epochs-filtered",
+      options={
+        "trials": 6,
+        "exp": "run_filtered",
+        "server": "",
+      },
+    ),
+  ]
+)
