@@ -59,7 +59,7 @@ run_experiment_group(
     ExperimentInstance(
       name="tpch-merged-bare",
       options={
-        "trials": 6,
+        "trials": 11,
         "exp": "run_bare",
         "s3-bucket": "geoffxy-research",
       },
@@ -67,7 +67,7 @@ run_experiment_group(
     ExperimentInstance(
       name="tpch-merged-uneven10",
       options={
-        "trials": 6,
+        "trials": 11,
         "exp": "run_merged",
         "s3-bucket": "geoffxy-research",
       },
