@@ -28,7 +28,8 @@ class QueryParser:
         filtered_attributes = []
 
         if "FROM" in d.keys():
-            tables = d["FROM"].split(",")
+            #tables = d["FROM"].split(",")
+            tables = d["FROM"].split("JOIN")
             predicates.extend(
                 [t.split("ON")[1].strip() for t in tables if len(t.split("ON")) >= 2]
             )
@@ -36,10 +37,18 @@ class QueryParser:
             # Match the pattern period - equals sign - period, with the periods not inside single quotes.
 
             for i in d["WHERE"].split("AND"):
-                if bool(re.match(r"[^']*\.[^']*=[^']*\.[^']*", i)):
+                #if bool(re.match(r"[^']*\.[^']*=[^']*\.[^']*", i)):
+                if bool(re.match(r"[A-Za-z]*\.[A-Za-z]*\s*=\s*[A-Za-z]*\.[A-Za-z]*", i)):
                     predicates.append(i.strip())
                 else:
                     filtered_attributes.append(i.split()[0].strip())
+
+        if len(predicates) == 8:
+            print("-----------")
+            print(d["FROM"])
+            print(d["WHERE"])
+            print(predicates)
+            print("-----------")
 
         return predicates, filtered_attributes
 
