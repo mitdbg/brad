@@ -51,3 +51,26 @@ run_experiment_group(
     ),
   ]
 )
+
+run_experiment_group(
+  name="tpch-merged",
+  run="python3 run_split_queries.py",
+  experiments=[
+    ExperimentInstance(
+      name="tpch-merged-bare",
+      options={
+        "trials": 6,
+        "exp": "run_bare",
+        "s3-bucket": "geoffxy-research",
+      },
+    ),
+    ExperimentInstance(
+      name="tpch-merged-uneven10",
+      options={
+        "trials": 6,
+        "exp": "run_merged",
+        "s3-bucket": "geoffxy-research",
+      },
+    ),
+  ]
+)

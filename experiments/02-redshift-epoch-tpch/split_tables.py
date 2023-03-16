@@ -84,7 +84,9 @@ def main():
             q = DROP_VIEW_TEMPLATE.format(view_name="{}_merged".format(table_name))
             cursor.execute(q)
             for i in range(args.num_parts):
-                q = DROP_TABLE_TEMPLATE.format(table_name="{}_{}_{}".format(table_name, i + 1, args.num_parts))
+                q = DROP_TABLE_TEMPLATE.format(
+                    table_name="{}_{}_{}".format(table_name, i + 1, args.num_parts)
+                )
                 cursor.execute(q)
         cursor.commit()
         return
