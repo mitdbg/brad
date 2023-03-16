@@ -1,0 +1,124 @@
+import argparse
+import pyodbc
+import sys
+import os
+
+CONN_STR_TEMPLATE = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};Database={};"
+
+TABLES = {
+    "customer": ["c_custkey"],
+    "orders": ["o_orderkey"],
+    "supplier": ["s_suppkey"],
+    "lineitem": ["l_orderkey", "l_partkey", "l_suppkey"],
+}
+
+SPLIT_TABLE_QUERY_TEMPLATE = """
+    CREATE TABLE {table_name}_{idx} AS
+    WITH batched AS (
+        SELECT *, NTILE({num_parts}) OVER (ORDER BY {key_col}) AS batch_nbr FROM {table_name}
+    )
+    SELECT * FROM batched WHERE batch_nbr {batch_predicate}
+"""
+
+
+DROP_VIEW_TEMPLATE = "DROP VIEW {view_name}"
+DROP_TABLE_TEMPLATE = "DROP TABLE {table_name}"
+DEL_COLUMN_TEMPLATE = "ALTER TABLE {table_name} DROP COLUMN {col_name}"
+CREATE_VIEW_TEMPLATE = "CREATE VIEW {view_name} AS {view_query}"
+VIEW_QUERY_TEMPLATE = "SELECT * FROM {table_name}"
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=5439)
+    parser.add_argument("--host", type=str, required=True)
+    parser.add_argument("--database", type=str, required=True)
+    parser.add_argument("--drop-batch-column", action="store_true")
+    parser.add_argument("--create-views", action="store_true")
+    parser.add_argument("--drop-split-tables", action="store_true")
+    args = parser.parse_args()
+
+    rds_user = os.environ["RDS_UID"]
+    rds_pass = os.environ["RDS_PWD"]
+
+    # We'll split the table into 2 parts, one with 1/10 of the data, the rest
+    # with 9/10 of the data.
+    num_parts = 10
+
+    conn_str = CONN_STR_TEMPLATE.format(
+        "Amazon Redshift (x64)",
+        args.host,
+        args.port,
+        rds_user,
+        rds_pass,
+        args.database,
+    )
+    conn = pyodbc.connect(conn_str)
+    cursor = conn.cursor()
+    print("Established connection.", file=sys.stderr)
+
+    if args.drop_batch_column:
+        for table_name, keys in TABLES.items():
+            q = DEL_COLUMN_TEMPLATE.format(
+                table_name="{}_1".format(table_name),
+                col_name="batch_nbr",
+            )
+            cursor.execute(q)
+            q = DEL_COLUMN_TEMPLATE.format(
+                table_name="{}_2".format(table_name),
+                col_name="batch_nbr",
+            )
+            cursor.execute(q)
+        cursor.commit()
+        return
+
+    if args.create_views:
+        for table_name, keys in TABLES.items():
+            tbls = [
+                VIEW_QUERY_TEMPLATE.format(table_name="{}_1".format(table_name)),
+                VIEW_QUERY_TEMPLATE.format(table_name="{}_2".format(table_name)),
+            ]
+            q = CREATE_VIEW_TEMPLATE.format(
+                view_name="{}_merged".format(table_name),
+                view_query=" UNION ALL ".join(tbls),
+            )
+            cursor.execute(q)
+            cursor.commit()
+        return
+
+    if args.drop_split_tables:
+        for table_name, keys in TABLES.items():
+            q = DROP_VIEW_TEMPLATE.format(view_name="{}_merged".format(table_name))
+            cursor.execute(q)
+            q = DROP_TABLE_TEMPLATE.format(table_name="{}_1".format(table_name))
+            cursor.execute(q)
+            q = DROP_TABLE_TEMPLATE.format(table_name="{}_2".format(table_name))
+            cursor.execute(q)
+        cursor.commit()
+        return
+
+    for table_name, keys in TABLES.items():
+        key_col = ", ".join(keys)
+        print("Creating {} part 1...".format(table_name), file=sys.stderr)
+        q = SPLIT_TABLE_QUERY_TEMPLATE.format(
+            table_name=table_name,
+            num_parts=num_parts,
+            key_col=key_col,
+            idx=1,
+            batch_predicate="= 1",
+        )
+        cursor.execute(q)
+        print("Creating {} part 2...".format(table_name), file=sys.stderr)
+        q = SPLIT_TABLE_QUERY_TEMPLATE.format(
+            table_name=table_name,
+            num_parts=num_parts,
+            key_col=key_col,
+            idx=2,
+            batch_predicate="> 1",
+        )
+        cursor.execute(q)
+        cursor.commit()
+
+
+if __name__ == "__main__":
+    main()

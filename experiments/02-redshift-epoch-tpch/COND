@@ -51,3 +51,34 @@ run_experiment_group(
     ),
   ]
 )
+
+run_experiment_group(
+  name="tpch-merged",
+  run="python3 run_split_queries.py",
+  experiments=[
+    ExperimentInstance(
+      name="tpch-merged-bare",
+      options={
+        "trials": 6,
+        "server": "redshift-tpch-test.cv1pkocptzr2.us-east-1.redshift.amazonaws.com",
+        "exp": "run_bare",
+      },
+    ),
+    ExperimentInstance(
+      name="tpch-merged-2",
+      options={
+        "trials": 6,
+        "server": "redshift-tpch-test.cv1pkocptzr2.us-east-1.redshift.amazonaws.com",
+        "exp": "run_merged",
+      },
+    ),
+    ExperimentInstance(
+      name="tpch-merged-uneven10",
+      options={
+        "trials": 6,
+        "server": "redshift-tpch-test.cv1pkocptzr2.us-east-1.redshift.amazonaws.com",
+        "exp": "run_merged",
+      },
+    ),
+  ]
+)

@@ -10,7 +10,7 @@ run_experiment_group(
       options={
         "trials": 6,
         "exp": "run_bare",
-        "server": "aurora-1.cluster-cwnnmm0augmy.us-east-1.rds.amazonaws.com",
+        "server": "aurora-2.cluster-cwnnmm0augmy.us-east-1.rds.amazonaws.com",
       },
     ),
     ExperimentInstance(
@@ -18,7 +18,7 @@ run_experiment_group(
       options={
         "trials": 6,
         "exp": "run_filtered",
-        "server": "aurora-1.cluster-cwnnmm0augmy.us-east-1.rds.amazonaws.com",
+        "server": "aurora-2.cluster-cwnnmm0augmy.us-east-1.rds.amazonaws.com",
       },
     ),
   ]
