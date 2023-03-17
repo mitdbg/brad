@@ -8,7 +8,7 @@ run_experiment_group(
     ExperimentInstance(
       name="tpch_diverse_epochs-bare",
       options={
-        "trials": 6,
+        "trials": 11,
         "exp": "run_bare",
         "server": "aurora-2.cluster-cwnnmm0augmy.us-east-1.rds.amazonaws.com",
       },
@@ -16,7 +16,7 @@ run_experiment_group(
     ExperimentInstance(
       name="tpch_diverse_epochs-filtered",
       options={
-        "trials": 6,
+        "trials": 11,
         "exp": "run_filtered",
         "server": "aurora-2.cluster-cwnnmm0augmy.us-east-1.rds.amazonaws.com",
       },
