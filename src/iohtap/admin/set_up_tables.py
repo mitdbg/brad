@@ -13,7 +13,7 @@ from iohtap.config.strings import (
 )
 from iohtap.config.extraction import ExtractionStrategy
 from iohtap.config.file import ConfigFile
-from iohtap.server.db_connection_manager import DBConnectionManager
+from iohtap.server.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def set_up_tables(args):
         )
 
     # 3. Connect to the underlying engines.
-    cxns = DBConnectionManager(config, autocommit=False)
+    cxns = EngineConnections.connect(config, autocommit=False)
     redshift = cxns.get_connection(DBType.Redshift).cursor()
     aurora = cxns.get_connection(DBType.Aurora).cursor()
     athena = cxns.get_connection(DBType.Athena).cursor()

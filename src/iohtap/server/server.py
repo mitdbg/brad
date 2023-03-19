@@ -3,7 +3,7 @@ import pyodbc
 import socket
 import sqlglot
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, TextIO
+from typing import List, TextIO, Optional
 
 from iohtap.config.dbtype import DBType
 from iohtap.config.file import ConfigFile
@@ -13,7 +13,7 @@ from iohtap.config.schema import Schema
 from iohtap.cost_model.always_one import AlwaysOneCostModel
 from iohtap.cost_model.model import CostModel, RoundRobinCostModel
 from iohtap.data_sync.manager import DataSyncManager
-from iohtap.server.db_connection_manager import DBConnectionManager
+from iohtap.server.session import SessionManager, Session
 from iohtap.forecasting.forecaster import WorkloadForecaster
 from iohtap.net.connection_acceptor import ConnectionAcceptor
 from iohtap.utils.timer_trigger import TimerTrigger
@@ -30,7 +30,9 @@ class IOHTAPServer:
         self._config = config
         self._schema = schema
 
-        routing_policy = config.routing_policy
+        # We have different routing policies for performance evaluation and
+        # testing purposes.
+        routing_policy = self._config.routing_policy
         if routing_policy == RoutingPolicy.Default:
             self._cost_model: CostModel = RoundRobinCostModel()
         elif routing_policy == RoutingPolicy.AlwaysAthena:
@@ -44,7 +46,10 @@ class IOHTAPServer:
                 "Unsupported routing policy: {}".format(str(routing_policy))
             )
 
-        self._dbs = DBConnectionManager(self._config)
+        self._sessions = SessionManager(self._config)
+        # NOTE: This is temporary - we will support multiple concurrent sessions.
+        self._the_session: Optional[Session] = None
+
         self._connection_acceptor = ConnectionAcceptor(
             self._config.server_interface,
             self._config.server_port,
@@ -56,9 +61,7 @@ class IOHTAPServer:
             self._on_new_daemon_connection,
         )
         self._daemon_connections: List[TextIO] = []
-        # NOTE: The data sync should be invoked from the daemon. We put it here
-        # for convenience (until we implement a more robust client/daemon
-        # interaction).
+
         self._data_sync_mgr = DataSyncManager(self._config, self._schema)
         self._auto_sync_timer = (
             TimerTrigger(
@@ -68,6 +71,7 @@ class IOHTAPServer:
             if self._config.data_sync_period_seconds > 0
             else None
         )
+
         self._main_executor = ThreadPoolExecutor(max_workers=1)
         self._forecaster = WorkloadForecaster()
 
@@ -79,6 +83,7 @@ class IOHTAPServer:
         self.stop()
 
     def start(self):
+        _, self._the_session = self._sessions.create_new_session()
         self._connection_acceptor.start()
         self._daemon_connection_acceptor.start()
         if self._auto_sync_timer is not None:
@@ -88,6 +93,10 @@ class IOHTAPServer:
 
     def stop(self):
         def shutdown():
+            assert self._the_session is not None
+            self._sessions.end_session(self._the_session.identifier)
+            self._the_session = None
+
             if self._auto_sync_timer is not None:
                 self._auto_sync_timer.stop()
             self._daemon_connection_acceptor.stop()
@@ -169,7 +178,8 @@ class IOHTAPServer:
         sql_query = self._rewrite_query_if_needed(sql_query, db_to_use)
 
         # 3. Actually execute the query
-        connection = self._dbs.get_connection(db_to_use)
+        assert self._the_session is not None
+        connection = self._the_session.engines.get_connection(db_to_use)
         cursor = connection.cursor()
         try:
             cursor.execute(sql_query)
