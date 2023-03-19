@@ -7,32 +7,37 @@ from iohtap.config.file import ConfigFile
 logger = logging.getLogger(__name__)
 
 
-class DBConnectionManager:
+class EngineConnections:
     """
     Manages connections to the underlying database systems.
     """
 
-    def __init__(self, config: ConfigFile, autocommit: bool = True):
-        self._config = config
-        # To start, we just hold one set of connections. As things get more
-        # sophisticated, we'll add connection pooling, etc.
+    @classmethod
+    def connect(
+        cls, config: ConfigFile, autocommit: bool = True
+    ) -> "EngineConnections":
+        # As the system gets more sophisticated, we'll add connection pooling, etc.
         logger.info("Establishing connections to the underlying database systems...")
         logger.debug("Connecting to Athena...")
-        self._athena = pyodbc.connect(
+        athena = pyodbc.connect(
             config.get_odbc_connection_string(DBType.Athena), autocommit=autocommit
         )
         logger.debug("Connecting to Aurora...")
-        self._aurora = pyodbc.connect(
+        aurora = pyodbc.connect(
             config.get_odbc_connection_string(DBType.Aurora), autocommit=autocommit
         )
         logger.debug("Connecting to Redshift...")
-        self._redshift = pyodbc.connect(
+        redshift = pyodbc.connect(
             config.get_odbc_connection_string(DBType.Redshift), autocommit=autocommit
         )
-        self._redshift.execute("SET enable_result_cache_for_session = off")
+        redshift.execute("SET enable_result_cache_for_session = off")
+        return cls(athena, aurora, redshift)
 
-        # NOTE: Need to set the appropriate isolation levels. Need to also test
-        # running transactions through our router.
+    def __init__(self, athena, aurora, redshift):
+        # NOTE: Need to set the appropriate isolation levels.
+        self._athena = athena
+        self._aurora = aurora
+        self._redshift = redshift
 
     def get_connection(self, db: DBType):
         if db == DBType.Athena:
