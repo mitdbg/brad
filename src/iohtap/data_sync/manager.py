@@ -1,5 +1,6 @@
 import logging
 import pyodbc
+from typing import Any
 
 from iohtap.config.dbtype import DBType
 from iohtap.config.file import ConfigFile
@@ -102,19 +103,26 @@ class DataSyncManager:
         self._config = config
         self._schema = schema
 
+        # No typing information available for `pyodbc`, so we use `Any` as an
+        # escape hatch.
+        self._aurora: Any = None
+        self._redshift: Any = None
+        self._athena: Any = None
+
+    def establish_connections(self):
         # This class maintains its own connections because it has different
         # isolation level and autocommit requirements.
         self._aurora = pyodbc.connect(
-            config.get_odbc_connection_string(DBType.Aurora), autocommit=False
+            self._config.get_odbc_connection_string(DBType.Aurora), autocommit=False
         )
         self._aurora.execute(
             "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL REPEATABLE READ READ WRITE"
         )
         self._redshift = pyodbc.connect(
-            config.get_odbc_connection_string(DBType.Redshift), autocommit=False
+            self._config.get_odbc_connection_string(DBType.Redshift), autocommit=False
         )
         self._athena = pyodbc.connect(
-            config.get_odbc_connection_string(DBType.Athena), autocommit=False
+            self._config.get_odbc_connection_string(DBType.Athena), autocommit=False
         )
 
     def run_sync(self):
