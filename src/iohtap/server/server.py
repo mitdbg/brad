@@ -91,7 +91,7 @@ class IOHTAPServer:
             self._sessions.end_session(self._the_session.identifier)
             self._the_session = None
 
-        for (_, writer) in self._daemon_connections:
+        for _, writer in self._daemon_connections:
             writer.close()
             await writer.wait_closed()
         self._daemon_connections.clear()
@@ -145,7 +145,7 @@ class IOHTAPServer:
         # NOTE: What we do here depends on the needs of the background daemon.
         if sql_query is not None:
             try:
-                for (_, daemon_writer) in self._daemon_connections:
+                for _, daemon_writer in self._daemon_connections:
                     daemon_writer.write(str(sql_query).encode())
                     daemon_writer.write(LINESEP)
                     await daemon_writer.drain()
