@@ -33,7 +33,7 @@ def set_up_tables(args):
         )
 
     # 3. Connect to the underlying engines.
-    cxns = EngineConnections.connect(config, autocommit=False)
+    cxns = EngineConnections.connect_sync(config, autocommit=False)
     redshift = cxns.get_connection(DBType.Redshift).cursor()
     aurora = cxns.get_connection(DBType.Aurora).cursor()
     athena = cxns.get_connection(DBType.Athena).cursor()

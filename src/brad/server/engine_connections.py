@@ -1,4 +1,5 @@
 import logging
+import aioodbc
 import pyodbc
 
 from brad.config.dbtype import DBType
@@ -13,9 +14,41 @@ class EngineConnections:
     """
 
     @classmethod
-    def connect(
+    async def connect(
         cls, config: ConfigFile, autocommit: bool = True
     ) -> "EngineConnections":
+        """
+        Establishes connections to the underlying engines. The connections made
+        by this method are `aioodbc` connections.
+        """
+
+        # As the system gets more sophisticated, we'll add connection pooling, etc.
+        logger.info("Establishing connections to the underlying database systems...")
+        logger.debug("Connecting to Athena...")
+        athena = await aioodbc.connect(
+            dsn=config.get_odbc_connection_string(DBType.Athena), autocommit=autocommit
+        )
+        logger.debug("Connecting to Aurora...")
+        aurora = await aioodbc.connect(
+            dsn=config.get_odbc_connection_string(DBType.Aurora), autocommit=autocommit
+        )
+        logger.debug("Connecting to Redshift...")
+        redshift = await aioodbc.connect(
+            dsn=config.get_odbc_connection_string(DBType.Redshift),
+            autocommit=autocommit,
+        )
+        await redshift.execute("SET enable_result_cache_for_session = off")
+        return cls(athena, aurora, redshift)
+
+    @classmethod
+    def connect_sync(
+        cls, config: ConfigFile, autocommit: bool = True
+    ) -> "EngineConnections":
+        """
+        Synchronously establishes connections to the underlying engines. The
+        connections made by this method are `pyodbc` connections.
+        """
+
         # As the system gets more sophisticated, we'll add connection pooling, etc.
         logger.info("Establishing connections to the underlying database systems...")
         logger.debug("Connecting to Athena...")
@@ -28,7 +61,8 @@ class EngineConnections:
         )
         logger.debug("Connecting to Redshift...")
         redshift = pyodbc.connect(
-            config.get_odbc_connection_string(DBType.Redshift), autocommit=autocommit
+            config.get_odbc_connection_string(DBType.Redshift),
+            autocommit=autocommit,
         )
         redshift.execute("SET enable_result_cache_for_session = off")
         return cls(athena, aurora, redshift)
@@ -48,3 +82,11 @@ class EngineConnections:
             return self._redshift
         else:
             raise AssertionError("Unsupported database type: " + str(db))
+
+    async def close(self):
+        """
+        Call to close the connections when opened in async mode.
+        """
+        await self._athena.close()
+        await self._aurora.close()
+        await self._redshift.close()

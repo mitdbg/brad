@@ -55,11 +55,12 @@ class BradServer:
             Tuple[asyncio.StreamReader, asyncio.StreamWriter]
         ] = []
         self._data_sync_mgr = DataSyncManager(self._config, self._schema)
+        self._timed_sync_task = None
         self._forecaster = WorkloadForecaster()
 
     async def serve_forever(self):
         try:
-            self._run_setup()
+            await self._run_setup()
             frontend_acceptor = await AsyncConnectionAcceptor.create(
                 host=self._config.server_interface,
                 port=self._config.server_port,
@@ -79,22 +80,28 @@ class BradServer:
             await self._run_teardown()
             logger.info("The BRAD server has shut down.")
 
-    def _run_setup(self):
-        self._data_sync_mgr.establish_connections()
-        _, self._the_session = self._sessions.create_new_session()
+    async def _run_setup(self):
+        await self._data_sync_mgr.establish_connections()
+        _, self._the_session = await self._sessions.create_new_session()
         if self._config.data_sync_period_seconds > 0:
             loop = asyncio.get_event_loop()
-            loop.create_task(self._run_sync_periodically())
+            self._timed_sync_task = loop.create_task(self._run_sync_periodically())
 
     async def _run_teardown(self):
+        if self._timed_sync_task is not None:
+            await self._timed_sync_task.close()
+            self._timed_sync_task = None
+
         if self._the_session is not None:
-            self._sessions.end_session(self._the_session.identifier)
+            await self._sessions.end_session(self._the_session.identifier)
             self._the_session = None
 
         for _, writer in self._daemon_connections:
             writer.close()
             await writer.wait_closed()
         self._daemon_connections.clear()
+
+        await self._data_sync_mgr.close()
 
     def _handle_new_daemon_connection(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -127,13 +134,19 @@ class BradServer:
 
             # Extract and transmit the results, if any.
             if cursor is not None:
-                num_rows = 0
-                for row in cursor:
-                    writer.write(" | ".join(map(str, row)).encode())
-                    writer.write(LINESEP)
-                    num_rows += 1
-                await writer.drain()
-                logger.debug("Responded with %d rows.", num_rows)
+                try:
+                    num_rows = 0
+                    while True:
+                        row = await cursor.fetchone()
+                        if row is None:
+                            break
+                        writer.write(" | ".join(map(str, row)).encode())
+                        writer.write(LINESEP)
+                        num_rows += 1
+                    await writer.drain()
+                    logger.debug("Responded with %d rows.", num_rows)
+                except pyodbc.ProgrammingError:
+                    logger.debug("No rows produced.")
 
         except:  # pylint: disable=bare-except
             logger.exception("Encountered exception when handling request.")
@@ -176,9 +189,9 @@ class BradServer:
         # 3. Actually execute the query
         assert self._the_session is not None
         connection = self._the_session.engines.get_connection(db_to_use)
-        cursor = connection.cursor()
+        cursor = await connection.cursor()
         try:
-            cursor.execute(sql_query)
+            await cursor.execute(sql_query)
         except pyodbc.ProgrammingError as ex:
             # Error when executing the query.
             writer.write(str(ex).encode())
@@ -222,7 +235,7 @@ class BradServer:
         """
         if command == "BRAD_SYNC":
             logger.debug("Manually triggered a data sync.")
-            self._data_sync_mgr.run_sync()
+            await self._data_sync_mgr.run_sync()
             writer.write("Sync succeeded.".encode())
         elif command == "BRAD_FORECAST":
             logger.debug("Manually triggered a workload forecast.")

@@ -26,6 +26,7 @@ ENTRY_POINTS = {
 }
 
 INSTALL_REQUIRES = [
+    "aioodbc",
     "pyodbc",
     "pyyaml",
     "sqlglot",
