@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package brad;
+
+// BRAD's internal-use RPC interface.
+service Brad {
+  // Start a new session.
+  // All requests (except this one) must include a `SessionId` that is returned
+  // by this method.
+  rpc StartSession(StartSessionRequest) returns (StartSessionResponse) {}
+
+  // Run a SQL query (or execute an internal command like BRAD_SYNC).
+  rpc RunQuery(RunQueryRequest) returns (stream RunQueryResponse) {}
+
+  // End a previously started session. Clients must call this method once they
+  // are done with their session.
+  rpc EndSession(EndSessionRequest) returns (EndSessionResponse) {}
+}
+
+message SessionId {
+  uint64 id_value = 1;
+}
+
+message StartSessionRequest {}
+
+message StartSessionResponse {
+  SessionId id = 1;
+}
+
+message RunQueryRequest {
+  SessionId id = 1;
+  string query = 2;
+}
+
+message RunQueryResponse {
+  oneof result {
+    QueryResultRow row = 1;
+    QueryError error = 2;
+  }
+  Engine serviced_by = 10;
+}
+
+message QueryResultRow {
+  // Arbitrary encoding.
+  bytes row_data = 1;
+}
+
+message QueryError {
+  string error_msg = 1;
+}
+
+message EndSessionRequest {
+  SessionId id = 1;
+}
+
+message EndSessionResponse {}
+
+// Used for debug purposes.
+enum Engine {
+  ENGINE_NONE = 0;
+  ENGINE_ATHENA = 1;
+  ENGINE_AURORA = 2;
+  ENGINE_REDSHIFT = 3;
+}
