@@ -1,0 +1,6 @@
+# .git-blame-ignore-revs
+# Commits in this file are ignored by `git blame` on GitHub (useful for
+# ignoring project-wide refactors). Always specify the full commit hash.
+
+# Project-wide rename from IOHTAP to BRAD.
+1fcb024543c90dc9d3060913636d28fd0857a01c
