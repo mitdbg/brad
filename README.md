@@ -1,15 +1,15 @@
-# IOHTAP
+# BRAD
 
 "Single-interface" version
 
 ## Getting Started
 
-### Setting up IOHTAP
+### Setting up BRAD
 
-Run `./tools/install-dev.sh` to install IOHTAP in development mode. This script
-will also take care of installing IOHTAP's Python dependencies.
+Run `./tools/install-dev.sh` to install BRAD in development mode. This script
+will also take care of installing BRAD's Python dependencies.
 
-If you would like to install IOHTAP in a `virtualenv`, run
+If you would like to install BRAD in a `virtualenv`, run
 `./tools/install-dev.sh --virtualenv <venv name>` instead.
 
 ### Installing the ODBC drivers
@@ -40,18 +40,18 @@ Note that these instructions are written for a Debian based machine (e.g., Ubunt
 
 ### Creating Tables
 
-IOHTAP expects to be given your schema up front. You must also use the IOHTAP
-administrative tools `iohtap admin` to set up the tables across all the
+BRAD expects to be given your schema up front. You must also use the BRAD
+administrative tools `brad admin` to set up the tables across all the
 underlying engines.
 
 - Create a schema file (see `config/test_schema.yml` for an example). Use
   PostgreSQL data types.
-- Run `iohtap admin set_up_tables --config-file path/to/config.yml --schema-file
+- Run `brad admin set_up_tables --config-file path/to/config.yml --schema-file
   path/to/your/schema.yml` to set up the tables across the underlying engines.
-- Start the IOHTAP server `iohtap server --config-file path/to/config.yml --schema-file path/to/schema.yml`.
-- Run queries through the CLI `iohtap cli`.
+- Start the BRAD server `brad server --config-file path/to/config.yml --schema-file path/to/schema.yml`.
+- Run queries through the CLI `brad cli`.
 
-To remove the tables, use `iohtap admin tear_down_tables` (e.g., `iohtap admin
+To remove the tables, use `brad admin tear_down_tables` (e.g., `brad admin
 tear_down_tables --config-file path/to/config.yml --schema-file
 path/to/your/schema.yml`). Note that this command will delete the data in the
 tables (and will drop the tables)!

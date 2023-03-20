@@ -43,7 +43,7 @@ fi
 if [ -z $mode ] || [ $mode == $check_lint ]; then
   echo_blue "Lint (pylint)"
   echo_blue "============="
-  pylint src/iohtap setup.py
+  pylint src/brad setup.py
   pylint_exit=$?
   echo ""
 fi
@@ -51,7 +51,7 @@ fi
 if [ -z $mode ] || [ $mode == $check_types ]; then
   echo_blue "Type Check (mypy)"
   echo_blue "================="
-  MYPYPATH=src mypy -p iohtap
+  MYPYPATH=src mypy -p brad
   mypy_exit=$?
   echo ""
 fi
