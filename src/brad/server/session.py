@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 from brad.config.file import ConfigFile
 from .engine_connections import EngineConnections
@@ -7,6 +7,15 @@ from .engine_connections import EngineConnections
 class SessionId:
     def __init__(self, id_value: int):
         self._session_id = id_value
+
+    def __repr__(self) -> str:
+        return str(self._session_id)
+
+    def value(self) -> int:
+        """
+        Meant for serialization only.
+        """
+        return self._session_id
 
 
 class Session:
@@ -45,7 +54,9 @@ class SessionManager:
         self._sessions[session_id] = session
         return (session_id, session)
 
-    def get_session(self, session_id: SessionId) -> Session:
+    def get_session(self, session_id: SessionId) -> Optional[Session]:
+        if session_id not in self._sessions:
+            return None
         return self._sessions[session_id]
 
     async def end_session(self, session_id: SessionId):

@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import List, Optional, Tuple
+from typing import AsyncIterable, List, Optional, Tuple
 
 import pyodbc
 import sqlglot
@@ -13,7 +13,9 @@ from brad.config.schema import Schema
 from brad.cost_model.always_one import AlwaysOneCostModel
 from brad.cost_model.model import CostModel, RoundRobinCostModel
 from brad.data_sync.manager import DataSyncManager
-from brad.server.session import SessionManager, Session
+from brad.server.brad_interface import BradInterface
+from brad.server.errors import QueryError
+from brad.server.session import SessionManager, Session, SessionId
 from brad.forecasting.forecaster import WorkloadForecaster
 from brad.net.async_connection_acceptor import AsyncConnectionAcceptor
 
@@ -26,7 +28,7 @@ _UPDATE_SEQ_EXPR = sqlglot.parse_one(
 LINESEP = "\n".encode()
 
 
-class BradServer:
+class BradServer(BradInterface):
     def __init__(self, config: ConfigFile, schema: Schema):
         self._config = config
         self._schema = schema
@@ -108,6 +110,23 @@ class BradServer:
     ):
         logger.debug("Accepted new daemon connection.")
         self._daemon_connections.append((reader, writer))
+
+    async def start_session(self) -> SessionId:
+        session_id, _ = await self._sessions.create_new_session()
+        return session_id
+
+    async def end_session(self, session_id: SessionId) -> None:
+        await self._sessions.end_session(session_id)
+
+    # pylint: disable-next=invalid-overridden-method
+    async def run_query(
+        self, session_id: SessionId, query: str
+    ) -> AsyncIterable[bytes]:
+        session = self._sessions.get_session(session_id)
+        if session is None:
+            raise QueryError("Invalid session id {}".format(str(session_id)))
+        # NOTE: This is a temporary placeholder.
+        yield query.encode()
 
     async def _handle_request(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
