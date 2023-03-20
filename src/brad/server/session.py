@@ -27,6 +27,9 @@ class Session:
     def engines(self) -> EngineConnections:
         return self._engines
 
+    async def close(self):
+        await self._engines.close()
+
 
 class SessionManager:
     def __init__(self, config: ConfigFile):
@@ -45,5 +48,7 @@ class SessionManager:
     def get_session(self, session_id: SessionId) -> Session:
         return self._sessions[session_id]
 
-    def end_session(self, session_id: SessionId):
+    async def end_session(self, session_id: SessionId):
+        session = self._sessions[session_id]
+        await session.close()
         del self._sessions[session_id]

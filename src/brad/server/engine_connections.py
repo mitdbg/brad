@@ -82,3 +82,11 @@ class EngineConnections:
             return self._redshift
         else:
             raise AssertionError("Unsupported database type: " + str(db))
+
+    async def close(self):
+        """
+        Call to close the connections when opened in async mode.
+        """
+        await self._athena.close()
+        await self._aurora.close()
+        await self._redshift.close()

@@ -55,6 +55,7 @@ class BradServer:
             Tuple[asyncio.StreamReader, asyncio.StreamWriter]
         ] = []
         self._data_sync_mgr = DataSyncManager(self._config, self._schema)
+        self._timed_sync_task = None
         self._forecaster = WorkloadForecaster()
 
     async def serve_forever(self):
@@ -84,17 +85,23 @@ class BradServer:
         _, self._the_session = await self._sessions.create_new_session()
         if self._config.data_sync_period_seconds > 0:
             loop = asyncio.get_event_loop()
-            loop.create_task(self._run_sync_periodically())
+            self._timed_sync_task = loop.create_task(self._run_sync_periodically())
 
     async def _run_teardown(self):
+        if self._timed_sync_task is not None:
+            await self._timed_sync_task.close()
+            self._timed_sync_task = None
+
         if self._the_session is not None:
-            self._sessions.end_session(self._the_session.identifier)
+            await self._sessions.end_session(self._the_session.identifier)
             self._the_session = None
 
         for _, writer in self._daemon_connections:
             writer.close()
             await writer.wait_closed()
         self._daemon_connections.clear()
+
+        await self._data_sync_mgr.close()
 
     def _handle_new_daemon_connection(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -228,7 +235,7 @@ class BradServer:
         """
         if command == "BRAD_SYNC":
             logger.debug("Manually triggered a data sync.")
-            self._data_sync_mgr.run_sync()
+            await self._data_sync_mgr.run_sync()
             writer.write("Sync succeeded.".encode())
         elif command == "BRAD_FORECAST":
             logger.debug("Manually triggered a workload forecast.")
