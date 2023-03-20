@@ -1,5 +1,5 @@
+import aioodbc
 import logging
-import pyodbc
 from typing import Any
 
 from brad.config.dbtype import DBType
@@ -109,20 +109,21 @@ class DataSyncManager:
         self._redshift: Any = None
         self._athena: Any = None
 
-    def establish_connections(self):
+    async def establish_connections(self):
         # This class maintains its own connections because it has different
         # isolation level and autocommit requirements.
-        self._aurora = pyodbc.connect(
-            self._config.get_odbc_connection_string(DBType.Aurora), autocommit=False
+        self._aurora = await aioodbc.connect(
+            dsn=self._config.get_odbc_connection_string(DBType.Aurora), autocommit=False
         )
-        self._aurora.execute(
+        await self._aurora.execute(
             "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL REPEATABLE READ READ WRITE"
         )
-        self._redshift = pyodbc.connect(
-            self._config.get_odbc_connection_string(DBType.Redshift), autocommit=False
+        self._redshift = await aioodbc.connect(
+            dsn=self._config.get_odbc_connection_string(DBType.Redshift),
+            autocommit=False,
         )
-        self._athena = pyodbc.connect(
-            self._config.get_odbc_connection_string(DBType.Athena), autocommit=False
+        self._athena = await aioodbc.connect(
+            dsn=self._config.get_odbc_connection_string(DBType.Athena), autocommit=False
         )
 
     def run_sync(self):

@@ -59,7 +59,7 @@ class BradServer:
 
     async def serve_forever(self):
         try:
-            self._run_setup()
+            await self._run_setup()
             frontend_acceptor = await AsyncConnectionAcceptor.create(
                 host=self._config.server_interface,
                 port=self._config.server_port,
@@ -79,9 +79,9 @@ class BradServer:
             await self._run_teardown()
             logger.info("The BRAD server has shut down.")
 
-    def _run_setup(self):
-        self._data_sync_mgr.establish_connections()
-        _, self._the_session = self._sessions.create_new_session()
+    async def _run_setup(self):
+        await self._data_sync_mgr.establish_connections()
+        _, self._the_session = await self._sessions.create_new_session()
         if self._config.data_sync_period_seconds > 0:
             loop = asyncio.get_event_loop()
             loop.create_task(self._run_sync_periodically())
@@ -127,13 +127,19 @@ class BradServer:
 
             # Extract and transmit the results, if any.
             if cursor is not None:
-                num_rows = 0
-                for row in cursor:
-                    writer.write(" | ".join(map(str, row)).encode())
-                    writer.write(LINESEP)
-                    num_rows += 1
-                await writer.drain()
-                logger.debug("Responded with %d rows.", num_rows)
+                try:
+                    num_rows = 0
+                    while True:
+                        row = await cursor.fetchone()
+                        if row is None:
+                            break
+                        writer.write(" | ".join(map(str, row)).encode())
+                        writer.write(LINESEP)
+                        num_rows += 1
+                    await writer.drain()
+                    logger.debug("Responded with %d rows.", num_rows)
+                except pyodbc.ProgrammingError:
+                    logger.debug("No rows produced.")
 
         except:  # pylint: disable=bare-except
             logger.exception("Encountered exception when handling request.")
@@ -176,9 +182,9 @@ class BradServer:
         # 3. Actually execute the query
         assert self._the_session is not None
         connection = self._the_session.engines.get_connection(db_to_use)
-        cursor = connection.cursor()
+        cursor = await connection.cursor()
         try:
-            cursor.execute(sql_query)
+            await cursor.execute(sql_query)
         except pyodbc.ProgrammingError as ex:
             # Error when executing the query.
             writer.write(str(ex).encode())

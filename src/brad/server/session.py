@@ -34,10 +34,11 @@ class SessionManager:
         self._next_id_value = 0
         self._sessions: Dict[SessionId, Session] = {}
 
-    def create_new_session(self) -> Tuple[SessionId, Session]:
+    async def create_new_session(self) -> Tuple[SessionId, Session]:
         session_id = SessionId(self._next_id_value)
         self._next_id_value += 1
-        session = Session(session_id, EngineConnections.connect(self._config))
+        connections = await EngineConnections.connect(self._config)
+        session = Session(session_id, connections)
         self._sessions[session_id] = session
         return (session_id, session)
 
