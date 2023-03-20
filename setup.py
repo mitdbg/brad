@@ -39,6 +39,7 @@ DEV_REQUIRES = [
     "mypy",
     "pylint",
     "types-PyYAML",
+    "types-protobuf",
 ]
 
 KEYWORDS = []

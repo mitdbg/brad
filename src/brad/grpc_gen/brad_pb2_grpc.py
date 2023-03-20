@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import brad.grpc.brad_pb2 as brad__pb2
+import brad.grpc_gen.brad_pb2 as brad__pb2
 
 
 class BradStub(object):

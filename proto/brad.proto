@@ -37,7 +37,6 @@ message RunQueryResponse {
     QueryResultRow row = 1;
     QueryError error = 2;
   }
-  Engine serviced_by = 10;
 }
 
 message QueryResultRow {
@@ -54,11 +53,3 @@ message EndSessionRequest {
 }
 
 message EndSessionResponse {}
-
-// Used for debug purposes.
-enum Engine {
-  ENGINE_NONE = 0;
-  ENGINE_ATHENA = 1;
-  ENGINE_AURORA = 2;
-  ENGINE_REDSHIFT = 3;
-}
