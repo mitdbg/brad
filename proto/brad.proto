@@ -21,7 +21,9 @@ message SessionId {
   uint64 id_value = 1;
 }
 
-message StartSessionRequest {}
+message StartSessionRequest {
+  uint64 unused = 100;
+}
 
 message StartSessionResponse {
   SessionId id = 1;
@@ -52,4 +54,6 @@ message EndSessionRequest {
   SessionId id = 1;
 }
 
-message EndSessionResponse {}
+message EndSessionResponse {
+  uint64 unused = 100;
+}

@@ -3,3 +3,4 @@ disable=R,C
 enable=useless-suppression
 
 extension-pkg-whitelist=pyodbc
+ignore-paths=src/brad/grpc_gen/

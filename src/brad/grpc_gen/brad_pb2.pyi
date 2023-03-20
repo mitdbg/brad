@@ -11,8 +11,10 @@ class EndSessionRequest(_message.Message):
     def __init__(self, id: _Optional[_Union[SessionId, _Mapping]] = ...) -> None: ...
 
 class EndSessionResponse(_message.Message):
-    __slots__ = []
-    def __init__(self) -> None: ...
+    __slots__ = ["unused"]
+    UNUSED_FIELD_NUMBER: _ClassVar[int]
+    unused: int
+    def __init__(self, unused: _Optional[int] = ...) -> None: ...
 
 class QueryError(_message.Message):
     __slots__ = ["error_msg"]
@@ -49,8 +51,10 @@ class SessionId(_message.Message):
     def __init__(self, id_value: _Optional[int] = ...) -> None: ...
 
 class StartSessionRequest(_message.Message):
-    __slots__ = []
-    def __init__(self) -> None: ...
+    __slots__ = ["unused"]
+    UNUSED_FIELD_NUMBER: _ClassVar[int]
+    unused: int
+    def __init__(self, unused: _Optional[int] = ...) -> None: ...
 
 class StartSessionResponse(_message.Message):
     __slots__ = ["id"]
