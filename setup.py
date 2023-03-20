@@ -10,9 +10,9 @@ from setuptools import setup, find_packages
 
 ###################################################################
 
-NAME = "iohtap"
+NAME = "brad"
 PACKAGES = find_packages(where="src")
-META_PATH = os.path.join("src", "iohtap", "__init__.py")
+META_PATH = os.path.join("src", "brad", "__init__.py")
 README_PATH = "README.md"
 PYTHON_REQUIRES = ">=3.10"
 
@@ -21,7 +21,7 @@ PACKAGE_DIR = {"": "src"}
 
 ENTRY_POINTS = {
     "console_scripts": [
-        "iohtap = iohtap.__main__:main",
+        "brad = brad.__main__:main",
     ],
 }
 

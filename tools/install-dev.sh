@@ -9,7 +9,7 @@ set -e
 
 # We use --ci in our CI workflow to skip interactive prompts
 if [ "$1" != "--ci" ]; then
-  prompt_yn "Install IOHTAP in development mode? [y/N] "
+  prompt_yn "Install BRAD in development mode? [y/N] "
 fi
 
 # Virtualenv is not used in our CI workflow
