@@ -1,16 +1,16 @@
 import argparse
+import asyncio
 import csv
 import pathlib
 import time
-import io
 
 import conductor.lib as cond
 
-from iohtap.config.file import ConfigFile
-from iohtap.config.dbtype import DBType
-from iohtap.config.routing_policy import RoutingPolicy
-from iohtap.config.schema import Schema
-from iohtap.server.server import IOHTAPServer
+from brad.config.file import ConfigFile
+from brad.config.dbtype import DBType
+from brad.config.routing_policy import RoutingPolicy
+from brad.config.schema import Schema
+from brad.server.server import BradServer
 
 
 class ConfigFileOverride(ConfigFile):
@@ -30,6 +30,25 @@ class ConfigFileOverride(ConfigFile):
         return self._policy
 
 
+async def run_brad_experiment(args, brad: BradServer, out_dir: pathlib.Path):
+    await brad.run_setup()
+    session_id = await brad.start_session()
+    try:
+        with open(out_dir / "results.csv", "w") as f:
+            writer = csv.writer(f)
+            writer.writerow(["dbname", "iters", "run_time_ns"])
+            for _trial in range(args.trials):
+                start = time.time()
+                for _iteration in range(args.iters):
+                    async for _row in brad.run_query(session_id, "SELECT 1"):
+                        pass
+                end = time.time()
+                writer.writerow([args.dbname, args.iters, int((end - start) * 1e9)])
+    finally:
+        await brad.end_session(session_id)
+        await brad.run_teardown()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dbname", type=str, required=True)
@@ -41,25 +60,14 @@ def main():
 
     config = ConfigFileOverride(args.config_file, args.dbname)
     schema = Schema.load(args.schema_file)
-    # NOTE: This is unused (just exists for API compatibility)
-    strio = io.StringIO()
 
     try:
         out_dir = cond.get_output_path()
     except RuntimeError:
         out_dir = pathlib.Path()  # The current working directory.
 
-    with IOHTAPServer(config, schema) as server, open(
-        out_dir / "results.csv", "w"
-    ) as f:
-        writer = csv.writer(f)
-        writer.writerow(["dbname", "iters", "run_time_ns"])
-        for _trial in range(args.trials):
-            start = time.time()
-            for _iteration in range(args.iters):
-                server._handle_request_internal("SELECT 1", strio)
-            end = time.time()
-            writer.writerow([args.dbname, args.iters, int((end - start) * 1e9)])
+    brad = BradServer(config, schema)
+    asyncio.run(run_brad_experiment(args, brad, out_dir))
 
 
 if __name__ == "__main__":

@@ -62,7 +62,7 @@ class BradServer(BradInterface):
 
     async def serve_forever(self):
         try:
-            await self._run_setup()
+            await self.run_setup()
             daemon_acceptor = await AsyncConnectionAcceptor.create(
                 host=self._config.server_interface,
                 port=self._config.server_daemon_port,
@@ -85,16 +85,16 @@ class BradServer(BradInterface):
             # gRPC's internal shutdown process completes before we return from
             # this method.
             grpc_server.__del__()
-            await self._run_teardown()
+            await self.run_teardown()
             logger.info("The BRAD server has shut down.")
 
-    async def _run_setup(self):
+    async def run_setup(self):
         await self._data_sync_mgr.establish_connections()
         if self._config.data_sync_period_seconds > 0:
             loop = asyncio.get_event_loop()
             self._timed_sync_task = loop.create_task(self._run_sync_periodically())
 
-    async def _run_teardown(self):
+    async def run_teardown(self):
         if self._timed_sync_task is not None:
             await self._timed_sync_task.close()
             self._timed_sync_task = None
