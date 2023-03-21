@@ -1,7 +1,7 @@
-import socket
 import time
 
 import brad
+from brad.grpc_client import BradGrpcClient, BradClientError
 
 
 def register_command(subparsers):
@@ -27,31 +27,47 @@ def register_command(subparsers):
 def main(args):
     print("BRAD Interactive CLI v{}".format(brad.__version__))
     print()
-    print("Sending queries to BRAD at {}:{}.".format(args.host, args.port))
-    print("Terminate all SQL queries with a semicolon (;). Hit Ctrl-D to exit.")
-    print()
+    print("Connecting to BRAD at {}:{}...".format(args.host, args.port))
 
-    while True:
-        # Allow multiline input.
-        try:
-            pieces = []
-            pieces.append(input(">>> ").strip())
-            while not pieces[-1].endswith(";"):
-                pieces.append(input("--> "))
-            query = " ".join(pieces)
-        except (EOFError, KeyboardInterrupt):
-            break
-
-        req_socket = socket.create_connection((args.host, args.port))
-        with req_socket.makefile("rw") as io:
-            start = time.time()
-            print(query, file=io, flush=True)
-            # Wait for and print the results.
-            print()
-            for line in io:
-                print(line, end="")
-            end = time.time()
-            print()
-            print("Took {:.3f} seconds.".format(end - start))
-        req_socket.close()
+    with BradGrpcClient(args.host, args.port) as client:
+        session_id = client.start_session()
+        print("Connected!")
         print()
+        print("Terminate all SQL queries with a semicolon (;). Hit Ctrl-D to exit.")
+        print()
+
+        try:
+            while True:
+                # Allow multiline input.
+                pieces = []
+                pieces.append(input(">>> ").strip())
+                while not pieces[-1].endswith(";"):
+                    pieces.append(input("--> "))
+                query = " ".join(pieces)
+
+                try:
+                    # Dispatch query and print results. We buffer the whole result
+                    # set in memory to get a reasonable estimate of the query
+                    # execution time (including network overheads).
+                    encoded_rows = []
+                    start = time.time()
+                    encoded_row_stream = client.run_query(session_id, query)
+                    for encoded_row in encoded_row_stream:
+                        encoded_rows.append(encoded_row)
+                    end = time.time()
+
+                    for encoded_row in encoded_rows:
+                        print(encoded_row.decode())
+                    print()
+                    print("Took {:.3f} seconds.".format(end - start))
+                    print()
+                except BradClientError as ex:
+                    print()
+                    print("Query resulted in an error:")
+                    print(ex.message())
+                    print()
+
+        except (EOFError, KeyboardInterrupt):
+            pass
+        finally:
+            client.end_session(session_id)

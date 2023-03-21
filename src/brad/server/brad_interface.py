@@ -1,5 +1,5 @@
 from typing import AsyncIterable
-from brad.server.session import SessionId
+from brad.config.session import SessionId
 
 
 class BradInterface:

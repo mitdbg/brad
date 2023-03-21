@@ -1,27 +1,18 @@
+import logging
 from typing import Dict, Tuple, Optional
 
 from brad.config.file import ConfigFile
+from brad.config.session import SessionId
 from .engine_connections import EngineConnections
 
-
-class SessionId:
-    def __init__(self, id_value: int):
-        self._session_id = id_value
-
-    def __repr__(self) -> str:
-        return str(self._session_id)
-
-    def value(self) -> int:
-        """
-        Meant for serialization only.
-        """
-        return self._session_id
+logger = logging.getLogger(__name__)
 
 
 class Session:
     """
-    Stores session-specific state. Each session has its own connections to the
-    underlying engines. Create instances using `SessionManager`.
+    Stores session-specific state (on the server). Each session has its own
+    connections to the underlying engines. Create instances using
+    `SessionManager`.
     """
 
     def __init__(self, session_id: SessionId, engines: EngineConnections):
@@ -47,11 +38,13 @@ class SessionManager:
         self._sessions: Dict[SessionId, Session] = {}
 
     async def create_new_session(self) -> Tuple[SessionId, Session]:
+        logger.debug("Creating a new session...")
         session_id = SessionId(self._next_id_value)
         self._next_id_value += 1
         connections = await EngineConnections.connect(self._config)
         session = Session(session_id, connections)
         self._sessions[session_id] = session
+        logger.debug("Established a new session: %s", session_id)
         return (session_id, session)
 
     def get_session(self, session_id: SessionId) -> Optional[Session]:
@@ -62,4 +55,5 @@ class SessionManager:
     async def end_session(self, session_id: SessionId):
         session = self._sessions[session_id]
         await session.close()
+        logger.debug("Ended session %s", session_id)
         del self._sessions[session_id]

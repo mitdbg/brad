@@ -2,9 +2,9 @@ from typing import AsyncIterable
 
 import brad.grpc_gen.brad_pb2 as b
 import brad.grpc_gen.brad_pb2_grpc as rpc
+from brad.config.session import SessionId
 from brad.server.brad_interface import BradInterface
 from brad.server.errors import QueryError
-from brad.server.session import SessionId
 
 # pylint: disable=no-member
 # See https://github.com/protocolbuffers/protobuf/issues/10372
@@ -36,6 +36,9 @@ class BradGrpc(rpc.BradServicer):
         except QueryError as ex:
             yield b.RunQueryResponse(error=b.QueryError(error_msg=str(ex)))
 
-    async def EndSession(self, request: b.EndSessionRequest, _context) -> None:
+    async def EndSession(
+        self, request: b.EndSessionRequest, _context
+    ) -> b.EndSessionResponse:
         session_id = SessionId(request.id.id_value)
-        return await self._brad.end_session(session_id)
+        await self._brad.end_session(session_id)
+        return b.EndSessionResponse()
