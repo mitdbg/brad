@@ -1,10 +1,12 @@
 import asyncio
 import logging
-from typing import List, Optional, Tuple
+from typing import AsyncIterable, List, Optional, Tuple
 
+import grpc
 import pyodbc
 import sqlglot
 
+import brad.grpc_gen.brad_pb2_grpc as brad_grpc
 from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
 from brad.config.routing_policy import RoutingPolicy
@@ -13,7 +15,10 @@ from brad.config.schema import Schema
 from brad.cost_model.always_one import AlwaysOneCostModel
 from brad.cost_model.model import CostModel, RoundRobinCostModel
 from brad.data_sync.manager import DataSyncManager
-from brad.server.session import SessionManager, Session
+from brad.server.brad_interface import BradInterface
+from brad.server.errors import QueryError
+from brad.server.grpc import BradGrpc
+from brad.server.session import SessionManager, Session, SessionId
 from brad.forecasting.forecaster import WorkloadForecaster
 from brad.net.async_connection_acceptor import AsyncConnectionAcceptor
 
@@ -26,7 +31,7 @@ _UPDATE_SEQ_EXPR = sqlglot.parse_one(
 LINESEP = "\n".encode()
 
 
-class BradServer:
+class BradServer(BradInterface):
     def __init__(self, config: ConfigFile, schema: Schema):
         self._config = config
         self._schema = schema
@@ -64,19 +69,33 @@ class BradServer:
             frontend_acceptor = await AsyncConnectionAcceptor.create(
                 host=self._config.server_interface,
                 port=self._config.server_port,
-                handler_function=self._handle_request,
+                handler_function=self._handle_raw_request,
             )
             daemon_acceptor = await AsyncConnectionAcceptor.create(
                 host=self._config.server_interface,
                 port=self._config.server_daemon_port,
                 handler_function=self._handle_new_daemon_connection,
             )
+            grpc_server = grpc.aio.server()
+            brad_grpc.add_BradServicer_to_server(BradGrpc(self), grpc_server)
+            grpc_server.add_insecure_port(
+                "{}:{}".format(
+                    self._config.server_interface, self._config.server_port + 1
+                )
+            )
+            await grpc_server.start()
             logger.info("The BRAD server has successfully started.")
             logger.info("Listening on port %d.", self._config.server_port)
             await asyncio.gather(
-                frontend_acceptor.serve_forever(), daemon_acceptor.serve_forever()
+                frontend_acceptor.serve_forever(),
+                daemon_acceptor.serve_forever(),
+                grpc_server.wait_for_termination(),
             )
         finally:
+            # Not ideal, but we need to manually call this method to ensure
+            # gRPC's internal shutdown process completes before we return from
+            # this method.
+            grpc_server.__del__()
             await self._run_teardown()
             logger.info("The BRAD server has shut down.")
 
@@ -109,9 +128,10 @@ class BradServer:
         logger.debug("Accepted new daemon connection.")
         self._daemon_connections.append((reader, writer))
 
-    async def _handle_request(
+    async def _handle_raw_request(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
+        # NOTE: This exists for transition purposes - it will be removed.
         # Simple protocol (the intention is that we replace this with ODBC or a
         # Postgres wire protocol compatible server):
         # - Client establishes a new connection for each request.
@@ -127,81 +147,91 @@ class BradServer:
             # and the semicolon.
             raw_sql_query = await reader.readline()
             sql_query = raw_sql_query.decode().strip()[:-1]
-            logger.debug("Received query: %s", sql_query)
+            logger.debug("Received query from raw interface: %s", sql_query)
+            assert self._the_session is not None
+            session_id = self._the_session.identifier
+            async for out_row in self.run_query(session_id, sql_query):
+                writer.write(out_row)
+                writer.write(LINESEP)
+            await writer.drain()
 
-            # Route and run the request.
-            cursor = await self._handle_request_internal(sql_query, writer)
-
-            # Extract and transmit the results, if any.
-            if cursor is not None:
-                try:
-                    num_rows = 0
-                    while True:
-                        row = await cursor.fetchone()
-                        if row is None:
-                            break
-                        writer.write(" | ".join(map(str, row)).encode())
-                        writer.write(LINESEP)
-                        num_rows += 1
-                    await writer.drain()
-                    logger.debug("Responded with %d rows.", num_rows)
-                except pyodbc.ProgrammingError:
-                    logger.debug("No rows produced.")
-
+        except QueryError as ex:
+            writer.write(str(ex).encode())
+            await writer.drain()
         except:  # pylint: disable=bare-except
-            logger.exception("Encountered exception when handling request.")
+            logger.exception(
+                "Encountered unexpected exception when handling raw request."
+            )
         finally:
-            # 5. Close the socket to indicate the end of the result set.
             writer.close()
             await writer.wait_closed()
 
+    async def start_session(self) -> SessionId:
+        session_id, _ = await self._sessions.create_new_session()
+        return session_id
+
+    async def end_session(self, session_id: SessionId) -> None:
+        await self._sessions.end_session(session_id)
+
+    # pylint: disable-next=invalid-overridden-method
+    async def run_query(
+        self, session_id: SessionId, query: str
+    ) -> AsyncIterable[bytes]:
+        session = self._sessions.get_session(session_id)
+        if session is None:
+            raise QueryError("Invalid session id {}".format(str(session_id)))
+
+        try:
+            # Handle internal commands separately.
+            if query.startswith("BRAD_"):
+                async for output in self._handle_internal_command(query):
+                    yield output
+                return
+
+            self._forecaster.process(query)
+
+            # 2. Predict which DBMS to use.
+            run_times = self._cost_model.predict_run_time(query)
+            db_to_use, _ = run_times.min_time_ms()
+            logger.debug("Routing '%s' to %s", query, db_to_use)
+            query = self._rewrite_query_if_needed(query, db_to_use)
+
+            # 3. Actually execute the query
+            assert self._the_session is not None
+            connection = self._the_session.engines.get_connection(db_to_use)
+            cursor = await connection.cursor()
+            try:
+                await cursor.execute(query)
+            except pyodbc.ProgrammingError as ex:
+                # Error when executing the query.
+                raise QueryError.from_exception(ex)
+
+            # Extract and return the results, if any.
+            try:
+                num_rows = 0
+                while True:
+                    row = await cursor.fetchone()
+                    if row is None:
+                        break
+                    num_rows += 1
+                    yield " | ".join(map(str, row)).encode()
+                logger.debug("Responded with %d rows.", num_rows)
+            except pyodbc.ProgrammingError:
+                logger.debug("No rows produced.")
+
+        except Exception as ex:
+            logger.exception("Encountered unexpected exception when handling request.")
+            raise QueryError.from_exception(ex)
+
         # NOTE: What we do here depends on the needs of the background daemon.
-        if sql_query is not None:
+        if query is not None:
             try:
                 for _, daemon_writer in self._daemon_connections:
-                    daemon_writer.write(str(sql_query).encode())
+                    daemon_writer.write(str(query).encode())
                     daemon_writer.write(LINESEP)
                     await daemon_writer.drain()
             except:  # pylint: disable=bare-except
                 logger.exception("Exception when sending the query to the daemon.")
-
-    async def _handle_request_internal(
-        self, sql_query: str, writer: asyncio.StreamWriter
-    ):
-        """
-        The actual query handling logic should appear in this method. We keep
-        this logic separate from `_handle_request()` to allow for benchmarking
-        query routing overhead while excluding socket communication latency.
-        """
-        # Handle internal commands separately.
-        if sql_query.startswith("BRAD_"):
-            await self._handle_internal_command(sql_query, writer)
-            return
-
-        self._forecaster.process(sql_query)
-
-        # 2. Predict which DBMS to use.
-        run_times = self._cost_model.predict_run_time(sql_query)
-        db_to_use, _ = run_times.min_time_ms()
-        logger.debug("Routing '%s' to %s", sql_query, db_to_use)
-        sql_query = self._rewrite_query_if_needed(sql_query, db_to_use)
-
-        # 3. Actually execute the query
-        assert self._the_session is not None
-        connection = self._the_session.engines.get_connection(db_to_use)
-        cursor = await connection.cursor()
-        try:
-            await cursor.execute(sql_query)
-        except pyodbc.ProgrammingError as ex:
-            # Error when executing the query.
-            writer.write(str(ex).encode())
-            writer.write(LINESEP)
-            logger.debug("Query failed with exception %s", str(ex))
-            await writer.drain()
-            return
-
-        # 4. Return the cursor for results extraction.
-        return cursor
 
     def _rewrite_query_if_needed(self, sql_query: str, db_to_use: DBType) -> str:
         if db_to_use != DBType.Aurora:
@@ -226,9 +256,7 @@ class BradServer:
         # columns). But it is a bit cumbersome to do.
         return sql_query
 
-    async def _handle_internal_command(
-        self, command: str, writer: asyncio.StreamWriter
-    ):
+    async def _handle_internal_command(self, command: str) -> AsyncIterable[bytes]:
         """
         This method is used to handle BRAD_ prefixed "queries" (i.e., commands
         to run custom functionality like syncing data across the engines).
@@ -236,16 +264,15 @@ class BradServer:
         if command == "BRAD_SYNC":
             logger.debug("Manually triggered a data sync.")
             await self._data_sync_mgr.run_sync()
-            writer.write("Sync succeeded.".encode())
+            yield "Sync succeeded.".encode()
+
         elif command == "BRAD_FORECAST":
             logger.debug("Manually triggered a workload forecast.")
             self._forecaster.forecast()
-            writer.write("Forecast succeeded.".encode())
+            yield "Forecast succeeded.".encode()
+
         else:
-            writer.write("Unknown internal command:".encode())
-            writer.write(command.encode())
-        writer.write(LINESEP)
-        await writer.drain()
+            yield "Unknown internal command: {}".format(command).encode()
 
     async def _run_sync_periodically(self):
         while True:

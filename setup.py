@@ -27,6 +27,7 @@ ENTRY_POINTS = {
 
 INSTALL_REQUIRES = [
     "aioodbc",
+    "grpcio",
     "pyodbc",
     "pyyaml",
     "sqlglot",
@@ -34,9 +35,11 @@ INSTALL_REQUIRES = [
 
 DEV_REQUIRES = [
     "black",
+    "grpcio-tools",
     "mypy",
     "pylint",
     "types-PyYAML",
+    "types-protobuf",
 ]
 
 KEYWORDS = []
