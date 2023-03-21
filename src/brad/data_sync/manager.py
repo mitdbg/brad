@@ -110,6 +110,7 @@ class DataSyncManager:
         self._athena: Any = None
 
     async def establish_connections(self):
+        logger.debug("Data sync manager establishing engine connections...")
         # This class maintains its own connections because it has different
         # isolation level and autocommit requirements.
         self._aurora = await aioodbc.connect(
@@ -127,9 +128,12 @@ class DataSyncManager:
         )
 
     async def close(self):
-        await self._aurora.close()
-        await self._redshift.close()
-        await self._athena.close()
+        if self._aurora is not None:
+            await self._aurora.close()
+        if self._redshift is not None:
+            await self._redshift.close()
+        if self._athena is not None:
+            await self._athena.close()
 
     async def run_sync(self):
         # NOTE: This implementation assumes that at most one sync is running at

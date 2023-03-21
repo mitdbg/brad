@@ -47,7 +47,9 @@ async def shutdown_server(event_loop):
 def handle_exception(event_loop, context):
     message = context.get("exception", context["message"])
     logging.error("Encountered fatal exception: %s", message)
-    asyncio.create_task(shutdown_server(event_loop))
+    if event_loop.is_closed():
+        return
+    event_loop.create_task(shutdown_server(event_loop))
 
 
 def main(args):

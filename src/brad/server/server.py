@@ -78,7 +78,11 @@ class BradServer(BradInterface):
             )
             grpc_server = grpc.aio.server()
             brad_grpc.add_BradServicer_to_server(BradGrpc(self), grpc_server)
-            grpc_server.add_insecure_port(str(self._config.server_port + 1))
+            grpc_server.add_insecure_port(
+                "{}:{}".format(
+                    self._config.server_interface, self._config.server_port + 1
+                )
+            )
             await grpc_server.start()
             logger.info("The BRAD server has successfully started.")
             logger.info("Listening on port %d.", self._config.server_port)
@@ -88,6 +92,10 @@ class BradServer(BradInterface):
                 grpc_server.wait_for_termination(),
             )
         finally:
+            # Not ideal, but we need to manually call this method to ensure
+            # gRPC's internal shutdown process completes before we return from
+            # this method.
+            grpc_server.__del__()
             await self._run_teardown()
             logger.info("The BRAD server has shut down.")
 
