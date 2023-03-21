@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import AsyncIterable, List, Optional, Tuple
+from typing import AsyncIterable, List, Tuple
 
 import grpc
 import pyodbc
@@ -18,7 +18,7 @@ from brad.data_sync.manager import DataSyncManager
 from brad.server.brad_interface import BradInterface
 from brad.server.errors import QueryError
 from brad.server.grpc import BradGrpc
-from brad.server.session import SessionManager, Session, SessionId
+from brad.server.session import SessionManager, SessionId
 from brad.forecasting.forecaster import WorkloadForecaster
 from brad.net.async_connection_acceptor import AsyncConnectionAcceptor
 
@@ -53,9 +53,6 @@ class BradServer(BradInterface):
             )
 
         self._sessions = SessionManager(self._config)
-        # NOTE: This is temporary - we will support multiple concurrent sessions.
-        self._the_session: Optional[Session] = None
-
         self._daemon_connections: List[
             Tuple[asyncio.StreamReader, asyncio.StreamWriter]
         ] = []
@@ -65,12 +62,7 @@ class BradServer(BradInterface):
 
     async def serve_forever(self):
         try:
-            await self._run_setup()
-            frontend_acceptor = await AsyncConnectionAcceptor.create(
-                host=self._config.server_interface,
-                port=self._config.server_port + 1,
-                handler_function=self._handle_raw_request,
-            )
+            await self.run_setup()
             daemon_acceptor = await AsyncConnectionAcceptor.create(
                 host=self._config.server_interface,
                 port=self._config.server_daemon_port,
@@ -85,33 +77,27 @@ class BradServer(BradInterface):
             logger.info("The BRAD server has successfully started.")
             logger.info("Listening on port %d.", self._config.server_port)
             await asyncio.gather(
-                frontend_acceptor.serve_forever(),
-                daemon_acceptor.serve_forever(),
                 grpc_server.wait_for_termination(),
+                daemon_acceptor.serve_forever(),
             )
         finally:
             # Not ideal, but we need to manually call this method to ensure
             # gRPC's internal shutdown process completes before we return from
             # this method.
             grpc_server.__del__()
-            await self._run_teardown()
+            await self.run_teardown()
             logger.info("The BRAD server has shut down.")
 
-    async def _run_setup(self):
+    async def run_setup(self):
         await self._data_sync_mgr.establish_connections()
-        _, self._the_session = await self._sessions.create_new_session()
         if self._config.data_sync_period_seconds > 0:
             loop = asyncio.get_event_loop()
             self._timed_sync_task = loop.create_task(self._run_sync_periodically())
 
-    async def _run_teardown(self):
+    async def run_teardown(self):
         if self._timed_sync_task is not None:
             await self._timed_sync_task.close()
             self._timed_sync_task = None
-
-        if self._the_session is not None:
-            await self._sessions.end_session(self._the_session.identifier)
-            self._the_session = None
 
         for _, writer in self._daemon_connections:
             writer.close()
@@ -125,44 +111,6 @@ class BradServer(BradInterface):
     ):
         logger.debug("Accepted new daemon connection.")
         self._daemon_connections.append((reader, writer))
-
-    async def _handle_raw_request(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-    ):
-        # NOTE: This exists for transition purposes - it will be removed.
-        # Simple protocol (the intention is that we replace this with ODBC or a
-        # Postgres wire protocol compatible server):
-        # - Client establishes a new connection for each request.
-        # - Upon establishing a connection, it sends a SQL query terminated with
-        #   a newline character.
-        # - BRAD then routes the query to an underlying DBMS.
-        # - Upon receiving the results, the server will send the results back in
-        #   textual form.
-        # - The server closes the connection after it finishes transmitting the
-        #   results back.
-        try:
-            # Receive the SQL query and strip all trailing white space
-            # and the semicolon.
-            raw_sql_query = await reader.readline()
-            sql_query = raw_sql_query.decode().strip()[:-1]
-            logger.debug("Received query from raw interface: %s", sql_query)
-            assert self._the_session is not None
-            session_id = self._the_session.identifier
-            async for out_row in self.run_query(session_id, sql_query):
-                writer.write(out_row)
-                writer.write(LINESEP)
-            await writer.drain()
-
-        except QueryError as ex:
-            writer.write(str(ex).encode())
-            await writer.drain()
-        except:  # pylint: disable=bare-except
-            logger.exception(
-                "Encountered unexpected exception when handling raw request."
-            )
-        finally:
-            writer.close()
-            await writer.wait_closed()
 
     async def start_session(self) -> SessionId:
         session_id, _ = await self._sessions.create_new_session()
@@ -195,8 +143,7 @@ class BradServer(BradInterface):
             query = self._rewrite_query_if_needed(query, db_to_use)
 
             # 3. Actually execute the query
-            assert self._the_session is not None
-            connection = self._the_session.engines.get_connection(db_to_use)
+            connection = session.engines.get_connection(db_to_use)
             cursor = await connection.cursor()
             try:
                 await cursor.execute(query)

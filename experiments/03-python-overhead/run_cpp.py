@@ -1,8 +1,8 @@
 import argparse
 import subprocess
 
-from iohtap.config.file import ConfigFile
-from iohtap.config.dbtype import DBType
+from brad.config.file import ConfigFile
+from brad.config.dbtype import DBType
 
 
 def main():
