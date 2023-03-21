@@ -68,7 +68,7 @@ class BradServer(BradInterface):
             await self._run_setup()
             frontend_acceptor = await AsyncConnectionAcceptor.create(
                 host=self._config.server_interface,
-                port=self._config.server_port,
+                port=self._config.server_port + 1,
                 handler_function=self._handle_raw_request,
             )
             daemon_acceptor = await AsyncConnectionAcceptor.create(
@@ -79,9 +79,7 @@ class BradServer(BradInterface):
             grpc_server = grpc.aio.server()
             brad_grpc.add_BradServicer_to_server(BradGrpc(self), grpc_server)
             grpc_server.add_insecure_port(
-                "{}:{}".format(
-                    self._config.server_interface, self._config.server_port + 1
-                )
+                "{}:{}".format(self._config.server_interface, self._config.server_port)
             )
             await grpc_server.start()
             logger.info("The BRAD server has successfully started.")
@@ -202,7 +200,7 @@ class BradServer(BradInterface):
             cursor = await connection.cursor()
             try:
                 await cursor.execute(query)
-            except pyodbc.ProgrammingError as ex:
+            except (pyodbc.ProgrammingError, pyodbc.Error) as ex:
                 # Error when executing the query.
                 raise QueryError.from_exception(ex)
 
@@ -219,6 +217,10 @@ class BradServer(BradInterface):
             except pyodbc.ProgrammingError:
                 logger.debug("No rows produced.")
 
+        except QueryError:
+            # This is an expected exception. We catch and re-raise it here to
+            # avoid triggering the handler below.
+            raise
         except Exception as ex:
             logger.exception("Encountered unexpected exception when handling request.")
             raise QueryError.from_exception(ex)

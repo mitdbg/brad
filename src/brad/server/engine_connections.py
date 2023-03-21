@@ -23,7 +23,9 @@ class EngineConnections:
         """
 
         # As the system gets more sophisticated, we'll add connection pooling, etc.
-        logger.info("Establishing connections to the underlying database systems...")
+        logger.debug(
+            "Establishing a new set of connections to the underlying engines..."
+        )
         logger.debug("Connecting to Athena...")
         athena = await aioodbc.connect(
             dsn=config.get_odbc_connection_string(DBType.Athena), autocommit=autocommit
@@ -50,7 +52,9 @@ class EngineConnections:
         """
 
         # As the system gets more sophisticated, we'll add connection pooling, etc.
-        logger.info("Establishing connections to the underlying database systems...")
+        logger.debug(
+            "Establishing a new set of connections to the underlying engines..."
+        )
         logger.debug("Connecting to Athena...")
         athena = pyodbc.connect(
             config.get_odbc_connection_string(DBType.Athena), autocommit=autocommit
