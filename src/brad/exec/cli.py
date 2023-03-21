@@ -30,7 +30,6 @@ def main(args):
     print("Connecting to BRAD at {}:{}...".format(args.host, args.port))
 
     with BradGrpcClient(args.host, args.port) as client:
-        session_id = client.start_session()
         print("Connected!")
         print()
         print("Terminate all SQL queries with a semicolon (;). Hit Ctrl-D to exit.")
@@ -51,7 +50,7 @@ def main(args):
                     # execution time (including network overheads).
                     encoded_rows = []
                     start = time.time()
-                    encoded_row_stream = client.run_query(session_id, query)
+                    encoded_row_stream = client.run_query(query)
                     for encoded_row in encoded_row_stream:
                         encoded_rows.append(encoded_row)
                     end = time.time()
@@ -69,5 +68,3 @@ def main(args):
 
         except (EOFError, KeyboardInterrupt):
             pass
-        finally:
-            client.end_session(session_id)

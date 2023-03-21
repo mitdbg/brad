@@ -11,16 +11,66 @@ from brad.config.session import SessionId
 
 class BradGrpcClient:
     """
-    A wrapper over BRAD's gRPC stub, to simplify programmatic access through Python.
+    A client that communicates with BRAD over its gRPC interface.
+
+    Usage:
+    ```
+    with BradGrpcClient(host, port) as client:
+        for row in client.run_query(session_id, "SELECT 1"):
+            print(row)
+    ```
+    """
+
+    def __init__(self, host: str, port: int):
+        self._impl = BradRawGrpcClient(host, port)
+        self._session_id: Optional[SessionId] = None
+
+    def __enter__(self):
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+    def connect(self):
+        self._impl.connect()
+        self._session_id = self._impl.start_session()
+
+    def close(self):
+        assert self._session_id is not None
+        self._impl.end_session(self._session_id)
+        self._impl.close()
+        self._session_id = None
+
+    def run_query(self, query: str) -> Generator[bytes, None, None]:
+        """
+        Send a query to BRAD. The query result will come back row-by-row in
+        encoded form. For simplicity, each row is currently encoded as a UTF-8
+        string (meant only for printing to the screen).
+        """
+        assert self._session_id is not None
+        for row in self._impl.run_query(self._session_id, query):
+            yield row
+
+
+class BradRawGrpcClient:
+    """
+    A wrapper over BRAD's gRPC stub, to simplify programmatic access through
+    Python.
+
+    This client is a thin wrapper over the gRPC stub. For application
+    development, you will probably want to use the `BradGrpcClient` above.
 
     Methods on this client are synchronous.
 
     Usage:
-      with BradGrpcClient(host, port) as client:
-          session_id = client.start_session()
-          for row in client.run_query(session_id, "SELECT 1"):
-              print(row)
-          client.end_session(session_id)
+    ```
+    with BradGrpcClient(host, port) as client:
+        session_id = client.start_session()
+        for row in client.run_query(session_id, "SELECT 1"):
+            print(row)
+        client.end_session(session_id)
+    ```
     """
 
     def __init__(self, host: str, port: int):
