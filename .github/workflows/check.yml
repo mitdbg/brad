@@ -28,7 +28,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install IOHTAP (development mode)
+    - name: Install BRAD (development mode)
       run: ./tools/install-dev.sh --ci
       if: success() || failure()
 
@@ -42,4 +42,8 @@ jobs:
 
     - name: Type Check (mypy)
       run: ./tools/check-code.sh types
+      if: success() || failure()
+
+    - name: Run Tests (pytest)
+      run: pytest
       if: success() || failure()

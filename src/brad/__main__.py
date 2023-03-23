@@ -27,6 +27,7 @@ def main():
 
     if args.version:
         print("BRAD", brad.__version__)
+        return
 
     if "func" not in args:
         parser.print_help()

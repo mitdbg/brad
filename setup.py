@@ -38,6 +38,7 @@ DEV_REQUIRES = [
     "grpcio-tools",
     "mypy",
     "pylint",
+    "pytest",
     "types-PyYAML",
     "types-protobuf",
 ]
