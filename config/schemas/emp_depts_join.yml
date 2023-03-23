@@ -1,0 +1,114 @@
+database_name: emp_depts_join
+
+# Use PostgreSQL data types. Make sure the data type is supported in Athena too.
+tables:
+  - table_name: employees
+    columns:
+      - name: e_id
+        data_type: BIGINT
+        primary_key: true
+      - name: e_full_name
+        data_type: TEXT
+      - name: e_salary
+        data_type: BIGINT
+      - name: e_d_id
+        data_type: BIGINT
+
+  - table_name: departments
+    columns:
+      - name: d_id
+        data_type: BIGINT
+        primary_key: true
+      - name: d_name
+        data_type: TEXT
+      - name: d_cost_center
+        data_type: INT
+
+  - table_name: emp_depts
+    columns:
+      - name: e_id
+        data_type: BIGINT
+        primary_key: true
+      - name: d_id
+        data_type: BIGINT
+        primary_key: true
+      - name: e_full_name
+        data_type: TEXT
+      - name: e_salary
+        data_type: BIGINT
+      - name: d_name
+        data_type: TEXT
+      - name: d_cost_center
+        data_type: INT
+
+    dependencies:
+      - employees
+      - departments
+
+    transform: |
+      -- Implicit "input" tables:
+      -- departments_inserts
+      -- departments_deletes
+      -- employees_inserts
+      -- employees_deletes
+      --
+      -- Implicit "output" tables:
+      -- emp_depts_deletes
+      -- emp_depts_inserts
+      --
+      -- Other tables that can be read:
+      -- departments
+      -- employees
+      -- emp_depts
+
+      -- Remove rows that would no longer match.
+      INSERT INTO emp_depts_deletes
+        SELECT
+          e_id,
+          d_id
+        FROM emp_depts
+        WHERE
+          e_id IN (SELECT e_id FROM employees_deletes)
+          OR d_id IN (SELECT d_id FROM departments_deletes);
+
+      -- Incrementally update the join.
+      INSERT INTO emp_depts_inserts
+        SELECT
+          e_id,
+          d_id,
+          e_full_name,
+          e_salary,
+          d_name
+        FROM
+          employees_inserts,
+          departments_inserts
+        WHERE
+          e_d_id = e_id;
+
+      INSERT INTO emp_depts_inserts
+        SELECT
+          e_id,
+          d_id,
+          e_full_name,
+          e_salary,
+          d_name,
+          d_cost_center
+        FROM
+          employees,
+          departments_inserts
+        WHERE
+          e_d_id = e_id;
+
+      INSERT INTO emp_depts_inserts
+        SELECT
+          e_id,
+          d_id,
+          e_full_name,
+          e_salary,
+          d_name,
+          d_cost_center
+        FROM
+          employees_inserts,
+          departments
+        WHERE
+          e_d_id = e_id;
