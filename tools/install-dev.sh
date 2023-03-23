@@ -23,5 +23,5 @@ if [ "$1" == "--virtualenv" ]; then
   fi
 fi
 
-pip3 install --editable ".[dev]"
+pip3 install --prefix $HOME/.local/ --editable ".[dev]"
 echo_green "✓ Done"

@@ -43,3 +43,7 @@ jobs:
     - name: Type Check (mypy)
       run: ./tools/check-code.sh types
       if: success() || failure()
+
+    - name: Run Tests (pytest)
+      run: pytest
+      if: success() || failure()
