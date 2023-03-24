@@ -44,7 +44,7 @@ BRAD expects to be given your schema up front. You must also use the BRAD
 administrative tools `brad admin` to set up the tables across all the
 underlying engines.
 
-- Create a schema file (see `config/test_schema.yml` for an example). Use
+- Create a schema file (see `config/schemas/test_schema.yml` for an example). Use
   PostgreSQL data types.
 - Run `brad admin set_up_tables --config-file path/to/config.yml --schema-file
   path/to/your/schema.yml` to set up the tables across the underlying engines.

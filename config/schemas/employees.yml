@@ -1,0 +1,75 @@
+database_name: employees
+
+# Use PostgreSQL data types. Make sure the data type is supported in Athena too.
+tables:
+  - table_name: employees
+    columns:
+      - name: e_id
+        data_type: BIGINT
+        primary_key: true
+      - name: e_full_name
+        data_type: TEXT
+      - name: e_salary
+        data_type: BIGINT
+      - name: e_d_id
+        data_type: BIGINT
+
+  - table_name: employee_history
+    columns:
+      - name: e_id
+        data_type: BIGINT
+        primary_key: true
+      - name: e_valid_from
+        data_type: TIMESTAMP
+        primary_key: true
+      - name: e_full_name
+        data_type: TEXT
+      - name: e_salary
+        data_type: BIGINT
+      - name: e_valid_until
+        data_type: TIMESTAMP
+
+    dependencies:
+      - employees
+
+    transform: |
+      -- Implicit "input" tables:
+      -- employees_deletes
+      -- employees_inserts
+      --
+      -- Implicit "output" tables:
+      -- employee_history_deletes
+      -- employee_history_inserts
+      --
+      -- Other tables that can be read:
+      -- employees
+      -- employee_history
+
+      INSERT INTO employee_history_inserts
+        SELECT
+          e_id,
+          e_valid_from,
+          e_full_name,
+          e_salary,
+          GETDATE() AS e_valid_until
+        FROM employee_history
+        WHERE
+          e_id IN (SELECT e_id FROM employees_deletes)
+          AND e_valid_until IS NULL;
+
+      INSERT INTO employee_history_deletes
+        SELECT e_id, e_valid_from FROM employee_history_inserts;
+
+      INSERT INTO employee_history_inserts (
+        e_id,
+        e_valid_from,
+        e_full_name,
+        e_salary
+      )
+        SELECT
+          e_id,
+          GETDATE() AS e_valid_from,
+          e_full_name,
+          e_salary
+        FROM
+          employee_inserts;
