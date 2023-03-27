@@ -1,19 +1,7 @@
 from .location import Location
-from .table import TableSchema, TableLocation
+from .table import TableSchema, TableLocation, TableDependency
 
-from typing import Dict, List, Optional
-
-
-class TableDependency:
-    def __init__(
-        self,
-        sources: List[TableLocation],
-        target: TableLocation,
-        transform: Optional[str],
-    ):
-        self._sources = sources
-        self._target = target
-        self._transform = transform
+from typing import Dict, List
 
 
 class DataBlueprint:

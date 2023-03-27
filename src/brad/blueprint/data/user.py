@@ -1,7 +1,7 @@
 import yaml
 
 from .table import Column, UserProvidedTable
-from typing import List
+from typing import List, Set
 
 
 class UserProvidedDataBlueprint:
@@ -16,10 +16,17 @@ class UserProvidedDataBlueprint:
     """
 
     @classmethod
-    def load_from_yaml_file(cls, path: str):
+    def load_from_yaml_file(cls, path: str) -> "UserProvidedDataBlueprint":
         with open(path, "r", encoding="UTF-8") as file:
             raw_yaml = yaml.load(file, Loader=yaml.Loader)
+        return cls._load_from_raw_yaml(raw_yaml)
 
+    @classmethod
+    def load_from_yaml_str(cls, yaml_str: str) -> "UserProvidedDataBlueprint":
+        return cls._load_from_raw_yaml(yaml.load(yaml_str, Loader=yaml.Loader))
+
+    @classmethod
+    def _load_from_raw_yaml(cls, raw_yaml) -> "UserProvidedDataBlueprint":
         tables: List[UserProvidedTable] = []
         for raw_table in raw_yaml["tables"]:
             table_name = raw_table["table_name"]
@@ -43,6 +50,41 @@ class UserProvidedDataBlueprint:
     @property
     def tables(self) -> List[UserProvidedTable]:
         return self._tables
+
+    def validate(self) -> None:
+        """
+        Checks the user-declared tables and ensures that there are (i) no
+        dependency cycles, and (ii) no dependencies on undeclared tables.
+        """
+
+        tables_by_name = {tbl.name: tbl for tbl in self.tables}
+        checked: Set[str] = set()
+        curr_path: Set[str] = set()
+
+        # Recursively checks for circular dependencies.
+        def check_deps(table: UserProvidedTable):
+            if table.name in checked:
+                return
+            if table.name in curr_path:
+                raise RuntimeError(
+                    "Detected dependency cycle involving '{}'.".format(table.name)
+                )
+            curr_path.add(table.name)
+
+            for dep in table.table_dependencies:
+                if dep not in tables_by_name:
+                    raise RuntimeError(
+                        "Table '{}' depends on undeclared table '{}'".format(
+                            table.name, dep
+                        )
+                    )
+                check_deps(tables_by_name[dep])
+
+            curr_path.remove(table.name)
+            checked.add(table.name)
+
+        for tbl in self.tables:
+            check_deps(tbl)
 
     @staticmethod
     def _parse_column(raw_column) -> Column:

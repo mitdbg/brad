@@ -77,6 +77,9 @@ class UserProvidedTable(TableSchema):
     def transform_text(self) -> Optional[str]:
         return self._transform_text
 
+    def as_schema(self) -> TableSchema:
+        return self
+
 
 class TableLocation:
     """
@@ -95,3 +98,15 @@ class TableLocation:
     @property
     def location(self) -> Location:
         return self._location
+
+
+class TableDependency:
+    def __init__(
+        self,
+        sources: List[TableLocation],
+        target: TableLocation,
+        transform: Optional[str],
+    ):
+        self._sources = sources
+        self._target = target
+        self._transform = transform
