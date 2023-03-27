@@ -74,6 +74,8 @@ def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> DataBlueprint:
         # This table will be replicated on Redshift and S3.
         redshift_tbl = TableLocation(user_table.name, Location.Redshift)
         s3_tbl = TableLocation(user_table.name, Location.S3Iceberg)
+        locations.append(redshift_tbl)
+        locations.append(s3_tbl)
 
         # Add dependencies.
         # Heuristic: If the dependency is not a base table (e.g., a multi-hop

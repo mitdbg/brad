@@ -99,6 +99,14 @@ class TableLocation:
     def location(self) -> Location:
         return self._location
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TableLocation):
+            return False
+        return self.table_name == other.table_name and self.location == other.location
+
+    def __hash__(self) -> int:
+        return hash((self._table_name, self._location))
+
 
 class TableDependency:
     def __init__(
@@ -110,3 +118,15 @@ class TableDependency:
         self._sources = sources
         self._target = target
         self._transform = transform
+
+    @property
+    def target(self) -> TableLocation:
+        return self._target
+
+    @property
+    def sources(self) -> List[TableLocation]:
+        return self._sources
+
+    @property
+    def transform(self) -> Optional[str]:
+        return self._transform
