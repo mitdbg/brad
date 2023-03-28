@@ -35,7 +35,7 @@ message TableSchema {
 // PostgreSQL data type.
 message TableColumn {
   string name = 1;
-  string type = 2;
+  string data_type = 2;
   bool is_primary = 3;
 }
 

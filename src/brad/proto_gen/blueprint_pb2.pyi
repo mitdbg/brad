@@ -23,14 +23,14 @@ class DataBlueprint(_message.Message):
     def __init__(self, db_name: _Optional[str] = ..., table_schemas: _Optional[_Iterable[_Union[TableSchema, _Mapping]]] = ..., table_locations: _Optional[_Iterable[_Union[TableLocation, _Mapping]]] = ..., table_dependencies: _Optional[_Iterable[_Union[TableDependency, _Mapping]]] = ...) -> None: ...
 
 class TableColumn(_message.Message):
-    __slots__ = ["is_primary", "name", "type"]
+    __slots__ = ["data_type", "is_primary", "name"]
+    DATA_TYPE_FIELD_NUMBER: _ClassVar[int]
     IS_PRIMARY_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
+    data_type: str
     is_primary: bool
     name: str
-    type: str
-    def __init__(self, name: _Optional[str] = ..., type: _Optional[str] = ..., is_primary: bool = ...) -> None: ...
+    def __init__(self, name: _Optional[str] = ..., data_type: _Optional[str] = ..., is_primary: bool = ...) -> None: ...
 
 class TableDependency(_message.Message):
     __slots__ = ["sources", "target", "transform"]
