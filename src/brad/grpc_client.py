@@ -15,16 +15,15 @@ class BradGrpcClient:
 
     Usage:
     ```
-    with BradGrpcClient(host, port, database_name) as client:
+    with BradGrpcClient(host, port) as client:
         for row in client.run_query(session_id, "SELECT 1"):
             print(row)
     ```
     """
 
-    def __init__(self, host: str, port: int, database_name: str):
+    def __init__(self, host: str, port: int):
         self._impl = BradRawGrpcClient(host, port)
         self._session_id: Optional[SessionId] = None
-        self._database_name = database_name
 
     def __enter__(self):
         self.connect()
@@ -35,7 +34,7 @@ class BradGrpcClient:
 
     def connect(self):
         self._impl.connect()
-        self._session_id = self._impl.start_session(self._database_name)
+        self._session_id = self._impl.start_session()
 
     def close(self):
         assert self._session_id is not None
@@ -67,7 +66,7 @@ class BradRawGrpcClient:
     Usage:
     ```
     with BradGrpcClient(host, port) as client:
-        session_id = client.start_session(database_name)
+        session_id = client.start_session()
         for row in client.run_query(session_id, "SELECT 1"):
             print(row)
         client.end_session(session_id)
@@ -98,11 +97,9 @@ class BradRawGrpcClient:
         self._channel.close()
         self._channel = None
 
-    def start_session(self, database_name: str) -> SessionId:
+    def start_session(self) -> SessionId:
         assert self._stub is not None
-        result = self._stub.StartSession(
-            b.StartSessionRequest(database_name=database_name)
-        )
+        result = self._stub.StartSession(b.StartSessionRequest())
         return SessionId(result.id.id_value)
 
     def end_session(self, session_id: SessionId) -> None:

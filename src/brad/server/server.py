@@ -11,11 +11,11 @@ from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
 from brad.config.routing_policy import RoutingPolicy
 from brad.config.strings import AURORA_SEQ_COLUMN
-from brad.config.schema import Schema
 from brad.cost_model.always_one import AlwaysOneCostModel
 from brad.cost_model.model import CostModel, RoundRobinCostModel
 from brad.data_sync.manager import DataSyncManager
 from brad.server.brad_interface import BradInterface
+from brad.server.data_blueprint_manager import DataBlueprintManager
 from brad.server.errors import QueryError
 from brad.server.grpc import BradGrpc
 from brad.server.session import SessionManager, SessionId
@@ -32,9 +32,9 @@ LINESEP = "\n".encode()
 
 
 class BradServer(BradInterface):
-    def __init__(self, config: ConfigFile, schema: Schema):
+    def __init__(self, config: ConfigFile, schema_name: str):
         self._config = config
-        self._schema = schema
+        self._schema_name = schema_name
 
         # We have different routing policies for performance evaluation and
         # testing purposes.
@@ -52,11 +52,12 @@ class BradServer(BradInterface):
                 "Unsupported routing policy: {}".format(str(routing_policy))
             )
 
-        self._sessions = SessionManager(self._config)
+        self._data_blueprint_mgr = DataBlueprintManager(self._config, self._schema_name)
+        self._sessions = SessionManager(self._config, self._schema_name)
         self._daemon_connections: List[
             Tuple[asyncio.StreamReader, asyncio.StreamWriter]
         ] = []
-        self._data_sync_mgr = DataSyncManager(self._config, self._schema)
+        self._data_sync_mgr = DataSyncManager(self._config, self._data_blueprint_mgr)
         self._timed_sync_task = None
         self._forecaster = WorkloadForecaster()
 
@@ -89,6 +90,7 @@ class BradServer(BradInterface):
             logger.info("The BRAD server has shut down.")
 
     async def run_setup(self):
+        await self._data_blueprint_mgr.load()
         await self._data_sync_mgr.establish_connections()
         if self._config.data_sync_period_seconds > 0:
             loop = asyncio.get_event_loop()
@@ -112,8 +114,8 @@ class BradServer(BradInterface):
         logger.debug("Accepted new daemon connection.")
         self._daemon_connections.append((reader, writer))
 
-    async def start_session(self, database_name: str) -> SessionId:
-        session_id, _ = await self._sessions.create_new_session(database_name)
+    async def start_session(self) -> SessionId:
+        session_id, _ = await self._sessions.create_new_session()
         return session_id
 
     async def end_session(self, session_id: SessionId) -> None:

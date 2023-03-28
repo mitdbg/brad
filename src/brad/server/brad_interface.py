@@ -3,7 +3,7 @@ from brad.config.session import SessionId
 
 
 class BradInterface:
-    async def start_session(self, database_name: str) -> SessionId:
+    async def start_session(self) -> SessionId:
         raise NotImplementedError
 
     def run_query(self, _session_id: SessionId, _query: str) -> AsyncIterable[bytes]:

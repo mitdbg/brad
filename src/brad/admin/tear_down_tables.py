@@ -7,7 +7,6 @@ from brad.config.strings import (
     shadow_table_name,
     AURORA_EXTRACT_PROGRESS_TABLE_NAME,
 )
-from brad.config.extraction import ExtractionStrategy
 from brad.config.file import ConfigFile
 from brad.server.engine_connections import EngineConnections
 
@@ -21,12 +20,6 @@ def tear_down_tables(args):
 
     # 2. Load the config.
     config = ConfigFile(args.config_file)
-    if config.extraction_strategy != ExtractionStrategy.SequenceTrigger:
-        raise NotImplementedError(
-            "Unsupported extraction strategy: {}".format(
-                str(config.extraction_strategy)
-            )
-        )
 
     # 3. Connect to the underlying engines.
     cxns = EngineConnections.connect_sync(config, autocommit=False)

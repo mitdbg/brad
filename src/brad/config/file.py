@@ -70,9 +70,7 @@ class ConfigFile:
     def routing_policy(self) -> RoutingPolicy:
         return RoutingPolicy.from_str(self._raw["routing_policy"])
 
-    def get_odbc_connection_string(
-        self, db: DBType, database_name: Optional[str]
-    ) -> str:
+    def get_odbc_connection_string(self, db: DBType, schema_name: Optional[str]) -> str:
         if db not in self._raw:
             raise AssertionError("Unhandled database type: " + str(db))
 
@@ -85,8 +83,8 @@ class ConfigFile:
                 config["access_key"],
                 config["access_key_secret"],
             )
-            if database_name is not None:
-                cstr += "Schema={};".format(database_name)
+            if schema_name is not None:
+                cstr += "Schema={};".format(schema_name)
             return cstr
 
         elif db is DBType.Aurora or db is DBType.Redshift:
@@ -97,8 +95,13 @@ class ConfigFile:
                 config["user"],
                 config["password"],
             )
-            if database_name is not None:
-                cstr += "Database={};".format(database_name)
+            if schema_name is not None:
+                cstr += "Database={};".format(schema_name)
+            elif db is DBType.Redshift:
+                # Redshift requires a database name to be specified. As far as
+                # we know, there is always a `dev` database. We connect without
+                # a database when we are bootstrapping a new database.
+                cstr += "Database=dev;"
             return cstr
 
 

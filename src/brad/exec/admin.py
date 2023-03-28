@@ -21,10 +21,9 @@ def register_command(subparsers):
         help="Path to BRAD's configuration file.",
     )
     parser.add_argument(
-        "--schema-file",
+        "--bootstrap-schema",
         type=str,
-        required=True,
-        help="Path to the database schema.",
+        help="Path to the database schema (used for bootstrapping).",
     )
     parser.add_argument(
         "--debug",

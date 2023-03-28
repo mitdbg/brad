@@ -15,12 +15,9 @@ class Session:
     `SessionManager`.
     """
 
-    def __init__(
-        self, session_id: SessionId, engines: EngineConnections, database_name: str
-    ):
+    def __init__(self, session_id: SessionId, engines: EngineConnections):
         self._session_id = session_id
         self._engines = engines
-        self._database_name = database_name
 
     @property
     def identifier(self) -> SessionId:
@@ -30,28 +27,30 @@ class Session:
     def engines(self) -> EngineConnections:
         return self._engines
 
-    @property
-    def database_name(self) -> str:
-        return self._database_name
-
     async def close(self):
         await self._engines.close()
 
 
 class SessionManager:
-    def __init__(self, config: ConfigFile):
+    def __init__(self, config: ConfigFile, schema_name: str):
         self._config = config
         self._next_id_value = 0
         self._sessions: Dict[SessionId, Session] = {}
+        # Eventually we will allow connections to multiple underlying "schemas"
+        # (table namespaces).  There is no fundamental reason why we cannot
+        # support this - it's just unnecessary for the early stages of this
+        # project. For now we assume that we always operate against one schema
+        # and that it is provided up front when starting BRAD.
+        self._schema_name = schema_name
 
-    async def create_new_session(self, database_name: str) -> Tuple[SessionId, Session]:
-        logger.debug("Creating a new session for database '%s'...", database_name)
+    async def create_new_session(self) -> Tuple[SessionId, Session]:
+        logger.debug("Creating a new session '%s'...")
         session_id = SessionId(self._next_id_value)
         self._next_id_value += 1
-        connections = await EngineConnections.connect(self._config, database_name)
-        session = Session(session_id, connections, database_name)
+        connections = await EngineConnections.connect(self._config, self._schema_name)
+        session = Session(session_id, connections)
         self._sessions[session_id] = session
-        logger.debug("Established a new session: (%s, %s)", session_id, database_name)
+        logger.debug("Established a new session: %s", session_id)
         return (session_id, session)
 
     def get_session(self, session_id: SessionId) -> Optional[Session]:

@@ -2,14 +2,19 @@ import aioodbc
 import logging
 from typing import Any
 
+from brad.blueprint.data.table import TableSchema
+from brad.blueprint.sql_gen.table import (
+    comma_separated_column_names,
+    comma_separated_column_names_and_types,
+)
 from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
-from brad.config.schema import Schema, Table, Column
 from brad.config.strings import (
     shadow_table_name,
     imported_staging_table_name,
     imported_shadow_staging_table_name,
 )
+from brad.server.data_blueprint_manager import DataBlueprintManager
 from ._templates import (
     GET_NEXT_EXTRACT,
     GET_MAX_EXTRACT_TEMPLATE,
@@ -35,7 +40,7 @@ _MAX_SEQ = 0xFFFFFFFF_FFFFFFFF
 
 
 class _SyncContext:
-    def __init__(self, table: Table):
+    def __init__(self, table: TableSchema):
         self.table = table
 
         self.next_extract_seq = -1
@@ -99,9 +104,9 @@ class _SyncContext:
 
 
 class DataSyncManager:
-    def __init__(self, config: ConfigFile, schema: Schema):
+    def __init__(self, config: ConfigFile, data_blueprint_mgr: DataBlueprintManager):
         self._config = config
-        self._schema = schema
+        self._data_blueprint_mgr = data_blueprint_mgr
 
         # No typing information available for `pyodbc`, so we use `Any` as an
         # escape hatch.
@@ -114,17 +119,25 @@ class DataSyncManager:
         # This class maintains its own connections because it has different
         # isolation level and autocommit requirements.
         self._aurora = await aioodbc.connect(
-            dsn=self._config.get_odbc_connection_string(DBType.Aurora), autocommit=False
+            dsn=self._config.get_odbc_connection_string(
+                DBType.Aurora, self._data_blueprint_mgr.schema_name
+            ),
+            autocommit=False,
         )
         await self._aurora.execute(
             "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL REPEATABLE READ READ WRITE"
         )
         self._redshift = await aioodbc.connect(
-            dsn=self._config.get_odbc_connection_string(DBType.Redshift),
+            dsn=self._config.get_odbc_connection_string(
+                DBType.Redshift, self._data_blueprint_mgr.schema_name
+            ),
             autocommit=False,
         )
         self._athena = await aioodbc.connect(
-            dsn=self._config.get_odbc_connection_string(DBType.Athena), autocommit=False
+            dsn=self._config.get_odbc_connection_string(
+                DBType.Athena, self._data_blueprint_mgr.schema_name
+            ),
+            autocommit=False,
         )
 
     async def close(self):
@@ -141,11 +154,12 @@ class DataSyncManager:
         # to break down the extract and import steps so that the imports into
         # Redshift and Athena can run concurrently.
         logger.debug("Starting data sync...")
-        for table in self._schema.tables:
-            await self._sync_table(table)
+        blueprint = self._data_blueprint_mgr.get()
+        for table_name in blueprint.table_names():
+            await self._sync_table(blueprint.schema_for(table_name))
         logger.debug("Sync complete.")
 
-    async def _sync_table(self, table: Table):
+    async def _sync_table(self, table: TableSchema):
         aurora = await self._aurora.cursor()
         redshift = await self._redshift.cursor()
         athena = await self._athena.cursor()
@@ -214,13 +228,13 @@ class DataSyncManager:
 
     async def _export_aurora_to_s3(self, aurora, ctx: _SyncContext):
         extract_main_query = EXTRACT_FROM_MAIN_TEMPLATE.format(
-            table_cols=Column.comma_separated_names(ctx.table.columns),
+            table_cols=comma_separated_column_names(ctx.table.columns),
             main_table=ctx.table.name,
             lower_bound=ctx.next_extract_seq,
             upper_bound=ctx.max_extract_seq,
         )
         extract_shadow_query = EXTRACT_FROM_SHADOW_TEMPLATE.format(
-            pkey_cols=Column.comma_separated_names(ctx.table.primary_key),
+            pkey_cols=comma_separated_column_names(ctx.table.primary_key),
             shadow_table=shadow_table_name(ctx.table),
             lower_bound=ctx.next_shadow_extract_seq,
             upper_bound=ctx.max_shadow_extract_seq,
@@ -258,7 +272,7 @@ class DataSyncManager:
         )
         create_redshift_shadow_staging = REDSHIFT_CREATE_SHADOW_STAGING_TABLE.format(
             shadow_staging_table=imported_shadow_staging_table_name(ctx.table),
-            pkey_cols=Column.comma_separated_names_and_types(
+            pkey_cols=comma_separated_column_names_and_types(
                 ctx.table.primary_key, DBType.Redshift
             ),
         )
@@ -340,7 +354,7 @@ class DataSyncManager:
         )
         create_athena_staging = ATHENA_CREATE_STAGING_TABLE.format(
             staging_table=imported_staging_table_name(ctx.table),
-            columns=Column.comma_separated_names_and_types(
+            columns=comma_separated_column_names_and_types(
                 ctx.table.columns, DBType.Athena
             ),
             s3_location="s3://{}/{}".format(
@@ -350,7 +364,7 @@ class DataSyncManager:
         )
         create_athena_shadow_staging = ATHENA_CREATE_STAGING_TABLE.format(
             staging_table=imported_shadow_staging_table_name(ctx.table),
-            columns=Column.comma_separated_names_and_types(
+            columns=comma_separated_column_names_and_types(
                 ctx.table.primary_key, DBType.Athena
             ),
             s3_location="s3://{}/{}".format(
@@ -429,16 +443,20 @@ class DataSyncManager:
         # do not delete them for now because they will be overwritten by the
         # next sync.
 
-    def _get_s3_main_table_path(self, table: Table, include_file: bool = True) -> str:
+    def _get_s3_main_table_path(
+        self, table: TableSchema, include_file: bool = True
+    ) -> str:
         prefix = "{}{}/main/".format(self._config.s3_extract_path, table.name)
         return prefix + "table.tbl" if include_file else prefix
 
-    def _get_s3_shadow_table_path(self, table: Table, include_file: bool = True) -> str:
+    def _get_s3_shadow_table_path(
+        self, table: TableSchema, include_file: bool = True
+    ) -> str:
         prefix = "{}{}/shadow/".format(self._config.s3_extract_path, table.name)
         return prefix + "table.tbl" if include_file else prefix
 
     def _generate_redshift_delete_conditions(
-        self, table: Table, for_shadow_table: bool
+        self, table: TableSchema, for_shadow_table: bool
     ) -> str:
         conditions = []
         for col in table.primary_key:
@@ -453,10 +471,10 @@ class DataSyncManager:
             )
         return " AND ".join(conditions)
 
-    def _generate_athena_merge_query(self, table: Table) -> str:
-        pkey_cols = Column.comma_separated_names(table.primary_key)
+    def _generate_athena_merge_query(self, table: TableSchema) -> str:
+        pkey_cols = comma_separated_column_names(table.primary_key)
         non_primary_cols = list(filter(lambda c: not c.is_primary, table.columns))
-        other_cols = Column.comma_separated_names(non_primary_cols)
+        other_cols = comma_separated_column_names(non_primary_cols)
         other_cols_as_null = ", ".join(
             map(lambda c: "NULL AS {}".format(c.name), non_primary_cols)
         )

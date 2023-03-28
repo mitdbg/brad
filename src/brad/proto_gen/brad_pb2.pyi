@@ -51,10 +51,10 @@ class SessionId(_message.Message):
     def __init__(self, id_value: _Optional[int] = ...) -> None: ...
 
 class StartSessionRequest(_message.Message):
-    __slots__ = ["database_name"]
-    DATABASE_NAME_FIELD_NUMBER: _ClassVar[int]
-    database_name: str
-    def __init__(self, database_name: _Optional[str] = ...) -> None: ...
+    __slots__ = ["unused"]
+    UNUSED_FIELD_NUMBER: _ClassVar[int]
+    unused: int
+    def __init__(self, unused: _Optional[int] = ...) -> None: ...
 
 class StartSessionResponse(_message.Message):
     __slots__ = ["id"]

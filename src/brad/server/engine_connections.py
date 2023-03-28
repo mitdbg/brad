@@ -18,7 +18,7 @@ class EngineConnections:
     async def connect(
         cls,
         config: ConfigFile,
-        database_name: Optional[str] = None,
+        schema_name: Optional[str] = None,
         autocommit: bool = True,
     ) -> "EngineConnections":
         """
@@ -32,27 +32,27 @@ class EngineConnections:
         )
         logger.debug("Connecting to Athena...")
         athena = await aioodbc.connect(
-            dsn=config.get_odbc_connection_string(DBType.Athena, database_name),
+            dsn=config.get_odbc_connection_string(DBType.Athena, schema_name),
             autocommit=autocommit,
         )
         logger.debug("Connecting to Aurora...")
         aurora = await aioodbc.connect(
-            dsn=config.get_odbc_connection_string(DBType.Aurora, database_name),
+            dsn=config.get_odbc_connection_string(DBType.Aurora, schema_name),
             autocommit=autocommit,
         )
         logger.debug("Connecting to Redshift...")
         redshift = await aioodbc.connect(
-            dsn=config.get_odbc_connection_string(DBType.Redshift, database_name),
+            dsn=config.get_odbc_connection_string(DBType.Redshift, schema_name),
             autocommit=autocommit,
         )
         await redshift.execute("SET enable_result_cache_for_session = off")
-        return cls(athena, aurora, redshift, database_name)
+        return cls(athena, aurora, redshift, schema_name)
 
     @classmethod
     def connect_sync(
         cls,
         config: ConfigFile,
-        database_name: Optional[str] = None,
+        schema_name: Optional[str] = None,
         autocommit: bool = True,
     ) -> "EngineConnections":
         """
@@ -66,32 +66,32 @@ class EngineConnections:
         )
         logger.debug("Connecting to Athena...")
         athena = pyodbc.connect(
-            config.get_odbc_connection_string(DBType.Athena, database_name),
+            config.get_odbc_connection_string(DBType.Athena, schema_name),
             autocommit=autocommit,
         )
         logger.debug("Connecting to Aurora...")
         aurora = pyodbc.connect(
-            config.get_odbc_connection_string(DBType.Aurora, database_name),
+            config.get_odbc_connection_string(DBType.Aurora, schema_name),
             autocommit=autocommit,
         )
         logger.debug("Connecting to Redshift...")
         redshift = pyodbc.connect(
-            config.get_odbc_connection_string(DBType.Redshift, database_name),
+            config.get_odbc_connection_string(DBType.Redshift, schema_name),
             autocommit=autocommit,
         )
         redshift.execute("SET enable_result_cache_for_session = off")
-        return cls(athena, aurora, redshift, database_name)
+        return cls(athena, aurora, redshift, schema_name)
 
-    def __init__(self, athena, aurora, redshift, database_name: Optional[str]):
+    def __init__(self, athena, aurora, redshift, schema_name: Optional[str]):
         # NOTE: Need to set the appropriate isolation levels.
         self._athena = athena
         self._aurora = aurora
         self._redshift = redshift
-        self._database_name = database_name
+        self._schema_name = schema_name
 
     @property
-    def database_name(self) -> Optional[str]:
-        return self._database_name
+    def schema_name(self) -> Optional[str]:
+        return self._schema_name
 
     def get_connection(self, db: DBType):
         if db == DBType.Athena:

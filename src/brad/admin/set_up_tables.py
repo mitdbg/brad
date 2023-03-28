@@ -1,8 +1,9 @@
 import logging
 from typing import List
 
+from brad.blueprint.data.table import TableSchema, Column
 from brad.config.dbtype import DBType
-from brad.config.schema import Schema, Table, Column
+from brad.config.schema import Schema
 from brad.config.strings import (
     delete_trigger_function_name,
     delete_trigger_name,
@@ -11,7 +12,6 @@ from brad.config.strings import (
     AURORA_EXTRACT_PROGRESS_TABLE_NAME,
     AURORA_SEQ_COLUMN,
 )
-from brad.config.extraction import ExtractionStrategy
 from brad.config.file import ConfigFile
 from brad.server.engine_connections import EngineConnections
 
@@ -25,12 +25,6 @@ def set_up_tables(args):
 
     # 2. Load the config.
     config = ConfigFile(args.config_file)
-    if config.extraction_strategy != ExtractionStrategy.SequenceTrigger:
-        raise NotImplementedError(
-            "Unsupported extraction strategy: {}".format(
-                str(config.extraction_strategy)
-            )
-        )
 
     # 3. Connect to the underlying engines.
     cxns = EngineConnections.connect_sync(config, autocommit=False)
@@ -92,7 +86,7 @@ def set_up_tables(args):
     logger.info("Done!")
 
 
-def _set_up_aurora_table(cursor, table: Table):
+def _set_up_aurora_table(cursor, table: TableSchema):
     aurora_extract_main_template = (
         "CREATE TABLE {} ({}, " + AURORA_SEQ_COLUMN + " BIGSERIAL, PRIMARY KEY ({}));"
     )
