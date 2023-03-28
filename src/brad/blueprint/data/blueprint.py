@@ -7,12 +7,12 @@ from typing import Dict, List, Optional
 class DataBlueprint:
     def __init__(
         self,
-        db_name: str,
+        schema_name: str,
         table_schemas: List[TableSchema],
         table_locations: List[TableLocation],
         table_dependencies: List[TableDependency],
     ):
-        self._db_name = db_name
+        self._schema_name = schema_name
         self._table_schemas = table_schemas
         self._table_locations = table_locations
         self._table_dependencies = table_dependencies
@@ -29,8 +29,8 @@ class DataBlueprint:
         self._dependencies_by_target = {dep.target: dep for dep in table_dependencies}
 
     @property
-    def db_name(self) -> str:
-        return self._db_name
+    def schema_name(self) -> str:
+        return self._schema_name
 
     @property
     def table_schemas(self) -> List[TableSchema]:

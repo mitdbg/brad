@@ -11,16 +11,16 @@ S3_ICEBERG: DataLocation
 UNKNOWN: DataLocation
 
 class DataBlueprint(_message.Message):
-    __slots__ = ["db_name", "table_dependencies", "table_locations", "table_schemas"]
-    DB_NAME_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ["schema_name", "table_dependencies", "table_locations", "table_schemas"]
+    SCHEMA_NAME_FIELD_NUMBER: _ClassVar[int]
     TABLE_DEPENDENCIES_FIELD_NUMBER: _ClassVar[int]
     TABLE_LOCATIONS_FIELD_NUMBER: _ClassVar[int]
     TABLE_SCHEMAS_FIELD_NUMBER: _ClassVar[int]
-    db_name: str
+    schema_name: str
     table_dependencies: _containers.RepeatedCompositeFieldContainer[TableDependency]
     table_locations: _containers.RepeatedCompositeFieldContainer[TableLocation]
     table_schemas: _containers.RepeatedCompositeFieldContainer[TableSchema]
-    def __init__(self, db_name: _Optional[str] = ..., table_schemas: _Optional[_Iterable[_Union[TableSchema, _Mapping]]] = ..., table_locations: _Optional[_Iterable[_Union[TableLocation, _Mapping]]] = ..., table_dependencies: _Optional[_Iterable[_Union[TableDependency, _Mapping]]] = ...) -> None: ...
+    def __init__(self, schema_name: _Optional[str] = ..., table_schemas: _Optional[_Iterable[_Union[TableSchema, _Mapping]]] = ..., table_locations: _Optional[_Iterable[_Union[TableLocation, _Mapping]]] = ..., table_dependencies: _Optional[_Iterable[_Union[TableDependency, _Mapping]]] = ...) -> None: ...
 
 class TableColumn(_message.Message):
     __slots__ = ["data_type", "is_primary", "name"]
