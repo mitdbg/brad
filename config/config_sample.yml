@@ -17,8 +17,8 @@ aws_access_key: ABCABCABC123ABCABC45
 aws_access_key_secret: abCD+E1f2Gxhi3J4klmN/OP5QrSTuvwXYzabcdEF
 
 # BRAD stores metadata here (e.g., the physical data blueprint).
-s3_metadata_bucket: geoffxy-research
-s3_metadata_path: iohtap/metadata/
+s3_metadata_bucket: your-bucket
+s3_metadata_path: metadata/path/
 
 # Holds intermediate results during data syncing.
 s3_extract_bucket: your-bucket
