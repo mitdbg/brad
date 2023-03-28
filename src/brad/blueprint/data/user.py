@@ -39,15 +39,15 @@ class UserProvidedDataBlueprint:
             transform = raw_table["transform"] if "transform" in raw_table else None
             tables.append(UserProvidedTable(table_name, columns, table_deps, transform))
 
-        return cls(raw_yaml["database_name"], tables)
+        return cls(raw_yaml["schema_name"], tables)
 
-    def __init__(self, db_name: str, tables: List[UserProvidedTable]):
-        self._db_name = db_name
+    def __init__(self, schema_name: str, tables: List[UserProvidedTable]):
+        self._schema_name = schema_name
         self._tables = tables
 
     @property
-    def db_name(self) -> str:
-        return self._db_name
+    def schema_name(self) -> str:
+        return self._schema_name
 
     @property
     def tables(self) -> List[UserProvidedTable]:

@@ -38,20 +38,29 @@ Note that these instructions are written for a Debian based machine (e.g., Ubunt
     Driver=/opt/simba/athenaodbc/lib/64/libathenaodbc_sb64.so
     ```
 
+### Creating a Configuration File
+
+Make a copy of `config/config_sample.yml` and fill in the configurations using
+your values. Make sure you **do not** check in your configuration file, as it
+will contain your AWS access keys.
+
 ### Creating Tables
 
 BRAD expects to be given your schema up front. You must also use the BRAD
-administrative tools `brad admin` to set up the tables across all the
-underlying engines.
+administrative tools `brad admin` to bootstrap the tables across the underlying
+engines.
 
 - Create a schema file (see `config/schemas/test_schema.yml` for an example). Use
-  PostgreSQL data types.
-- Run `brad admin set_up_tables --config-file path/to/config.yml --schema-file
-  path/to/your/schema.yml` to set up the tables across the underlying engines.
-- Start the BRAD server `brad server --config-file path/to/config.yml --schema-file path/to/schema.yml`.
+  PostgreSQL data types. Remember the schema name that you choose; you will need
+  it when starting the BRAD server.
+- Run `brad admin bootstrap_schema --config-file path/to/config.yml
+  --bootstrap-schema-file path/to/your/schema.yml` to set up the tables across the
+  underlying engines.
+- Start the BRAD server `brad server --config-file path/to/config.yml
+  --schema-name your_schema_name`.
 - Run queries through the CLI `brad cli`.
 
-To remove the tables, use `brad admin tear_down_tables` (e.g., `brad admin
-tear_down_tables --config-file path/to/config.yml --schema-file
-path/to/your/schema.yml`). Note that this command will delete the data in the
-tables (and will drop the tables)!
+To remove the tables, use `brad admin drop_schema` (e.g., `brad admin
+drop_schema --config-file path/to/config.yml --drop-schema-name
+your_schema_name`). Note that this command will delete the data in the tables
+(and will drop the tables)!

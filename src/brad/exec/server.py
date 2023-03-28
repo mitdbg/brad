@@ -3,7 +3,6 @@ import logging
 import signal
 
 from brad.config.file import ConfigFile
-from brad.config.schema import Schema
 from brad.server.server import BradServer
 from brad.utils import set_up_logging
 
@@ -22,10 +21,10 @@ def register_command(subparsers):
         help="Path to BRAD's configuration file.",
     )
     parser.add_argument(
-        "--schema-file",
+        "--schema-name",
         type=str,
         required=True,
-        help="Path to the database schema.",
+        help="The name of the schema to run against.",
     )
     parser.add_argument(
         "--debug",
@@ -55,7 +54,6 @@ def handle_exception(event_loop, context):
 def main(args):
     set_up_logging(debug_mode=args.debug)
     config = ConfigFile(args.config_file)
-    schema = Schema.load(args.schema_file)
 
     event_loop = asyncio.new_event_loop()
     event_loop.set_debug(enabled=args.debug)
@@ -68,7 +66,7 @@ def main(args):
     event_loop.set_exception_handler(handle_exception)
 
     try:
-        server = BradServer(config, schema)
+        server = BradServer(config, args.schema_name)
         event_loop.create_task(server.serve_forever())
         event_loop.run_forever()
     finally:

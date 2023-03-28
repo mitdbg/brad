@@ -6,7 +6,7 @@ from brad.planner.data import bootstrap_data_blueprint
 
 def test_boostrap_data_blueprint():
     table_config = """
-      database_name: test
+      schema_name: test
       tables:
         - table_name: table1
           columns:

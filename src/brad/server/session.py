@@ -32,16 +32,22 @@ class Session:
 
 
 class SessionManager:
-    def __init__(self, config: ConfigFile):
+    def __init__(self, config: ConfigFile, schema_name: str):
         self._config = config
         self._next_id_value = 0
         self._sessions: Dict[SessionId, Session] = {}
+        # Eventually we will allow connections to multiple underlying "schemas"
+        # (table namespaces).  There is no fundamental reason why we cannot
+        # support this - it's just unnecessary for the early stages of this
+        # project. For now we assume that we always operate against one schema
+        # and that it is provided up front when starting BRAD.
+        self._schema_name = schema_name
 
     async def create_new_session(self) -> Tuple[SessionId, Session]:
         logger.debug("Creating a new session...")
         session_id = SessionId(self._next_id_value)
         self._next_id_value += 1
-        connections = await EngineConnections.connect(self._config)
+        connections = await EngineConnections.connect(self._config, self._schema_name)
         session = Session(session_id, connections)
         self._sessions[session_id] = session
         logger.debug("Established a new session: %s", session_id)

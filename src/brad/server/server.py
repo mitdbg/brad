@@ -11,11 +11,11 @@ from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
 from brad.config.routing_policy import RoutingPolicy
 from brad.config.strings import AURORA_SEQ_COLUMN
-from brad.config.schema import Schema
 from brad.cost_model.always_one import AlwaysOneCostModel
 from brad.cost_model.model import CostModel, RoundRobinCostModel
 from brad.data_sync.manager import DataSyncManager
 from brad.server.brad_interface import BradInterface
+from brad.server.data_blueprint_manager import DataBlueprintManager
 from brad.server.errors import QueryError
 from brad.server.grpc import BradGrpc
 from brad.server.session import SessionManager, SessionId
@@ -32,9 +32,9 @@ LINESEP = "\n".encode()
 
 
 class BradServer(BradInterface):
-    def __init__(self, config: ConfigFile, schema: Schema):
+    def __init__(self, config: ConfigFile, schema_name: str):
         self._config = config
-        self._schema = schema
+        self._schema_name = schema_name
 
         # We have different routing policies for performance evaluation and
         # testing purposes.
@@ -52,11 +52,12 @@ class BradServer(BradInterface):
                 "Unsupported routing policy: {}".format(str(routing_policy))
             )
 
-        self._sessions = SessionManager(self._config)
+        self._data_blueprint_mgr = DataBlueprintManager(self._config, self._schema_name)
+        self._sessions = SessionManager(self._config, self._schema_name)
         self._daemon_connections: List[
             Tuple[asyncio.StreamReader, asyncio.StreamWriter]
         ] = []
-        self._data_sync_mgr = DataSyncManager(self._config, self._schema)
+        self._data_sync_mgr = DataSyncManager(self._config, self._data_blueprint_mgr)
         self._timed_sync_task = None
         self._forecaster = WorkloadForecaster()
 
@@ -89,6 +90,7 @@ class BradServer(BradInterface):
             logger.info("The BRAD server has shut down.")
 
     async def run_setup(self):
+        await self._data_blueprint_mgr.load()
         await self._data_sync_mgr.establish_connections()
         if self._config.data_sync_period_seconds > 0:
             loop = asyncio.get_event_loop()
@@ -128,6 +130,9 @@ class BradServer(BradInterface):
             raise QueryError("Invalid session id {}".format(str(session_id)))
 
         try:
+            # Remove any trailing or leading whitespace.
+            query = query.strip()
+
             # Handle internal commands separately.
             if query.startswith("BRAD_"):
                 async for output in self._handle_internal_command(query):
@@ -210,12 +215,12 @@ class BradServer(BradInterface):
         This method is used to handle BRAD_ prefixed "queries" (i.e., commands
         to run custom functionality like syncing data across the engines).
         """
-        if command == "BRAD_SYNC":
+        if command == "BRAD_SYNC;":
             logger.debug("Manually triggered a data sync.")
             await self._data_sync_mgr.run_sync()
             yield "Sync succeeded.".encode()
 
-        elif command == "BRAD_FORECAST":
+        elif command == "BRAD_FORECAST;":
             logger.debug("Manually triggered a workload forecast.")
             self._forecaster.forecast()
             yield "Forecast succeeded.".encode()

@@ -8,7 +8,7 @@ from brad.blueprint.serde.data import (
 
 def test_data_blueprint_serde():
     table_config = """
-      database_name: test
+      schema_name: test
       tables:
         - table_name: table1
           columns:
@@ -35,7 +35,7 @@ def test_data_blueprint_serde():
     )
 
     # Sanity check assertions.
-    assert blueprint_orig.db_name == blueprint_after.db_name
+    assert blueprint_orig.schema_name == blueprint_after.schema_name
     assert len(blueprint_orig.table_schemas) == len(blueprint_after.table_schemas)
     assert len(blueprint_orig.table_locations) == len(blueprint_after.table_locations)
     assert len(blueprint_orig.table_dependencies) == len(

@@ -21,7 +21,7 @@ def deserialize_data_blueprint(raw_data: bytes) -> DataBlueprint:
     proto = b.DataBlueprint()
     proto.ParseFromString(raw_data)
     return DataBlueprint(
-        db_name=proto.db_name,
+        schema_name=proto.schema_name,
         table_schemas=list(map(_table_schema_from_proto, proto.table_schemas)),
         table_locations=list(map(_table_location_from_proto, proto.table_locations)),
         table_dependencies=list(
@@ -32,7 +32,7 @@ def deserialize_data_blueprint(raw_data: bytes) -> DataBlueprint:
 
 def serialize_data_blueprint(blueprint: DataBlueprint) -> bytes:
     proto = b.DataBlueprint(
-        db_name=blueprint.db_name,
+        schema_name=blueprint.schema_name,
         table_schemas=map(_table_schema_to_proto, blueprint.table_schemas),
         table_locations=map(_table_location_to_proto, blueprint.table_locations),
         table_dependencies=map(

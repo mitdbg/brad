@@ -19,7 +19,7 @@ enum DataLocation {
 // Stores information about the tables in BRAD: their schemas, locations,
 // dependencies, and transforms.
 message DataBlueprint {
-  string db_name = 1;
+  string schema_name = 1;
   repeated TableSchema table_schemas = 2;
   repeated TableLocation table_locations = 3;
   repeated TableDependency table_dependencies = 4;

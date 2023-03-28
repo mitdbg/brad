@@ -2,8 +2,8 @@ import sys
 import logging
 
 from brad.utils import set_up_logging
-from brad.admin.set_up_tables import set_up_tables
-from brad.admin.tear_down_tables import tear_down_tables
+from brad.admin.bootstrap_schema import bootstrap_schema
+from brad.admin.drop_schema import drop_schema
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +21,14 @@ def register_command(subparsers):
         help="Path to BRAD's configuration file.",
     )
     parser.add_argument(
-        "--schema-file",
+        "--bootstrap-schema-file",
         type=str,
-        required=True,
-        help="Path to the database schema.",
+        help="Path to the database schema to bootstrap.",
+    )
+    parser.add_argument(
+        "--drop-schema-name",
+        type=str,
+        help="The name of the database schema to drop.",
     )
     parser.add_argument(
         "--debug",
@@ -37,11 +41,11 @@ def register_command(subparsers):
 def main(args):
     set_up_logging(debug_mode=args.debug)
 
-    if args.action == "set_up_tables":
-        set_up_tables(args)
-    elif args.action == "tear_down_tables":
+    if args.action == "bootstrap_schema":
+        bootstrap_schema(args)
+    elif args.action == "drop_schema":
         # NOTE: This will delete the data in the tables too!
-        tear_down_tables(args)
+        drop_schema(args)
     else:
         logger.error("Unknown admin action: %s", args.action)
         sys.exit(1)
