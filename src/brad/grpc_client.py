@@ -1,8 +1,8 @@
 import grpc
 from typing import Generator, Optional
 
-import brad.grpc_gen.brad_pb2 as b
-import brad.grpc_gen.brad_pb2_grpc as brad_grpc
+import brad.proto_gen.brad_pb2 as b
+import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.config.session import SessionId
 
 # pylint: disable=no-member

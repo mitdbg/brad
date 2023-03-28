@@ -1,7 +1,7 @@
 from typing import AsyncIterable
 
-import brad.grpc_gen.brad_pb2 as b
-import brad.grpc_gen.brad_pb2_grpc as rpc
+import brad.proto_gen.brad_pb2 as b
+import brad.proto_gen.brad_pb2_grpc as rpc
 from brad.config.session import SessionId
 from brad.server.brad_interface import BradInterface
 from brad.server.errors import QueryError
