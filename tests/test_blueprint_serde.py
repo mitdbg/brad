@@ -8,7 +8,7 @@ from brad.blueprint.serde.data import (
 
 def test_data_blueprint_serde():
     table_config = """
-      database_name: test
+      schema_name: test
       tables:
         - table_name: table1
           columns:

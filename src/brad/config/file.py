@@ -45,7 +45,7 @@ class ConfigFile:
 
     @property
     def s3_metadata_path(self) -> str:
-        return self._raw["s3_metadata_path"]
+        return _ensure_slash_terminated(self._raw["s3_metadata_path"])
 
     @property
     def s3_extract_bucket(self) -> str:

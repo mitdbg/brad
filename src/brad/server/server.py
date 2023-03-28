@@ -130,6 +130,9 @@ class BradServer(BradInterface):
             raise QueryError("Invalid session id {}".format(str(session_id)))
 
         try:
+            # Remove any trailing or leading whitespace.
+            query = query.strip()
+
             # Handle internal commands separately.
             if query.startswith("BRAD_"):
                 async for output in self._handle_internal_command(query):
@@ -212,12 +215,12 @@ class BradServer(BradInterface):
         This method is used to handle BRAD_ prefixed "queries" (i.e., commands
         to run custom functionality like syncing data across the engines).
         """
-        if command == "BRAD_SYNC":
+        if command == "BRAD_SYNC;":
             logger.debug("Manually triggered a data sync.")
             await self._data_sync_mgr.run_sync()
             yield "Sync succeeded.".encode()
 
-        elif command == "BRAD_FORECAST":
+        elif command == "BRAD_FORECAST;":
             logger.debug("Manually triggered a workload forecast.")
             self._forecaster.forecast()
             yield "Forecast succeeded.".encode()

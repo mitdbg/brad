@@ -28,6 +28,10 @@ class DataBlueprintManager:
         )
 
     async def load(self) -> None:
+        """
+        Loads the persisted version of the data blueprint from S3.
+        """
+
         loop = asyncio.get_running_loop()
 
         def _get_s3() -> Dict[str, Any]:
@@ -45,15 +49,31 @@ class DataBlueprintManager:
 
         def _load_response() -> bytes:
             return response["Body"].read()
-        serialized = await loop.run_in_executor(None, _load_response)
 
-        return deserialize_data_blueprint(serialized)
+        serialized = await loop.run_in_executor(None, _load_response)
+        self._blueprint = deserialize_data_blueprint(serialized)
 
     def persist_sync(self) -> None:
+        """
+        Persists the current data blueprint to S3.
+        """
+
         assert self._blueprint is not None
         serialized = serialize_data_blueprint(self._blueprint)
         self._s3_client.put_object(
             Body=serialized,
+            Bucket=self._config.s3_metadata_bucket,
+            Key=_METADATA_KEY_TEMPLATE.format(
+                self._config.s3_metadata_path, self._schema_name
+            ),
+        )
+
+    def delete_sync(self) -> None:
+        """
+        Deletes the persisted data blueprint from S3.
+        """
+
+        self._s3_client.delete_object(
             Bucket=self._config.s3_metadata_bucket,
             Key=_METADATA_KEY_TEMPLATE.format(
                 self._config.s3_metadata_path, self._schema_name

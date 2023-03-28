@@ -44,7 +44,7 @@ class SessionManager:
         self._schema_name = schema_name
 
     async def create_new_session(self) -> Tuple[SessionId, Session]:
-        logger.debug("Creating a new session '%s'...")
+        logger.debug("Creating a new session...")
         session_id = SessionId(self._next_id_value)
         self._next_id_value += 1
         connections = await EngineConnections.connect(self._config, self._schema_name)

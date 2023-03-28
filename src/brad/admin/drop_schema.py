@@ -1,13 +1,9 @@
 import logging
+import pyodbc
 
 from brad.config.dbtype import DBType
-from brad.config.schema import Schema
-from brad.config.strings import (
-    delete_trigger_function_name,
-    shadow_table_name,
-    AURORA_EXTRACT_PROGRESS_TABLE_NAME,
-)
 from brad.config.file import ConfigFile
+from brad.server.data_blueprint_manager import DataBlueprintManager
 from brad.server.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
@@ -15,50 +11,26 @@ logger = logging.getLogger(__name__)
 
 # This method is called by `brad.exec.admin.main`.
 def drop_schema(args):
-    # 1. Load the schema file.
-    schema = Schema.load(args.schema_file)
-
-    # 2. Load the config.
+    # 1. Load the config.
     config = ConfigFile(args.config_file)
 
-    # 3. Connect to the underlying engines.
-    cxns = EngineConnections.connect_sync(config, autocommit=False)
+    # 2. Delete the persisted data blueprint, if it exists.
+    data_blueprint_mgr = DataBlueprintManager(config, args.drop_schema_name)
+    data_blueprint_mgr.delete_sync()
+
+    # 3. Connect to the underlying engines without an explicit database.
+    cxns = EngineConnections.connect_sync(config, autocommit=True)
     redshift = cxns.get_connection(DBType.Redshift).cursor()
     aurora = cxns.get_connection(DBType.Aurora).cursor()
     athena = cxns.get_connection(DBType.Athena).cursor()
 
-    drop_table_template = "DROP TABLE IF EXISTS {}"
-    drop_trigger_fn_template = "DROP FUNCTION IF EXISTS {}"
-
-    # 4. Drop the tables.
-    for table in schema.tables:
-        logger.info("Deleting table '%s'...", table.name)
-        drop_main_table = drop_table_template.format(table.name)
-
-        logger.debug("Running on Redshift: %s", drop_main_table)
-        redshift.execute(drop_main_table)
-        logger.debug("Running on Athena: %s", drop_main_table)
-        athena.execute(drop_main_table)
-
-        # Triggers and indexes are automatically dropped.
-        query = drop_table_template.format(shadow_table_name(table))
-        logger.debug("Running on Aurora %s", query)
-        aurora.execute(query)
-
-        logger.debug("Running on Aurora: %s", drop_main_table)
-        aurora.execute(drop_main_table)
-
-        query = drop_trigger_fn_template.format(delete_trigger_function_name(table))
-        logger.debug("Running on Aurora: %s", query)
-        aurora.execute(query)
-
-    query = drop_table_template.format(AURORA_EXTRACT_PROGRESS_TABLE_NAME)
-    logger.debug("Running on Aurora: %s", query)
-    aurora.execute(query)
-
-    # 5. Commit the changes.
-    aurora.commit()
-    redshift.commit()
-    # Athena does not support the notion of committing a transaction.
+    # 4. Drop the underlying "databases" if they exist.
+    athena.execute("DROP DATABASE IF EXISTS {} CASCADE".format(args.drop_schema_name))
+    aurora.execute("DROP DATABASE IF EXISTS {}".format(args.drop_schema_name))
+    try:
+        redshift.execute("DROP DATABASE {}".format(args.drop_schema_name))
+    except pyodbc.Error:
+        # Ignore the error if a database does not exist.
+        logger.exception("Exception when dropping Redshift database.")
 
     logger.info("Done!")

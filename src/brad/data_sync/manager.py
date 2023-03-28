@@ -154,7 +154,7 @@ class DataSyncManager:
         # to break down the extract and import steps so that the imports into
         # Redshift and Athena can run concurrently.
         logger.debug("Starting data sync...")
-        blueprint = self._data_blueprint_mgr.get()
+        blueprint = self._data_blueprint_mgr.get_blueprint()
         for table_name in blueprint.table_names():
             await self._sync_table(blueprint.table_schema_for(table_name))
         logger.debug("Sync complete.")
