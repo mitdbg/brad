@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 # This method is called by `brad.exec.admin.main`.
-def tear_down_tables(args):
+def drop_schema(args):
     # 1. Load the schema file.
     schema = Schema.load(args.schema_file)
 

@@ -156,7 +156,7 @@ class DataSyncManager:
         logger.debug("Starting data sync...")
         blueprint = self._data_blueprint_mgr.get()
         for table_name in blueprint.table_names():
-            await self._sync_table(blueprint.schema_for(table_name))
+            await self._sync_table(blueprint.table_schema_for(table_name))
         logger.debug("Sync complete.")
 
     async def _sync_table(self, table: TableSchema):

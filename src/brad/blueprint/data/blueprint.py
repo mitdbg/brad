@@ -47,7 +47,7 @@ class DataBlueprint:
     def table_names(self) -> List[str]:
         return list(self._schemas_by_name.keys())
 
-    def schema_for(self, table_name: str) -> TableSchema:
+    def table_schema_for(self, table_name: str) -> TableSchema:
         return self._schemas_by_name[table_name]
 
     def locations_of(self, table_name: str) -> List[Location]:

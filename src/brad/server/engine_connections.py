@@ -110,3 +110,8 @@ class EngineConnections:
         await self._athena.close()
         await self._aurora.close()
         await self._redshift.close()
+
+    def close_sync(self):
+        self._athena.close()
+        self._aurora.close()
+        self._redshift.close()

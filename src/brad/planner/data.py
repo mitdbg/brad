@@ -124,4 +124,4 @@ def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> DataBlueprint:
             continue
         process_user_table(user_table, expect_standalone_base_table=True)
 
-    return DataBlueprint(user.db_name, table_schemas, locations, dependencies)
+    return DataBlueprint(user.schema_name, table_schemas, locations, dependencies)
