@@ -6,7 +6,7 @@ import grpc
 import pyodbc
 import sqlglot
 
-import brad.grpc_gen.brad_pb2_grpc as brad_grpc
+import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
 from brad.config.routing_policy import RoutingPolicy

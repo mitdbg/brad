@@ -1,2 +1,2 @@
 [tool.black]
-extend-exclude = "src/brad/grpc_gen/*"
+extend-exclude = "src/brad/proto_gen/*"

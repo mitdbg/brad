@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package brad;
+
+// We use this file to define the serialization format of BRAD's persistent
+// physical data mesh plan.
+
+// Used to indicate the location of data.
+enum DataLocation {
+  UNKNOWN = 0;
+  // The data is stored in Aurora.
+  AURORA = 1;
+  // The data is stored in Redshift.
+  REDSHIFT = 2;
+  // The data is stored on S3 in an Iceberg table.
+  S3_ICEBERG = 3;
+}
+
+// Stores information about the tables in BRAD: their schemas, locations,
+// dependencies, and transforms.
+message DataBlueprint {
+  string db_name = 1;
+  repeated TableSchema table_schemas = 2;
+  repeated TableLocation table_locations = 3;
+  repeated TableDependency table_dependencies = 4;
+}
+
+// Stores a table's logical (i.e., user-provided) schema.
+message TableSchema {
+  string table_name = 1;
+  repeated TableColumn columns = 2;
+}
+
+// Stores type information about a column. The `type` is expected to be a
+// PostgreSQL data type.
+message TableColumn {
+  string name = 1;
+  string type = 2;
+  bool is_primary = 3;
+}
+
+// Used to indicate that the table with `table_name` is stored in `location`.
+message TableLocation {
+  string table_name = 1;
+  DataLocation location = 2;
+}
+
+// Used to indicate that the `target` table is dependent on the `sources`
+// table(s). There is an optional transform that can be applied (a sequence of
+// SQL statements). If there is no transform, then it is treated as a an
+// identity transform (i.e., the target table is a replica of the source table).
+message TableDependency {
+  TableLocation target = 1;
+  repeated TableLocation sources = 2;
+  string transform = 3;
+}
