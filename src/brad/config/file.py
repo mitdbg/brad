@@ -32,6 +32,22 @@ class ConfigFile:
         return self._raw[DBType.Redshift]["s3_iam_role"]
 
     @property
+    def aws_access_key(self) -> str:
+        return self._raw["aws_access_key"]
+
+    @property
+    def aws_access_key_secret(self) -> str:
+        return self._raw["aws_access_key_secret"]
+
+    @property
+    def s3_metadata_bucket(self) -> str:
+        return self._raw["s3_metadata_bucket"]
+
+    @property
+    def s3_metadata_path(self) -> str:
+        return self._raw["s3_metadata_path"]
+
+    @property
     def s3_extract_bucket(self) -> str:
         """Needed when exporting data from Aurora to S3."""
         return self._raw["s3_extract_bucket"]
@@ -55,7 +71,7 @@ class ConfigFile:
         return RoutingPolicy.from_str(self._raw["routing_policy"])
 
     def get_odbc_connection_string(
-        self, db: DBType, db_name: Optional[str] = None
+        self, db: DBType, database_name: Optional[str]
     ) -> str:
         if db not in self._raw:
             raise AssertionError("Unhandled database type: " + str(db))
@@ -69,8 +85,8 @@ class ConfigFile:
                 config["access_key"],
                 config["access_key_secret"],
             )
-            if db_name is not None:
-                cstr += "Schema={};".format(db_name)
+            if database_name is not None:
+                cstr += "Schema={};".format(database_name)
             return cstr
 
         elif db is DBType.Aurora or db is DBType.Redshift:
@@ -81,8 +97,8 @@ class ConfigFile:
                 config["user"],
                 config["password"],
             )
-            if db_name is not None:
-                cstr += "Database={};".format(db_name)
+            if database_name is not None:
+                cstr += "Database={};".format(database_name)
             return cstr
 
 

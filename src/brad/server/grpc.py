@@ -21,9 +21,9 @@ class BradGrpc(rpc.BradServicer):
         self._brad = brad
 
     async def StartSession(
-        self, _request: b.StartSessionRequest, _context
+        self, request: b.StartSessionRequest, _context
     ) -> b.StartSessionResponse:
-        new_session_id = await self._brad.start_session()
+        new_session_id = await self._brad.start_session(request.database_name)
         return b.StartSessionResponse(id=b.SessionId(id_value=new_session_id.value()))
 
     async def RunQuery(

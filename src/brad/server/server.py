@@ -112,8 +112,8 @@ class BradServer(BradInterface):
         logger.debug("Accepted new daemon connection.")
         self._daemon_connections.append((reader, writer))
 
-    async def start_session(self) -> SessionId:
-        session_id, _ = await self._sessions.create_new_session()
+    async def start_session(self, database_name: str) -> SessionId:
+        session_id, _ = await self._sessions.create_new_session(database_name)
         return session_id
 
     async def end_session(self, session_id: SessionId) -> None:

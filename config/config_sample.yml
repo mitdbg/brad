@@ -17,8 +17,8 @@ aws_access_key: ABCABCABC123ABCABC45
 aws_access_key_secret: abCD+E1f2Gxhi3J4klmN/OP5QrSTuvwXYzabcdEF
 
 # BRAD stores metadata here (e.g., the physical data blueprint).
-# After setting this path, do not change it unless you know what you are doing!
-s3_metadata_path: s3://your-bucket/metadata/path/
+s3_metadata_bucket: geoffxy-research
+s3_metadata_path: iohtap/metadata/
 
 # Holds intermediate results during data syncing.
 s3_extract_bucket: your-bucket
@@ -41,7 +41,6 @@ athena:
   s3_data_path: s3://your-bucket/data/path
   access_key: ABCABCABC123ABCABC45
   access_key_secret: abCD+E1f2Gxhi3J4klmN/OP5QrSTuvwXYzabcdEF
-  database: iohtap
 
 aurora:
   odbc_driver: PostgreSQL
@@ -49,7 +48,6 @@ aurora:
   port: 5432
   user: postgres
   password: postgres_password
-  database: iohtap
 
 redshift:
   odbc_driver: Redshift
@@ -57,5 +55,4 @@ redshift:
   port: 5439
   user: awsuser
   password: awsuser_password
-  database: iohtap
   s3_iam_role: arn:aws:iam:123

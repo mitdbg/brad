@@ -21,6 +21,12 @@ def register_command(subparsers):
         default=6583,
         help="The port on which BRAD is listening for connections.",
     )
+    parser.add_argument(
+        "--database",
+        type=str,
+        required=True,
+        help="The name of the BRAD database to issue queries against.",
+    )
     parser.set_defaults(func=main)
 
 
@@ -29,7 +35,7 @@ def main(args):
     print()
     print("Connecting to BRAD at {}:{}...".format(args.host, args.port))
 
-    with BradGrpcClient(args.host, args.port) as client:
+    with BradGrpcClient(args.host, args.port, args.database) as client:
         print("Connected!")
         print()
         print("Terminate all SQL queries with a semicolon (;). Hit Ctrl-D to exit.")

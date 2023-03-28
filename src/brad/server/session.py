@@ -15,9 +15,12 @@ class Session:
     `SessionManager`.
     """
 
-    def __init__(self, session_id: SessionId, engines: EngineConnections):
+    def __init__(
+        self, session_id: SessionId, engines: EngineConnections, database_name: str
+    ):
         self._session_id = session_id
         self._engines = engines
+        self._database_name = database_name
 
     @property
     def identifier(self) -> SessionId:
@@ -26,6 +29,10 @@ class Session:
     @property
     def engines(self) -> EngineConnections:
         return self._engines
+
+    @property
+    def database_name(self) -> str:
+        return self._database_name
 
     async def close(self):
         await self._engines.close()
@@ -37,14 +44,14 @@ class SessionManager:
         self._next_id_value = 0
         self._sessions: Dict[SessionId, Session] = {}
 
-    async def create_new_session(self) -> Tuple[SessionId, Session]:
-        logger.debug("Creating a new session...")
+    async def create_new_session(self, database_name: str) -> Tuple[SessionId, Session]:
+        logger.debug("Creating a new session for database '%s'...", database_name)
         session_id = SessionId(self._next_id_value)
         self._next_id_value += 1
-        connections = await EngineConnections.connect(self._config)
-        session = Session(session_id, connections)
+        connections = await EngineConnections.connect(self._config, database_name)
+        session = Session(session_id, connections, database_name)
         self._sessions[session_id] = session
-        logger.debug("Established a new session: %s", session_id)
+        logger.debug("Established a new session: (%s, %s)", session_id, database_name)
         return (session_id, session)
 
     def get_session(self, session_id: SessionId) -> Optional[Session]:

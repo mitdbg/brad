@@ -22,7 +22,7 @@ message SessionId {
 }
 
 message StartSessionRequest {
-  uint64 unused = 100;
+  string database_name = 1;
 }
 
 message StartSessionResponse {
