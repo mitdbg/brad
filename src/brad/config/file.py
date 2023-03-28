@@ -1,7 +1,7 @@
 import yaml
+from typing import Optional
 
 from brad.config.dbtype import DBType
-from brad.config.extraction import ExtractionStrategy
 from brad.config.routing_policy import RoutingPolicy
 
 
@@ -25,10 +25,6 @@ class ConfigFile:
     @property
     def athena_s3_data_path(self) -> str:
         return _ensure_slash_terminated(self._raw[DBType.Athena]["s3_data_path"])
-
-    @property
-    def extraction_strategy(self) -> ExtractionStrategy:
-        return ExtractionStrategy.from_str(self._raw["extraction_strategy"])
 
     @property
     def redshift_s3_iam_role(self) -> str:
@@ -58,40 +54,36 @@ class ConfigFile:
     def routing_policy(self) -> RoutingPolicy:
         return RoutingPolicy.from_str(self._raw["routing_policy"])
 
-    def get_odbc_connection_string(self, db: DBType) -> str:
+    def get_odbc_connection_string(
+        self, db: DBType, db_name: Optional[str] = None
+    ) -> str:
         if db not in self._raw:
             raise AssertionError("Unhandled database type: " + str(db))
 
         config = self._raw[db]
         if db is DBType.Athena:
-            return "Driver={{{}}};AwsRegion={};S3OutputLocation={};AuthenticationType=IAM Credentials;UID={};PWD={};Schema={};".format(
+            cstr = "Driver={{{}}};AwsRegion={};S3OutputLocation={};AuthenticationType=IAM Credentials;UID={};PWD={};".format(
                 config["odbc_driver"],
                 config["aws_region"],
                 config["s3_output_path"],
                 config["access_key"],
                 config["access_key_secret"],
-                config["database"],
             )
+            if db_name is not None:
+                cstr += "Schema={};".format(db_name)
+            return cstr
 
-        elif db is DBType.Aurora:
-            return "Driver={{{}}};Server={};Port={};Uid={};Pwd={};Database={};".format(
+        elif db is DBType.Aurora or db is DBType.Redshift:
+            cstr = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};".format(
                 config["odbc_driver"],
                 config["host"],
                 config["port"],
                 config["user"],
                 config["password"],
-                config["database"],
             )
-
-        elif db is DBType.Redshift:
-            return "Driver={{{}}};Server={};Port={};Uid={};Pwd={};Database={};".format(
-                config["odbc_driver"],
-                config["host"],
-                config["port"],
-                config["user"],
-                config["password"],
-                config["database"],
-            )
+            if db_name is not None:
+                cstr += "Database={};".format(db_name)
+            return cstr
 
 
 def _ensure_slash_terminated(candidate: str) -> str:

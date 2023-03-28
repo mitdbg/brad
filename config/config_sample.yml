@@ -7,9 +7,18 @@ server_interface: "0.0.0.0"
 server_port: 6583
 server_daemon_port: 6586
 
-# If you change the strategy, you will need to recreate the tables in the
-# underlying engines.
-extraction_strategy: sequence_trigger
+# BRAD uses these credentials when interacting with the AWS APIs.
+# These credentials should have access to
+# - Athena
+# - RDS
+# - Redshift
+# - S3
+aws_access_key: ABCABCABC123ABCABC45
+aws_access_key_secret: abCD+E1f2Gxhi3J4klmN/OP5QrSTuvwXYzabcdEF
+
+# BRAD stores metadata here (e.g., the physical data blueprint).
+# After setting this path, do not change it unless you know what you are doing!
+s3_metadata_path: s3://your-bucket/metadata/path/
 
 # Holds intermediate results during data syncing.
 s3_extract_bucket: your-bucket
