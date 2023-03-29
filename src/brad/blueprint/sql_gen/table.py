@@ -110,7 +110,7 @@ class TableSqlGenerator:
                     trigger_name=delete_trigger_name(table),
                     table_name=source_table_name(table),
                     trigger_fn_name=delete_trigger_function_name(table),
-                    trigger_cond="AFTER DELETE ON",
+                    trigger_cond="AFTER DELETE",
                 )
 
                 # The update trigger function. Whenever a row is updated, we
@@ -129,7 +129,7 @@ class TableSqlGenerator:
                     trigger_name=update_trigger_name(table),
                     table_name=source_table_name(table),
                     trigger_fn_name=update_trigger_function_name(table),
-                    trigger_cond="BEFORE UPDATE ON",
+                    trigger_cond="BEFORE UPDATE",
                 )
 
                 return (
@@ -197,10 +197,10 @@ class TableSqlGenerator:
         initialize_template = (
             "INSERT INTO "
             + AURORA_EXTRACT_PROGRESS_TABLE_NAME
-            + " (table_name, next_extract_seq, next_shadow_extract_seq) VALUES ({table_name}, 0, 0)"
+            + " (table_name, next_extract_seq, next_shadow_extract_seq) VALUES ('{table_name}', 0, 0)"
         )
         for table_name in self._aurora_sources:
-            queries.append(initialize_template.format(table_name))
+            queries.append(initialize_template.format(table_name=table_name))
 
         return (queries, DBType.Aurora)
 
