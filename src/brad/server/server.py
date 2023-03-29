@@ -147,13 +147,12 @@ class BradServer(BradInterface):
             # 2. Select an engine for the query.
             engine_to_use = self._router.engine_for(query_rep)
             logger.debug("Routing '%s' to %s", query, engine_to_use)
-            query = self._rewrite_query_if_needed(query_rep, engine_to_use)
 
             # 3. Actually execute the query
             connection = session.engines.get_connection(engine_to_use)
             cursor = await connection.cursor()
             try:
-                await cursor.execute(query)
+                await cursor.execute(query_rep.raw_query)
             except (pyodbc.ProgrammingError, pyodbc.Error) as ex:
                 # Error when executing the query.
                 raise QueryError.from_exception(ex)
@@ -188,29 +187,6 @@ class BradServer(BradInterface):
                     await daemon_writer.drain()
             except:  # pylint: disable=bare-except
                 logger.exception("Exception when sending the query to the daemon.")
-
-    def _rewrite_query_if_needed(self, query_rep: QueryRep, db_to_use: DBType) -> str:
-        if db_to_use != DBType.Aurora:
-            return query_rep.raw_query
-
-        upper_query = query_rep.raw_query.upper()
-        if upper_query.startswith("UPDATE"):
-            # NOTE: The parser we use here is written in Python, so it is likely
-            # slow. We should replace it with a C-based parser (and with a parser
-            # that handles PostgreSQL SQL). But for prototype purposes (and until we
-            # are sure that this is a bottleneck), this implementation is fine.
-            ast = query_rep.ast()
-            # Need to make sure we update the `brad_seq` column so the update
-            # is picked up in the next extraction. This rewrite is specific to our
-            # current extraction strategy.
-            ast.expressions.append(_UPDATE_SEQ_EXPR)
-            result = ast.sql()
-            logger.debug("Rewrote query to '%s'", result)
-            return result
-
-        # Should ideally also handle SELECT * (to omit all brad_ prefixed
-        # columns). But it is a bit cumbersome to do.
-        return query_rep.raw_query
 
     async def _handle_internal_command(self, command: str) -> AsyncIterable[bytes]:
         """

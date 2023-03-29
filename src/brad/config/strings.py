@@ -1,6 +1,10 @@
 from brad.blueprint.data.table import TableSchema
 
 
+def source_table_name(table: TableSchema) -> str:
+    return "{}_brad_source".format(table.name)
+
+
 def shadow_table_name(table: TableSchema) -> str:
     return "{}_brad_shadow".format(table.name)
 
@@ -11,6 +15,14 @@ def delete_trigger_function_name(table: TableSchema) -> str:
 
 def delete_trigger_name(table: TableSchema) -> str:
     return "{}_brad_delete_trigger".format(table.name)
+
+
+def update_trigger_function_name(table: TableSchema) -> str:
+    return "{}_brad_update_trigger_fn".format(table.name)
+
+
+def update_trigger_name(table: TableSchema) -> str:
+    return "{}_brad_update_trigger".format(table.name)
 
 
 def seq_index_name(table: TableSchema, for_shadow: bool) -> str:
