@@ -1,7 +1,7 @@
 from brad.forecasting.query_parser import QueryParser
 import argparse
 import os
-from sqlglot import parse_one, exp
+from sqlglot import exp
 import sys
 
 MAX_JOINS = 10
@@ -38,8 +38,8 @@ class WorkloadForecaster:
     #         len(filtered_attributes),
     #     )
 
-    def process(self, sql_query):
-        parsed = parse_one(sql_query, read="postgres")
+    def process(self, query_rep):
+        parsed = query_rep.ast()
 
         # Count joins
         tables_cnt = 0
