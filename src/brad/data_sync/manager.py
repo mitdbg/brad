@@ -11,6 +11,7 @@ from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
 from brad.config.strings import (
     shadow_table_name,
+    source_table_name,
     imported_staging_table_name,
     imported_shadow_staging_table_name,
 )
@@ -206,7 +207,9 @@ class DataSyncManager:
         assert row is not None
         ctx.next_extract_seq, ctx.next_shadow_extract_seq = row
 
-        await aurora.execute(GET_MAX_EXTRACT_TEMPLATE.format(table_name=ctx.table.name))
+        await aurora.execute(
+            GET_MAX_EXTRACT_TEMPLATE.format(table_name=source_table_name(ctx.table))
+        )
         row = await aurora.fetchone()
         if row is None or row[0] is None:
             # The scenario when the table is empty.
@@ -229,7 +232,7 @@ class DataSyncManager:
     async def _export_aurora_to_s3(self, aurora, ctx: _SyncContext):
         extract_main_query = EXTRACT_FROM_MAIN_TEMPLATE.format(
             table_cols=comma_separated_column_names(ctx.table.columns),
-            main_table=ctx.table.name,
+            main_table=source_table_name(ctx.table),
             lower_bound=ctx.next_extract_seq,
             upper_bound=ctx.max_extract_seq,
         )
