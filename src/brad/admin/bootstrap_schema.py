@@ -1,22 +1,8 @@
 import logging
 
-from brad.blueprint.data.table import TableSchema
-from brad.blueprint.data.location import Location
 from brad.blueprint.data.user import UserProvidedDataBlueprint
-from brad.blueprint.sql_gen.table import (
-    TableSqlGenerator,
-    comma_separated_column_names_and_types,
-    comma_separated_column_names,
-)
+from brad.blueprint.sql_gen.table import TableSqlGenerator
 from brad.config.dbtype import DBType
-from brad.config.strings import (
-    delete_trigger_function_name,
-    delete_trigger_name,
-    seq_index_name,
-    shadow_table_name,
-    AURORA_EXTRACT_PROGRESS_TABLE_NAME,
-    AURORA_SEQ_COLUMN,
-)
 from brad.config.file import ConfigFile
 from brad.planner.data import bootstrap_data_blueprint
 from brad.server.data_blueprint_manager import DataBlueprintManager
@@ -63,33 +49,20 @@ def bootstrap_schema(args):
             table_location.table_name,
             table_location.location,
         )
+        queries, db_type = sql_gen.generate_create_table_sql(table_location)
+        conn = cxns.get_connection(db_type)
+        cursor = conn.cursor()
+        for q in queries:
+            logger.debug("Running on %s: %s", str(db_type), q)
+            cursor.execute(q)
 
-        if table_location.location == Location.Aurora:
-            # NOTE: This is temporary while we support the legacy data sync.
-            table = blueprint.table_schema_for(table_location.table_name)
-            _legacy_set_up_aurora_table(aurora, table)
-            continue
-
-        sql, db_type = sql_gen.generate_create_table_sql(table_location)
-        cxns.get_connection(db_type).execute(sql)
-
-    # 7. (Legacy) Create the extraction progress table.
-    query = "CREATE TABLE {} (table_name TEXT PRIMARY KEY, next_extract_seq BIGINT, next_shadow_extract_seq BIGINT)".format(
-        AURORA_EXTRACT_PROGRESS_TABLE_NAME,
-    )
-    logger.debug("Running on Aurora: %s", query)
-    aurora.execute(query)
-
-    # 8. (Legacy) Initialize extraction progress metadata for each table.
-    initialize_template = "INSERT INTO {} (table_name, next_extract_seq, next_shadow_extract_seq) VALUES (?, 0, 0)".format(
-        AURORA_EXTRACT_PROGRESS_TABLE_NAME
-    )
-    for table_name in blueprint.table_names():
-        table = blueprint.table_schema_for(table_name)
-        logger.debug(
-            "Running on Aurora: %s with value %s", initialize_template, table.name
-        )
-        aurora.execute(initialize_template, table.name)
+    # 7. Create and set up the extraction progress table.
+    queries, db_type = sql_gen.generate_extraction_progress_set_up_table_sql()
+    conn = cxns.get_connection(db_type)
+    cursor = conn.cursor()
+    for q in queries:
+        logger.debug("Running on %s: %s", str(db_type), q)
+        cursor.execute(q)
 
     # 9. Commit the changes.
     aurora.commit()
@@ -106,88 +79,3 @@ def bootstrap_schema(args):
     data_blueprint_mgr.persist_sync()
 
     logger.info("Done!")
-
-
-def _legacy_set_up_aurora_table(cursor, table: TableSchema):
-    # NOTE: Table extraction will be overhauled.
-    aurora_extract_main_template = (
-        "CREATE TABLE {} ({}, " + AURORA_SEQ_COLUMN + " BIGSERIAL, PRIMARY KEY ({}));"
-    )
-    aurora_extract_shadow_template = (
-        "CREATE TABLE {} ({}, " + AURORA_SEQ_COLUMN + " BIGSERIAL, PRIMARY KEY ({}));"
-    )
-    aurora_delete_trigger_fn_template = """
-        CREATE OR REPLACE FUNCTION {trigger_fn_name}()
-            RETURNS trigger AS
-        $BODY$
-        BEGIN
-        INSERT INTO {shadow_table_name} ({pkey_cols}) VALUES ({pkey_vals});
-        RETURN NULL;
-        END;
-        $BODY$
-        LANGUAGE plpgsql VOLATILE;
-    """
-    aurora_create_trigger_template = """
-        CREATE TRIGGER {trigger_name}
-        AFTER DELETE ON {table_name}
-        FOR EACH ROW
-        EXECUTE PROCEDURE {trigger_fn_name}();
-    """
-    aurora_index_template = (
-        "CREATE INDEX {} ON {} USING btree (" + AURORA_SEQ_COLUMN + ");"
-    )
-
-    primary_key_col_str = comma_separated_column_names_and_types(
-        table.primary_key, DBType.Aurora
-    )
-    primary_key_str = comma_separated_column_names(table.primary_key)
-
-    # Create the main table.
-    query = aurora_extract_main_template.format(
-        table.name,
-        comma_separated_column_names_and_types(table.columns, DBType.Aurora),
-        primary_key_str,
-    )
-    logger.debug("Running on Aurora: %s", query)
-    cursor.execute(query)
-
-    # Create the shadow table (for deletes).
-    query = aurora_extract_shadow_template.format(
-        shadow_table_name(table), primary_key_col_str, primary_key_str
-    )
-    logger.debug("Running on Aurora: %s", query)
-    cursor.execute(query)
-
-    # Create the delete trigger function.
-    query = aurora_delete_trigger_fn_template.format(
-        trigger_fn_name=delete_trigger_function_name(table),
-        shadow_table_name=shadow_table_name(table),
-        pkey_cols=primary_key_str,
-        pkey_vals=", ".join(
-            map(lambda pkey: "OLD.{}".format(pkey.name), table.primary_key)
-        ),
-    )
-    logger.debug("Running on Aurora: %s", query)
-    cursor.execute(query)
-
-    # Create the delete trigger.
-    query = aurora_create_trigger_template.format(
-        trigger_name=delete_trigger_name(table),
-        table_name=table.name,
-        trigger_fn_name=delete_trigger_function_name(table),
-    )
-    logger.debug("Running on Aurora: %s", query)
-    cursor.execute(query)
-
-    # Create the indexes.
-    query = aurora_index_template.format(
-        seq_index_name(table, for_shadow=False), table.name
-    )
-    logger.debug("Running on Aurora: %s", query)
-    cursor.execute(query)
-
-    query = aurora_index_template.format(
-        seq_index_name(table, for_shadow=True), shadow_table_name(table)
-    )
-    logger.debug("Running on Aurora: %s", query)
-    cursor.execute(query)
