@@ -51,7 +51,10 @@ class DataBlueprint:
         return self._schemas_by_name[table_name]
 
     def locations_of(self, table_name: str) -> List[Location]:
-        return self._table_locations_by_name[table_name]
+        try:
+            return self._table_locations_by_name[table_name]
+        except KeyError:
+            return []
 
     def dependencies_of(self, table: TableLocation) -> Optional[TableDependency]:
         if table not in self._dependencies_by_target:

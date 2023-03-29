@@ -9,11 +9,12 @@ import sqlglot
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
-from brad.config.routing_policy import RoutingPolicy
 from brad.config.strings import AURORA_SEQ_COLUMN
-from brad.cost_model.always_one import AlwaysOneCostModel
-from brad.cost_model.model import CostModel, RoundRobinCostModel
 from brad.data_sync.manager import DataSyncManager
+from brad.routing import Router
+from brad.routing.always_one import AlwaysOneRouter
+from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
+from brad.routing.policy import RoutingPolicy
 from brad.server.brad_interface import BradInterface
 from brad.server.data_blueprint_manager import DataBlueprintManager
 from brad.server.errors import QueryError
@@ -21,6 +22,7 @@ from brad.server.grpc import BradGrpc
 from brad.server.session import SessionManager, SessionId
 from brad.forecasting.forecaster import WorkloadForecaster
 from brad.net.async_connection_acceptor import AsyncConnectionAcceptor
+from brad.query_rep import QueryRep
 
 logger = logging.getLogger(__name__)
 
@@ -35,24 +37,24 @@ class BradServer(BradInterface):
     def __init__(self, config: ConfigFile, schema_name: str):
         self._config = config
         self._schema_name = schema_name
+        self._data_blueprint_mgr = DataBlueprintManager(self._config, self._schema_name)
 
         # We have different routing policies for performance evaluation and
         # testing purposes.
         routing_policy = self._config.routing_policy
         if routing_policy == RoutingPolicy.Default:
-            self._cost_model: CostModel = RoundRobinCostModel()
+            self._router: Router = LocationAwareRoundRobin(self._data_blueprint_mgr)
         elif routing_policy == RoutingPolicy.AlwaysAthena:
-            self._cost_model = AlwaysOneCostModel(DBType.Athena)
+            self._router = AlwaysOneRouter(DBType.Athena)
         elif routing_policy == RoutingPolicy.AlwaysAurora:
-            self._cost_model = AlwaysOneCostModel(DBType.Aurora)
+            self._router = AlwaysOneRouter(DBType.Aurora)
         elif routing_policy == RoutingPolicy.AlwaysRedshift:
-            self._cost_model = AlwaysOneCostModel(DBType.Redshift)
+            self._router = AlwaysOneRouter(DBType.Redshift)
         else:
             raise RuntimeError(
                 "Unsupported routing policy: {}".format(str(routing_policy))
             )
 
-        self._data_blueprint_mgr = DataBlueprintManager(self._config, self._schema_name)
         self._sessions = SessionManager(self._config, self._schema_name)
         self._daemon_connections: List[
             Tuple[asyncio.StreamReader, asyncio.StreamWriter]
@@ -139,16 +141,16 @@ class BradServer(BradInterface):
                     yield output
                 return
 
-            self._forecaster.process(query)
+            query_rep = QueryRep(query)
+            self._forecaster.process(query_rep)
 
-            # 2. Predict which DBMS to use.
-            run_times = self._cost_model.predict_run_time(query)
-            db_to_use, _ = run_times.min_time_ms()
-            logger.debug("Routing '%s' to %s", query, db_to_use)
-            query = self._rewrite_query_if_needed(query, db_to_use)
+            # 2. Select an engine for the query.
+            engine_to_use = self._router.engine_for(query_rep)
+            logger.debug("Routing '%s' to %s", query, engine_to_use)
+            query = self._rewrite_query_if_needed(query_rep, engine_to_use)
 
             # 3. Actually execute the query
-            connection = session.engines.get_connection(db_to_use)
+            connection = session.engines.get_connection(engine_to_use)
             cursor = await connection.cursor()
             try:
                 await cursor.execute(query)
@@ -187,28 +189,28 @@ class BradServer(BradInterface):
             except:  # pylint: disable=bare-except
                 logger.exception("Exception when sending the query to the daemon.")
 
-    def _rewrite_query_if_needed(self, sql_query: str, db_to_use: DBType) -> str:
+    def _rewrite_query_if_needed(self, query_rep: QueryRep, db_to_use: DBType) -> str:
         if db_to_use != DBType.Aurora:
-            return sql_query
+            return query_rep.raw_query
 
-        upper_query = sql_query.upper()
+        upper_query = query_rep.raw_query.upper()
         if upper_query.startswith("UPDATE"):
             # NOTE: The parser we use here is written in Python, so it is likely
             # slow. We should replace it with a C-based parser (and with a parser
             # that handles PostgreSQL SQL). But for prototype purposes (and until we
             # are sure that this is a bottleneck), this implementation is fine.
-            parsed = sqlglot.parse_one(sql_query)  # type: ignore
+            ast = query_rep.ast()
             # Need to make sure we update the `brad_seq` column so the update
             # is picked up in the next extraction. This rewrite is specific to our
             # current extraction strategy.
-            parsed.expressions.append(_UPDATE_SEQ_EXPR)
-            result = parsed.sql()
+            ast.expressions.append(_UPDATE_SEQ_EXPR)
+            result = ast.sql()
             logger.debug("Rewrote query to '%s'", result)
             return result
 
         # Should ideally also handle SELECT * (to omit all brad_ prefixed
         # columns). But it is a bit cumbersome to do.
-        return sql_query
+        return query_rep.raw_query
 
     async def _handle_internal_command(self, command: str) -> AsyncIterable[bytes]:
         """

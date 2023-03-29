@@ -2,7 +2,7 @@ import yaml
 from typing import Optional
 
 from brad.config.dbtype import DBType
-from brad.config.routing_policy import RoutingPolicy
+from brad.routing.policy import RoutingPolicy
 
 
 class ConfigFile:

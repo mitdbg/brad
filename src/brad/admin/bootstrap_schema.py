@@ -1,8 +1,10 @@
 import logging
 
 from brad.blueprint.data.table import TableSchema
+from brad.blueprint.data.location import Location
 from brad.blueprint.data.user import UserProvidedDataBlueprint
 from brad.blueprint.sql_gen.table import (
+    TableSqlGenerator,
     comma_separated_column_names_and_types,
     comma_separated_column_names,
 )
@@ -51,45 +53,34 @@ def bootstrap_schema(args):
     )
     redshift = cxns.get_connection(DBType.Redshift).cursor()
     aurora = cxns.get_connection(DBType.Aurora).cursor()
-    athena = cxns.get_connection(DBType.Athena).cursor()
 
     # 6. Set up the underlying tables.
-    redshift_template = "CREATE TABLE {} ({}, PRIMARY KEY ({}));"
-    athena_template = (
-        "CREATE TABLE {} ({}) LOCATION '{}' TBLPROPERTIES ('table_type' = 'ICEBERG');"
-    )
+    sql_gen = TableSqlGenerator(config, blueprint)
 
-    for table_name in blueprint.table_names():
-        logger.info("Setting up table '%s'...", table_name)
-        table = blueprint.table_schema_for(table_name)
-        _set_up_aurora_table(aurora, table)
-
-        primary_key_str = comma_separated_column_names(table.primary_key)
-
-        query = redshift_template.format(
-            table.name,
-            comma_separated_column_names_and_types(table.columns, DBType.Redshift),
-            primary_key_str,
+    for table_location in blueprint.table_locations:
+        logger.info(
+            "Creating table '%s' on %s...",
+            table_location.table_name,
+            table_location.location,
         )
-        logger.debug("Running on Redshift: %s", query)
-        redshift.execute(query)
 
-        query = athena_template.format(
-            table.name,
-            comma_separated_column_names_and_types(table.columns, DBType.Athena),
-            "{}{}".format(config.athena_s3_data_path, table.name),
-        )
-        logger.debug("Running on Athena: %s", query)
-        athena.execute(query)
+        if table_location.location == Location.Aurora:
+            # NOTE: This is temporary while we support the legacy data sync.
+            table = blueprint.table_schema_for(table_location.table_name)
+            _legacy_set_up_aurora_table(aurora, table)
+            continue
 
-    # 7. Create the extraction progress table.
+        sql, db_type = sql_gen.generate_create_table_sql(table_location)
+        cxns.get_connection(db_type).execute(sql)
+
+    # 7. (Legacy) Create the extraction progress table.
     query = "CREATE TABLE {} (table_name TEXT PRIMARY KEY, next_extract_seq BIGINT, next_shadow_extract_seq BIGINT)".format(
         AURORA_EXTRACT_PROGRESS_TABLE_NAME,
     )
     logger.debug("Running on Aurora: %s", query)
     aurora.execute(query)
 
-    # 8. Initialize extraction progress metadata for each table.
+    # 8. (Legacy) Initialize extraction progress metadata for each table.
     initialize_template = "INSERT INTO {} (table_name, next_extract_seq, next_shadow_extract_seq) VALUES (?, 0, 0)".format(
         AURORA_EXTRACT_PROGRESS_TABLE_NAME
     )
@@ -107,6 +98,7 @@ def bootstrap_schema(args):
 
     # 10. Install the `aws_s3` extension (needed for data extraction).
     aurora.execute("CREATE EXTENSION IF NOT EXISTS aws_s3 CASCADE")
+    aurora.commit()
 
     # 11. Persist the data blueprint.
     data_blueprint_mgr = DataBlueprintManager(config, blueprint.schema_name)
@@ -116,7 +108,7 @@ def bootstrap_schema(args):
     logger.info("Done!")
 
 
-def _set_up_aurora_table(cursor, table: TableSchema):
+def _legacy_set_up_aurora_table(cursor, table: TableSchema):
     # NOTE: Table extraction will be overhauled.
     aurora_extract_main_template = (
         "CREATE TABLE {} ({}, " + AURORA_SEQ_COLUMN + " BIGSERIAL, PRIMARY KEY ({}));"
