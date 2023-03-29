@@ -44,7 +44,7 @@ class TableSqlGenerator:
 
     def generate_create_table_sql(
         self, table_location: TableLocation
-    ) -> Tuple[str, DBType]:
+    ) -> Tuple[List[str], DBType]:
         """
         Returns SQL queries that should be used to create the table given by
         `table_location`, along with the engine on which to execute the queries.
