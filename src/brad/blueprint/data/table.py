@@ -11,7 +11,7 @@ class TableName:
         return self._name
 
     def __repr__(self) -> str:
-        return "".join(["TableName(", self._name, ")"])
+        return self._name
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, TableName):

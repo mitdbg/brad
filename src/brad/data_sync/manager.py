@@ -156,8 +156,8 @@ class DataSyncManager:
         # Redshift and Athena can run concurrently.
         logger.debug("Starting data sync...")
         blueprint = self._data_blueprint_mgr.get_blueprint()
-        for table_name in blueprint.table_names():
-            await self._sync_table(blueprint.table_schema_for(table_name))
+        for table in blueprint.tables:
+            await self._sync_table(table)
         logger.debug("Sync complete.")
 
     async def _sync_table(self, table: Table):
@@ -202,7 +202,7 @@ class DataSyncManager:
     async def _fetch_and_set_sync_bounds(self, aurora, ctx: _SyncContext):
         #  - Select `next_extract_seq` values from the extraction progress table (lower bound)
         #  - Select current max sequence values from the main and shadow tables (upper bound)
-        await aurora.execute(GET_NEXT_EXTRACT, ctx.table.name)
+        await aurora.execute(GET_NEXT_EXTRACT, ctx.table.name.value)
         row = await aurora.fetchone()
         assert row is not None
         ctx.next_extract_seq, ctx.next_shadow_extract_seq = row
@@ -271,7 +271,7 @@ class DataSyncManager:
         )
         create_redshift_staging = REDSHIFT_CREATE_STAGING_TABLE.format(
             staging_table=imported_staging_table_name(ctx.table),
-            base_table=ctx.table.name,
+            base_table=ctx.table.name.value,
         )
         create_redshift_shadow_staging = REDSHIFT_CREATE_SHADOW_STAGING_TABLE.format(
             shadow_staging_table=imported_shadow_staging_table_name(ctx.table),
@@ -309,14 +309,14 @@ class DataSyncManager:
 
         # c) Delete updated and deleted rows from the main table.
         delete_using_redshift_staging = REDSHIFT_DELETE_COMMAND.format(
-            main_table=ctx.table.name,
+            main_table=ctx.table.name.value,
             staging_table=imported_staging_table_name(ctx.table),
             conditions=self._generate_redshift_delete_conditions(
                 ctx.table, for_shadow_table=False
             ),
         )
         delete_using_redshift_shadow_staging = REDSHIFT_DELETE_COMMAND.format(
-            main_table=ctx.table.name,
+            main_table=ctx.table.name.value,
             staging_table=imported_shadow_staging_table_name(ctx.table),
             conditions=self._generate_redshift_delete_conditions(
                 ctx.table, for_shadow_table=True
@@ -329,7 +329,7 @@ class DataSyncManager:
 
         # d) Insert new (and updated) rows.
         insert_using_redshift_staging = REDSHIFT_INSERT_COMMAND.format(
-            dest_table=ctx.table.name,
+            dest_table=ctx.table.name.value,
             staging_table=imported_staging_table_name(ctx.table),
         )
         logger.debug("Running on Redshift: %s", insert_using_redshift_staging)
@@ -417,14 +417,14 @@ class DataSyncManager:
                 UPDATE_EXTRACT_PROGRESS_BOTH,
                 ctx.max_extract_seq + 1,
                 ctx.max_shadow_extract_seq + 1,
-                ctx.table.name,
+                ctx.table.name.value,
             )
         elif ctx.should_advance_main_seq():
             logger.debug("Setting next main sync seq: %d", ctx.max_extract_seq + 1)
             await aurora.execute(
                 UPDATE_EXTRACT_PROGRESS_NON_SHADOW,
                 ctx.max_extract_seq + 1,
-                ctx.table.name,
+                ctx.table.name.value,
             )
         elif ctx.should_advance_shadow_seq():
             logger.debug(
@@ -433,7 +433,7 @@ class DataSyncManager:
             await aurora.execute(
                 UPDATE_EXTRACT_PROGRESS_SHADOW,
                 ctx.max_shadow_extract_seq + 1,
-                ctx.table.name,
+                ctx.table.name.value,
             )
         else:
             # This case should not happen - we skip the sync if both ranges are empty.
@@ -447,11 +447,11 @@ class DataSyncManager:
         # next sync.
 
     def _get_s3_main_table_path(self, table: Table, include_file: bool = True) -> str:
-        prefix = "{}{}/main/".format(self._config.s3_extract_path, table.name)
+        prefix = "{}{}/main/".format(self._config.s3_extract_path, table.name.value)
         return prefix + "table.tbl" if include_file else prefix
 
     def _get_s3_shadow_table_path(self, table: Table, include_file: bool = True) -> str:
-        prefix = "{}{}/shadow/".format(self._config.s3_extract_path, table.name)
+        prefix = "{}{}/shadow/".format(self._config.s3_extract_path, table.name.value)
         return prefix + "table.tbl" if include_file else prefix
 
     def _generate_redshift_delete_conditions(
@@ -461,7 +461,7 @@ class DataSyncManager:
         for col in table.primary_key:
             conditions.append(
                 "{main_table}.{col_name} = {staging_table}.{col_name}".format(
-                    main_table=table.name,
+                    main_table=table.name.value,
                     staging_table=imported_staging_table_name(table)
                     if not for_shadow_table
                     else imported_shadow_staging_table_name(table),
@@ -502,7 +502,7 @@ class DataSyncManager:
             merge_cond=merge_cond,
             update_cols=update_cols,
             insert_cols=insert_cols,
-            main_table=table.name,
+            main_table=table.name.value,
             staging_table=imported_staging_table_name(table),
             shadow_staging_table=imported_shadow_staging_table_name(table),
         )
