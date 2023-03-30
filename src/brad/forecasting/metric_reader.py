@@ -27,7 +27,7 @@ class MetricReader:
     def get_stats(self, i: int = -1, end: datetime = datetime.now()):
         if i >= 0:
             raise ValueError(
-                f"Can only get stats for past epochs (negative values of i)"
+                "Can only get stats for past epochs (negative values of i)"
             )
 
         end_floor = (

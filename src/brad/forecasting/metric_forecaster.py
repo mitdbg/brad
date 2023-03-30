@@ -1,4 +1,4 @@
-from metric_reader import MetricReader
+from brad.forecasting.metric_reader import MetricReader
 from typing import List, Dict
 
 
@@ -41,7 +41,7 @@ class MetricForecaster:
     # Values for a specific metric-stat pair from start_epoch (inclusive) until end_epoch (exclusive)
     def by_metric(self, metric_stat, start_epoch, end_epoch):
         if start_epoch > end_epoch:
-            raise ValueError(f"start_epoch must be less than or equal to end_epoch")
+            raise ValueError("start_epoch must be less than or equal to end_epoch")
 
         l = []
         i = start_epoch
@@ -56,7 +56,7 @@ class MetricForecaster:
     # Forecast the value of a specific metric-stat pair at epoch i.
     def forecast(self, metric_stat, i):
         if i < 0:
-            raise ValueError(f"Can only forecast values for future epochs.")
+            raise ValueError("Can only forecast values for future epochs.")
         return self.readers[metric_stat].get_stats(-1)
 
 
