@@ -11,16 +11,24 @@ S3_ICEBERG: DataLocation
 UNKNOWN: DataLocation
 
 class DataBlueprint(_message.Message):
-    __slots__ = ["schema_name", "table_dependencies", "table_locations", "table_schemas"]
+    __slots__ = ["schema_name", "tables"]
     SCHEMA_NAME_FIELD_NUMBER: _ClassVar[int]
-    TABLE_DEPENDENCIES_FIELD_NUMBER: _ClassVar[int]
-    TABLE_LOCATIONS_FIELD_NUMBER: _ClassVar[int]
-    TABLE_SCHEMAS_FIELD_NUMBER: _ClassVar[int]
+    TABLES_FIELD_NUMBER: _ClassVar[int]
     schema_name: str
-    table_dependencies: _containers.RepeatedCompositeFieldContainer[TableDependency]
-    table_locations: _containers.RepeatedCompositeFieldContainer[TableLocation]
-    table_schemas: _containers.RepeatedCompositeFieldContainer[TableSchema]
-    def __init__(self, schema_name: _Optional[str] = ..., table_schemas: _Optional[_Iterable[_Union[TableSchema, _Mapping]]] = ..., table_locations: _Optional[_Iterable[_Union[TableLocation, _Mapping]]] = ..., table_dependencies: _Optional[_Iterable[_Union[TableDependency, _Mapping]]] = ...) -> None: ...
+    tables: _containers.RepeatedCompositeFieldContainer[Table]
+    def __init__(self, schema_name: _Optional[str] = ..., tables: _Optional[_Iterable[_Union[Table, _Mapping]]] = ...) -> None: ...
+
+class Table(_message.Message):
+    __slots__ = ["columns", "dependencies", "locations", "table_name"]
+    COLUMNS_FIELD_NUMBER: _ClassVar[int]
+    DEPENDENCIES_FIELD_NUMBER: _ClassVar[int]
+    LOCATIONS_FIELD_NUMBER: _ClassVar[int]
+    TABLE_NAME_FIELD_NUMBER: _ClassVar[int]
+    columns: _containers.RepeatedCompositeFieldContainer[TableColumn]
+    dependencies: TableDependency
+    locations: _containers.RepeatedScalarFieldContainer[DataLocation]
+    table_name: str
+    def __init__(self, table_name: _Optional[str] = ..., columns: _Optional[_Iterable[_Union[TableColumn, _Mapping]]] = ..., locations: _Optional[_Iterable[_Union[DataLocation, str]]] = ..., dependencies: _Optional[_Union[TableDependency, _Mapping]] = ...) -> None: ...
 
 class TableColumn(_message.Message):
     __slots__ = ["data_type", "is_primary", "name"]
@@ -33,30 +41,12 @@ class TableColumn(_message.Message):
     def __init__(self, name: _Optional[str] = ..., data_type: _Optional[str] = ..., is_primary: bool = ...) -> None: ...
 
 class TableDependency(_message.Message):
-    __slots__ = ["sources", "target", "transform"]
-    SOURCES_FIELD_NUMBER: _ClassVar[int]
-    TARGET_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ["source_table_names", "transform"]
+    SOURCE_TABLE_NAMES_FIELD_NUMBER: _ClassVar[int]
     TRANSFORM_FIELD_NUMBER: _ClassVar[int]
-    sources: _containers.RepeatedCompositeFieldContainer[TableLocation]
-    target: TableLocation
+    source_table_names: _containers.RepeatedScalarFieldContainer[str]
     transform: str
-    def __init__(self, target: _Optional[_Union[TableLocation, _Mapping]] = ..., sources: _Optional[_Iterable[_Union[TableLocation, _Mapping]]] = ..., transform: _Optional[str] = ...) -> None: ...
-
-class TableLocation(_message.Message):
-    __slots__ = ["location", "table_name"]
-    LOCATION_FIELD_NUMBER: _ClassVar[int]
-    TABLE_NAME_FIELD_NUMBER: _ClassVar[int]
-    location: DataLocation
-    table_name: str
-    def __init__(self, table_name: _Optional[str] = ..., location: _Optional[_Union[DataLocation, str]] = ...) -> None: ...
-
-class TableSchema(_message.Message):
-    __slots__ = ["columns", "table_name"]
-    COLUMNS_FIELD_NUMBER: _ClassVar[int]
-    TABLE_NAME_FIELD_NUMBER: _ClassVar[int]
-    columns: _containers.RepeatedCompositeFieldContainer[TableColumn]
-    table_name: str
-    def __init__(self, table_name: _Optional[str] = ..., columns: _Optional[_Iterable[_Union[TableColumn, _Mapping]]] = ...) -> None: ...
+    def __init__(self, source_table_names: _Optional[_Iterable[str]] = ..., transform: _Optional[str] = ...) -> None: ...
 
 class DataLocation(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):  # type: ignore
     __slots__ = []  # type: ignore

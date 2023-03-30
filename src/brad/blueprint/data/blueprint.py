@@ -1,5 +1,5 @@
 from .location import Location
-from .table import TableSchema, TableLocation, TableDependency
+from .table import Table
 
 from typing import Dict, List, Optional
 
@@ -8,14 +8,10 @@ class DataBlueprint:
     def __init__(
         self,
         schema_name: str,
-        table_schemas: List[TableSchema],
-        table_locations: List[TableLocation],
-        table_dependencies: List[TableDependency],
+        tables: List[Table],
     ):
         self._schema_name = schema_name
-        self._table_schemas = table_schemas
-        self._table_locations = table_locations
-        self._table_dependencies = table_dependencies
+        self._tables = tables
 
         self._schemas_by_name = {tbl.name: tbl for tbl in self._table_schemas}
         self._table_locations_by_name: Dict[str, List[Location]] = dict()
@@ -33,8 +29,8 @@ class DataBlueprint:
         return self._schema_name
 
     @property
-    def table_schemas(self) -> List[TableSchema]:
-        return self._table_schemas
+    def tables(self) -> List[Table]:
+        return self._tables
 
     @property
     def table_locations(self) -> List[TableLocation]:

@@ -13,23 +13,21 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0f\x62lueprint.proto\x12\x04\x62rad\"\xaf\x01\n\rDataBlueprint\x12\x13\n\x0bschema_name\x18\x01 \x01(\t\x12(\n\rtable_schemas\x18\x02 \x03(\x0b\x32\x11.brad.TableSchema\x12,\n\x0ftable_locations\x18\x03 \x03(\x0b\x32\x13.brad.TableLocation\x12\x31\n\x12table_dependencies\x18\x04 \x03(\x0b\x32\x15.brad.TableDependency\"E\n\x0bTableSchema\x12\x12\n\ntable_name\x18\x01 \x01(\t\x12\"\n\x07\x63olumns\x18\x02 \x03(\x0b\x32\x11.brad.TableColumn\"B\n\x0bTableColumn\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\tdata_type\x18\x02 \x01(\t\x12\x12\n\nis_primary\x18\x03 \x01(\x08\"I\n\rTableLocation\x12\x12\n\ntable_name\x18\x01 \x01(\t\x12$\n\x08location\x18\x02 \x01(\x0e\x32\x12.brad.DataLocation\"o\n\x0fTableDependency\x12#\n\x06target\x18\x01 \x01(\x0b\x32\x13.brad.TableLocation\x12$\n\x07sources\x18\x02 \x03(\x0b\x32\x13.brad.TableLocation\x12\x11\n\ttransform\x18\x03 \x01(\t*E\n\x0c\x44\x61taLocation\x12\x0b\n\x07UNKNOWN\x10\x00\x12\n\n\x06\x41URORA\x10\x01\x12\x0c\n\x08REDSHIFT\x10\x02\x12\x0e\n\nS3_ICEBERG\x10\x03\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0f\x62lueprint.proto\x12\x04\x62rad\"A\n\rDataBlueprint\x12\x13\n\x0bschema_name\x18\x01 \x01(\t\x12\x1b\n\x06tables\x18\x02 \x03(\x0b\x32\x0b.brad.Table\"\x93\x01\n\x05Table\x12\x12\n\ntable_name\x18\x01 \x01(\t\x12\"\n\x07\x63olumns\x18\x02 \x03(\x0b\x32\x11.brad.TableColumn\x12%\n\tlocations\x18\x03 \x03(\x0e\x32\x12.brad.DataLocation\x12+\n\x0c\x64\x65pendencies\x18\x04 \x01(\x0b\x32\x15.brad.TableDependency\"B\n\x0bTableColumn\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\tdata_type\x18\x02 \x01(\t\x12\x12\n\nis_primary\x18\x03 \x01(\x08\"@\n\x0fTableDependency\x12\x1a\n\x12source_table_names\x18\x02 \x03(\t\x12\x11\n\ttransform\x18\x03 \x01(\t*E\n\x0c\x44\x61taLocation\x12\x0b\n\x07UNKNOWN\x10\x00\x12\n\n\x06\x41URORA\x10\x01\x12\x0c\n\x08REDSHIFT\x10\x02\x12\x0e\n\nS3_ICEBERG\x10\x03\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'blueprint_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _DATALOCATION._serialized_start=530
-  _DATALOCATION._serialized_end=599
-  _DATABLUEPRINT._serialized_start=26
-  _DATABLUEPRINT._serialized_end=201
-  _TABLESCHEMA._serialized_start=203
-  _TABLESCHEMA._serialized_end=272
-  _TABLECOLUMN._serialized_start=274
-  _TABLECOLUMN._serialized_end=340
-  _TABLELOCATION._serialized_start=342
-  _TABLELOCATION._serialized_end=415
-  _TABLEDEPENDENCY._serialized_start=417
-  _TABLEDEPENDENCY._serialized_end=528
+  _DATALOCATION._serialized_start=376
+  _DATALOCATION._serialized_end=445
+  _DATABLUEPRINT._serialized_start=25
+  _DATABLUEPRINT._serialized_end=90
+  _TABLE._serialized_start=93
+  _TABLE._serialized_end=240
+  _TABLECOLUMN._serialized_start=242
+  _TABLECOLUMN._serialized_end=308
+  _TABLEDEPENDENCY._serialized_start=310
+  _TABLEDEPENDENCY._serialized_end=374
 # @@protoc_insertion_point(module_scope)

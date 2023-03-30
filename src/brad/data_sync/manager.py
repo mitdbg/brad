@@ -2,7 +2,7 @@ import aioodbc
 import logging
 from typing import Any
 
-from brad.blueprint.data.table import TableSchema
+from brad.blueprint.data.table import Table
 from brad.blueprint.sql_gen.table import (
     comma_separated_column_names,
     comma_separated_column_names_and_types,
@@ -41,7 +41,7 @@ _MAX_SEQ = 0xFFFFFFFF_FFFFFFFF
 
 
 class _SyncContext:
-    def __init__(self, table: TableSchema):
+    def __init__(self, table: Table):
         self.table = table
 
         self.next_extract_seq = -1
@@ -160,7 +160,7 @@ class DataSyncManager:
             await self._sync_table(blueprint.table_schema_for(table_name))
         logger.debug("Sync complete.")
 
-    async def _sync_table(self, table: TableSchema):
+    async def _sync_table(self, table: Table):
         aurora = await self._aurora.cursor()
         redshift = await self._redshift.cursor()
         athena = await self._athena.cursor()
@@ -446,20 +446,16 @@ class DataSyncManager:
         # do not delete them for now because they will be overwritten by the
         # next sync.
 
-    def _get_s3_main_table_path(
-        self, table: TableSchema, include_file: bool = True
-    ) -> str:
+    def _get_s3_main_table_path(self, table: Table, include_file: bool = True) -> str:
         prefix = "{}{}/main/".format(self._config.s3_extract_path, table.name)
         return prefix + "table.tbl" if include_file else prefix
 
-    def _get_s3_shadow_table_path(
-        self, table: TableSchema, include_file: bool = True
-    ) -> str:
+    def _get_s3_shadow_table_path(self, table: Table, include_file: bool = True) -> str:
         prefix = "{}{}/shadow/".format(self._config.s3_extract_path, table.name)
         return prefix + "table.tbl" if include_file else prefix
 
     def _generate_redshift_delete_conditions(
-        self, table: TableSchema, for_shadow_table: bool
+        self, table: Table, for_shadow_table: bool
     ) -> str:
         conditions = []
         for col in table.primary_key:
@@ -474,7 +470,7 @@ class DataSyncManager:
             )
         return " AND ".join(conditions)
 
-    def _generate_athena_merge_query(self, table: TableSchema) -> str:
+    def _generate_athena_merge_query(self, table: Table) -> str:
         pkey_cols = comma_separated_column_names(table.primary_key)
         non_primary_cols = list(filter(lambda c: not c.is_primary, table.columns))
         other_cols = comma_separated_column_names(non_primary_cols)

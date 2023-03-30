@@ -3,7 +3,7 @@ from typing import Dict
 from brad.blueprint.data import DataBlueprint
 from brad.blueprint.data.location import Location
 from brad.blueprint.data.user import UserProvidedDataBlueprint
-from brad.blueprint.data.table import Table
+from brad.blueprint.data.table import Table, TableName
 
 
 def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> DataBlueprint:
@@ -32,7 +32,7 @@ def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> DataBlueprint:
     #   three engines.
 
     # The bool indicates whether or not the table is a base table.
-    is_base_table: Dict[str, bool] = dict()
+    is_base_table: Dict[TableName, bool] = dict()
 
     def process_table(table: Table, expect_standalone_base_table: bool):
         if table.name in is_base_table:
