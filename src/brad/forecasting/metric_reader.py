@@ -22,8 +22,14 @@ class MetricReader:
         elif service == "aurora":
             self.namespace = "AWS/RDS"
 
-    # Stats for the i-th (0-based) most recent epoch that completely finished before `end`
-    def get_stats(self, i: int = 0, end: datetime = datetime.now()):
+    # Stats for the i-th epoch, for negative i.
+    # Epoch 0 is currently in progress, positive epochs are in the future.
+    def get_stats(self, i: int = -1, end: datetime = datetime.now()):
+        if i >= 0:
+            raise ValueError(
+                f"Can only get stats for past epochs (negative values of i)"
+            )
+
         end_floor = (
             end
             - timedelta(
@@ -32,7 +38,7 @@ class MetricReader:
                 seconds=end.second,
                 microseconds=end.microsecond,
             )
-            - timedelta(minutes=self.epoch_minutes * i)
+            - timedelta(minutes=self.epoch_minutes * (-i - 1))
         )
         start = end_floor - timedelta(minutes=self.epoch_minutes)
 
@@ -62,10 +68,10 @@ class MetricReader:
 if __name__ == "__main__":
     mr = MetricReader("redshift", "CPUUtilization", "Average", 60)
     print(mr.get_stats())
-    print(mr.get_stats(i=2))
+    print(mr.get_stats(i=-2))
     print(mr.get_stats(end=datetime.now() - timedelta(days=1)))
 
     mr2 = MetricReader("aurora", "CPUUtilization", "Average", 30)
     print(mr2.get_stats())
-    print(mr2.get_stats(i=2))
+    print(mr2.get_stats(i=-2))
     print(mr2.get_stats(end=datetime.now() - timedelta(days=1)))
