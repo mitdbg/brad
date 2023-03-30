@@ -44,7 +44,10 @@ def _table_to_proto(table: Table) -> b.Table:
         columns=map(_table_column_to_proto, table.columns),
         locations=map(_location_to_proto, table.locations),
         dependencies=b.TableDependency(
-            sources=table.table_dependencies, transform=table.transform_text
+            source_table_names=map(
+                lambda tbl_name: tbl_name.value, table.table_dependencies
+            ),
+            transform=table.transform_text,
         ),
     )
 
@@ -73,7 +76,7 @@ def _table_from_proto(table: b.Table) -> Table:
     return Table(
         name=TableName(table.table_name),
         columns=list(map(_table_column_from_proto, table.columns)),
-        table_dependencies=table.dependencies.source_table_names,
+        table_dependencies=list(map(TableName, table.dependencies.source_table_names)),
         transform_text=table.dependencies.transform,
         locations=list(map(_location_from_proto, table.locations)),
     )

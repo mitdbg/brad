@@ -1,8 +1,8 @@
-from typing import List, Tuple, Set
+from typing import List, Tuple
 
 from brad.blueprint.data import DataBlueprint
 from brad.blueprint.data.location import Location
-from brad.blueprint.data.table import Column, TableLocation
+from brad.blueprint.data.table import Column, Table
 from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
 from brad.config.strings import (
@@ -33,28 +33,16 @@ class TableSqlGenerator:
         self._config = config
         self._blueprint = blueprint
 
-        # Compute the set of Aurora tables that are sources in a dependency
-        # relationship.
-        self._aurora_sources: Set[str] = set()
-        for dep in self._blueprint.table_dependencies:
-            for table_loc in dep.sources:
-                if table_loc.location != Location.Aurora:
-                    continue
-                self._aurora_sources.add(table_loc.table_name)
-
     def generate_create_table_sql(
-        self, table_location: TableLocation
+        self, table: Table, location: Location
     ) -> Tuple[List[str], DBType]:
         """
-        Returns SQL queries that should be used to create the table given by
-        `table_location`, along with the engine on which to execute the queries.
+        Returns SQL queries that should be used to create `table` on `location`,
+        along with the engine on which to execute the queries.
         """
 
-        table = self._blueprint.table_schema_for(table_location.table_name)
-        location = table_location.location
-
         if location == Location.Aurora:
-            if table_location.table_name in self._aurora_sources:
+            if table.name in self._blueprint.base_table_names:
                 # This table needs to support incremental extraction. We need to
                 # create several additional structures to support this extraction.
                 columns_with_types = comma_separated_column_names_and_types(
@@ -199,8 +187,11 @@ class TableSqlGenerator:
             + AURORA_EXTRACT_PROGRESS_TABLE_NAME
             + " (table_name, next_extract_seq, next_shadow_extract_seq) VALUES ('{table_name}', 0, 0)"
         )
-        for table_name in self._aurora_sources:
-            queries.append(initialize_template.format(table_name=table_name))
+        for base_table_name in self._blueprint.base_table_names:
+            base_table = self._blueprint.get_table(base_table_name)
+            if Location.Aurora not in base_table.locations:
+                continue
+            queries.append(initialize_template.format(table_name=base_table_name))
 
         return (queries, DBType.Aurora)
 

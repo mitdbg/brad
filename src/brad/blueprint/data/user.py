@@ -33,8 +33,10 @@ class UserProvidedDataBlueprint:
             columns = list(
                 map(UserProvidedDataBlueprint._parse_column, raw_table["columns"])
             )
-            table_deps = (
-                raw_table["dependencies"] if "dependencies" in raw_table else []
+            table_deps: List[TableName] = (
+                list(map(TableName, raw_table["dependencies"]))
+                if "dependencies" in raw_table
+                else []
             )
             transform = raw_table["transform"] if "transform" in raw_table else None
             tables.append(Table(TableName(name), columns, table_deps, transform, []))
