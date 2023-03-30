@@ -7,10 +7,14 @@ class MetricReader:
     Utility class used for accessing monitoring metrics for the deployed services.
     """
 
-    def __init__(self, namespace: str, metric_name: str):
-        self.namespace = namespace
+    def __init__(self, service: str, metric_name: str):
+        self.service = service
         self.metric_name = metric_name
         self.client = boto3.client("cloudwatch")
+        if service == "redshift":
+            self.namespace = "AWS/Redshift"
+        elif service == "aurora":
+            self.namespace = "AWS/RDS"
 
     def get_stats(self, minutes: int):
         now = datetime.datetime.now()
@@ -19,12 +23,19 @@ class MetricReader:
         )
         yesterday = now_floor - datetime.timedelta(minutes=minutes)
 
+        if self.service == "redshift":
+            dimensions = [
+                {"Name": "ClusterIdentifier", "Value": "brad-redshift"},
+            ]
+        elif self.service == "aurora":
+            dimensions = [
+                {"Name": "EngineName", "Value": "aurora-postgresql"},
+            ]
+
         response = self.client.get_metric_statistics(
             Namespace=self.namespace,
             MetricName=self.metric_name,
-            Dimensions=[
-                {"Name": "ClusterIdentifier", "Value": "brad-redshift"},
-            ],
+            Dimensions=dimensions,
             StartTime=yesterday,
             EndTime=now_floor,
             Period=minutes * 60,
@@ -41,6 +52,10 @@ class MetricReader:
 
 
 if __name__ == "__main__":
-    mr = MetricReader("AWS/Redshift", "CPUUtilization")
+    mr = MetricReader("redshift", "CPUUtilization")
     mr.get_stats(60 * 24)
     mr.get_stats(60 * 24 * 2)
+
+    mr2 = MetricReader("aurora", "CPUUtilization")
+    mr2.get_stats(60 * 24)
+    mr2.get_stats(60 * 24 * 2)
