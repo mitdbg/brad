@@ -1,5 +1,5 @@
 import boto3
-import datetime
+from datetime import datetime, timedelta
 
 
 class MetricReader:
@@ -16,12 +16,9 @@ class MetricReader:
         elif service == "aurora":
             self.namespace = "AWS/RDS"
 
-    def get_stats(self, minutes: int):
-        now = datetime.datetime.now()
-        now_floor = now - datetime.timedelta(
-            seconds=now.second, microseconds=now.microsecond
-        )
-        yesterday = now_floor - datetime.timedelta(minutes=minutes)
+    def get_stats(self, minutes: int, end: datetime = datetime.now()):
+        end_floor = end - timedelta(seconds=end.second, microseconds=end.microsecond)
+        start = end_floor - timedelta(minutes=minutes)
 
         if self.service == "redshift":
             dimensions = [
@@ -36,8 +33,8 @@ class MetricReader:
             Namespace=self.namespace,
             MetricName=self.metric_name,
             Dimensions=dimensions,
-            StartTime=yesterday,
-            EndTime=now_floor,
+            StartTime=start,
+            EndTime=end_floor,
             Period=minutes * 60,
             Statistics=[
                 "SampleCount",
@@ -59,3 +56,4 @@ if __name__ == "__main__":
     mr2 = MetricReader("aurora", "CPUUtilization")
     mr2.get_stats(60 * 24)
     mr2.get_stats(60 * 24 * 2)
+    mr2.get_stats(60 * 24, end=datetime.now() - timedelta(days=1))
