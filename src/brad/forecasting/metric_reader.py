@@ -7,19 +7,34 @@ class MetricReader:
     Utility class used for accessing monitoring metrics for the deployed services.
     """
 
-    def __init__(self, service: str, metric_name: str, stat: str):
+    def __init__(self, service: str, metric_name: str, stat: str, epoch_minutes: int):
+        if epoch_minutes > 60 * 24:
+            raise ValueError(
+                f"epoch_minutes can be at most 1440 (one day), not {epoch_minutes}"
+            )
         self.service = service
         self.metric_name = metric_name
         self.stat = stat
+        self.epoch_minutes = epoch_minutes
         self.client = boto3.client("cloudwatch")
         if service == "redshift":
             self.namespace = "AWS/Redshift"
         elif service == "aurora":
             self.namespace = "AWS/RDS"
 
-    def get_stats(self, minutes: int, end: datetime = datetime.now()):
-        end_floor = end - timedelta(seconds=end.second, microseconds=end.microsecond)
-        start = end_floor - timedelta(minutes=minutes)
+    # Stats for the i-th (0-based) most recent epoch that completely finished before `end`
+    def get_stats(self, i: int = 0, end: datetime = datetime.now()):
+        end_floor = (
+            end
+            - timedelta(
+                hours=end.hour % (self.epoch_minutes / 60),
+                minutes=end.minute % self.epoch_minutes,
+                seconds=end.second,
+                microseconds=end.microsecond,
+            )
+            - timedelta(minutes=self.epoch_minutes * i)
+        )
+        start = end_floor - timedelta(minutes=self.epoch_minutes)
 
         if self.service == "redshift":
             dimensions = [
@@ -36,22 +51,21 @@ class MetricReader:
             Dimensions=dimensions,
             StartTime=start,
             EndTime=end_floor,
-            Period=minutes * 60,
-            Statistics=[
-                self.stat
-            ],
+            Period=self.epoch_minutes * 60,
+            Statistics=[self.stat],
             Unit="Percent",
         )
 
-        print(response["Datapoints"])
+        return response["Datapoints"][0][self.stat]
 
 
 if __name__ == "__main__":
-    mr = MetricReader("redshift", "CPUUtilization", "Average")
-    mr.get_stats(60 * 24)
-    mr.get_stats(60 * 24 * 2)
+    mr = MetricReader("redshift", "CPUUtilization", "Average", 60)
+    print(mr.get_stats())
+    print(mr.get_stats(i=2))
+    print(mr.get_stats(end=datetime.now() - timedelta(days=1)))
 
-    mr2 = MetricReader("aurora", "CPUUtilization", "Average")
-    mr2.get_stats(60 * 24)
-    mr2.get_stats(60 * 24 * 2)
-    mr2.get_stats(60 * 24, end=datetime.now() - timedelta(days=1))
+    mr2 = MetricReader("aurora", "CPUUtilization", "Average", 30)
+    print(mr2.get_stats())
+    print(mr2.get_stats(i=2))
+    print(mr2.get_stats(end=datetime.now() - timedelta(days=1)))
