@@ -36,8 +36,4 @@ def test_data_blueprint_serde():
 
     # Sanity check assertions.
     assert blueprint_orig.schema_name == blueprint_after.schema_name
-    assert len(blueprint_orig.table_schemas) == len(blueprint_after.table_schemas)
-    assert len(blueprint_orig.table_locations) == len(blueprint_after.table_locations)
-    assert len(blueprint_orig.table_dependencies) == len(
-        blueprint_after.table_dependencies
-    )
+    assert len(blueprint_orig.tables) == len(blueprint_after.tables)

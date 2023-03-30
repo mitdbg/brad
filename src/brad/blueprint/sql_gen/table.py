@@ -1,8 +1,8 @@
-from typing import List, Tuple, Set
+from typing import List, Tuple
 
 from brad.blueprint.data import DataBlueprint
 from brad.blueprint.data.location import Location
-from brad.blueprint.data.table import Column, TableLocation
+from brad.blueprint.data.table import Column, Table
 from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
 from brad.config.strings import (
@@ -33,28 +33,16 @@ class TableSqlGenerator:
         self._config = config
         self._blueprint = blueprint
 
-        # Compute the set of Aurora tables that are sources in a dependency
-        # relationship.
-        self._aurora_sources: Set[str] = set()
-        for dep in self._blueprint.table_dependencies:
-            for table_loc in dep.sources:
-                if table_loc.location != Location.Aurora:
-                    continue
-                self._aurora_sources.add(table_loc.table_name)
-
     def generate_create_table_sql(
-        self, table_location: TableLocation
+        self, table: Table, location: Location
     ) -> Tuple[List[str], DBType]:
         """
-        Returns SQL queries that should be used to create the table given by
-        `table_location`, along with the engine on which to execute the queries.
+        Returns SQL queries that should be used to create `table` on `location`,
+        along with the engine on which to execute the queries.
         """
 
-        table = self._blueprint.table_schema_for(table_location.table_name)
-        location = table_location.location
-
         if location == Location.Aurora:
-            if table_location.table_name in self._aurora_sources:
+            if table.name in self._blueprint.base_table_names:
                 # This table needs to support incremental extraction. We need to
                 # create several additional structures to support this extraction.
                 columns_with_types = comma_separated_column_names_and_types(
@@ -77,7 +65,7 @@ class TableSqlGenerator:
                 # A view over the source table that excludes the monotonically
                 # increasing sequence column.
                 create_source_view = AURORA_CREATE_SOURCE_VIEW_TEMPLATE.format(
-                    view_name=table.name,
+                    view_name=table.name.value,
                     source_table_name=source_table_name(table),
                     columns=comma_separated_column_names(table.columns),
                 )
@@ -151,7 +139,7 @@ class TableSqlGenerator:
                 # This is just a regular table on Aurora that will not need to
                 # support incremental extraction.
                 sql = AURORA_BARE_OR_REDSHIFT_CREATE_TABLE_TEMPLATE.format(
-                    table_name=table.name,
+                    table_name=table.name.value,
                     columns=comma_separated_column_names_and_types(
                         table.columns, DBType.Aurora
                     ),
@@ -161,7 +149,7 @@ class TableSqlGenerator:
 
         elif location == Location.Redshift:
             sql = AURORA_BARE_OR_REDSHIFT_CREATE_TABLE_TEMPLATE.format(
-                table_name=table.name,
+                table_name=table.name.value,
                 columns=comma_separated_column_names_and_types(
                     table.columns, DBType.Redshift
                 ),
@@ -171,11 +159,13 @@ class TableSqlGenerator:
 
         elif location == Location.S3Iceberg:
             sql = ATHENA_CREATE_TABLE_TEMPLATE.format(
-                table_name=table.name,
+                table_name=table.name.value,
                 columns=comma_separated_column_names_and_types(
                     table.columns, DBType.Athena
                 ),
-                s3_path="{}{}".format(self._config.athena_s3_data_path, table.name),
+                s3_path="{}{}".format(
+                    self._config.athena_s3_data_path, table.name.value
+                ),
             )
             return ([sql], DBType.Athena)
 
@@ -199,8 +189,11 @@ class TableSqlGenerator:
             + AURORA_EXTRACT_PROGRESS_TABLE_NAME
             + " (table_name, next_extract_seq, next_shadow_extract_seq) VALUES ('{table_name}', 0, 0)"
         )
-        for table_name in self._aurora_sources:
-            queries.append(initialize_template.format(table_name=table_name))
+        for base_table_name in self._blueprint.base_table_names:
+            base_table = self._blueprint.get_table(base_table_name)
+            if Location.Aurora not in base_table.locations:
+                continue
+            queries.append(initialize_template.format(table_name=base_table_name))
 
         return (queries, DBType.Aurora)
 

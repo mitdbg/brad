@@ -1,9 +1,8 @@
 from brad.blueprint.data import DataBlueprint
 from brad.blueprint.data.table import (
-    TableLocation,
-    TableDependency,
-    TableSchema,
     Column,
+    Table,
+    TableName,
 )
 from brad.blueprint.data.location import Location
 
@@ -22,22 +21,14 @@ def deserialize_data_blueprint(raw_data: bytes) -> DataBlueprint:
     proto.ParseFromString(raw_data)
     return DataBlueprint(
         schema_name=proto.schema_name,
-        table_schemas=list(map(_table_schema_from_proto, proto.table_schemas)),
-        table_locations=list(map(_table_location_from_proto, proto.table_locations)),
-        table_dependencies=list(
-            map(_table_dependency_from_proto, proto.table_dependencies)
-        ),
+        tables=list(map(_table_from_proto, proto.tables)),
     )
 
 
 def serialize_data_blueprint(blueprint: DataBlueprint) -> bytes:
     proto = b.DataBlueprint(
         schema_name=blueprint.schema_name,
-        table_schemas=map(_table_schema_to_proto, blueprint.table_schemas),
-        table_locations=map(_table_location_to_proto, blueprint.table_locations),
-        table_dependencies=map(
-            _table_dependency_to_proto, blueprint.table_dependencies
-        ),
+        tables=map(_table_to_proto, blueprint.tables),
     )
     return proto.SerializeToString()
 
@@ -47,29 +38,23 @@ def serialize_data_blueprint(blueprint: DataBlueprint) -> bytes:
 # Serialization
 
 
-def _table_schema_to_proto(table: TableSchema) -> b.TableSchema:
-    return b.TableSchema(
-        table_name=table.name, columns=map(_table_column_to_proto, table.columns)
+def _table_to_proto(table: Table) -> b.Table:
+    return b.Table(
+        table_name=table.name.value,
+        columns=map(_table_column_to_proto, table.columns),
+        locations=map(_location_to_proto, table.locations),
+        dependencies=b.TableDependency(
+            source_table_names=map(
+                lambda tbl_name: tbl_name.value, table.table_dependencies
+            ),
+            transform=table.transform_text,
+        ),
     )
 
 
 def _table_column_to_proto(col: Column) -> b.TableColumn:
     return b.TableColumn(
         name=col.name, data_type=col.data_type, is_primary=col.is_primary
-    )
-
-
-def _table_dependency_to_proto(tdep: TableDependency) -> b.TableDependency:
-    return b.TableDependency(
-        target=_table_location_to_proto(tdep.target),
-        sources=map(_table_location_to_proto, tdep.sources),
-        transform=tdep.transform,
-    )
-
-
-def _table_location_to_proto(tloc: TableLocation) -> b.TableLocation:
-    return b.TableLocation(
-        table_name=tloc.table_name, location=_location_to_proto(tloc.location)
     )
 
 
@@ -87,29 +72,18 @@ def _location_to_proto(loc: Location) -> b.DataLocation:
 # Deserialization
 
 
-def _table_schema_from_proto(table: b.TableSchema) -> TableSchema:
-    return TableSchema(
-        name=table.table_name,
+def _table_from_proto(table: b.Table) -> Table:
+    return Table(
+        name=TableName(table.table_name),
         columns=list(map(_table_column_from_proto, table.columns)),
+        table_dependencies=list(map(TableName, table.dependencies.source_table_names)),
+        transform_text=table.dependencies.transform,
+        locations=list(map(_location_from_proto, table.locations)),
     )
 
 
 def _table_column_from_proto(col: b.TableColumn) -> Column:
     return Column(name=col.name, data_type=col.data_type, is_primary=col.is_primary)
-
-
-def _table_dependency_from_proto(tdep: b.TableDependency) -> TableDependency:
-    return TableDependency(
-        target=_table_location_from_proto(tdep.target),
-        sources=list(map(_table_location_from_proto, tdep.sources)),
-        transform=tdep.transform,
-    )
-
-
-def _table_location_from_proto(tloc: b.TableLocation) -> TableLocation:
-    return TableLocation(
-        table_name=tloc.table_name, location=_location_from_proto(tloc.location)
-    )
 
 
 def _location_from_proto(loc: b.DataLocation) -> Location:

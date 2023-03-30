@@ -20,15 +20,16 @@ enum DataLocation {
 // dependencies, and transforms.
 message DataBlueprint {
   string schema_name = 1;
-  repeated TableSchema table_schemas = 2;
-  repeated TableLocation table_locations = 3;
-  repeated TableDependency table_dependencies = 4;
+  repeated Table tables = 2;
 }
 
-// Stores a table's logical (i.e., user-provided) schema.
-message TableSchema {
+// Stores metadata about a table (its schema, where it is stored, whether it has
+// a dependency on other table(s)).
+message Table {
   string table_name = 1;
   repeated TableColumn columns = 2;
+  repeated DataLocation locations = 3;
+  TableDependency dependencies = 4;
 }
 
 // Stores type information about a column. The `type` is expected to be a
@@ -39,18 +40,13 @@ message TableColumn {
   bool is_primary = 3;
 }
 
-// Used to indicate that the table with `table_name` is stored in `location`.
-message TableLocation {
-  string table_name = 1;
-  DataLocation location = 2;
-}
-
-// Used to indicate that the `target` table is dependent on the `sources`
-// table(s). There is an optional transform that can be applied (a sequence of
-// SQL statements). If there is no transform, then it is treated as a an
-// identity transform (i.e., the target table is a replica of the source table).
+// Used to indicate a dependency on the `sources` table(s). There is an optional
+// transform that can be applied (a sequence of SQL statements).
+//
+// If there is no transform, then it is treated as an identity transform
+// (i.e., the target table is a replica of the source table). In this case,
+// there can only be one source table.
 message TableDependency {
-  TableLocation target = 1;
-  repeated TableLocation sources = 2;
+  repeated string source_table_names = 2;
   string transform = 3;
 }

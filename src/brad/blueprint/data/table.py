@@ -2,6 +2,26 @@ from .location import Location
 from typing import List, Optional
 
 
+class TableName:
+    def __init__(self, name: str):
+        self._name = name
+
+    @property
+    def value(self) -> str:
+        return self._name
+
+    def __repr__(self) -> str:
+        return self._name
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TableName):
+            return False
+        return self._name == other._name
+
+    def __hash__(self) -> int:
+        return hash(self._name)
+
+
 class Column:
     """
     Represents a column (its name and type).
@@ -25,22 +45,32 @@ class Column:
         return self._is_primary
 
 
-class TableSchema:
+class Table:
     """
-    Represents a table's schema (its name, columns, and primary key columns).
+    Holds metadata that BRAD needs to know about a table:
+    - Its schema (name, columns, primary key columns)
+    - Physical locations
+    - Its dependencies
+    - The transformation to use when propagating changes from the dependencies
     """
 
     def __init__(
         self,
-        name: str,
+        name: TableName,
         columns: List[Column],
+        table_dependencies: List[TableName],
+        transform_text: Optional[str],
+        locations: List[Location],
     ):
         self._name = name
         self._columns = columns
+        self._table_dependencies = table_dependencies
+        self._transform_text = transform_text
+        self._locations = locations
         self._primary_key = list(filter(lambda c: c.is_primary, columns))
 
     @property
-    def name(self) -> str:
+    def name(self) -> TableName:
         return self._name
 
     @property
@@ -48,85 +78,17 @@ class TableSchema:
         return self._columns
 
     @property
-    def primary_key(self) -> List[Column]:
-        return self._primary_key
-
-
-class UserProvidedTable(TableSchema):
-    """
-    Extends a `TableSchema` with additional properties that are provided by a
-    user (table dependencies and transforms).
-    """
-
-    def __init__(
-        self,
-        name: str,
-        columns: List[Column],
-        table_dependencies: List[str],
-        transform_text: Optional[str],
-    ):
-        super().__init__(name, columns)
-        self._table_dependencies = table_dependencies
-        self._transform_text = transform_text
-
-    @property
-    def table_dependencies(self) -> List[str]:
+    def table_dependencies(self) -> List[TableName]:
         return self._table_dependencies
 
     @property
     def transform_text(self) -> Optional[str]:
         return self._transform_text
 
-    def as_schema(self) -> TableSchema:
-        return self
-
-
-class TableLocation:
-    """
-    Indicates that the table with a name of `table_name` is stored in
-    `location`.
-    """
-
-    def __init__(self, table_name: str, location: Location):
-        self._table_name = table_name
-        self._location = location
+    @property
+    def locations(self) -> List[Location]:
+        return self._locations
 
     @property
-    def table_name(self) -> str:
-        return self._table_name
-
-    @property
-    def location(self) -> Location:
-        return self._location
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, TableLocation):
-            return False
-        return self.table_name == other.table_name and self.location == other.location
-
-    def __hash__(self) -> int:
-        return hash((self._table_name, self._location))
-
-
-class TableDependency:
-    def __init__(
-        self,
-        sources: List[TableLocation],
-        target: TableLocation,
-        transform: Optional[str],
-    ):
-        self._sources = sources
-        self._target = target
-        self._transform = transform
-
-    @property
-    def target(self) -> TableLocation:
-        return self._target
-
-    @property
-    def sources(self) -> List[TableLocation]:
-        return self._sources
-
-    @property
-    def transform(self) -> Optional[str]:
-        return self._transform
+    def primary_key(self) -> List[Column]:
+        return self._primary_key

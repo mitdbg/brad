@@ -1,5 +1,8 @@
+from typing import Set, List
+
 from brad.config.dbtype import DBType
 from brad.blueprint.data.location import Location
+from brad.blueprint.data.table import TableName
 from brad.server.data_blueprint_manager import DataBlueprintManager
 from brad.routing import Router
 from brad.query_rep import QueryRep
@@ -20,14 +23,19 @@ class LocationAwareRoundRobin(Router):
             return DBType.Aurora
 
         blueprint = self._data_blueprint_mgr.get_blueprint()
-        locations = list(
-            set.intersection(
-                *map(
-                    lambda table_name: set(blueprint.locations_of(table_name)),
-                    query.tables(),
-                )
-            )
-        )
+
+        location_sets: List[Set[Location]] = []
+        for table_name_str in query.tables():
+            try:
+                table = blueprint.get_table(TableName(table_name_str))
+                location_sets.append(set(table.locations))
+            except ValueError:
+                # The query is referencing a non-existent table (could be a CTE
+                # - the parser does not differentiate between CTE tables and
+                # "actual" tables).
+                pass
+        locations = list(set.intersection(*location_sets))
+
         if len(locations) == 0:
             # This happens when a query references a set of tables that do not
             # all have a presence in the same location.

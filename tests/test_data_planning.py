@@ -1,6 +1,6 @@
 from brad.blueprint.data.location import Location
+from brad.blueprint.data.table import TableName
 from brad.blueprint.data.user import UserProvidedDataBlueprint
-from brad.blueprint.data.table import TableLocation
 from brad.planner.data import bootstrap_data_blueprint
 
 
@@ -29,53 +29,35 @@ def test_boostrap_data_blueprint():
     user = UserProvidedDataBlueprint.load_from_yaml_str(table_config)
     blueprint = bootstrap_data_blueprint(user)
 
-    tables = blueprint.table_names()
+    tables = blueprint.tables
+    table_names_str = list(map(lambda t: t.name.value, tables))
     assert len(tables) == 3
-    assert "table1" in tables
-    assert "table2" in tables
-    assert "table3" in tables
+    assert "table1" in table_names_str
+    assert "table2" in table_names_str
+    assert "table3" in table_names_str
 
-    # See `bootstrap_data_blueprint()`'s docstring.
-    table1_locs = blueprint.locations_of("table1")
-    assert len(table1_locs) == 1
-    assert Location.Aurora in table1_locs
+    table1 = blueprint.get_table(TableName("table1"))
+    assert len(table1.locations) == 1
+    assert Location.Aurora in table1.locations
 
-    table2_locs = blueprint.locations_of("table2")
-    assert len(table2_locs) == 2
-    assert Location.Redshift in table2_locs
-    assert Location.S3Iceberg in table2_locs
+    table2 = blueprint.get_table(TableName("table2"))
+    assert len(table2.locations) == 2
+    assert Location.Redshift in table2.locations
+    assert Location.S3Iceberg in table2.locations
 
-    table3_locs = blueprint.locations_of("table3")
-    assert len(table3_locs) == 3
-    assert Location.Aurora in table3_locs
-    assert Location.Redshift in table3_locs
-    assert Location.S3Iceberg in table3_locs
+    table3 = blueprint.get_table(TableName("table3"))
+    assert len(table3.locations) == 3
+    assert Location.Aurora in table3.locations
+    assert Location.Redshift in table3.locations
+    assert Location.S3Iceberg in table3.locations
 
     # Table 1 is a base table and it is only present on Aurora.
-    assert blueprint.dependencies_of(TableLocation("table1", Location.Aurora)) is None
-    assert blueprint.dependencies_of(TableLocation("table1", Location.Redshift)) is None
-    assert (
-        blueprint.dependencies_of(TableLocation("table1", Location.S3Iceberg)) is None
-    )
+    assert len(table1.table_dependencies) == 0
 
-    # Table 3 is a base table but it is replicated.
-    assert blueprint.dependencies_of(TableLocation("table3", Location.Aurora)) is None
-
-    t3_redshift = blueprint.dependencies_of(TableLocation("table3", Location.Redshift))
-    assert t3_redshift is not None
-    assert len(t3_redshift.sources) == 1
-
-    t3_s3 = blueprint.dependencies_of(TableLocation("table3", Location.S3Iceberg))
-    assert t3_s3 is not None
-    assert len(t3_s3.sources) == 1
+    # Table 3 is also a base table but it is replicated across Redshift and S3.
+    assert len(table3.table_dependencies) == 0
+    assert TableName("table3") in blueprint.base_table_names
 
     # Table 2 is dependent on table 1 and is present on Redshift and S3.
-    assert blueprint.dependencies_of(TableLocation("table2", Location.Aurora)) is None
-
-    t2_redshift = blueprint.dependencies_of(TableLocation("table2", Location.Redshift))
-    assert t2_redshift is not None
-    assert len(t2_redshift.sources) == 1
-
-    t2_s3 = blueprint.dependencies_of(TableLocation("table2", Location.S3Iceberg))
-    assert t2_s3 is not None
-    assert len(t2_s3.sources) == 1
+    assert TableName("table1") in table2.table_dependencies
+    assert TableName("table2") not in blueprint.base_table_names

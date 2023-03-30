@@ -43,18 +43,19 @@ def bootstrap_schema(args):
     # 6. Set up the underlying tables.
     sql_gen = TableSqlGenerator(config, blueprint)
 
-    for table_location in blueprint.table_locations:
-        logger.info(
-            "Creating table '%s' on %s...",
-            table_location.table_name,
-            table_location.location,
-        )
-        queries, db_type = sql_gen.generate_create_table_sql(table_location)
-        conn = cxns.get_connection(db_type)
-        cursor = conn.cursor()
-        for q in queries:
-            logger.debug("Running on %s: %s", str(db_type), q)
-            cursor.execute(q)
+    for table in blueprint.tables:
+        for location in table.locations:
+            logger.info(
+                "Creating table '%s' on %s...",
+                table.name,
+                location,
+            )
+            queries, db_type = sql_gen.generate_create_table_sql(table, location)
+            conn = cxns.get_connection(db_type)
+            cursor = conn.cursor()
+            for q in queries:
+                logger.debug("Running on %s: %s", str(db_type), q)
+                cursor.execute(q)
 
     # 7. Create and set up the extraction progress table.
     queries, db_type = sql_gen.generate_extraction_progress_set_up_table_sql()

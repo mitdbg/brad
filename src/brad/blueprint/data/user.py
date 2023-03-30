@@ -1,6 +1,6 @@
 import yaml
 
-from .table import Column, UserProvidedTable
+from .table import Column, Table, TableName
 from typing import List, Set
 
 
@@ -27,21 +27,23 @@ class UserProvidedDataBlueprint:
 
     @classmethod
     def _load_from_raw_yaml(cls, raw_yaml) -> "UserProvidedDataBlueprint":
-        tables: List[UserProvidedTable] = []
+        tables: List[Table] = []
         for raw_table in raw_yaml["tables"]:
-            table_name = raw_table["table_name"]
+            name = raw_table["table_name"]
             columns = list(
                 map(UserProvidedDataBlueprint._parse_column, raw_table["columns"])
             )
-            table_deps = (
-                raw_table["dependencies"] if "dependencies" in raw_table else []
+            table_deps: List[TableName] = (
+                list(map(TableName, raw_table["dependencies"]))
+                if "dependencies" in raw_table
+                else []
             )
             transform = raw_table["transform"] if "transform" in raw_table else None
-            tables.append(UserProvidedTable(table_name, columns, table_deps, transform))
+            tables.append(Table(TableName(name), columns, table_deps, transform, []))
 
         return cls(raw_yaml["schema_name"], tables)
 
-    def __init__(self, schema_name: str, tables: List[UserProvidedTable]):
+    def __init__(self, schema_name: str, tables: List[Table]):
         self._schema_name = schema_name
         self._tables = tables
 
@@ -50,7 +52,7 @@ class UserProvidedDataBlueprint:
         return self._schema_name
 
     @property
-    def tables(self) -> List[UserProvidedTable]:
+    def tables(self) -> List[Table]:
         return self._tables
 
     def validate(self) -> None:
@@ -60,11 +62,11 @@ class UserProvidedDataBlueprint:
         """
 
         tables_by_name = {tbl.name: tbl for tbl in self.tables}
-        checked: Set[str] = set()
-        curr_path: Set[str] = set()
+        checked: Set[TableName] = set()
+        curr_path: Set[TableName] = set()
 
         # Recursively checks for circular dependencies.
-        def check_deps(table: UserProvidedTable):
+        def check_deps(table: Table):
             if table.name in checked:
                 return
             if table.name in curr_path:
