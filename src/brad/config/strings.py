@@ -1,41 +1,41 @@
-from brad.blueprint.data.table import TableSchema
+from brad.blueprint.data.table import Table
 
 
-def source_table_name(table: TableSchema) -> str:
+def source_table_name(table: Table) -> str:
     return "{}_brad_source".format(table.name)
 
 
-def shadow_table_name(table: TableSchema) -> str:
+def shadow_table_name(table: Table) -> str:
     return "{}_brad_shadow".format(table.name)
 
 
-def delete_trigger_function_name(table: TableSchema) -> str:
+def delete_trigger_function_name(table: Table) -> str:
     return "{}_brad_delete_trigger_fn".format(table.name)
 
 
-def delete_trigger_name(table: TableSchema) -> str:
+def delete_trigger_name(table: Table) -> str:
     return "{}_brad_delete_trigger".format(table.name)
 
 
-def update_trigger_function_name(table: TableSchema) -> str:
+def update_trigger_function_name(table: Table) -> str:
     return "{}_brad_update_trigger_fn".format(table.name)
 
 
-def update_trigger_name(table: TableSchema) -> str:
+def update_trigger_name(table: Table) -> str:
     return "{}_brad_update_trigger".format(table.name)
 
 
-def seq_index_name(table: TableSchema, for_shadow: bool) -> str:
+def seq_index_name(table: Table, for_shadow: bool) -> str:
     return "{}_brad_seq_index".format(
         table.name if not for_shadow else shadow_table_name(table)
     )
 
 
-def imported_staging_table_name(table: TableSchema) -> str:
+def imported_staging_table_name(table: Table) -> str:
     return "{}_brad_staging".format(table.name)
 
 
-def imported_shadow_staging_table_name(table: TableSchema) -> str:
+def imported_shadow_staging_table_name(table: Table) -> str:
     return "{}_brad_shadow_staging".format(table.name)
 
 
