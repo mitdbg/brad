@@ -163,7 +163,9 @@ class TableSqlGenerator:
                 columns=comma_separated_column_names_and_types(
                     table.columns, DBType.Athena
                 ),
-                s3_path="{}{}".format(self._config.athena_s3_data_path, table.name.value),
+                s3_path="{}{}".format(
+                    self._config.athena_s3_data_path, table.name.value
+                ),
             )
             return ([sql], DBType.Athena)
 
