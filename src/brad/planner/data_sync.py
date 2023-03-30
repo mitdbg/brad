@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from brad.blueprint.data.blueprint import DataBlueprint
 from brad.blueprint.data.table import Table, TableName
@@ -14,7 +14,7 @@ from brad.data_sync.logical_plan import (
 
 def make_logical_data_sync_plan(blueprint: DataBlueprint) -> LogicalDataSyncPlan:
     # For each table, the operator whose output is the table's deltas.
-    delta_operators: Dict[TableName, LogicalDataSyncOperator] = {}
+    delta_operators: Dict[TableName, Optional[LogicalDataSyncOperator]] = {}
     all_operators: List[LogicalDataSyncOperator] = []
     base_operators: List[LogicalDataSyncOperator] = []
 
@@ -34,18 +34,27 @@ def make_logical_data_sync_plan(blueprint: DataBlueprint) -> LogicalDataSyncPlan
     #   the deltas into deltas to be applied to this table.
     # - While traversing the dependency graph, this function also generates
     #   "apply delta" operators to actually apply the changes to the table.
-    def process_table(table: Table) -> LogicalDataSyncOperator:
+    def process_table(table: Table) -> Optional[LogicalDataSyncOperator]:
         # Base case: Table already processed.
         if table.name in delta_operators:
             return delta_operators[table.name]
 
         # 1. Get the operator that will compute deltas to apply to this table.
         if len(table.table_dependencies) == 0:
-            # This is a base table.
-            extract_op = ExtractDeltas(table.name)
-            all_operators.append(extract_op)
-            base_operators.append(extract_op)
-            delta_source_for_this_table: LogicalDataSyncOperator = extract_op
+            # This is a base table. If it has a replica on Aurora, we create an
+            # `ExtractDeltas` op.
+            if Location.Aurora in table.locations:
+                extract_op = ExtractDeltas(table.name)
+                all_operators.append(extract_op)
+                base_operators.append(extract_op)
+                delta_source_for_this_table: Optional[
+                    LogicalDataSyncOperator
+                ] = extract_op
+            else:
+                # This scenario occurs when we have "static" table replicas
+                # (e.g, a table replicated on Redshift and S3 that does not
+                # experience writes).
+                delta_source_for_this_table = None
 
         else:
             # This table has dependencies. Recursively compute their delta
@@ -57,21 +66,26 @@ def make_logical_data_sync_plan(blueprint: DataBlueprint) -> LogicalDataSyncPlan
                 )
             )
 
-            # Sanity check.
+            # Sanity check. All sources should not be `None` (otherwise it means
+            # we are depending on a table that cannot be extracted from - a data
+            # planning error).
+            non_null_delta_sources: List[LogicalDataSyncOperator] = []
             for gen in source_delta_generators:
+                assert gen is not None
                 assert isinstance(gen, ExtractDeltas) or isinstance(
                     gen, TransformDeltas
                 )
+                non_null_delta_sources.append(gen)
 
             if table.transform_text is None:
                 # Identity transform. There must be only one source.
-                assert len(source_delta_generators) == 0
-                delta_source_for_this_table = source_delta_generators[0]
+                assert len(non_null_delta_sources) == 1
+                delta_source_for_this_table = non_null_delta_sources[0]
 
             else:
                 # There is a transform.
                 transform_op = TransformDeltas(
-                    source_delta_generators,
+                    non_null_delta_sources,
                     table.transform_text,
                     # Initial heuristic: Run all transforms on Redshift. This
                     # can be made more sophisticated depending on system loads,
@@ -82,10 +96,23 @@ def make_logical_data_sync_plan(blueprint: DataBlueprint) -> LogicalDataSyncPlan
                 delta_source_for_this_table = transform_op
 
         # 2. Create operators to apply deltas to this table (and its replicas).
-        for location in table.locations:
-            all_operators.append(
-                ApplyDeltas(delta_source_for_this_table, table.name, location)
-            )
+        # If this table is a base table and it does not have a replica on
+        # Aurora, it is considered static (we assume writes originate on
+        # Aurora).
+        is_base_and_static = (
+            len(table.table_dependencies) == 0
+            and Location.Aurora not in table.locations
+        )
+        if not is_base_and_static:
+            for location in table.locations:
+                if len(table.table_dependencies) == 0 and location == Location.Aurora:
+                    # This is a base table. Writes originate from Aurora, so we do
+                    # not need to apply deltas to it.
+                    continue
+                assert delta_source_for_this_table is not None
+                all_operators.append(
+                    ApplyDeltas(delta_source_for_this_table, table.name, location)
+                )
 
         delta_operators[table.name] = delta_source_for_this_table
         return delta_source_for_this_table

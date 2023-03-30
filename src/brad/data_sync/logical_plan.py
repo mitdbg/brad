@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 
 from brad.blueprint.data.location import Location
 from brad.blueprint.data.table import TableName
@@ -28,6 +28,12 @@ class LogicalDataSyncPlan:
         self._operators = operators
         self._base_operators = base_operators
 
+    def operators(self) -> List[LogicalDataSyncOperator]:
+        return self._operators
+
+    def base_operators(self) -> List[LogicalDataSyncOperator]:
+        return self._base_operators
+
 
 class ExtractDeltas(LogicalDataSyncOperator):
     """
@@ -47,6 +53,9 @@ class ExtractDeltas(LogicalDataSyncOperator):
     def dependencies(self) -> List[LogicalDataSyncOperator]:
         return []
 
+    def __repr__(self) -> str:
+        return "".join(["ExtractDeltas(", str(self._table_name), ")"])
+
 
 class TransformDeltas(LogicalDataSyncOperator):
     """
@@ -57,7 +66,7 @@ class TransformDeltas(LogicalDataSyncOperator):
     def __init__(
         self,
         sources: List[LogicalDataSyncOperator],
-        transform_text: Optional[str],
+        transform_text: str,
         location: Location,
     ):
         super().__init__()
@@ -72,6 +81,17 @@ class TransformDeltas(LogicalDataSyncOperator):
 
     def dependencies(self) -> List[LogicalDataSyncOperator]:
         return self._sources
+
+    def __repr__(self) -> str:
+        return "".join(
+            [
+                "TransformDeltas(num_sources=",
+                str(len(self._sources)),
+                ", location=",
+                self._location,
+                ")",
+            ]
+        )
 
 
 class ApplyDeltas(LogicalDataSyncOperator):
@@ -93,5 +113,13 @@ class ApplyDeltas(LogicalDataSyncOperator):
 
         self._source.add_dependee(self)
 
+    def table_name(self) -> TableName:
+        return self._table_name
+
     def dependencies(self) -> List[LogicalDataSyncOperator]:
         return [self._source]
+
+    def __repr__(self) -> str:
+        return "".join(
+            ["ApplyDeltas(", str(self._table_name), ", location=", self._location, ")"]
+        )
