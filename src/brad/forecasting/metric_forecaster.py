@@ -28,7 +28,7 @@ class MetricForecaster:
 
     # Stats for the i-th epoch. Epoch 0 is currently in progress, positive epochs are in the future.
     # Returns actual stats for negative values of i, forecasts for other values of i.
-    def at_epoch(self, i):
+    def at_epoch(self, i: int):
         d = {}
         for reader in self.readers.keys():
             value = (
@@ -39,7 +39,7 @@ class MetricForecaster:
         return d
 
     # Values for a specific metric-stat pair from start_epoch (inclusive) until end_epoch (exclusive)
-    def by_metric(self, metric_stat, start_epoch, end_epoch):
+    def by_metric(self, metric_stat: str, start_epoch: int, end_epoch: int):
         if start_epoch > end_epoch:
             raise ValueError("start_epoch must be less than or equal to end_epoch")
 
@@ -54,7 +54,7 @@ class MetricForecaster:
         return l
 
     # Forecast the value of a specific metric-stat pair at epoch i.
-    def forecast(self, metric_stat, i):
+    def forecast(self, metric_stat: str, i: int):
         if i < 0:
             raise ValueError("Can only forecast values for future epochs.")
         return self.readers[metric_stat].get_stats(-1)
