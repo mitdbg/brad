@@ -1,7 +1,15 @@
 import os
 import json
-from workloads.IMDB.util import format_time_str, IMDB_TABLE_SIZE, extract_columns, extract_join_keys
-from workloads.IMDB.generate_oltp_queries import generate_oltp_queries, make_init_log_file
+from workloads.IMDB.util import (
+    format_time_str,
+    IMDB_TABLE_SIZE,
+    extract_columns,
+    extract_join_keys,
+)
+from workloads.IMDB.generate_oltp_queries import (
+    generate_oltp_queries,
+    make_init_log_file,
+)
 
 
 def simulate_oltp_one_day(param, day=None):
@@ -14,7 +22,9 @@ def simulate_oltp_one_day(param, day=None):
 
     if os.path.exists(txn_query_dir) and len(os.listdir(txn_query_dir)) != 0:
         if not p.force:
-            print(f"transaction queries already generated for day {day} at {txn_query_dir}")
+            print(
+                f"transaction queries already generated for day {day} at {txn_query_dir}"
+            )
             return
         else:
             for file in os.listdir(txn_query_dir):
@@ -36,16 +46,17 @@ def simulate_oltp_one_day(param, day=None):
         user_name = f"transaction_user_{user+1}"
         user_queries = dict()
         for hour in range(24):
-            current_queries = generate_oltp_queries(num_queries=int(num_queries * p.num_txn_queries_dist[hour]),
-                                                    generation_log_file=p.txn_generation_ids_offset_file,
-                                                    table_insert_freq=p.table_insert_freq,
-                                                    num_tuples_insert=p.num_tuples_insert_per_user,
-                                                    PK_columns=PK_columns,
-                                                    all_columns=all_columns,
-                                                    all_tables=all_table_name,
-                                                    all_join_keys=join_keys,
-                                                    match_new_pk=p.match_new_pk
-                                                    )
+            current_queries = generate_oltp_queries(
+                num_queries=int(num_queries * p.num_txn_queries_dist[hour]),
+                generation_log_file=p.txn_generation_ids_offset_file,
+                table_insert_freq=p.table_insert_freq,
+                num_tuples_insert=p.num_tuples_insert_per_user,
+                PK_columns=PK_columns,
+                all_columns=all_columns,
+                all_tables=all_table_name,
+                all_join_keys=join_keys,
+                match_new_pk=p.match_new_pk,
+            )
             if len(current_queries) != 0:
                 exec_freq = max(int(3600 / len(current_queries)), 1)
                 for i, q in enumerate(current_queries):
@@ -56,6 +67,7 @@ def simulate_oltp_one_day(param, day=None):
         json_file_name = os.path.join(txn_query_dir, user_name)
         with open(json_file_name + ".json", "w+") as f:
             json.dump(user_queries, f)
+
 
 def simulate_oltp(param):
     num_day = param.num_days
