@@ -32,6 +32,7 @@ INSTALL_REQUIRES = [
     "pyodbc",
     "pyyaml",
     "sqlglot",
+    "boto3",
 ]
 
 DEV_REQUIRES = [
