@@ -14,8 +14,12 @@ tables:
     s3_path: folder/for/table1/table1.csv
     aurora_options: FORMAT csv, HEADER true
     redshift_options: CSV IGNOREHEADER 1
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: table2
     s3_path: folder/for/table2/table2.csv
     aurora_options: FORMAT csv, HEADER true
     redshift_options: CSV IGNOREHEADER 1
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')

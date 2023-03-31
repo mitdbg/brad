@@ -5,9 +5,15 @@ from collections import namedtuple
 
 from brad.blueprint.data import DataBlueprint
 from brad.blueprint.data.location import Location
-from brad.blueprint.data.table import Table
+from brad.blueprint.data.table import Table, TableName
+from brad.blueprint.sql_gen.table import comma_separated_column_names_and_types
 from brad.config.file import ConfigFile
 from brad.config.dbtype import DBType
+from brad.config.strings import (
+    AURORA_EXTRACT_PROGRESS_TABLE_NAME,
+    AURORA_SEQ_COLUMN,
+    source_table_name,
+)
 from brad.server.data_blueprint_manager import DataBlueprintManager
 from brad.server.engine_connections import EngineConnections
 
@@ -32,6 +38,13 @@ _REDSHIFT_LOAD_TEMPLATE = """
     COPY {table_name} FROM 's3://{s3_bucket}/{s3_path}'
     IAM_ROLE {s3_iam_role}
     {options}
+"""
+
+_ATHENA_CREATE_LOAD_TABLE = """
+    CREATE EXTERNAL TABLE {load_table_name} ({columns})
+    {options1}
+    LOCATION 's3://{s3_bucket}/{s3_path}'
+    {options2}
 """
 
 
@@ -105,7 +118,7 @@ def _location_to_engine(location: Location) -> DBType:
 async def _load_aurora(
     ctx: _LoadContext,
     table_name: str,
-    table_options: yaml.YAMLObject,
+    table_options,
     aurora_connection,
 ) -> DBType:
     logger.info("Loading %s on Aurora...", table_name)
@@ -118,6 +131,7 @@ async def _load_aurora(
         s3_region=ctx.s3_bucket_region,
         s3_path=table_options["s3_path"],
     )
+    logger.debug("Running on Aurora: %s", load_query)
     await aurora_connection.execute(load_query)
     logger.info("Done loading %s on Aurora!", table_name)
     return DBType.Aurora
@@ -126,7 +140,7 @@ async def _load_aurora(
 async def _load_redshift(
     ctx: _LoadContext,
     table_name: str,
-    table_options: yaml.YAMLObject,
+    table_options,
     redshift_connection,
 ) -> DBType:
     logger.info("Loading %s on Redshift...", table_name)
@@ -141,6 +155,7 @@ async def _load_redshift(
         ),
         s3_iam_role=ctx.config.redshift_s3_iam_role,
     )
+    logger.debug("Running on Redshift %s", load_query)
     await redshift_connection.execute(load_query)
     logger.info("Done loading %s on Redshift!", table_name)
     return DBType.Redshift
@@ -149,10 +164,49 @@ async def _load_redshift(
 async def _load_athena(
     ctx: _LoadContext,
     table_name: str,
-    table_options: yaml.YAMLObject,
+    table_options,
+    table: Table,
     athena_connection,
 ) -> DBType:
     logger.info("Loading %s on Athena...", table_name)
+
+    # Strip off the file name from the file path (i.e., we need the prefix)
+    # my/table1/table1.csv -> my/table1/
+    path_parts = table_options["s3_path"].split("/")
+    s3_folder_path = "/".join(path_parts[:-1]) + "/"
+
+    # 1. We need to create a loading table.
+    q = _ATHENA_CREATE_LOAD_TABLE.format(
+        load_table_name="{}_brad_loading".format(table_name),
+        columns=comma_separated_column_names_and_types(table.columns, DBType.Athena),
+        s3_bucket=ctx.s3_bucket,
+        s3_path=s3_folder_path,
+        options1=(
+            table_options["athena_options1"]
+            if "athena_options1" in table_options
+            else ""
+        ),
+        options2=(
+            table_options["athena_options2"]
+            if "athena_options2" in table_options
+            else ""
+        ),
+    )
+    logger.debug("Running on Athena %s", q)
+    await athena_connection.execute(q)
+
+    # 2. Actually run the load.
+    q = "INSERT INTO {table_name} SELECT * FROM {table_name}_brad_loading".format(
+        table_name=table_name
+    )
+    logger.debug("Running on Athena %s", q)
+    await athena_connection.execute(q)
+
+    # 3. Remove the loading table.
+    q = "DROP TABLE {}_brad_loading".format(table_name)
+    logger.debug("Running on Athena %s", q)
+    await athena_connection.execute(q)
+
     logger.info("Done loading %s on Athena!", table_name)
     return DBType.Athena
 
@@ -160,7 +214,28 @@ async def _load_athena(
 async def _update_sync_progress(
     ctx: _LoadContext, blueprint: DataBlueprint, aurora_connection
 ) -> None:
-    pass
+    cursor = await aurora_connection.cursor()
+
+    q = "SELECT table_name FROM " + AURORA_EXTRACT_PROGRESS_TABLE_NAME
+    logger.debug("Running on Aurora %s", q)
+    await cursor.execute(q)
+    extract_tables = await cursor.fetchall()
+
+    for tbl_name in extract_tables:
+        table = blueprint.get_table(tbl_name)
+        q = "SELECT MAX({}) FROM {}".format(AURORA_SEQ_COLUMN, source_table_name(table))
+        logger.debug("Running on Aurora %s", q)
+        await cursor.execute(q)
+        row = await cursor.fetchone()
+        max_seq = row[0]
+
+        q = "UPDATE {} SET next_extract_seq = {}".format(
+            AURORA_EXTRACT_PROGRESS_TABLE_NAME, max_seq + 1
+        )
+        logger.debug("Running on Aurora %s", q)
+        await cursor.execute(q)
+
+    await cursor.commit()
 
 
 async def bulk_load_impl(args, manifest) -> None:
@@ -183,7 +258,7 @@ async def bulk_load_impl(args, manifest) -> None:
         # 1. Generate all load tasks.
         for table_options in manifest["tables"]:
             table_name = table_options["table_name"]
-            table = blueprint.get_table(table_name)
+            table = blueprint.get_table(TableName(table_name))
             for loc in table.locations:
                 if loc == Location.Aurora:
                     aurora_loads.append(
@@ -211,6 +286,7 @@ async def bulk_load_impl(args, manifest) -> None:
                             ctx,
                             table_name,
                             table_options,
+                            table,
                             engines.get_connection(DBType.Athena),
                         )
                     )
@@ -233,26 +309,26 @@ async def bulk_load_impl(args, manifest) -> None:
                 lambda f: f is not None,
                 [running_aurora, running_redshift, running_athena],
             )
-            done, _ = asyncio.wait(running, return_when=asyncio.FIRST_COMPLETED)
+            done, _ = asyncio.wait(*running, return_when=asyncio.FIRST_COMPLETED)  # type: ignore
 
             for task in done:
                 engine = task.result()
                 if engine == DBType.Aurora:
-                    aurora_loads.pop()
+                    aurora_loads.pop()  # type: ignore
                     running_aurora = aurora_loads[-1] if len(aurora_loads) > 0 else None
 
                 elif engine == DBType.Redshift:
-                    redshift_loads.pop()
+                    redshift_loads.pop()  # type: ignore
                     running_redshift = (
                         redshift_loads[-1] if len(redshift_loads) > 0 else None
                     )
 
                 elif engine == DBType.Athena:
-                    athena_loads.pop()
+                    athena_loads.pop()  # type: ignore
                     running_athena = athena_loads[-1] if len(athena_loads) > 0 else None
 
-        engines.get_connection(DBType.Aurora).commit()
-        engines.get_connection(DBType.Redshift).commit()
+        await engines.get_connection(DBType.Aurora).commit()
+        await engines.get_connection(DBType.Redshift).commit()
         # Athena does not support transactions.
 
         # Sanity checks.
@@ -266,7 +342,7 @@ async def bulk_load_impl(args, manifest) -> None:
         )
 
     finally:
-        engines.close()
+        await engines.close()
 
 
 def bulk_load(args) -> None:
