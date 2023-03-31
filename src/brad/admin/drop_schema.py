@@ -9,13 +9,29 @@ from brad.server.engine_connections import EngineConnections
 logger = logging.getLogger(__name__)
 
 
+def register_admin_action(subparser) -> None:
+    parser = subparser.add_parser("drop_schema", help="Drop a schema from BRAD.")
+    parser.add_argument(
+        "--config-file",
+        type=str,
+        required=True,
+        help="Path to BRAD's configuration file.",
+    )
+    parser.add_argument(
+        "--schema-name",
+        type=str,
+        help="The name of the schema to drop.",
+    )
+    parser.set_defaults(admin_action=drop_schema)
+
+
 # This method is called by `brad.exec.admin.main`.
 def drop_schema(args):
     # 1. Load the config.
     config = ConfigFile(args.config_file)
 
     # 2. Delete the persisted data blueprint, if it exists.
-    data_blueprint_mgr = DataBlueprintManager(config, args.drop_schema_name)
+    data_blueprint_mgr = DataBlueprintManager(config, args.schema_name)
     data_blueprint_mgr.delete_sync()
 
     # 3. Connect to the underlying engines without an explicit database.
@@ -25,10 +41,10 @@ def drop_schema(args):
     athena = cxns.get_connection(DBType.Athena).cursor()
 
     # 4. Drop the underlying "databases" if they exist.
-    athena.execute("DROP DATABASE IF EXISTS {} CASCADE".format(args.drop_schema_name))
-    aurora.execute("DROP DATABASE IF EXISTS {}".format(args.drop_schema_name))
+    athena.execute("DROP DATABASE IF EXISTS {} CASCADE".format(args.schema_name))
+    aurora.execute("DROP DATABASE IF EXISTS {}".format(args.schema_name))
     try:
-        redshift.execute("DROP DATABASE {}".format(args.drop_schema_name))
+        redshift.execute("DROP DATABASE {}".format(args.schema_name))
     except pyodbc.Error:
         # Ignore the error if a database does not exist.
         logger.exception("Exception when dropping Redshift database.")
