@@ -7,14 +7,15 @@
 #   - Example: Store `table1.csv` at `my/data/table1/table1.csv` and `table2.csv` as `my/data/table2/table2.csv`
 
 s3_bucket: your-bucket
+s3_bucket_region: us-east-1
 
 tables:
-  - table1:
-      s3_path: folder/for/table1/table1.csv
-      aurora_options: FORMAT csv, HEADER true
-      redshift_options: FORMAT csv, HEADER true
+  - table_name: table1
+    s3_path: folder/for/table1/table1.csv
+    aurora_options: FORMAT csv, HEADER true
+    redshift_options: CSV IGNOREHEADER 1
 
-  - table2:
-      s3_path: folder/for/table2/table2.csv
-      aurora_options: FORMAT csv, HEADER true
-      redshift_options: FORMAT csv, HEADER true
+  - table_name: table2
+    s3_path: folder/for/table2/table2.csv
+    aurora_options: FORMAT csv, HEADER true
+    redshift_options: CSV IGNOREHEADER 1
