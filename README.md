@@ -64,3 +64,23 @@ To remove the tables, use `brad admin drop_schema` (e.g., `brad admin
 drop_schema --config-file path/to/config.yml --drop-schema-name
 your_schema_name`). Note that this command will delete the data in the tables
 (and will drop the tables)!
+
+
+### Generate IMDB workload
+
+Required package (pip install): pandas, absl-py, numpy
+
+Load schema and data: TODO
+
+Generate_workload: 
+
+The hyperparameters with documentation can be found at `workloads/IMDB/parameters.py`. 
+Please correct the path if necessary. 
+You can create a super class of `WorkloadParams` to explore different parameters, 
+and make sure to put `@Register` before your parameter class.
+
+```angular2html
+python --run Default
+```
+
+

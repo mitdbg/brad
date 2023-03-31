@@ -1,0 +1,3 @@
+OLTP_queries/
+OLAP_queries/adhoc_queries/
+OLAP_queries/reporting_queries/
