@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import yaml
+from concurrent.futures import ThreadPoolExecutor
 from collections import namedtuple
 from typing import Any, Coroutine, Iterator, List
 
@@ -318,8 +319,8 @@ async def bulk_load_impl(args, manifest) -> None:
         athena_loads = load_tasks_for_engine(DBType.Athena)
 
         _try_add_task(aurora_loads, running)
-        _try_add_task(redshift_loads, running)
         _try_add_task(athena_loads, running)
+        _try_add_task(redshift_loads, running)
 
         while len(running) > 0:
             done, pending = await asyncio.wait(
@@ -346,53 +347,21 @@ async def bulk_load_impl(args, manifest) -> None:
             manifest, blueprint, engines.get_connection(DBType.Aurora)
         )
 
-    except Exception as ex:
-        logger.error("Encountered error during bulk load.")
-        print(ex)
+    except:
         for task in running:
             task.cancel()
-        print("before wait")
         await asyncio.gather(*running, return_exceptions=True)
-        print("after wait")
         raise
 
     finally:
-        print("inside finally...")
         await engines.close()
-        print("after finally...")
-
-
-async def cancel_all_tasks():
-    logging.debug("Shutting down the event loop...")
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    for task in tasks:
-        task.cancel()
-    await asyncio.gather(*tasks, return_exceptions=True)
-
-
-def handle_exception(event_loop, context):
-    message = context.get("exception", context["message"])
-    logging.error("Encountered fatal exception: %s", message)
-    if event_loop.is_closed():
-        return
-    event_loop.create_task(cancel_all_tasks())
 
 
 def bulk_load(args) -> None:
     with open(args.manifest_file, "r") as file:
         manifest = yaml.load(file, Loader=yaml.Loader)
 
-    event_loop = asyncio.new_event_loop()
-    event_loop.set_debug(enabled=args.debug)
-    asyncio.set_event_loop(event_loop)
-    event_loop.set_exception_handler(handle_exception)
-
-    try:
-        event_loop.run_until_complete(bulk_load_impl(args, manifest))
-    except Exception as ex:
-        logger.error("hello")
-        print(ex)
-        raise
-    finally:
-        event_loop.stop()
-        event_loop.close()
+    executor = ThreadPoolExecutor(max_workers=3)
+    loop = asyncio.get_event_loop()
+    loop.set_default_executor(executor)
+    asyncio.run(bulk_load_impl(args, manifest))
