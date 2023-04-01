@@ -186,9 +186,7 @@ async def _load_athena(
     # 1. We need to create a loading table.
     q = _ATHENA_CREATE_LOAD_TABLE.format(
         load_table_name="{}_brad_loading".format(table_name),
-        columns=comma_separated_column_names_and_types(
-            table.columns, DBType.Athena
-        ),
+        columns=comma_separated_column_names_and_types(table.columns, DBType.Athena),
         s3_bucket=ctx.s3_bucket,
         s3_path=s3_folder_path,
         options1=(
@@ -259,7 +257,7 @@ async def _update_sync_progress(
 
 def _try_add_task(
     generator: Iterator[Coroutine[Any, Any, DBType]],
-    dest: List[Coroutine[Any, Any, DBType]],
+    dest: List[asyncio.Task[DBType] | Coroutine[Any, Any, DBType]],
 ) -> None:
     try:
         dest.append(next(generator))
@@ -274,7 +272,7 @@ async def bulk_load_impl(args, manifest) -> None:
     blueprint = blueprint_mgr.get_blueprint()
 
     try:
-        running: List[Coroutine[Any, Any, DBType]] = []
+        running: List[asyncio.Task[DBType] | Coroutine[Any, Any, DBType]] = []
         engines = await EngineConnections.connect(config, manifest["schema_name"])
         if not args.force:
             await _ensure_empty(manifest, blueprint, engines)
@@ -348,8 +346,9 @@ async def bulk_load_impl(args, manifest) -> None:
         )
 
     except:
-        for task in running:
-            task.cancel()
+        for to_cancel in running:
+            if isinstance(to_cancel, asyncio.Task):
+                to_cancel.cancel()
         await asyncio.gather(*running, return_exceptions=True)
         raise
 
