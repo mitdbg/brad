@@ -53,6 +53,9 @@ class DataBlueprintManager:
         serialized = await loop.run_in_executor(None, _load_response)
         self._blueprint = deserialize_data_blueprint(serialized)
 
+    def load_sync(self) -> None:
+        asyncio.run(self.load())
+
     def persist_sync(self) -> None:
         """
         Persists the current data blueprint to S3.

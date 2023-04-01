@@ -11,13 +11,31 @@ from brad.server.engine_connections import EngineConnections
 logger = logging.getLogger(__name__)
 
 
+def register_admin_action(subparser) -> None:
+    parser = subparser.add_parser(
+        "bootstrap_schema", help="Set up a new schema on BRAD."
+    )
+    parser.add_argument(
+        "--config-file",
+        type=str,
+        required=True,
+        help="Path to BRAD's configuration file.",
+    )
+    parser.add_argument(
+        "--schema-file",
+        type=str,
+        help="Path to the database schema to bootstrap.",
+    )
+    parser.set_defaults(admin_action=bootstrap_schema)
+
+
 # This method is called by `brad.exec.admin.main`.
 def bootstrap_schema(args):
     # 1. Load the config.
     config = ConfigFile(args.config_file)
 
     # 2. Load the user-provided data schema.
-    user = UserProvidedDataBlueprint.load_from_yaml_file(args.bootstrap_schema_file)
+    user = UserProvidedDataBlueprint.load_from_yaml_file(args.schema_file)
 
     # 3. Get the bootstrapped blueprint. Later on this planning phase will be
     # more sophisticated (we'll take the "workload" as input).

@@ -1,0 +1,27 @@
+# - The data being loaded must be copied to S3.
+# - All data being loaded must be stored in the same S3 bucket.
+# - The underlying engines need to have permissions to read from your S3 bucket
+#   (usually if you use the same bucket as used by BRAD, you will be fine).
+# - Each table's data should be in one file (we can relax this restriction later if needed).
+# - Each table's file should be in its own "folder" (i.e., have a distinct prefix) (a restriction for Athena).
+#   - Example: Store `table1.csv` at `my/data/table1/table1.csv` and `table2.csv` as `my/data/table2/table2.csv`
+
+s3_bucket: your-bucket
+s3_bucket_region: us-east-1
+# This needs to be the same as the schema name used during bootstrapping.
+schema_name: my_test_schema
+
+tables:
+  - table_name: table1
+    s3_path: folder/for/table1/table1.csv
+    aurora_options: FORMAT csv, HEADER true
+    redshift_options: CSV IGNOREHEADER 1
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
+
+  - table_name: table2
+    s3_path: folder/for/table2/table2.csv
+    aurora_options: FORMAT csv, HEADER true
+    redshift_options: CSV IGNOREHEADER 1
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
