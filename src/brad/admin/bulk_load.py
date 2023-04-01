@@ -6,8 +6,10 @@ from typing import Any, Coroutine, Iterator, List
 
 from brad.blueprint.data import DataBlueprint
 from brad.blueprint.data.location import Location
-from brad.blueprint.data.table import Table
-from brad.blueprint.sql_gen.table import comma_separated_column_names_and_types
+from brad.blueprint.sql_gen.table import (
+    comma_separated_column_names_and_types,
+    comma_separated_column_names,
+)
 from brad.config.file import ConfigFile
 from brad.config.dbtype import DBType
 from brad.config.strings import (
@@ -20,12 +22,14 @@ from brad.server.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
-_LoadContext = namedtuple("_LoadContext", ["config", "s3_bucket", "s3_bucket_region"])
+_LoadContext = namedtuple(
+    "_LoadContext", ["config", "s3_bucket", "s3_bucket_region", "blueprint"]
+)
 
 _AURORA_LOAD_TEMPLATE = """
     SELECT aws_s3.table_import_from_s3(
         '{table_name}',
-        '',
+        '{columns}',
         '{options}',
         aws_commons.create_s3_uri(
             '{s3_bucket}',
@@ -79,24 +83,28 @@ async def _ensure_empty(
     Verifies that the tables being loaded into are empty.
     """
 
-    for load_table in manifest["tables"]:
-        table_name = load_table["table_name"]
-        table = blueprint.get_table(table_name)
+    try:
+        for load_table in manifest["tables"]:
+            table_name = load_table["table_name"]
+            table = blueprint.get_table(table_name)
 
-        for loc in table.locations:
-            engine = _location_to_engine(loc)
-            conn = engines.get_connection(engine)
-            cursor = await conn.cursor()
-            await cursor.execute("SELECT COUNT(*) FROM {}".format(table_name))
-            row = await cursor.fetchone()
-            if row[0] != 0:
-                logger.error(
-                    "Table %s on %s is non-empty (%d rows). You can only bulk load non-empty tables.",
-                    table_name,
-                    loc,
-                    row[0],
-                )
-                raise RuntimeError
+            for loc in table.locations:
+                engine = _location_to_engine(loc)
+                conn = engines.get_connection(engine)
+                cursor = await conn.cursor()
+                await cursor.execute("SELECT COUNT(*) FROM {}".format(table_name))
+                row = await cursor.fetchone()
+                if row[0] != 0:
+                    message = "Table {} on {} is non-empty ({} rows). You can only bulk load non-empty tables.".format(
+                        table_name,
+                        loc,
+                        row[0],
+                    )
+                    logger.error(message)
+                    raise RuntimeError(message)
+    finally:
+        await engines.get_connection(DBType.Aurora).rollback()
+        await engines.get_connection(DBType.Redshift).rollback()
 
 
 def _location_to_engine(location: Location) -> DBType:
@@ -117,10 +125,14 @@ async def _load_aurora(
     aurora_connection,
 ) -> DBType:
     logger.info("Loading %s on Aurora...", table_name)
+    table = ctx.blueprint.get_table(table_name)
     load_query = _AURORA_LOAD_TEMPLATE.format(
-        table_name=table_name,
+        table_name=source_table_name(table),
+        columns=comma_separated_column_names(table.columns),
         options=(
-            table_options["aurora_options"] if "aurora_options" in table_options else ""
+            "({})".format(table_options["aurora_options"])
+            if "aurora_options" in table_options
+            else ""
         ),
         s3_bucket=ctx.s3_bucket,
         s3_region=ctx.s3_bucket_region,
@@ -160,10 +172,10 @@ async def _load_athena(
     ctx: _LoadContext,
     table_name: str,
     table_options,
-    table: Table,
     athena_connection,
 ) -> DBType:
     logger.info("Loading %s on Athena...", table_name)
+    table = ctx.blueprint.get_table(table_name)
 
     # Strip off the file name from the file path (i.e., we need the prefix)
     # my/table1/table1.csv -> my/table1/
@@ -173,7 +185,9 @@ async def _load_athena(
     # 1. We need to create a loading table.
     q = _ATHENA_CREATE_LOAD_TABLE.format(
         load_table_name="{}_brad_loading".format(table_name),
-        columns=comma_separated_column_names_and_types(table.columns, DBType.Athena),
+        columns=comma_separated_column_names_and_types(
+            table.columns, DBType.Athena
+        ),
         s3_bucket=ctx.s3_bucket,
         s3_path=s3_folder_path,
         options1=(
@@ -206,7 +220,9 @@ async def _load_athena(
     return DBType.Athena
 
 
-async def _update_sync_progress(blueprint: DataBlueprint, aurora_connection) -> None:
+async def _update_sync_progress(
+    manifest, blueprint: DataBlueprint, aurora_connection
+) -> None:
     """
     Updates BRAD's sync progress table to ensure that later syncs run correctly.
     """
@@ -216,16 +232,20 @@ async def _update_sync_progress(blueprint: DataBlueprint, aurora_connection) -> 
     q = "SELECT table_name FROM " + AURORA_EXTRACT_PROGRESS_TABLE_NAME
     logger.debug("Running on Aurora %s", q)
     await cursor.execute(q)
-    extract_tables = await cursor.fetchall()
+    extract_tables = {row[0] for row in await cursor.fetchall()}
+    load_tables = {table["table_name"] for table in manifest["tables"]}
+    loaded_extract_tables = set.intersection(extract_tables, load_tables)
 
-    for row in extract_tables:
-        tbl_name = row[0]
+    for tbl_name in loaded_extract_tables:
         table = blueprint.get_table(tbl_name)
         q = "SELECT MAX({}) FROM {}".format(AURORA_SEQ_COLUMN, source_table_name(table))
         logger.debug("Running on Aurora %s", q)
         await cursor.execute(q)
         row = await cursor.fetchone()
         max_seq = row[0]
+        if max_seq is None:
+            # The table is still empty.
+            continue
 
         q = "UPDATE {} SET next_extract_seq = {}".format(
             AURORA_EXTRACT_PROGRESS_TABLE_NAME, max_seq + 1
@@ -253,11 +273,14 @@ async def bulk_load_impl(args, manifest) -> None:
     blueprint = blueprint_mgr.get_blueprint()
 
     try:
+        running: List[Coroutine[Any, Any, DBType]] = []
         engines = await EngineConnections.connect(config, manifest["schema_name"])
         if not args.force:
             await _ensure_empty(manifest, blueprint, engines)
 
-        ctx = _LoadContext(config, manifest["s3_bucket"], manifest["s3_bucket_region"])
+        ctx = _LoadContext(
+            config, manifest["s3_bucket"], manifest["s3_bucket_region"], blueprint
+        )
 
         def load_tasks_for_engine(
             engine: DBType,
@@ -284,7 +307,6 @@ async def bulk_load_impl(args, manifest) -> None:
                         ctx,
                         table_name,
                         table_options,
-                        table,
                         engines.get_connection(DBType.Athena),
                     )
 
@@ -295,7 +317,6 @@ async def bulk_load_impl(args, manifest) -> None:
         redshift_loads = load_tasks_for_engine(DBType.Redshift)
         athena_loads = load_tasks_for_engine(DBType.Athena)
 
-        running: List[Coroutine[Any, Any, DBType]] = []
         _try_add_task(aurora_loads, running)
         _try_add_task(redshift_loads, running)
         _try_add_task(athena_loads, running)
@@ -321,14 +342,57 @@ async def bulk_load_impl(args, manifest) -> None:
         # Athena does not support transactions.
 
         # Update the sync tables.
-        await _update_sync_progress(blueprint, engines.get_connection(DBType.Aurora))
+        await _update_sync_progress(
+            manifest, blueprint, engines.get_connection(DBType.Aurora)
+        )
+
+    except Exception as ex:
+        logger.error("Encountered error during bulk load.")
+        print(ex)
+        for task in running:
+            task.cancel()
+        print("before wait")
+        await asyncio.gather(*running, return_exceptions=True)
+        print("after wait")
+        raise
 
     finally:
+        print("inside finally...")
         await engines.close()
+        print("after finally...")
+
+
+async def cancel_all_tasks():
+    logging.debug("Shutting down the event loop...")
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+
+def handle_exception(event_loop, context):
+    message = context.get("exception", context["message"])
+    logging.error("Encountered fatal exception: %s", message)
+    if event_loop.is_closed():
+        return
+    event_loop.create_task(cancel_all_tasks())
 
 
 def bulk_load(args) -> None:
     with open(args.manifest_file, "r") as file:
         manifest = yaml.load(file, Loader=yaml.Loader)
 
-    asyncio.run(bulk_load_impl(args, manifest))
+    event_loop = asyncio.new_event_loop()
+    event_loop.set_debug(enabled=args.debug)
+    asyncio.set_event_loop(event_loop)
+    event_loop.set_exception_handler(handle_exception)
+
+    try:
+        event_loop.run_until_complete(bulk_load_impl(args, manifest))
+    except Exception as ex:
+        logger.error("hello")
+        print(ex)
+        raise
+    finally:
+        event_loop.stop()
+        event_loop.close()
