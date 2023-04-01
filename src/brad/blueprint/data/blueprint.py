@@ -27,7 +27,9 @@ class DataBlueprint:
     def base_table_names(self) -> Set[TableName]:
         return self._base_table_names
 
-    def get_table(self, table_name: TableName) -> Table:
+    def get_table(self, table_name: str | TableName) -> Table:
+        if isinstance(table_name, str):
+            table_name = TableName(table_name)
         try:
             return self._tables_by_name[table_name]
         except KeyError as ex:

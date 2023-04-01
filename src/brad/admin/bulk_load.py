@@ -6,7 +6,7 @@ from typing import Any, Coroutine, Iterator, List
 
 from brad.blueprint.data import DataBlueprint
 from brad.blueprint.data.location import Location
-from brad.blueprint.data.table import Table, TableName
+from brad.blueprint.data.table import Table
 from brad.blueprint.sql_gen.table import comma_separated_column_names_and_types
 from brad.config.file import ConfigFile
 from brad.config.dbtype import DBType
@@ -37,7 +37,7 @@ _AURORA_LOAD_TEMPLATE = """
 
 _REDSHIFT_LOAD_TEMPLATE = """
     COPY {table_name} FROM 's3://{s3_bucket}/{s3_path}'
-    IAM_ROLE {s3_iam_role}
+    IAM_ROLE '{s3_iam_role}'
     {options}
 """
 
@@ -56,12 +56,6 @@ def register_admin_action(subparser) -> None:
         type=str,
         required=True,
         help="Path to BRAD's configuration file.",
-    )
-    parser.add_argument(
-        "--schema-name",
-        type=str,
-        required=True,
-        help="The name of the schema that contains the table(s) to load.",
     )
     parser.add_argument(
         "--manifest-file",
@@ -254,12 +248,12 @@ def _try_add_task(
 
 async def bulk_load_impl(args, manifest) -> None:
     config = ConfigFile(args.config_file)
-    blueprint_mgr = DataBlueprintManager(config, args.schema_name)
+    blueprint_mgr = DataBlueprintManager(config, manifest["schema_name"])
     await blueprint_mgr.load()
     blueprint = blueprint_mgr.get_blueprint()
 
     try:
-        engines = await EngineConnections.connect(config, args.schema_name)
+        engines = await EngineConnections.connect(config, manifest["schema_name"])
         if not args.force:
             await _ensure_empty(manifest, blueprint, engines)
 
@@ -270,7 +264,7 @@ async def bulk_load_impl(args, manifest) -> None:
         ) -> Iterator[Coroutine[Any, Any, DBType]]:
             for table_options in manifest["tables"]:
                 table_name = table_options["table_name"]
-                table = blueprint.get_table(TableName(table_name))
+                table = blueprint.get_table(table_name)
                 if engine == DBType.Aurora and Location.Aurora in table.locations:
                     yield _load_aurora(
                         ctx,
@@ -308,7 +302,7 @@ async def bulk_load_impl(args, manifest) -> None:
 
         while len(running) > 0:
             done, pending = await asyncio.wait(
-                *running, return_when=asyncio.FIRST_COMPLETED
+                running, return_when=asyncio.FIRST_COMPLETED
             )
             running.clear()
             running.extend(pending)
