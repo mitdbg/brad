@@ -56,6 +56,11 @@ engines.
 - Run `brad admin bootstrap_schema --config-file path/to/config.yml
   --bootstrap-schema-file path/to/your/schema.yml` to set up the tables across the
   underlying engines.
+- To bulk load data, upload your data to S3 and then create a manifest file (see
+  `config/manifests/manifest_sample.yml` for an example). Then run `brad admin
+  bulk_load --config-file path/to/config.yml --manifest-file
+  path/to/manifest.yml` to execute the bulk load (this time may take some time,
+  depending on how much data you are loading).
 - Start the BRAD server `brad server --config-file path/to/config.yml
   --schema-name your_schema_name`.
 - Run queries through the CLI `brad cli`.
