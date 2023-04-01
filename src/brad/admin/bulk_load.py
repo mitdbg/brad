@@ -69,6 +69,11 @@ def register_admin_action(subparser) -> None:
         help="The path to a manifest file, which contains the tables to load.",
     )
     parser.add_argument(
+        "--sequential",
+        action="store_true",
+        help="If set, this tool will load the tables one-by-one.",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Bulk load is normally only allowed when the table(s) are all empty. "
@@ -316,25 +321,34 @@ async def bulk_load_impl(args, manifest) -> None:
         redshift_loads = load_tasks_for_engine(DBType.Redshift)
         athena_loads = load_tasks_for_engine(DBType.Athena)
 
-        _try_add_task(aurora_loads, running)
-        _try_add_task(athena_loads, running)
-        _try_add_task(redshift_loads, running)
+        if args.sequential:
+            for t in aurora_loads:
+                await t
+            for t in redshift_loads:
+                await t
+            for t in athena_loads:
+                await t
 
-        while len(running) > 0:
-            done, pending = await asyncio.wait(
-                running, return_when=asyncio.FIRST_COMPLETED
-            )
-            running.clear()
-            running.extend(pending)
+        else:
+            _try_add_task(aurora_loads, running)
+            _try_add_task(athena_loads, running)
+            _try_add_task(redshift_loads, running)
 
-            for task in done:
-                engine = task.result()
-                if engine == DBType.Aurora:
-                    _try_add_task(aurora_loads, running)
-                elif engine == DBType.Redshift:
-                    _try_add_task(redshift_loads, running)
-                elif engine == DBType.Athena:
-                    _try_add_task(athena_loads, running)
+            while len(running) > 0:
+                done, pending = await asyncio.wait(
+                    running, return_when=asyncio.FIRST_COMPLETED
+                )
+                running.clear()
+                running.extend(pending)
+
+                for task in done:
+                    engine = task.result()
+                    if engine == DBType.Aurora:
+                        _try_add_task(aurora_loads, running)
+                    elif engine == DBType.Redshift:
+                        _try_add_task(redshift_loads, running)
+                    elif engine == DBType.Athena:
+                        _try_add_task(athena_loads, running)
 
         await engines.get_connection(DBType.Aurora).commit()
         await engines.get_connection(DBType.Redshift).commit()
