@@ -5,6 +5,7 @@ import os
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
+
 class RdsProvisioning:
     # Initialize provisioning.
     # If cluster does not exist, you must specify its initial state for it to be created.
@@ -54,21 +55,23 @@ class RdsProvisioning:
                 cluster = response["DBClusters"][0]
                 status = cluster["Status"]
                 # Set default values.
-                self.address =  cluster["Endpoint"]
+                self.address = cluster["Endpoint"]
                 self.reader_address = cluster["ReaderEndpoint"]
                 self.port = cluster["Port"]
                 if self.paused is None:
                     self.paused = status in ("stopping", "stopped")
                 # Check if status is stable.
                 if status != "available" and status != "stopped":
-                    logging.info(f"Rds Cluster {self.cluster_name}. Status: {status}. Waiting...")
+                    logging.info(
+                        f"Rds Cluster {self.cluster_name}. Status: {status}. Waiting..."
+                    )
                     time.sleep(5.0)
                     continue
                 # Reconcile running state.
                 if self.paused and status == "stopped":
                     logging.info(f"Rds Cluster {self.cluster_name}. Is in right state.")
-                    return 
-                if not(self.paused) and status == "available":
+                    return
+                if not (self.paused) and status == "available":
                     logging.info(f"Rds Cluster {self.cluster_name}. Is in right state.")
                     return
                 if self.paused and status == "available":
@@ -79,7 +82,7 @@ class RdsProvisioning:
                     )
                     time.sleep(5.0)
                     continue
-                if not(self.paused) and status == "stopped":
+                if not (self.paused) and status == "stopped":
                     # Should start.
                     logging.info(f"Rds Instance {self.cluster_name}. Restarting...")
                     self.rds.start_db_cluster(
@@ -87,7 +90,7 @@ class RdsProvisioning:
                     )
                     time.sleep(5.0)
                     continue
-            except:
+            except Exception as _e:
                 pass
             try:
                 logging.info(f"Rds Cluster {self.cluster_name}. Creating...")
@@ -96,8 +99,8 @@ class RdsProvisioning:
                     Engine="aurora-postgresql",
                     EngineMode="provisioned",
                     DatabaseName="dev",
-                    MasterUsername='brad',
-                    MasterUserPassword='BradBrad123',
+                    MasterUsername="brad",
+                    MasterUserPassword="BradBrad123",
                 )
             except Exception as e:
                 e_str = f"{e}"
@@ -118,13 +121,17 @@ class RdsProvisioning:
                 status = cluster["Status"]
                 # Check if status is stable.
                 if status != "available" and status != "stopped":
-                    logging.info(f"Rds Cluster {self.cluster_name}. Status: {status}. Waiting...")
+                    logging.info(
+                        f"Rds Cluster {self.cluster_name}. Status: {status}. Waiting..."
+                    )
                     time.sleep(5.0)
                     continue
                 # Find writer.
                 members = cluster["DBClusterMembers"]
-                members = [(x["DBInstanceIdentifier"], x["IsClusterWriter"]) for x in members]
-                for (member_id, is_writer) in members:
+                members = [
+                    (x["DBInstanceIdentifier"], x["IsClusterWriter"]) for x in members
+                ]
+                for member_id, is_writer in members:
                     if is_writer:
                         return member_id
                 # Create Writer Instance.
@@ -158,22 +165,26 @@ class RdsProvisioning:
                 logging.debug(f"RDS reconcile_writer. Response: {response}")
                 instance = response["DBInstances"][0]
                 status = instance["DBInstanceStatus"]
-                instance_type = instance["DBInstanceClass"]
+                curr_instance_type = instance["DBInstanceClass"]
                 # Set default variables.
                 if self.instance_type is None:
-                    self.instance_type = instance_type
+                    self.instance_type = curr_instance_type
                 # Check if status is stable.
                 if status != "available" and status != "stopped":
-                    logging.info(f"Rds Cluster {self.cluster_name}. Status: {status}. Waiting...")
+                    logging.info(
+                        f"Rds Cluster {self.cluster_name}. Status: {status}. Waiting..."
+                    )
                     time.sleep(5.0)
                     continue
                 # Reconcile expected instance type and count with current ones.
-                if instance_type == self.instance_type:
+                if curr_instance_type == self.instance_type:
                     # Cluster is as it should be. Return.
                     logging.info(f"Rds Cluster {self.cluster_name}. Is in right state.")
                     return
                 # Must resize cluster.
-                logging.info(f"Rds Cluster {self.cluster_name}. Resizing to ({self.instance_type})...")
+                logging.info(
+                    f"Rds Cluster {self.cluster_name}. Resizing to ({self.instance_type})..."
+                )
                 self.rds.modify_db_instance(
                     DBInstanceIdentifier=writer_id,
                     DBInstanceClass=self.instance_type,
@@ -181,14 +192,14 @@ class RdsProvisioning:
                 )
                 # Next iteration of the loop will wait for availability.
                 time.sleep(5.0)
-                continue    
-                
+                continue
+
             except Exception as e:
                 # Should not happend.
                 print(f"{e}")
                 raise e
 
-    # Redeploy. Used for initialization and rescaling. 
+    # Redeploy. Used for initialization and rescaling.
     def redeploy(self, immediate):
         # Create cluster if not exist.
         # These functions are intentionally separated to make them easy to write.
@@ -199,12 +210,15 @@ class RdsProvisioning:
         write_id = self.get_or_create_writer()
         self.reconcile_writer(write_id, immediate)
 
+
 if __name__ == "__main__":
     # Get or create cluster.
     try:
         rd = RdsProvisioning(cluster_name="brad-cluster0")
-    except:
-        rd = RdsProvisioning(cluster_name="brad-cluster0", initial_instance_type="db.r6g.large")
+    except Exception as _e:
+        rd = RdsProvisioning(
+            cluster_name="brad-cluster0", initial_instance_type="db.r6g.large"
+        )
     # Change instance type.
     instance_type = rd.instance_type
     if instance_type == "db.r6g.large":

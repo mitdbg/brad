@@ -1,5 +1,5 @@
 [MESSAGES CONTROL]
-disable=R,C
+disable=R,C,logging-fstring-interpolation,broad-exception-caught
 enable=useless-suppression
 
 extension-pkg-whitelist=pyodbc
