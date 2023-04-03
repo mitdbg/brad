@@ -1,12 +1,20 @@
 from brad.blueprint.data.table import Table
 
 
-def source_table_name(table: Table) -> str:
-    return "{}_brad_source".format(table.name.value)
+def source_table_name(table: str | Table) -> str:
+    if isinstance(table, Table):
+        str_name = table.name.value
+    else:
+        str_name = table
+    return "{}_brad_source".format(str_name)
 
 
-def shadow_table_name(table: Table) -> str:
-    return "{}_brad_shadow".format(table.name.value)
+def shadow_table_name(table: str | Table) -> str:
+    if isinstance(table, Table):
+        str_name = table.name.value
+    else:
+        str_name = table
+    return "{}_brad_shadow".format(str_name)
 
 
 def delete_trigger_function_name(table: Table) -> str:
