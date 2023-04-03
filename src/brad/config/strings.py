@@ -47,5 +47,21 @@ def imported_shadow_staging_table_name(table: Table) -> str:
     return "{}_brad_shadow_staging".format(table.name.value)
 
 
+def insert_delta_table_name(table: str | Table) -> str:
+    if isinstance(table, Table):
+        str_name = table.name.value
+    else:
+        str_name = table
+    return "{}_inserts".format(str_name)
+
+
+def delete_delta_table_name(table: str | Table) -> str:
+    if isinstance(table, Table):
+        str_name = table.name.value
+    else:
+        str_name = table
+    return "{}_deletes".format(str_name)
+
+
 AURORA_EXTRACT_PROGRESS_TABLE_NAME = "brad_extract_progress"
 AURORA_SEQ_COLUMN = "brad_seq"
