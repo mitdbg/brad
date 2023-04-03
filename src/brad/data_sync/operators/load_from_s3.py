@@ -33,11 +33,15 @@ class LoadFromS3(Operator):
     Loads data (stored on S3) into a table on an engine.
     """
 
-    def __init__(self, table_name: str, s3_path: str, engine: DBType) -> None:
+    def __init__(self, table_name: str, relative_s3_path: str, engine: DBType) -> None:
+        """
+        NOTE: All S3 paths are relative to the extract path, specified in the
+        configuration.
+        """
         super().__init__()
         self._table_name = table_name
         self._engine = engine
-        self._s3_path = s3_path
+        self._relative_s3_path = relative_s3_path
 
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         if self._engine == DBType.Aurora:
@@ -53,7 +57,7 @@ class LoadFromS3(Operator):
             table_name=self._table_name,
             s3_bucket=ctx.s3_bucket(),
             s3_region=ctx.s3_region(),
-            s3_path=self._s3_path,
+            s3_path="{}{}".format(ctx.s3_path(), self._relative_s3_path),
         )
         logger.debug("Running on Aurora: %s", query)
         aurora = await ctx.aurora()
@@ -64,7 +68,7 @@ class LoadFromS3(Operator):
         query = _REDSHIFT_LOAD_TEMPLATE.format(
             table_name=self._table_name,
             s3_bucket=ctx.s3_bucket(),
-            s3_path=self._s3_path,
+            s3_path="{}{}".format(ctx.s3_path(), self._relative_s3_path),
             s3_iam_role=ctx.config().redshift_s3_iam_role,
         )
         logger.debug("Running on Redshift: %s", query)
