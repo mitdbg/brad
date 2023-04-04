@@ -131,14 +131,14 @@ class PlanConverter:
             if dependee not in self._processing_ops:
                 dependee_pop = _ProcessingOp(dependee)
                 # Add the deltas' location.
-                if isinstance(pop.logical_op, TransformDeltas):
+                if isinstance(dependee_pop.logical_op, TransformDeltas):
                     dependee_pop.output_location = _DeltaLocation.from_engine(
-                        pop.logical_op.engine()
+                        dependee_pop.logical_op.engine()
                     )
-                elif isinstance(pop.logical_op, LogicalApplyDeltas):
+                elif isinstance(dependee_pop.logical_op, LogicalApplyDeltas):
                     # This operator does not "produce" deltas.
                     pass
-                elif isinstance(pop.logical_op, ExtractDeltas):
+                elif isinstance(dependee_pop.logical_op, ExtractDeltas):
                     # All `ExtractDeltas` should be base operators. They should
                     # not be a dependee.
                     raise AssertionError
