@@ -1,3 +1,4 @@
+import boto3
 from typing import List
 
 from brad.config.file import ConfigFile
@@ -36,6 +37,13 @@ class ExecutionContext:
         # Extracted tables.
         self._extracted_tables: List[str] = []
 
+        # NOTE: We need to create one per thread.
+        self._s3_client = boto3.client(
+            "s3",
+            aws_access_key_id=self._config.aws_access_key,
+            aws_secret_access_key=self._config.aws_access_key_secret,
+        )
+
     async def aurora(self):
         """Connection to the Aurora engine."""
         if self._aurora_cursor is None:
@@ -65,6 +73,9 @@ class ExecutionContext:
 
     def s3_path(self) -> str:
         return self._s3_path
+
+    def s3_client(self):
+        return self._s3_client
 
     def config(self) -> ConfigFile:
         return self._config

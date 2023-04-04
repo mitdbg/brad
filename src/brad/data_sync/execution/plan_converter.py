@@ -17,9 +17,12 @@ from brad.data_sync.operators import Operator
 from brad.data_sync.operators.adjust_deltas import AdjustDeltas
 from brad.data_sync.operators.apply_deltas import ApplyDeltas
 from brad.data_sync.operators.create_temp_table import CreateTempTable
+from brad.data_sync.operators.delete_s3_objects import DeleteS3Objects
+from brad.data_sync.operators.drop_tables import DropTables
 from brad.data_sync.operators.extract_aurora_s3 import ExtractFromAuroraToS3
 from brad.data_sync.operators.load_from_s3 import LoadFromS3
 from brad.data_sync.operators.register_athena_s3_table import RegisterAthenaS3Table
+from brad.data_sync.operators.run_commit import RunCommit
 from brad.data_sync.operators.run_transformation import RunTransformation
 from brad.data_sync.operators.unload_to_s3 import UnloadToS3
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
@@ -43,6 +46,7 @@ class PlanConverter:
 
         self._extract_op: Optional[ExtractFromAuroraToS3] = None
         self._physical_operators: List[Operator] = []
+        self._no_dependees: List[Operator] = []
 
     def get_plan(self) -> PhysicalDataSyncPlan:
         tables_to_extract = {}
@@ -81,14 +85,44 @@ class PlanConverter:
             pop = self._ready_to_process.popleft()
             self._process_logical_op(pop)
 
+        # Create cleanup operators.
+
+        # This is very heavy-handed - we take a dependency on all processed
+        # operators that have no dependees. Ideally we only take a dependency on
+        # the operators that use the tables being mentioned - but this is
+        # simpler to implement.
+        to_drop: Dict[DBType, List[str]] = {}
+        drop_ops: List[Operator] = []
+        for table_name, engine in self._intermediate_tables:
+            if engine not in to_drop:
+                to_drop[engine] = [table_name]
+            else:
+                to_drop[engine].append(table_name)
+        for engine, tables in to_drop.items():
+            drop_op = DropTables(tables, engine)
+            drop_op.add_dependencies(self._no_dependees)
+            drop_ops.append(drop_op)
+            self._physical_operators.append(drop_op)
+
+        # Run the commit.
+        commit_op = RunCommit()
+        commit_op.add_dependencies(drop_ops)
+        self._physical_operators.append(commit_op)
+
+        # Delete intermediate S3 objects.
+        delete_s3 = DeleteS3Objects(self._intermediate_s3_objects)
+        delete_s3.add_dependency(commit_op)
+        self._physical_operators.append(delete_s3)
+
         return PhysicalDataSyncPlan(self._extract_op, self._physical_operators)
 
     def reset(self) -> None:
-        self._intermediate_s3_objects.clear()
-        self._intermediate_tables.clear()
+        self._intermediate_s3_objects = []
+        self._intermediate_tables = []
         self._processing_ops.clear()
         self._ready_to_process.clear()
         self._physical_operators = []
+        self._no_dependees = []
 
     def _process_logical_op(self, pop: "_ProcessingOp") -> None:
         # Get a list of this logical operator's dependees.
@@ -174,6 +208,7 @@ class PlanConverter:
 
         if len(dependees) == 0:
             # No dependees - no further processing required.
+            self._no_dependees.append(phys_op)
             return
 
         # Create additional physical operators to "move" the deltas produced by
