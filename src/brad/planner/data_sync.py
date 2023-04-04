@@ -88,6 +88,7 @@ def make_logical_data_sync_plan(blueprint: DataBlueprint) -> LogicalDataSyncPlan
                 transform_op = TransformDeltas(
                     non_null_delta_sources,
                     table.transform_text,
+                    table.name,
                     # Initial heuristic: Run all transforms on Redshift. This
                     # can be made more sophisticated depending on system loads,
                     # the source data location, etc.

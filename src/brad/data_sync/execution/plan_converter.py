@@ -2,6 +2,7 @@ import enum
 from collections import deque
 from typing import Dict, List, Deque, Optional, Tuple
 
+from brad.blueprint.data.table import Location
 from brad.config.dbtype import DBType
 from brad.data_sync.logical_plan import (
     LogicalDataSyncPlan,
@@ -123,12 +124,56 @@ class PlanConverter:
             for phys_dep in pop.physical_dependencies:
                 phys_op.add_dependency(phys_dep)
             self._physical_operators.append(phys_op)
+        else:
+            assert self._extract_op is not None
+            phys_op = self._extract_op
 
-        # TODO (!!)
+        if len(dependees) == 0:
+            # No dependees - no further processing required.
+            return
+
         # Create additional physical operators to "move" the deltas produced by
         # this op into the engines that are needed by the dependee operators.
+        assert pop.output_location is not None
+        to_dest: Dict[DBType, Optional[Operator]] = {}
+        for dependee_pop in dependees:
+            if isinstance(dependee_pop.logical_op, TransformDeltas):
+                dest = dependee_pop.logical_op.engine()
+            elif isinstance(dependee_pop.logical_op, LogicalApplyDeltas):
+                dest = dependee_pop.logical_op.location().default_engine()
+            else:
+                # Should not have any other kinds of logical ops.
+                raise AssertionError
 
-        # Decrement the dependencies waiting for count on dependees. If the
+            if dest in to_dest:
+                # The ops have already been created.
+                to_dest_op = to_dest[dest]
+                if to_dest_op is not None:
+                    dependee_pop.physical_dependencies.append(to_dest_op)
+                else:
+                    # No movement operators needed. Take a direct dependency on
+                    # this physical operator.
+                    dependee_pop.physical_dependencies.append(phys_op)
+                continue
+
+            # Generate the movement ops and then register them.
+            ops = self._generate_movement_ops(
+                source_op=pop,
+                dest_op=dependee_pop,
+                source=pop.output_location,
+                dest=dest,
+            )
+            if len(ops) == 0:
+                to_dest[dest] = None
+            else:
+                # The operator chain depends on this physical operator finishing.
+                ops[0].add_dependency(phys_op)
+                # Our dependee depends on the physical operator chain completing.
+                dependee_pop.physical_dependencies.append(ops[-1])
+                # Keep track of all the operators we have created.
+                self._physical_operators.extend(ops)
+
+        # Decrement the "dependencies waiting for count" on dependees. If the
         # count is now zero, schedule it for processing.
         for dependee_pop in dependees:
             # Sanity check.
@@ -141,6 +186,56 @@ class PlanConverter:
         prefix = "aurora_extract/{}/".format(table_name)
         return (prefix + "writes/", prefix + "deletes/")
 
+    def _generate_movement_ops(
+        self,
+        source_op: "_ProcessingOp",
+        dest_op: "_ProcessingOp",
+        source: "_DeltaLocation",
+        dest: DBType,
+    ) -> List[Operator]:
+        out_ops: List[Operator] = []
+        need_adjust_op = isinstance(source_op.logical_op, ExtractDeltas) and isinstance(
+            dest_op.logical_op, TransformDeltas
+        )
+
+        if source == _DeltaLocation.S3Text and dest == DBType.Redshift:
+            # Create tables on Redshift
+            # Import from S3
+            pass
+
+        elif source == _DeltaLocation.S3Text and dest == DBType.Athena:
+            # Register Athena tables
+            pass
+
+        elif source == _DeltaLocation.Redshift and dest == DBType.Athena:
+            # Unload to S3
+            # Register Athena tables
+            pass
+
+        elif source == _DeltaLocation.Redshift and dest == DBType.Aurora:
+            # Unload to S3
+            # Create Aurora tables
+            # Import from S3
+            pass
+
+        elif (
+            (source == _DeltaLocation.Aurora and dest == DBType.Aurora)
+            or (source == _DeltaLocation.Redshift and dest == DBType.Redshift)
+            or (source == _DeltaLocation.S3AthenaIceberg and dest == DBType.Athena)
+        ):
+            # No movement ops needed.
+            pass
+
+        else:
+            # Some unimplemented transitions:
+            # - S3Text -> Aurora (only occurs if we run a transform on Aurora
+            #   right after extraction)
+            # - Athena -> Redshift
+            # - Athena -> Aurora
+            raise RuntimeError("Unsupported source/dest: {} -> {}".format(source, dest))
+
+        return out_ops
+
 
 class _DeltaLocation(enum.Enum):
     # The deltas are in tables on Aurora.
@@ -149,7 +244,9 @@ class _DeltaLocation(enum.Enum):
     Redshift = "redshift"
     # The deltas are in S3 Iceberg tables that are registered in Athena.
     S3AthenaIceberg = "s3_athena_iceberg"
-    # The deltas are in S3 text-based files.
+    # The deltas are in S3 text-based tables that are registered in Athena.
+    S3AthenaText = "s3_athena_text"
+    # The deltas are in S3 text-based files (unregistered on Athena).
     S3Text = "s3_text"
 
     @classmethod
@@ -160,6 +257,17 @@ class _DeltaLocation(enum.Enum):
             return _DeltaLocation.S3AthenaIceberg
         elif engine == DBType.Redshift:
             return _DeltaLocation.Redshift
+        else:
+            raise AssertionError
+
+    @classmethod
+    def from_location(cls, location: Location) -> "_DeltaLocation":
+        if location == Location.Aurora:
+            return _DeltaLocation.Aurora
+        elif location == Location.Redshift:
+            return _DeltaLocation.Redshift
+        elif location == Location.S3Iceberg:
+            return _DeltaLocation.S3AthenaIceberg
         else:
             raise AssertionError
 
