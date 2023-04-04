@@ -2,8 +2,10 @@ import enum
 from collections import deque
 from typing import Dict, List, Deque, Optional, Tuple
 
+from brad.blueprint.data import DataBlueprint
 from brad.blueprint.data.table import Location
 from brad.config.dbtype import DBType
+from brad.config.strings import insert_delta_table_name, delete_delta_table_name
 from brad.data_sync.logical_plan import (
     LogicalDataSyncPlan,
     LogicalDataSyncOperator,
@@ -12,9 +14,14 @@ from brad.data_sync.logical_plan import (
     ApplyDeltas as LogicalApplyDeltas,
 )
 from brad.data_sync.operators import Operator
+from brad.data_sync.operators.adjust_deltas import AdjustDeltas
 from brad.data_sync.operators.apply_deltas import ApplyDeltas
+from brad.data_sync.operators.create_temp_table import CreateTempTable
 from brad.data_sync.operators.extract_aurora_s3 import ExtractFromAuroraToS3
+from brad.data_sync.operators.load_from_s3 import LoadFromS3
+from brad.data_sync.operators.register_athena_s3_table import RegisterAthenaS3Table
 from brad.data_sync.operators.run_transformation import RunTransformation
+from brad.data_sync.operators.unload_to_s3 import UnloadToS3
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
 
 
@@ -23,10 +30,14 @@ class PlanConverter:
     Used to convert a logical data sync plan into a physical plan.
     """
 
-    def __init__(self, logical_plan: LogicalDataSyncPlan) -> None:
+    def __init__(
+        self, logical_plan: LogicalDataSyncPlan, blueprint: DataBlueprint
+    ) -> None:
         self._logical_plan = logical_plan
+        self._blueprint = blueprint
 
         self._intermediate_s3_objects: List[str] = []
+        self._intermediate_tables: List[Tuple[str, DBType]] = []
         self._processing_ops: Dict[LogicalDataSyncOperator, _ProcessingOp] = {}
         self._ready_to_process: Deque[_ProcessingOp] = deque()
 
@@ -74,6 +85,7 @@ class PlanConverter:
 
     def reset(self) -> None:
         self._intermediate_s3_objects.clear()
+        self._intermediate_tables.clear()
         self._processing_ops.clear()
         self._ready_to_process.clear()
         self._physical_operators = []
@@ -159,7 +171,6 @@ class PlanConverter:
             # Generate the movement ops and then register them.
             ops = self._generate_movement_ops(
                 source_op=pop,
-                dest_op=dependee_pop,
                 source=pop.output_location,
                 dest=dest,
             )
@@ -189,34 +200,99 @@ class PlanConverter:
     def _generate_movement_ops(
         self,
         source_op: "_ProcessingOp",
-        dest_op: "_ProcessingOp",
         source: "_DeltaLocation",
         dest: DBType,
     ) -> List[Operator]:
         out_ops: List[Operator] = []
-        need_adjust_op = isinstance(source_op.logical_op, ExtractDeltas) and isinstance(
-            dest_op.logical_op, TransformDeltas
-        )
+        table_name = source_op.logical_op.table_name().value
+        table = self._blueprint.get_table(table_name)
+
+        id_table_name = insert_delta_table_name(table_name)
+        dd_table_name = delete_delta_table_name(table_name)
 
         if source == _DeltaLocation.S3Text and dest == DBType.Redshift:
-            # Create tables on Redshift
-            # Import from S3
-            pass
+            # 1. Create tables on Redshift
+            # 2. Import from S3
+            assert source_op.output_insert_delta_s3_path is not None
+            assert source_op.output_delete_delta_s3_path is not None
+            c1 = CreateTempTable(
+                id_table_name,
+                table.columns,
+                engine=DBType.Redshift,
+            )
+            c2 = CreateTempTable(
+                dd_table_name,
+                table.primary_key,
+                engine=DBType.Redshift,
+            )
+            l1 = LoadFromS3(
+                id_table_name,
+                source_op.output_insert_delta_s3_path,
+                engine=DBType.Redshift,
+            )
+            l2 = LoadFromS3(
+                dd_table_name,
+                source_op.output_delete_delta_s3_path,
+                engine=DBType.Redshift,
+            )
+            c2.add_dependency(c1)
+            l1.add_dependency(c2)
+            l2.add_dependency(l1)
+            out_ops.extend([c1, c2, l1, l2])
+            self._intermediate_tables.extend(
+                [(id_table_name, DBType.Redshift), (dd_table_name, DBType.Redshift)]
+            )
 
         elif source == _DeltaLocation.S3Text and dest == DBType.Athena:
-            # Register Athena tables
-            pass
+            # 1. Register the S3 text data as Athena tables
+            assert source_op.output_insert_delta_s3_path is not None
+            assert source_op.output_delete_delta_s3_path is not None
+            r1 = RegisterAthenaS3Table(
+                id_table_name, table.columns, source_op.output_insert_delta_s3_path
+            )
+            r2 = RegisterAthenaS3Table(
+                dd_table_name, table.primary_key, source_op.output_delete_delta_s3_path
+            )
+            r2.add_dependency(r1)
+            out_ops.extend([r1, r2])
+            self._intermediate_tables.extend(
+                [(id_table_name, DBType.Athena), (dd_table_name, DBType.Athena)]
+            )
 
         elif source == _DeltaLocation.Redshift and dest == DBType.Athena:
-            # Unload to S3
-            # Register Athena tables
-            pass
+            # 1. Unload to S3
+            # 2. Register Athena tables
+            insert_s3_path = "redshift_unload/{}/inserts/table.tbl".format(table_name)
+            delete_s3_path = "redshift_unload/{}/deletes/table.tbl".format(table_name)
+            u1 = UnloadToS3(id_table_name, insert_s3_path, engine=DBType.Redshift)
+            u2 = UnloadToS3(dd_table_name, delete_s3_path, engine=DBType.Redshift)
+            r1 = RegisterAthenaS3Table(id_table_name, table.columns, insert_s3_path)
+            r2 = RegisterAthenaS3Table(dd_table_name, table.primary_key, delete_s3_path)
+            u2.add_dependency(u1)
+            r1.add_dependency(u2)
+            r2.add_dependency(r1)
+            out_ops.extend([u1, u2, r1, r2])
+            self._intermediate_s3_objects.extend([insert_s3_path, delete_s3_path])
 
         elif source == _DeltaLocation.Redshift and dest == DBType.Aurora:
-            # Unload to S3
-            # Create Aurora tables
-            # Import from S3
-            pass
+            # 1. Unload to S3
+            # 2. Create Aurora tables
+            # 3. Import from S3
+            insert_s3_path = "redshift_unload/{}/inserts/table.tbl".format(table_name)
+            delete_s3_path = "redshift_unload/{}/deletes/table.tbl".format(table_name)
+            u1 = UnloadToS3(id_table_name, insert_s3_path, engine=DBType.Redshift)
+            u2 = UnloadToS3(dd_table_name, delete_s3_path, engine=DBType.Redshift)
+            c1 = CreateTempTable(id_table_name, table.columns, engine=DBType.Aurora)
+            c2 = CreateTempTable(dd_table_name, table.primary_key, engine=DBType.Aurora)
+            l1 = LoadFromS3(id_table_name, insert_s3_path, engine=DBType.Aurora)
+            l2 = LoadFromS3(dd_table_name, delete_s3_path, engine=DBType.Aurora)
+            u2.add_dependency(u1)
+            c1.add_dependency(u2)
+            c2.add_dependency(c1)
+            l1.add_dependency(c2)
+            l2.add_dependency(l1)
+            out_ops.extend([u1, u2, l1, l2, c1, c2])
+            self._intermediate_s3_objects.extend([insert_s3_path, delete_s3_path])
 
         elif (
             (source == _DeltaLocation.Aurora and dest == DBType.Aurora)
