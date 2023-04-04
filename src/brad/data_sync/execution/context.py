@@ -71,13 +71,3 @@ class ExecutionContext:
 
     def set_extracted_tables(self, tables: List[str]) -> None:
         self._extracted_tables = tables
-
-    def get_extract_path_for(
-        self, table_name: str, is_shadow: bool, include_file: bool
-    ) -> str:
-        if is_shadow:
-            prefix = "{}{}/shadow/".format(self._s3_path, table_name)
-        else:
-            prefix = "{}{}/main/".format(self._s3_path, table_name)
-
-        return prefix + "table.tbl" if include_file else prefix

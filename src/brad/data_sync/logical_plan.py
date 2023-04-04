@@ -1,5 +1,6 @@
 from typing import List
 
+from brad.config.dbtype import DBType
 from brad.blueprint.data.location import Location
 from brad.blueprint.data.table import TableName
 
@@ -67,17 +68,23 @@ class TransformDeltas(LogicalDataSyncOperator):
         self,
         sources: List[LogicalDataSyncOperator],
         transform_text: str,
-        location: Location,
+        engine: DBType,
     ):
         super().__init__()
         self._sources = sources
         self._transform_text = transform_text
-        self._location = location
+        self._engine = engine
 
         for s in self._sources:
             # Sanity check.
             assert isinstance(s, ExtractDeltas) or isinstance(s, TransformDeltas)
             s.add_dependee(self)
+
+    def transform_text(self) -> str:
+        return self._transform_text
+
+    def engine(self) -> DBType:
+        return self._engine
 
     def dependencies(self) -> List[LogicalDataSyncOperator]:
         return self._sources
@@ -87,8 +94,8 @@ class TransformDeltas(LogicalDataSyncOperator):
             [
                 "TransformDeltas(num_sources=",
                 str(len(self._sources)),
-                ", location=",
-                self._location,
+                ", engine=",
+                self._engine,
                 ")",
             ]
         )
@@ -115,6 +122,9 @@ class ApplyDeltas(LogicalDataSyncOperator):
 
     def table_name(self) -> TableName:
         return self._table_name
+
+    def location(self) -> Location:
+        return self._location
 
     def dependencies(self) -> List[LogicalDataSyncOperator]:
         return [self._source]
