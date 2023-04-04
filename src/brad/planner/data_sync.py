@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional
 
+from brad.config.dbtype import DBType
 from brad.blueprint.data.blueprint import DataBlueprint
 from brad.blueprint.data.table import Table, TableName
 from brad.blueprint.data.location import Location
@@ -87,10 +88,11 @@ def make_logical_data_sync_plan(blueprint: DataBlueprint) -> LogicalDataSyncPlan
                 transform_op = TransformDeltas(
                     non_null_delta_sources,
                     table.transform_text,
+                    table.name,
                     # Initial heuristic: Run all transforms on Redshift. This
                     # can be made more sophisticated depending on system loads,
                     # the source data location, etc.
-                    Location.Redshift,
+                    DBType.Redshift,
                 )
                 all_operators.append(transform_op)
                 delta_source_for_this_table = transform_op

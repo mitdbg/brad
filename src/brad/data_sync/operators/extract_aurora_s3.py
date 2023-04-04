@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List
+from typing import Dict, Tuple
 
 from .operator import Operator
 from ._extract_aurora_s3_templates import (
@@ -13,7 +13,6 @@ from ._extract_aurora_s3_templates import (
     UPDATE_EXTRACT_PROGRESS_NON_SHADOW,
     UPDATE_EXTRACT_PROGRESS_SHADOW,
 )
-from brad.blueprint.data.table import TableName
 from brad.blueprint.sql_gen.table import comma_separated_column_names
 from brad.config.strings import source_table_name, shadow_table_name
 from brad.data_sync.execution.context import ExecutionContext
@@ -26,9 +25,9 @@ _MAX_SEQ = 0xFFFFFFFF_FFFFFFFF
 
 
 class ExtractFromAuroraToS3(Operator):
-    def __init__(self, table_names: List[TableName]) -> None:
+    def __init__(self, tables: Dict[str, Tuple[str, str]]) -> None:
         super().__init__()
-        self._to_extract = table_names
+        self._to_extract = tables
 
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         # 1. Retrieve the sequence ranges for extraction.
@@ -71,7 +70,7 @@ class ExtractFromAuroraToS3(Operator):
 
         # 1. Retrieve the starting sequence values for extraction.
         q = GET_NEXT_EXTRACT_TEMPLATE.format(
-            extract_tables=", ".join(map(lambda tn: tn.value, self._to_extract))
+            extract_tables=", ".join(self._to_extract.keys())
         )
         logger.debug("Executing on Aurora %s", q)
         await cursor.execute(q)
@@ -144,17 +143,13 @@ class ExtractFromAuroraToS3(Operator):
             query=extract_main_query,
             s3_bucket=ctx.s3_bucket(),
             s3_region=ctx.s3_region(),
-            s3_file_path=ctx.get_extract_path_for(
-                table_name, is_shadow=False, include_file=True
-            ),
+            s3_file_path=self._to_extract[table_name][0],
         )
         extract_shadow = EXTRACT_S3_TEMPLATE.format(
             query=extract_shadow_query,
             s3_bucket=ctx.s3_bucket(),
             s3_region=ctx.s3_region(),
-            s3_file_path=ctx.get_extract_path_for(
-                table_name, is_shadow=True, include_file=True
-            ),
+            s3_file_path=self._to_extract[table_name][1],
         )
         logger.debug("Running main export query: %s", extract_main)
         logger.debug("Running shadow export query: %s", extract_shadow)

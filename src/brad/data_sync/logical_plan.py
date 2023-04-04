@@ -1,12 +1,17 @@
 from typing import List
 
+from brad.config.dbtype import DBType
 from brad.blueprint.data.location import Location
 from brad.blueprint.data.table import TableName
 
 
 class LogicalDataSyncOperator:
-    def __init__(self) -> None:
+    def __init__(self, table_name: TableName) -> None:
         self._dependees: List["LogicalDataSyncOperator"] = []
+        self._table_name = table_name
+
+    def table_name(self) -> TableName:
+        return self._table_name
 
     def add_dependee(self, dependee: "LogicalDataSyncOperator") -> None:
         self._dependees.append(dependee)
@@ -43,13 +48,6 @@ class ExtractDeltas(LogicalDataSyncOperator):
     extraction on Aurora.
     """
 
-    def __init__(self, table_name: TableName):
-        super().__init__()
-        self._table_name = table_name
-
-    def table_name(self) -> TableName:
-        return self._table_name
-
     def dependencies(self) -> List[LogicalDataSyncOperator]:
         return []
 
@@ -67,17 +65,24 @@ class TransformDeltas(LogicalDataSyncOperator):
         self,
         sources: List[LogicalDataSyncOperator],
         transform_text: str,
-        location: Location,
+        table_name: TableName,
+        engine: DBType,
     ):
-        super().__init__()
+        super().__init__(table_name)
         self._sources = sources
         self._transform_text = transform_text
-        self._location = location
+        self._engine = engine
 
         for s in self._sources:
             # Sanity check.
             assert isinstance(s, ExtractDeltas) or isinstance(s, TransformDeltas)
             s.add_dependee(self)
+
+    def transform_text(self) -> str:
+        return self._transform_text
+
+    def engine(self) -> DBType:
+        return self._engine
 
     def dependencies(self) -> List[LogicalDataSyncOperator]:
         return self._sources
@@ -87,8 +92,8 @@ class TransformDeltas(LogicalDataSyncOperator):
             [
                 "TransformDeltas(num_sources=",
                 str(len(self._sources)),
-                ", location=",
-                self._location,
+                ", engine=",
+                self._engine,
                 ")",
             ]
         )
@@ -103,9 +108,8 @@ class ApplyDeltas(LogicalDataSyncOperator):
     def __init__(
         self, source: LogicalDataSyncOperator, table_name: TableName, location: Location
     ):
-        super().__init__()
+        super().__init__(table_name)
         self._source = source
-        self._table_name = table_name
         self._location = location
 
         # Sanity check.
@@ -113,8 +117,8 @@ class ApplyDeltas(LogicalDataSyncOperator):
 
         self._source.add_dependee(self)
 
-    def table_name(self) -> TableName:
-        return self._table_name
+    def location(self) -> Location:
+        return self._location
 
     def dependencies(self) -> List[LogicalDataSyncOperator]:
         return [self._source]

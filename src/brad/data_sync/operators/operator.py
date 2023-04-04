@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Iterable
 
 from brad.data_sync.execution.context import ExecutionContext
 
@@ -30,6 +30,10 @@ class Operator:
     def add_dependency(self, other: "Operator") -> None:
         self._dependencies.append(other)
         other._dependees.append(self)  # pylint: disable=protected-access
+
+    def add_dependencies(self, others: Iterable["Operator"]) -> None:
+        for op in others:
+            self.add_dependency(op)
 
     def reset_ready_to_run(self) -> None:
         self._num_pending_dependencies = len(self._dependencies)

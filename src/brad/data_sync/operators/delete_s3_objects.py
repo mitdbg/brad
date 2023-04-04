@@ -14,13 +14,12 @@ class DeleteS3Objects(Operator):
     sync.
     """
 
-    def __init__(self, s3_client, s3_paths: List[str]) -> None:
+    def __init__(self, s3_paths: List[str]) -> None:
         """
         NOTE: All S3 paths are relative to the extract path, specified in the
         configuration.
         """
         super().__init__()
-        self._s3_client = s3_client
         self._s3_paths = s3_paths
 
     async def execute(self, ctx: ExecutionContext) -> "Operator":
@@ -29,13 +28,14 @@ class DeleteS3Objects(Operator):
             await loop.run_in_executor(
                 None,
                 self._delete_object_sync,
+                ctx.s3_client(),
                 ctx.s3_bucket(),
                 "{}{}".format(ctx.s3_path(), relative_s3_path),
             )
         return self
 
-    def _delete_object_sync(self, s3_bucket: str, full_s3_path: str) -> None:
-        self._s3_client.delete_object(
+    def _delete_object_sync(self, s3_client, s3_bucket: str, full_s3_path: str) -> None:
+        s3_client.delete_object(
             Bucket=s3_bucket,
             Key=full_s3_path,
         )
