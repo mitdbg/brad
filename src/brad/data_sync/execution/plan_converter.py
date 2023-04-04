@@ -133,6 +133,38 @@ class PlanConverter:
 
         # Register the operator's dependencies.
         if phys_op is not None:
+            if isinstance(pop.logical_op, TransformDeltas):
+                # Need to create the destination delta tables.
+                transform_dest = pop.logical_op.table_name().value
+                transform_dest_table = self._blueprint.get_table(transform_dest)
+                transform_engine = pop.logical_op.engine()
+                phys_op.add_dependency(
+                    CreateTempTable(
+                        insert_delta_table_name(transform_dest),
+                        transform_dest_table.columns,
+                        transform_engine,
+                    )
+                )
+                phys_op.add_dependency(
+                    CreateTempTable(
+                        delete_delta_table_name(transform_dest),
+                        transform_dest_table.columns,
+                        transform_engine,
+                    )
+                )
+                self._intermediate_tables.extend(
+                    [
+                        (
+                            insert_delta_table_name(transform_dest),
+                            transform_engine,
+                        ),
+                        (
+                            delete_delta_table_name(transform_dest),
+                            transform_engine,
+                        ),
+                    ]
+                )
+
             for phys_dep in pop.physical_dependencies:
                 phys_op.add_dependency(phys_dep)
             self._physical_operators.append(phys_op)
@@ -159,13 +191,12 @@ class PlanConverter:
 
             if dest in to_dest:
                 # The ops have already been created.
-                to_dest_op = to_dest[dest]
-                if to_dest_op is not None:
-                    dependee_pop.physical_dependencies.append(to_dest_op)
-                else:
-                    # No movement operators needed. Take a direct dependency on
-                    # this physical operator.
-                    dependee_pop.physical_dependencies.append(phys_op)
+                self._attach_movement_ops(
+                    source_op=pop,
+                    dependee=dependee_pop,
+                    source_phys_op=phys_op,
+                    to_dest_phys_op=to_dest[dest],
+                )
                 continue
 
             # Generate the movement ops and then register them.
@@ -176,13 +207,24 @@ class PlanConverter:
             )
             if len(ops) == 0:
                 to_dest[dest] = None
+                self._attach_movement_ops(
+                    source_op=pop,
+                    dependee=dependee_pop,
+                    source_phys_op=phys_op,
+                    to_dest_phys_op=None,
+                )
             else:
+                to_dest[dest] = ops[-1]
                 # The operator chain depends on this physical operator finishing.
                 ops[0].add_dependency(phys_op)
-                # Our dependee depends on the physical operator chain completing.
-                dependee_pop.physical_dependencies.append(ops[-1])
                 # Keep track of all the operators we have created.
                 self._physical_operators.extend(ops)
+                self._attach_movement_ops(
+                    source_op=pop,
+                    dependee=dependee_pop,
+                    source_phys_op=phys_op,
+                    to_dest_phys_op=ops[-1],
+                )
 
         # Decrement the "dependencies waiting for count" on dependees. If the
         # count is now zero, schedule it for processing.
@@ -196,6 +238,40 @@ class PlanConverter:
     def _s3_extract_paths_for(self, table_name: str) -> Tuple[str, str]:
         prefix = "aurora_extract/{}/".format(table_name)
         return (prefix + "writes/", prefix + "deletes/")
+
+    def _attach_movement_ops(
+        self,
+        source_op: "_ProcessingOp",
+        dependee: "_ProcessingOp",
+        source_phys_op: Operator,
+        to_dest_phys_op: Optional[Operator],
+    ) -> None:
+        # The purpose of this method is to attach the physical delta movement
+        # operators to the dependency graph, and to add an `AdjustDeltas`
+        # operator when needed.
+        need_adjust_deltas = isinstance(source_op, ExtractDeltas) and isinstance(
+            dependee, TransformDeltas
+        )
+
+        if need_adjust_deltas:
+            assert isinstance(dependee.logical_op, TransformDeltas)
+            dest_table = dependee.logical_op.table_name().value
+            dest_table_engine = dependee.logical_op.engine()
+            adjust_delta = AdjustDeltas(dest_table, dest_table_engine)
+            self._physical_operators.append(adjust_delta)
+
+            if to_dest_phys_op is None:
+                adjust_delta.add_dependency(source_phys_op)
+                dependee.physical_dependencies.append(adjust_delta)
+            else:
+                adjust_delta.add_dependency(to_dest_phys_op)
+                dependee.physical_dependencies.append(adjust_delta)
+
+        else:
+            if to_dest_phys_op is None:
+                dependee.physical_dependencies.append(source_phys_op)
+            else:
+                dependee.physical_dependencies.append(to_dest_phys_op)
 
     def _generate_movement_ops(
         self,
