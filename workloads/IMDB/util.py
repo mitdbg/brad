@@ -1,6 +1,7 @@
 import re
 import os
 import numpy as np
+import yaml
 
 
 IMDB_TABLE_SIZE = {
@@ -130,6 +131,59 @@ def extract_columns(pg_schema_path):
                 all_columns[table_name].append(column)
 
     return PK_columns, all_columns
+
+
+def load_schema_as_dict(pg_schema_path, schema_name):
+    schema = dict()
+    schema['schema_name'] = schema_name
+    schema['tables'] = []
+    with open(pg_schema_path, "r") as file:
+        pg_schema = file.read()
+    if "DROP TABLE IF EXISTS" in pg_schema:
+        pg_schema = pg_schema.split("DROP TABLE IF EXISTS ")
+    elif "drop table if exists" in pg_schema:
+        pg_schema = pg_schema.split("drop table if exists ")
+    else:
+        raise NotImplementedError
+    for table_def in pg_schema:
+        if table_def.startswith('"'):
+            table_name = table_def.split("\n")[0].strip('"; ')
+            table_schema = dict()
+            table_schema['table_name'] = table_name
+            table_schema['columns'] = []
+            for line in table_def.strip().split("\n"):
+                line = line.strip()
+                if "CREATE TABLE" in line:
+                    continue
+                elif " " not in line:
+                    continue
+                column_name = line.split(" ")[0]
+                column_type = " ".join(line.split(" ")[1:])
+                if "PRIMARY KEY" in column_type:
+                    column_schema = {'name': column_name, 'data_type': 'SERIAL', 'primary_key': True}
+                else:
+                    column_type = reformat_data_type(column_type)
+                    column_schema = {'name': column_name, 'data_type': column_type}
+                table_schema['columns'].append(column_schema)
+            schema['tables'].append(table_schema)
+    return schema
+
+
+def reformat_data_type(data_type):
+    if "NOT NULL" in data_type:
+        data_type = data_type.replace("NOT NULL", "")
+    if "character varying" in data_type:
+        data_type = "TEXT"
+    data_type = data_type.strip().strip(",").strip()
+    if data_type == "integer":
+            data_type = "BIGINT"
+    return data_type
+
+
+def convert_imdb_schema_sql_to_yml(pg_schema_path, save_file="config/schemas/imdb.yml"):
+    schema = load_schema_as_dict(pg_schema_path, "imdb")
+    with open(save_file, 'w') as file:
+        documents = yaml.dump(schema, file)
 
 
 def extract_join_keys(query_dir):
