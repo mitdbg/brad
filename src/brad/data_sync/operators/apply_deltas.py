@@ -87,14 +87,14 @@ class ApplyDeltas(Operator):
             delete_delta_table=delete_delta_table_name(self._from_table_name),
             conditions=self._generate_aurora_redshift_delete_conditions(ctx),
         )
-        logger.debug("Running on Redshift: %s", make_deletes)
-        cursor.execute(make_deletes)
+        logger.debug("Running on %s: %s", self._engine, make_deletes)
+        await cursor.execute(make_deletes)
 
         make_inserts = _AURORA_REDSHIFT_INSERT_COMMAND.format(
             main_table=self._onto_table_name,
             insert_delta_table=insert_delta_table_name(self._from_table_name),
         )
-        logger.debug("Running on Redshift: %s", make_inserts)
+        logger.debug("Running on %s: %s", self._engine, make_inserts)
         await cursor.execute(make_inserts)
         return self
 

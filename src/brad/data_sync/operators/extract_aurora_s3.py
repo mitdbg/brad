@@ -76,7 +76,12 @@ class ExtractFromAuroraToS3(Operator):
 
         # 1. Retrieve the starting sequence values for extraction.
         q = GET_NEXT_EXTRACT_TEMPLATE.format(
-            extract_tables=", ".join(self._to_extract.keys())
+            extract_tables=", ".join(
+                map(
+                    lambda table_name: "'{}'".format(table_name),
+                    self._to_extract.keys(),
+                )
+            )
         )
         logger.debug("Executing on Aurora %s", q)
         await cursor.execute(q)
@@ -135,27 +140,33 @@ class ExtractFromAuroraToS3(Operator):
 
         extract_main_query = EXTRACT_FROM_MAIN_TEMPLATE.format(
             table_cols=comma_separated_column_names(table.columns),
-            main_table=source_table_name(table_name),
+            main_table_name=source_table_name(table_name),
             lower_bound=bounds.next_extract_seq,
             upper_bound=bounds.max_extract_seq,
         )
         extract_shadow_query = EXTRACT_FROM_SHADOW_TEMPLATE.format(
             pkey_cols=comma_separated_column_names(table.primary_key),
-            shadow_table=shadow_table_name(table_name),
+            shadow_table_name=shadow_table_name(table_name),
             lower_bound=bounds.next_shadow_extract_seq,
             upper_bound=bounds.max_shadow_extract_seq,
         )
         extract_main = EXTRACT_S3_TEMPLATE.format(
-            query=extract_main_query,
+            extract_query=extract_main_query,
             s3_bucket=ctx.s3_bucket(),
             s3_region=ctx.s3_region(),
-            s3_file_path=self._to_extract[table_name].writes_path().path_with_file(),
+            s3_file_path="{}{}".format(
+                ctx.s3_path(),
+                self._to_extract[table_name].writes_path().path_with_file(),
+            ),
         )
         extract_shadow = EXTRACT_S3_TEMPLATE.format(
-            query=extract_shadow_query,
+            extract_query=extract_shadow_query,
             s3_bucket=ctx.s3_bucket(),
             s3_region=ctx.s3_region(),
-            s3_file_path=self._to_extract[table_name].deletes_path().path_with_file(),
+            s3_file_path="{}{}".format(
+                ctx.s3_path(),
+                self._to_extract[table_name].deletes_path().path_with_file(),
+            ),
         )
         logger.debug("Running main export query: %s", extract_main)
         logger.debug("Running shadow export query: %s", extract_shadow)
