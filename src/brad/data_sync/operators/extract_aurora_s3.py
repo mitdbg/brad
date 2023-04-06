@@ -76,12 +76,7 @@ class ExtractFromAuroraToS3(Operator):
 
         # 1. Retrieve the starting sequence values for extraction.
         q = GET_NEXT_EXTRACT_TEMPLATE.format(
-            extract_tables=", ".join(
-                map(
-                    lambda table_name: "'{}'".format(table_name),
-                    self._to_extract.keys(),
-                )
-            )
+            extract_tables=", ".join(map("'{}'".format, self._to_extract.keys()))
         )
         logger.debug("Executing on Aurora %s", q)
         await cursor.execute(q)
