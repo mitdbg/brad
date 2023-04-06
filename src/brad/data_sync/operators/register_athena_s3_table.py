@@ -33,6 +33,17 @@ class RegisterAthenaS3Table(Operator):
         self._columns = columns
         self._relative_s3_path = relative_s3_path
 
+    def __repr__(self) -> str:
+        return "".join(
+            [
+                "RegisterAthenaS3Table(table_name=",
+                self._table_name,
+                ", s3_path=",
+                self._relative_s3_path,
+                ")",
+            ]
+        )
+
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         query = _REGISTER_TABLE_TEMPLATE.format(
             table_name=self._table_name,

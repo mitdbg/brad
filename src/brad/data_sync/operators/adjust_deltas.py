@@ -26,6 +26,17 @@ class AdjustDeltas(Operator):
         self._table_name = table_name
         self._engine = engine
 
+    def __repr__(self) -> str:
+        return "".join(
+            [
+                "AdjustDeltas(table_name=",
+                self._table_name,
+                ", engine=",
+                self._engine,
+                ")",
+            ]
+        )
+
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         table = ctx.blueprint().get_table(self._table_name)
         query = "INSERT INTO {delete_deltas} SELECT {pkey_cols} FROM {insert_deltas}".format(

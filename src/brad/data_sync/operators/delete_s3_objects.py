@@ -22,6 +22,9 @@ class DeleteS3Objects(Operator):
         super().__init__()
         self._s3_paths = s3_paths
 
+    def __repr__(self) -> str:
+        return "".join(["DeleteS3Objects(<", str(len(self._s3_paths)), " objects>)"])
+
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         loop = asyncio.get_running_loop()
         for relative_s3_path in self._s3_paths:
