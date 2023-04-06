@@ -166,9 +166,12 @@ class PlanConverter:
                 pop.logical_op.table_name().value,
             )
         elif isinstance(pop.logical_op, LogicalApplyDeltas):
+            assert len(pop.logical_op.dependencies()) == 1
+            delta_dep = pop.logical_op.dependencies()[0]
             phys_op = ApplyDeltas(
-                pop.logical_op.table_name().value,
-                pop.logical_op.location().default_engine(),
+                onto_table_name=pop.logical_op.table_name().value,
+                from_table_name=delta_dep.table_name().value,
+                engine=pop.logical_op.location().default_engine(),
             )
         elif isinstance(pop.logical_op, ExtractDeltas):
             phys_op = None

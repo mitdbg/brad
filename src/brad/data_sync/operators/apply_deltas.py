@@ -46,16 +46,21 @@ _ATHENA_MERGE_COMMAND = """
 
 
 class ApplyDeltas(Operator):
-    def __init__(self, table_name: str, engine: DBType) -> None:
+    def __init__(
+        self, onto_table_name: str, from_table_name: str, engine: DBType
+    ) -> None:
         super().__init__()
-        self._table_name = table_name
+        self._onto_table_name = onto_table_name
+        self._from_table_name = from_table_name
         self._engine = engine
 
     def __repr__(self) -> str:
         return "".join(
             [
-                "ApplyDeltas(table_name=",
-                self._table_name,
+                "ApplyDeltas(onto_table_name=",
+                self._onto_table_name,
+                ", from_table_name=",
+                self._from_table_name,
                 ", engine=",
                 self._engine,
                 ")",
@@ -78,36 +83,38 @@ class ApplyDeltas(Operator):
         self, ctx: ExecutionContext, cursor
     ) -> "Operator":
         make_deletes = _AURORA_REDSHIFT_DELETE_COMMAND.format(
-            main_table=self._table_name,
-            delete_delta_table=delete_delta_table_name(self._table_name),
+            main_table=self._onto_table_name,
+            delete_delta_table=delete_delta_table_name(self._from_table_name),
             conditions=self._generate_aurora_redshift_delete_conditions(ctx),
         )
         logger.debug("Running on Redshift: %s", make_deletes)
         cursor.execute(make_deletes)
 
         make_inserts = _AURORA_REDSHIFT_INSERT_COMMAND.format(
-            main_table=self._table_name,
-            insert_delta_table=insert_delta_table_name(self._table_name),
+            main_table=self._onto_table_name,
+            insert_delta_table=insert_delta_table_name(self._from_table_name),
         )
         logger.debug("Running on Redshift: %s", make_inserts)
         await cursor.execute(make_inserts)
         return self
 
     def _generate_aurora_redshift_delete_conditions(self, ctx: ExecutionContext) -> str:
-        table = ctx.blueprint().get_table(self._table_name)
+        table = ctx.blueprint().get_table(self._onto_table_name)
         conditions = []
         for col in table.primary_key:
             conditions.append(
                 "{main_table}.{col_name} = {delete_delta_table}.{col_name}".format(
-                    main_table=self._table_name,
-                    delete_delta_table=delete_delta_table_name(table),
+                    main_table=self._onto_table_name,
+                    delete_delta_table=delete_delta_table_name(
+                        self._from_table_name,
+                    ),
                     col_name=col.name,
                 )
             )
         return " AND ".join(conditions)
 
     async def _execute_athena(self, ctx: ExecutionContext) -> "Operator":
-        table = ctx.blueprint().get_table(self._table_name)
+        table = ctx.blueprint().get_table(self._onto_table_name)
         pkey_cols = comma_separated_column_names(table.primary_key)
         non_primary_cols = list(filter(lambda c: not c.is_primary, table.columns))
         other_cols = comma_separated_column_names(non_primary_cols)
@@ -133,10 +140,10 @@ class ApplyDeltas(Operator):
         insert_cols = ", ".join(map(lambda c: "s.{}".format(c.name), table.columns))
 
         query = _ATHENA_MERGE_COMMAND.format(
-            main_table=self._table_name,
+            main_table=self._onto_table_name,
             pkey_cols=pkey_cols,
-            insert_delta_table=insert_delta_table_name(self._table_name),
-            delete_delta_table=delete_delta_table_name(self._table_name),
+            insert_delta_table=insert_delta_table_name(self._from_table_name),
+            delete_delta_table=delete_delta_table_name(self._from_table_name),
             other_cols=other_cols,
             other_cols_as_null=other_cols_as_null,
             merge_cond=merge_cond,
