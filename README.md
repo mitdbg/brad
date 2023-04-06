@@ -54,7 +54,7 @@ engines.
   PostgreSQL data types. Remember the schema name that you choose; you will need
   it when starting the BRAD server.
 - Run `brad admin bootstrap_schema --config-file path/to/config.yml
-  --bootstrap-schema-file path/to/your/schema.yml` to set up the tables across the
+  --schema-file path/to/your/schema.yml` to set up the tables across the
   underlying engines.
 - To bulk load data, upload your data to S3 and then create a manifest file (see
   `config/manifests/manifest_sample.yml` for an example). Then run `brad admin
@@ -66,7 +66,7 @@ engines.
 - Run queries through the CLI `brad cli`.
 
 To remove the tables, use `brad admin drop_schema` (e.g., `brad admin
-drop_schema --config-file path/to/config.yml --drop-schema-name
+drop_schema --config-file path/to/config.yml --schema-name
 your_schema_name`). Note that this command will delete the data in the tables
 (and will drop the tables)!
 
