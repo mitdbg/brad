@@ -19,7 +19,7 @@ class DropTables(Operator):
         self._engine = engine
 
     def __repr__(self) -> str:
-        return "".join(["DropTables(<", str(len(self._table_names)), " tables>)"])
+        return "".join(["DropTables(", ", ".join(self._table_names), ")"])
 
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         query_template = "DROP TABLE {}"

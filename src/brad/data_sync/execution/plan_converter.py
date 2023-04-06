@@ -19,13 +19,17 @@ from brad.data_sync.operators.apply_deltas import ApplyDeltas
 from brad.data_sync.operators.create_temp_table import CreateTempTable
 from brad.data_sync.operators.delete_s3_objects import DeleteS3Objects
 from brad.data_sync.operators.drop_tables import DropTables
-from brad.data_sync.operators.extract_aurora_s3 import ExtractFromAuroraToS3
+from brad.data_sync.operators.extract_aurora_s3 import (
+    ExtractFromAuroraToS3,
+    ExtractLocation,
+)
 from brad.data_sync.operators.load_from_s3 import LoadFromS3
 from brad.data_sync.operators.register_athena_s3_table import RegisterAthenaS3Table
 from brad.data_sync.operators.run_commit import RunCommit
 from brad.data_sync.operators.run_transformation import RunTransformation
 from brad.data_sync.operators.unload_to_s3 import UnloadToS3
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
+from brad.data_sync.s3_path import S3Path
 
 
 class PlanConverter:
@@ -62,17 +66,18 @@ class PlanConverter:
             # physical operators for dependees.
             pop = _ProcessingOp(op)
             pop.output_location = _DeltaLocation.S3Text
-            (
-                pop.output_insert_delta_s3_path,
-                pop.output_delete_delta_s3_path,
-            ) = extract_paths
+            pop.output_s3_location = extract_paths
             self._processing_ops[op] = pop
             self._ready_to_process.append(pop)
 
             # Keep track of these intermediate objects so that they can be
             # deleted afterwards.
-            self._intermediate_s3_objects.append(extract_paths[0])
-            self._intermediate_s3_objects.append(extract_paths[1])
+            self._intermediate_s3_objects.append(
+                extract_paths.writes_path().path_with_file()
+            )
+            self._intermediate_s3_objects.append(
+                extract_paths.deletes_path().path_with_file()
+            )
 
         # The base operators should be `ExtractDeltas` operators. We create one
         # Aurora extraction physical operator to ensure that we extract a
@@ -272,9 +277,12 @@ class PlanConverter:
             if dependee_pop.dependencies_left_to_process == 0:
                 self._ready_to_process.append(dependee_pop)
 
-    def _s3_extract_paths_for(self, table_name: str) -> Tuple[str, str]:
+    def _s3_extract_paths_for(self, table_name: str) -> ExtractLocation:
         prefix = "aurora_extract/{}/".format(table_name)
-        return (prefix + "writes/", prefix + "deletes/")
+        return ExtractLocation(
+            S3Path(prefix + "writes/table.tbl"),
+            S3Path(prefix + "deletes/table.tbl"),
+        )
 
     def _attach_movement_ops(
         self,
@@ -326,8 +334,7 @@ class PlanConverter:
         if source == _DeltaLocation.S3Text and dest == DBType.Redshift:
             # 1. Create tables on Redshift
             # 2. Import from S3
-            assert source_op.output_insert_delta_s3_path is not None
-            assert source_op.output_delete_delta_s3_path is not None
+            assert source_op.output_s3_location is not None
             c1 = CreateTempTable(
                 id_table_name,
                 table.columns,
@@ -340,12 +347,12 @@ class PlanConverter:
             )
             l1 = LoadFromS3(
                 id_table_name,
-                source_op.output_insert_delta_s3_path,
+                source_op.output_s3_location.writes_path().path_with_file(),
                 engine=DBType.Redshift,
             )
             l2 = LoadFromS3(
                 dd_table_name,
-                source_op.output_delete_delta_s3_path,
+                source_op.output_s3_location.deletes_path().path_with_file(),
                 engine=DBType.Redshift,
             )
             c2.add_dependency(c1)
@@ -358,13 +365,16 @@ class PlanConverter:
 
         elif source == _DeltaLocation.S3Text and dest == DBType.Athena:
             # 1. Register the S3 text data as Athena tables
-            assert source_op.output_insert_delta_s3_path is not None
-            assert source_op.output_delete_delta_s3_path is not None
+            assert source_op.output_s3_location is not None
             r1 = RegisterAthenaS3Table(
-                id_table_name, table.columns, source_op.output_insert_delta_s3_path
+                id_table_name,
+                table.columns,
+                source_op.output_s3_location.writes_path().path_prefix(),
             )
             r2 = RegisterAthenaS3Table(
-                dd_table_name, table.primary_key, source_op.output_delete_delta_s3_path
+                dd_table_name,
+                table.primary_key,
+                source_op.output_s3_location.deletes_path().path_prefix(),
             )
             r2.add_dependency(r1)
             out_ops.extend([r1, r2])
@@ -480,5 +490,4 @@ class _ProcessingOp:
         self.output_location: Optional[_DeltaLocation] = None
 
         # These are relative to the configured S3 extract path.
-        self.output_insert_delta_s3_path: Optional[str] = None
-        self.output_delete_delta_s3_path: Optional[str] = None
+        self.output_s3_location: Optional[ExtractLocation] = None
