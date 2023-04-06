@@ -38,11 +38,12 @@ class DataSyncPlanExecutor:
         for op in plan.all_operators():
             op.reset_ready_to_run()
 
-        start_op = plan.start_op()
-        assert start_op.ready_to_run()
-
         ctx = self._new_execution_context()
-        ready_to_run = deque([start_op])
+        ready_to_run = deque([*plan.base_ops()])
+
+        # Sanity check.
+        for op in ready_to_run:
+            assert op.ready_to_run()
 
         # 2. Actually run the operators.
         # Serial execution to begin.

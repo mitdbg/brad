@@ -49,6 +49,7 @@ class PlanConverter:
         self._ready_to_process: Deque[_ProcessingOp] = deque()
 
         self._extract_op: Optional[ExtractFromAuroraToS3] = None
+        self._base_ops: List[Operator] = []
         self._physical_operators: List[Operator] = []
         self._no_dependees: List[Operator] = []
 
@@ -84,6 +85,7 @@ class PlanConverter:
         # transactionally-consistent snapshot. This is the base op.
         self._extract_op = ExtractFromAuroraToS3(tables_to_extract)
         self._physical_operators.append(self._extract_op)
+        self._base_ops.append(self._extract_op)
 
         # Process operations until they have all be processed.
         while len(self._ready_to_process) > 0:
@@ -119,7 +121,7 @@ class PlanConverter:
         delete_s3.add_dependency(commit_op)
         self._physical_operators.append(delete_s3)
 
-        return PhysicalDataSyncPlan(self._extract_op, self._physical_operators)
+        return PhysicalDataSyncPlan(self._base_ops, self._physical_operators)
 
     def reset(self) -> None:
         self._intermediate_s3_objects = []
@@ -128,6 +130,7 @@ class PlanConverter:
         self._ready_to_process.clear()
         self._physical_operators = []
         self._no_dependees = []
+        self._base_ops = []
 
     def _process_logical_op(self, pop: "_ProcessingOp") -> None:
         # Get a list of this logical operator's dependees.
@@ -179,20 +182,22 @@ class PlanConverter:
                 transform_dest = pop.logical_op.table_name().value
                 transform_dest_table = self._blueprint.get_table(transform_dest)
                 transform_engine = pop.logical_op.engine()
-                phys_op.add_dependency(
-                    CreateTempTable(
-                        insert_delta_table_name(transform_dest),
-                        transform_dest_table.columns,
-                        transform_engine,
-                    )
+                transform_ins_out = CreateTempTable(
+                    insert_delta_table_name(transform_dest),
+                    transform_dest_table.columns,
+                    transform_engine,
                 )
-                phys_op.add_dependency(
-                    CreateTempTable(
-                        delete_delta_table_name(transform_dest),
-                        transform_dest_table.columns,
-                        transform_engine,
-                    )
+                transform_del_out = CreateTempTable(
+                    delete_delta_table_name(transform_dest),
+                    transform_dest_table.columns,
+                    transform_engine,
                 )
+                phys_op.add_dependency(transform_ins_out)
+                phys_op.add_dependency(transform_del_out)
+                self._physical_operators.append(transform_ins_out)
+                self._physical_operators.append(transform_del_out)
+                self._base_ops.append(transform_ins_out)
+                self._base_ops.append(transform_del_out)
                 self._intermediate_tables.extend(
                     [
                         (

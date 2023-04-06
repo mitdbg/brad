@@ -5,17 +5,19 @@ from brad.data_sync.operators import Operator
 
 
 class PhysicalDataSyncPlan:
-    def __init__(self, start_op: Operator, all_operators: List[Operator]) -> None:
-        self._start_op = start_op
+    def __init__(self, base_ops: List[Operator], all_operators: List[Operator]) -> None:
+        # All operators that have no dependencies. This list is a subset of
+        # `all_operators`.
+        self._base_ops = base_ops
         self._all_operators = all_operators
 
-    def start_op(self) -> Operator:
-        return self._start_op
+    def base_ops(self) -> List[Operator]:
+        return self._base_ops
 
     def all_operators(self) -> List[Operator]:
         return self._all_operators
 
-    def print_sequential_plan(self) -> None:
+    def print_plan_sequentially(self) -> None:
         """
         Prints a topological ordering of the plan. Useful for debugging
         purposes.
@@ -24,7 +26,7 @@ class PhysicalDataSyncPlan:
             op.reset_ready_to_run()
 
         print("Physical Data Sync Plan:")
-        ready_to_process = deque([self._start_op])
+        ready_to_process = deque([*self._base_ops])
         while len(ready_to_process) > 0:
             op = ready_to_process.popleft()
             print("-", str(op))

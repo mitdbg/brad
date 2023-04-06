@@ -9,7 +9,7 @@ def validate_physical_plan_structure(plan: PhysicalDataSyncPlan):
     # Traverse the plan and check that all operators are represented in the list
     # of operators.
     visited = set()
-    stack = [plan.start_op()]
+    stack = [*plan.base_ops()]
 
     while len(stack) > 0:
         op = stack.pop()
