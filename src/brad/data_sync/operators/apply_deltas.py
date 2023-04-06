@@ -51,6 +51,17 @@ class ApplyDeltas(Operator):
         self._table_name = table_name
         self._engine = engine
 
+    def __repr__(self) -> str:
+        return "".join(
+            [
+                "ApplyDeltas(table_name=",
+                self._table_name,
+                ", engine=",
+                self._engine,
+                ")",
+            ]
+        )
+
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         if self._engine == DBType.Aurora:
             aurora = await ctx.aurora()

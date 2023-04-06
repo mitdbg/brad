@@ -153,7 +153,9 @@ class PlanConverter:
         # delta). Extractions are a special case and are already handled.
         if isinstance(pop.logical_op, TransformDeltas):
             phys_op: Optional[Operator] = RunTransformation(
-                pop.logical_op.transform_text(), pop.logical_op.engine()
+                pop.logical_op.transform_text(),
+                pop.logical_op.engine(),
+                pop.logical_op.table_name().value,
             )
         elif isinstance(pop.logical_op, LogicalApplyDeltas):
             phys_op = ApplyDeltas(

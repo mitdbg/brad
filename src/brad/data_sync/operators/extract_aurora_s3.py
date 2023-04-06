@@ -29,6 +29,11 @@ class ExtractFromAuroraToS3(Operator):
         super().__init__()
         self._to_extract = tables
 
+    def __repr__(self) -> str:
+        return "".join(
+            ["ExtractFromAuroraToS3(", ", ".join(self._to_extract.keys()), ")"]
+        )
+
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         # 1. Retrieve the sequence ranges for extraction.
         table_bounds = await self._get_table_extract_bounds(ctx)

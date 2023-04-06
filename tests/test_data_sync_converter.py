@@ -1,7 +1,27 @@
 from brad.blueprint.data.user import UserProvidedDataBlueprint
 from brad.data_sync.execution.plan_converter import PlanConverter
+from brad.data_sync.physical_plan import PhysicalDataSyncPlan
 from brad.planner.data import bootstrap_data_blueprint
 from brad.planner.data_sync import make_logical_data_sync_plan
+
+
+def validate_physical_plan_structure(plan: PhysicalDataSyncPlan):
+    # Traverse the plan and check that all operators are represented in the list
+    # of operators.
+    visited = set()
+    stack = [plan.start_op()]
+
+    while len(stack) > 0:
+        op = stack.pop()
+        if op in visited:
+            continue
+        visited.add(op)
+        for dependee in op.dependees():
+            stack.append(dependee)
+
+    assert len(plan.all_operators()) == len(visited)
+    for op in plan.all_operators():
+        assert op in visited
 
 
 def test_data_sync_converter_sanity_check():
@@ -31,7 +51,8 @@ def test_data_sync_converter_sanity_check():
     dsp = make_logical_data_sync_plan(blueprint)
 
     converter = PlanConverter(dsp, blueprint)
-    _ = converter.get_plan()
+    plan = converter.get_plan()
+    validate_physical_plan_structure(plan)
 
 
 def test_data_sync_converter_sanity_check2():
@@ -58,4 +79,5 @@ def test_data_sync_converter_sanity_check2():
     dsp = make_logical_data_sync_plan(blueprint)
 
     converter = PlanConverter(dsp, blueprint)
-    _ = converter.get_plan()
+    plan = converter.get_plan()
+    validate_physical_plan_structure(plan)

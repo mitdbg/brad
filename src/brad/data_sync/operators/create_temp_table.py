@@ -22,6 +22,17 @@ class CreateTempTable(Operator):
         self._columns = columns
         self._engine = engine
 
+    def __repr__(self) -> str:
+        return "".join(
+            [
+                "CreateTempTable(table_name=",
+                self._table_name,
+                ", engine=",
+                self._engine,
+                ")",
+            ]
+        )
+
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         if self._engine == DBType.Aurora:
             return await self._execute_aurora(ctx)

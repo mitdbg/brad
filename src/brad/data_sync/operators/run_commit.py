@@ -8,6 +8,9 @@ logger = logging.getLogger(__name__)
 
 
 class RunCommit(Operator):
+    def __repr__(self) -> str:
+        return "RunCommit()"
+
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         aurora = await ctx.aurora()
         redshift = await ctx.redshift()

@@ -43,6 +43,19 @@ class UnloadToS3(Operator):
         self._engine = engine
         self._relative_s3_path = relative_s3_path
 
+    def __repr__(self) -> str:
+        return "".join(
+            [
+                "UnloadToS3(table_name=",
+                self._table_name,
+                ", engine=",
+                self._engine,
+                ", to=",
+                self._relative_s3_path,
+                ")",
+            ]
+        )
+
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         if self._engine == DBType.Aurora:
             return await self._execute_aurora(ctx)
