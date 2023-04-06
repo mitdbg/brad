@@ -302,15 +302,19 @@ class PlanConverter:
         # The purpose of this method is to attach the physical delta movement
         # operators to the dependency graph, and to add an `AdjustDeltas`
         # operator when needed.
-        need_adjust_deltas = isinstance(source_op, ExtractDeltas) and isinstance(
-            dependee, TransformDeltas
+
+        # NOTE: This plan converter still needs a better story for executing
+        # transforms on Athena (we need to prepare the delta tables
+        # appropriately).
+        need_adjust_deltas = isinstance(source_op.logical_op, ExtractDeltas) and (
+            dependee.logical_op.engine() == DBType.Redshift
+            or isinstance(dependee.logical_op, TransformDeltas)
         )
 
         if need_adjust_deltas:
-            assert isinstance(dependee.logical_op, TransformDeltas)
-            dest_table = dependee.logical_op.table_name().value
+            source_table = source_op.logical_op.table_name().value
             dest_table_engine = dependee.logical_op.engine()
-            adjust_delta = AdjustDeltas(dest_table, dest_table_engine)
+            adjust_delta = AdjustDeltas(source_table, dest_table_engine)
             self._physical_operators.append(adjust_delta)
 
             if to_dest_phys_op is None:
