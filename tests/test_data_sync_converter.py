@@ -53,6 +53,7 @@ def test_data_sync_converter_sanity_check():
     converter = PlanConverter(dsp, blueprint)
     plan = converter.get_plan()
     validate_physical_plan_structure(plan)
+    plan.print_plan_sequentially()
 
 
 def test_data_sync_converter_sanity_check2():
@@ -81,3 +82,4 @@ def test_data_sync_converter_sanity_check2():
     converter = PlanConverter(dsp, blueprint)
     plan = converter.get_plan()
     validate_physical_plan_structure(plan)
+    plan.print_plan_sequentially()

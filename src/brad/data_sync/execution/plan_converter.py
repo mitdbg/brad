@@ -404,6 +404,9 @@ class PlanConverter:
             r2.add_dependency(r1)
             out_ops.extend([u1, u2, r1, r2])
             self._intermediate_s3_objects.extend([insert_s3_path, delete_s3_path])
+            self._intermediate_tables.extend(
+                [(id_table_name, DBType.Athena), (dd_table_name, DBType.Athena)]
+            )
 
         elif source == _DeltaLocation.Redshift and dest == DBType.Aurora:
             # 1. Unload to S3
@@ -424,6 +427,9 @@ class PlanConverter:
             l2.add_dependency(l1)
             out_ops.extend([u1, u2, l1, l2, c1, c2])
             self._intermediate_s3_objects.extend([insert_s3_path, delete_s3_path])
+            self._intermediate_tables.extend(
+                [(id_table_name, DBType.Aurora), (dd_table_name, DBType.Aurora)]
+            )
 
         elif (
             (source == _DeltaLocation.Aurora and dest == DBType.Aurora)
