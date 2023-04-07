@@ -214,6 +214,13 @@ def comma_separated_column_names_and_types(cols: List[Column], for_db: DBType) -
 def _type_for(data_type: str, for_db: DBType) -> str:
     # A hacky way to ensure we use a supported type in each DBMS (e.g. Athena does
     # not support `TEXT` data).
+    if data_type.upper().startswith("CHARACTER"):
+        if for_db == DBType.Athena:
+            return "STRING"
+        elif for_db == DBType.Redshift and data_type.upper() == "CHARACTER VARYING":
+            return "VARCHAR(MAX)"
+        elif for_db == DBType.Redshift and data_type.upper().startswith("CHARACTER VARYING"):
+            return "VARCHAR(256)"
     if data_type.upper() == "TEXT" and for_db == DBType.Athena:
         return "STRING"
     elif data_type.upper() == "SERIAL" and (
