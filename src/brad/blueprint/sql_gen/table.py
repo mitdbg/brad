@@ -219,7 +219,9 @@ def _type_for(data_type: str, for_db: DBType) -> str:
             return "STRING"
         elif for_db == DBType.Redshift and data_type.upper() == "CHARACTER VARYING":
             return "VARCHAR(MAX)"
-        elif for_db == DBType.Redshift and data_type.upper().startswith("CHARACTER VARYING"):
+        elif for_db == DBType.Redshift and data_type.upper().startswith(
+            "CHARACTER VARYING"
+        ):
             return "VARCHAR(256)"
     if data_type.upper() == "TEXT" and for_db == DBType.Athena:
         return "STRING"
