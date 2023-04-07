@@ -13,7 +13,7 @@ GET_MAX_EXTRACT_TEMPLATE = "SELECT MAX(" + AURORA_SEQ_COLUMN + ") FROM {table_na
 EXTRACT_S3_TEMPLATE = """
 SELECT * from aws_s3.query_export_to_s3(
     '{extract_query}',
-    aws_commons.create_s3_uri('{s3_bucket}', '{s3_path}', '{s3_region}'),
+    aws_commons.create_s3_uri('{s3_bucket}', '{s3_file_path}', '{s3_region}'),
     options :='FORMAT text, DELIMITER ''|'''
 );"""
 EXTRACT_FROM_MAIN_TEMPLATE = (
@@ -36,17 +36,17 @@ EXTRACT_FROM_SHADOW_TEMPLATE = (
 UPDATE_EXTRACT_PROGRESS_BOTH = (
     "UPDATE "
     + AURORA_EXTRACT_PROGRESS_TABLE_NAME
-    + " SET next_extract_seq = {next_main}, next_shadow_extract_seq = {next_shadow} WHERE table_name = {table_name}"
+    + " SET next_extract_seq = {next_main}, next_shadow_extract_seq = '{next_shadow}' WHERE table_name = '{table_name}'"
 )
 UPDATE_EXTRACT_PROGRESS_SHADOW = (
     "UPDATE "
     + AURORA_EXTRACT_PROGRESS_TABLE_NAME
-    + " SET next_shadow_extract_seq = {next_shadow} WHERE table_name = {table_name}"
+    + " SET next_shadow_extract_seq = {next_shadow} WHERE table_name = '{table_name}'"
 )
 UPDATE_EXTRACT_PROGRESS_NON_SHADOW = (
     "UPDATE "
     + AURORA_EXTRACT_PROGRESS_TABLE_NAME
-    + " SET next_extract_seq = {next_main} WHERE table_name = {table_name}"
+    + " SET next_extract_seq = {next_main} WHERE table_name = '{table_name}'"
 )
 DELETE_FROM_SHADOW = (
     "DELETE FROM {shadow_table} WHERE "

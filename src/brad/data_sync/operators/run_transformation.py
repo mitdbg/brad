@@ -30,6 +30,9 @@ class RunTransformation(Operator):
             ]
         )
 
+    def engine(self) -> DBType:
+        return self._engine
+
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         queries = self._transform.split(";")
         logger.debug("Will run %d queries as part of this transform.", len(queries))

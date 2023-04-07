@@ -27,6 +27,9 @@ class DataSyncPlanExecutor:
         self._engines = await EngineConnections.connect(
             self._config, self._data_blueprint_mgr.schema_name, autocommit=False
         )
+        await self._engines.get_connection(DBType.Aurora).execute(
+            "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE"
+        )
 
     async def shutdown(self) -> None:
         if self._engines is None:

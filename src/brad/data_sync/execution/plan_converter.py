@@ -53,6 +53,11 @@ class PlanConverter:
         self._physical_operators: List[Operator] = []
         self._no_dependees: List[Operator] = []
 
+        # Map of all apply delta operators on a table located in an engine.
+        self._apply_deltas: Dict[Tuple[str, DBType], ApplyDeltas] = {}
+        # List of all transformation operators and their input tables.
+        self._transform_inputs: List[Tuple[RunTransformation, List[str]]] = []
+
     def get_plan(self) -> PhysicalDataSyncPlan:
         tables_to_extract = {}
         for op in self._logical_plan.base_operators():
@@ -91,6 +96,20 @@ class PlanConverter:
         while len(self._ready_to_process) > 0:
             pop = self._ready_to_process.popleft()
             self._process_logical_op(pop)
+
+        # Add additional dependency constraints. We must run the transform
+        # (involving input tables) before applying any deltas.
+        for transform_op, input_tables in self._transform_inputs:
+            engine = transform_op.engine()
+            for tbl in input_tables:
+                key = (tbl, engine)
+                if key not in self._apply_deltas:
+                    continue
+                # Ensures that the transform op runs before the apply delta
+                # does. This is because the transformation code is allowed to
+                # read the input tables, and it should read the tables at their
+                # **old** state.
+                self._apply_deltas[key].add_dependency(transform_op)
 
         # Create cleanup operators.
 
@@ -131,6 +150,8 @@ class PlanConverter:
         self._physical_operators = []
         self._no_dependees = []
         self._base_ops = []
+        self._apply_deltas.clear()
+        self._transform_inputs.clear()
 
     def _process_logical_op(self, pop: "_ProcessingOp") -> None:
         # Get a list of this logical operator's dependees.
@@ -160,19 +181,38 @@ class PlanConverter:
         # Create a physical operator for this logical op (transform or apply
         # delta). Extractions are a special case and are already handled.
         if isinstance(pop.logical_op, TransformDeltas):
-            phys_op: Optional[Operator] = RunTransformation(
+            run_trans_op = RunTransformation(
                 pop.logical_op.transform_text(),
                 pop.logical_op.engine(),
                 pop.logical_op.table_name().value,
             )
+            phys_op: Optional[Operator] = run_trans_op
+            # Store for later processing.
+            self._transform_inputs.append(
+                (
+                    run_trans_op,
+                    list(
+                        map(
+                            lambda dep: dep.table_name().value,
+                            pop.logical_op.dependencies(),
+                        )
+                    ),
+                )
+            )
+
         elif isinstance(pop.logical_op, LogicalApplyDeltas):
             assert len(pop.logical_op.dependencies()) == 1
             delta_dep = pop.logical_op.dependencies()[0]
             phys_op = ApplyDeltas(
                 onto_table_name=pop.logical_op.table_name().value,
                 from_table_name=delta_dep.table_name().value,
-                engine=pop.logical_op.location().default_engine(),
+                engine=pop.logical_op.engine(),
             )
+            # Store for later processing.
+            self._apply_deltas[
+                (pop.logical_op.table_name().value, pop.logical_op.engine())
+            ] = phys_op
+
         elif isinstance(pop.logical_op, ExtractDeltas):
             phys_op = None
         else:
@@ -302,15 +342,19 @@ class PlanConverter:
         # The purpose of this method is to attach the physical delta movement
         # operators to the dependency graph, and to add an `AdjustDeltas`
         # operator when needed.
-        need_adjust_deltas = isinstance(source_op, ExtractDeltas) and isinstance(
-            dependee, TransformDeltas
+
+        # NOTE: This plan converter still needs a better story for executing
+        # transforms on Athena (we need to prepare the delta tables
+        # appropriately).
+        need_adjust_deltas = isinstance(source_op.logical_op, ExtractDeltas) and (
+            dependee.logical_op.engine() == DBType.Redshift
+            or isinstance(dependee.logical_op, TransformDeltas)
         )
 
         if need_adjust_deltas:
-            assert isinstance(dependee.logical_op, TransformDeltas)
-            dest_table = dependee.logical_op.table_name().value
+            source_table = source_op.logical_op.table_name().value
             dest_table_engine = dependee.logical_op.engine()
-            adjust_delta = AdjustDeltas(dest_table, dest_table_engine)
+            adjust_delta = AdjustDeltas(source_table, dest_table_engine)
             self._physical_operators.append(adjust_delta)
 
             if to_dest_phys_op is None:

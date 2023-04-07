@@ -200,14 +200,19 @@ class BradServer(BradInterface):
             await self._data_sync_mgr.run_sync()
             yield "Sync succeeded.".encode()
 
-        elif command == "BRAD_SYNC;":
-            logger.debug("Manually triggered a data sync.")
+        elif command == "BRAD_SYNC;" or command == "BRAD_EXPLAIN_SYNC;":
             plan = make_logical_data_sync_plan(self._data_blueprint_mgr.get_blueprint())
             phys_plan = PlanConverter(
                 plan, self._data_blueprint_mgr.get_blueprint()
             ).get_plan()
-            await self._data_sync_executor.run_plan(phys_plan)
-            yield "Sync succeeded.".encode()
+
+            if command == "BRAD_SYNC;":
+                logger.debug("Manually triggered a data sync.")
+                await self._data_sync_executor.run_plan(phys_plan)
+                yield "Sync succeeded.".encode()
+            else:
+                phys_plan.print_plan_sequentially()
+                yield "See server logs.".encode()
 
         elif command == "BRAD_FORECAST;":
             logger.debug("Manually triggered a workload forecast.")
