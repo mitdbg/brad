@@ -1,4 +1,5 @@
 import asyncio
+import io
 import logging
 from typing import AsyncIterable, List, Tuple
 
@@ -211,8 +212,13 @@ class BradServer(BradInterface):
                 await self._data_sync_executor.run_plan(phys_plan)
                 yield "Sync succeeded.".encode()
             else:
-                phys_plan.print_plan_sequentially()
-                yield "See server logs.".encode()
+                out = io.StringIO()
+                plan.print_plan_sequentially(file=out)
+                yield out.getvalue().encode()
+
+                out = io.StringIO()
+                phys_plan.print_plan_sequentially(file=out)
+                yield out.getvalue().encode()
 
         elif command == "BRAD_FORECAST;":
             logger.debug("Manually triggered a workload forecast.")

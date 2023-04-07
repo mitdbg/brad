@@ -1,3 +1,5 @@
+import sys
+from collections import deque
 from typing import List
 
 from brad.config.dbtype import DBType
@@ -43,6 +45,24 @@ class LogicalDataSyncPlan:
 
     def base_operators(self) -> List[LogicalDataSyncOperator]:
         return self._base_operators
+
+    def print_plan_sequentially(self, file=sys.stdout) -> None:
+        """
+        Prints a topological ordering of the plan. Useful for debugging
+        purposes.
+        """
+
+        deps_left = {op: len(op.dependencies()) for op in self._operators}
+        ready_to_run = deque([*self._base_operators])
+
+        print("Logical Data Sync Plan:", file=file)
+        while len(ready_to_run) > 0:
+            op = ready_to_run.popleft()
+            print("-", str(op), file=file)
+            for dependee in op.dependees():
+                deps_left[dependee] -= 1
+                if deps_left[dependee] == 0:
+                    ready_to_run.append(dependee)
 
 
 class ExtractDeltas(LogicalDataSyncOperator):

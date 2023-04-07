@@ -1,3 +1,4 @@
+import sys
 from collections import deque
 from typing import List
 
@@ -17,7 +18,7 @@ class PhysicalDataSyncPlan:
     def all_operators(self) -> List[Operator]:
         return self._all_operators
 
-    def print_plan_sequentially(self) -> None:
+    def print_plan_sequentially(self, file=sys.stdout) -> None:
         """
         Prints a topological ordering of the plan. Useful for debugging
         purposes.
@@ -25,11 +26,11 @@ class PhysicalDataSyncPlan:
         for op in self._all_operators:
             op.reset_ready_to_run()
 
-        print("Physical Data Sync Plan:")
+        print("Physical Data Sync Plan:", file=file)
         ready_to_process = deque([*self._base_ops])
         while len(ready_to_process) > 0:
             op = ready_to_process.popleft()
-            print("-", str(op))
+            print("-", str(op), file=file)
             for dependee in op.dependees():
                 dependee.mark_dependency_complete()
                 if dependee.ready_to_run():
