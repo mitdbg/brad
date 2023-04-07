@@ -24,6 +24,7 @@ _REDSHIFT_UNLOAD_TEMPLATE = """
     UNLOAD ('SELECT * FROM {table_name}') TO 's3://{s3_bucket}/{s3_path}'
     IAM_ROLE '{s3_iam_role}'
     DELIMITER '|'
+    ALLOWOVERWRITE
     PARALLEL OFF
 """
 

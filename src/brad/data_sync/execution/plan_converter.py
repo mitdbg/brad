@@ -437,8 +437,8 @@ class PlanConverter:
         elif source == _DeltaLocation.Redshift and dest == DBType.Athena:
             # 1. Unload to S3
             # 2. Register Athena tables
-            insert_s3_path = "redshift_unload/{}/inserts/table.tbl".format(table_name)
-            delete_s3_path = "redshift_unload/{}/deletes/table.tbl".format(table_name)
+            insert_s3_path = "redshift_unload/{}/inserts/".format(table_name)
+            delete_s3_path = "redshift_unload/{}/deletes/".format(table_name)
             u1 = UnloadToS3(id_table_name, insert_s3_path, engine=DBType.Redshift)
             u2 = UnloadToS3(dd_table_name, delete_s3_path, engine=DBType.Redshift)
             r1 = RegisterAthenaS3Table(id_table_name, table.columns, insert_s3_path)
