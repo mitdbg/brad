@@ -6,17 +6,17 @@ tables:
     primary_key: true
   - data_type: BIGINT
     name: person_id
-  - data_type: TEXT
+  - data_type: character varying
     name: name
-  - data_type: TEXT
+  - data_type: character varying(3)
     name: imdb_index
-  - data_type: TEXT
+  - data_type: character varying(11)
     name: name_pcode_cf
-  - data_type: TEXT
+  - data_type: character varying(11)
     name: name_pcode_nf
-  - data_type: TEXT
+  - data_type: character varying(11)
     name: surname_pcode
-  - data_type: TEXT
+  - data_type: character varying(65)
     name: md5sum
   table_name: aka_name
 - columns:
@@ -25,15 +25,15 @@ tables:
     primary_key: true
   - data_type: BIGINT
     name: movie_id
-  - data_type: TEXT
+  - data_type: character varying
     name: title
-  - data_type: TEXT
+  - data_type: character varying(4)
     name: imdb_index
   - data_type: BIGINT
     name: kind_id
   - data_type: BIGINT
     name: production_year
-  - data_type: TEXT
+  - data_type: character varying(5)
     name: phonetic_code
   - data_type: BIGINT
     name: episode_of_id
@@ -41,9 +41,9 @@ tables:
     name: season_nr
   - data_type: BIGINT
     name: episode_nr
-  - data_type: TEXT
+  - data_type: character varying(72)
     name: note
-  - data_type: TEXT
+  - data_type: character varying(32)
     name: md5sum
   table_name: aka_title
 - columns:
@@ -56,7 +56,7 @@ tables:
     name: movie_id
   - data_type: BIGINT
     name: person_role_id
-  - data_type: TEXT
+  - data_type: character varying
     name: note
   - data_type: BIGINT
     name: nr_order
@@ -67,48 +67,48 @@ tables:
   - data_type: SERIAL
     name: id
     primary_key: true
-  - data_type: TEXT
+  - data_type: character varying
     name: name
-  - data_type: TEXT
+  - data_type: character varying(2)
     name: imdb_index
   - data_type: BIGINT
     name: imdb_id
-  - data_type: TEXT
+  - data_type: character varying(5)
     name: name_pcode_nf
-  - data_type: TEXT
+  - data_type: character varying(5)
     name: surname_pcode
-  - data_type: TEXT
+  - data_type: character varying(32)
     name: md5sum
   table_name: char_name
 - columns:
   - data_type: SERIAL
     name: id
     primary_key: true
-  - data_type: TEXT
+  - data_type: character varying(32)
     name: kind
   table_name: comp_cast_type
 - columns:
   - data_type: SERIAL
     name: id
     primary_key: true
-  - data_type: TEXT
+  - data_type: character varying
     name: name
-  - data_type: TEXT
+  - data_type: character varying(6)
     name: country_code
   - data_type: BIGINT
     name: imdb_id
-  - data_type: TEXT
+  - data_type: character varying(5)
     name: name_pcode_nf
-  - data_type: TEXT
+  - data_type: character varying(5)
     name: name_pcode_sf
-  - data_type: TEXT
+  - data_type: character varying(32)
     name: md5sum
   table_name: company_name
 - columns:
   - data_type: SERIAL
     name: id
     primary_key: true
-  - data_type: TEXT
+  - data_type: character varying(32)
     name: kind
   table_name: company_type
 - columns:
@@ -126,30 +126,30 @@ tables:
   - data_type: SERIAL
     name: id
     primary_key: true
-  - data_type: TEXT
+  - data_type: character varying(32)
     name: info
   table_name: info_type
 - columns:
   - data_type: SERIAL
     name: id
     primary_key: true
-  - data_type: TEXT
+  - data_type: character varying
     name: keyword
-  - data_type: TEXT
+  - data_type: character varying(5)
     name: phonetic_code
   table_name: keyword
 - columns:
   - data_type: SERIAL
     name: id
     primary_key: true
-  - data_type: TEXT
+  - data_type: character varying(15)
     name: kind
   table_name: kind_type
 - columns:
   - data_type: SERIAL
     name: id
     primary_key: true
-  - data_type: TEXT
+  - data_type: character varying(32)
     name: link
   table_name: link_type
 - columns:
@@ -162,7 +162,7 @@ tables:
     name: company_id
   - data_type: BIGINT
     name: company_type_id
-  - data_type: TEXT
+  - data_type: character varying
     name: note
   table_name: movie_companies
 - columns:
@@ -173,9 +173,9 @@ tables:
     name: movie_id
   - data_type: BIGINT
     name: info_type_id
-  - data_type: TEXT
+  - data_type: character varying
     name: info
-  - data_type: TEXT
+  - data_type: character varying(1)
     name: note
   table_name: movie_info_idx
 - columns:
@@ -202,37 +202,37 @@ tables:
   - data_type: SERIAL
     name: id
     primary_key: true
-  - data_type: TEXT
+  - data_type: character varying
     name: name
-  - data_type: TEXT
+  - data_type: character varying(9)
     name: imdb_index
   - data_type: BIGINT
     name: imdb_id
-  - data_type: TEXT
+  - data_type: character varying(1)
     name: gender
-  - data_type: TEXT
+  - data_type: character varying(5)
     name: name_pcode_cf
-  - data_type: TEXT
+  - data_type: character varying(5)
     name: name_pcode_nf
-  - data_type: TEXT
+  - data_type: character varying(5)
     name: surname_pcode
-  - data_type: TEXT
+  - data_type: character varying(32)
     name: md5sum
   table_name: name
 - columns:
   - data_type: SERIAL
     name: id
     primary_key: true
-  - data_type: TEXT
+  - data_type: character varying(32)
     name: role
   table_name: role_type
 - columns:
   - data_type: SERIAL
     name: id
     primary_key: true
-  - data_type: TEXT
+  - data_type: character varying
     name: title
-  - data_type: TEXT
+  - data_type: character varying(5)
     name: imdb_index
   - data_type: BIGINT
     name: kind_id
@@ -240,7 +240,7 @@ tables:
     name: production_year
   - data_type: BIGINT
     name: imdb_id
-  - data_type: TEXT
+  - data_type: character varying(5)
     name: phonetic_code
   - data_type: BIGINT
     name: episode_of_id
@@ -248,9 +248,9 @@ tables:
     name: season_nr
   - data_type: BIGINT
     name: episode_nr
-  - data_type: TEXT
+  - data_type: character varying(49)
     name: series_years
-  - data_type: TEXT
+  - data_type: character varying(32)
     name: md5sum
   table_name: title
 - columns:
@@ -261,9 +261,9 @@ tables:
     name: movie_id
   - data_type: BIGINT
     name: info_type_id
-  - data_type: TEXT
+  - data_type: character varying
     name: info
-  - data_type: TEXT
+  - data_type: character varying
     name: note
   table_name: movie_info
 - columns:
@@ -274,8 +274,8 @@ tables:
     name: person_id
   - data_type: BIGINT
     name: info_type_id
-  - data_type: TEXT
+  - data_type: character varying
     name: info
-  - data_type: TEXT
+  - data_type: character varying
     name: note
   table_name: person_info
