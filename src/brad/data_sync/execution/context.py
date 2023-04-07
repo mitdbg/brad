@@ -13,9 +13,6 @@ class ExecutionContext:
         redshift,
         blueprint: DataBlueprint,
         config: ConfigFile,
-        s3_bucket: str,
-        s3_region: str,
-        s3_path: str,
     ) -> None:
         self._aurora = aurora
         self._aurora_cursor = None
@@ -30,9 +27,9 @@ class ExecutionContext:
         self._config = config
 
         # The "location" in S3 used for data sync intermediate results.
-        self._s3_bucket = s3_bucket
-        self._s3_region = s3_region
-        self._s3_path = s3_path
+        self._s3_bucket = self._config.s3_extract_bucket
+        self._s3_region = self._config.s3_extract_region
+        self._s3_path = self._config.s3_extract_path
 
         # Extracted tables.
         self._extracted_tables: List[str] = []

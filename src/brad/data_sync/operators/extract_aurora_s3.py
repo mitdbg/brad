@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Tuple
+from typing import Dict
 
 from .operator import Operator
 from ._extract_aurora_s3_templates import (
@@ -16,6 +16,7 @@ from ._extract_aurora_s3_templates import (
 from brad.blueprint.sql_gen.table import comma_separated_column_names
 from brad.config.strings import source_table_name, shadow_table_name
 from brad.data_sync.execution.context import ExecutionContext
+from brad.data_sync.s3_path import S3Path
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +26,14 @@ _MAX_SEQ = 0xFFFFFFFF_FFFFFFFF
 
 
 class ExtractFromAuroraToS3(Operator):
-    def __init__(self, tables: Dict[str, Tuple[str, str]]) -> None:
+    def __init__(self, tables: Dict[str, "ExtractLocation"]) -> None:
         super().__init__()
         self._to_extract = tables
+
+    def __repr__(self) -> str:
+        return "".join(
+            ["ExtractFromAuroraToS3(", ", ".join(self._to_extract.keys()), ")"]
+        )
 
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         # 1. Retrieve the sequence ranges for extraction.
@@ -70,7 +76,7 @@ class ExtractFromAuroraToS3(Operator):
 
         # 1. Retrieve the starting sequence values for extraction.
         q = GET_NEXT_EXTRACT_TEMPLATE.format(
-            extract_tables=", ".join(self._to_extract.keys())
+            extract_tables=", ".join(map("'{}'".format, self._to_extract.keys()))
         )
         logger.debug("Executing on Aurora %s", q)
         await cursor.execute(q)
@@ -129,27 +135,33 @@ class ExtractFromAuroraToS3(Operator):
 
         extract_main_query = EXTRACT_FROM_MAIN_TEMPLATE.format(
             table_cols=comma_separated_column_names(table.columns),
-            main_table=source_table_name(table_name),
+            main_table_name=source_table_name(table_name),
             lower_bound=bounds.next_extract_seq,
             upper_bound=bounds.max_extract_seq,
         )
         extract_shadow_query = EXTRACT_FROM_SHADOW_TEMPLATE.format(
             pkey_cols=comma_separated_column_names(table.primary_key),
-            shadow_table=shadow_table_name(table_name),
+            shadow_table_name=shadow_table_name(table_name),
             lower_bound=bounds.next_shadow_extract_seq,
             upper_bound=bounds.max_shadow_extract_seq,
         )
         extract_main = EXTRACT_S3_TEMPLATE.format(
-            query=extract_main_query,
+            extract_query=extract_main_query,
             s3_bucket=ctx.s3_bucket(),
             s3_region=ctx.s3_region(),
-            s3_file_path=self._to_extract[table_name][0],
+            s3_file_path="{}{}".format(
+                ctx.s3_path(),
+                self._to_extract[table_name].writes_path().path_with_file(),
+            ),
         )
         extract_shadow = EXTRACT_S3_TEMPLATE.format(
-            query=extract_shadow_query,
+            extract_query=extract_shadow_query,
             s3_bucket=ctx.s3_bucket(),
             s3_region=ctx.s3_region(),
-            s3_file_path=self._to_extract[table_name][1],
+            s3_file_path="{}{}".format(
+                ctx.s3_path(),
+                self._to_extract[table_name].deletes_path().path_with_file(),
+            ),
         )
         logger.debug("Running main export query: %s", extract_main)
         logger.debug("Running shadow export query: %s", extract_shadow)
@@ -274,3 +286,17 @@ class _TableSyncBounds:
             self.next_shadow_extract_seq,
             self.max_shadow_extract_seq,
         )
+
+
+class ExtractLocation:
+    def __init__(self, writes_path: S3Path, deletes_path: S3Path) -> None:
+        # "Writes" instead of inserts because the deltas we extract from Aurora
+        # contain inserts and updates.
+        self._writes_path = writes_path
+        self._deletes_path = deletes_path
+
+    def writes_path(self) -> S3Path:
+        return self._writes_path
+
+    def deletes_path(self) -> S3Path:
+        return self._deletes_path

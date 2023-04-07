@@ -13,10 +13,25 @@ class RunTransformation(Operator):
     be set up.
     """
 
-    def __init__(self, transform: str, engine: DBType) -> None:
+    def __init__(self, transform: str, engine: DBType, for_table: str) -> None:
         super().__init__()
         self._transform = transform
         self._engine = engine
+        self._for_table = for_table
+
+    def __repr__(self) -> str:
+        return "".join(
+            [
+                "RunTransformation(for_table=",
+                self._for_table,
+                ", engine=",
+                self._engine,
+                ")",
+            ]
+        )
+
+    def engine(self) -> DBType:
+        return self._engine
 
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         queries = self._transform.split(";")

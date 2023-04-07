@@ -83,7 +83,7 @@ tables:
           employees_inserts,
           departments_inserts
         WHERE
-          e_d_id = e_id;
+          e_d_id = d_id;
 
       INSERT INTO emp_depts_inserts
         SELECT
@@ -97,7 +97,7 @@ tables:
           employees,
           departments_inserts
         WHERE
-          e_d_id = e_id;
+          e_d_id = d_id;
 
       INSERT INTO emp_depts_inserts
         SELECT
@@ -111,4 +111,4 @@ tables:
           employees_inserts,
           departments
         WHERE
-          e_d_id = e_id;
+          e_d_id = d_id;

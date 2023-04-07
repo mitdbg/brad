@@ -19,13 +19,17 @@ from brad.data_sync.operators.apply_deltas import ApplyDeltas
 from brad.data_sync.operators.create_temp_table import CreateTempTable
 from brad.data_sync.operators.delete_s3_objects import DeleteS3Objects
 from brad.data_sync.operators.drop_tables import DropTables
-from brad.data_sync.operators.extract_aurora_s3 import ExtractFromAuroraToS3
+from brad.data_sync.operators.extract_aurora_s3 import (
+    ExtractFromAuroraToS3,
+    ExtractLocation,
+)
 from brad.data_sync.operators.load_from_s3 import LoadFromS3
 from brad.data_sync.operators.register_athena_s3_table import RegisterAthenaS3Table
 from brad.data_sync.operators.run_commit import RunCommit
 from brad.data_sync.operators.run_transformation import RunTransformation
 from brad.data_sync.operators.unload_to_s3 import UnloadToS3
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
+from brad.data_sync.s3_path import S3Path
 
 
 class PlanConverter:
@@ -45,8 +49,14 @@ class PlanConverter:
         self._ready_to_process: Deque[_ProcessingOp] = deque()
 
         self._extract_op: Optional[ExtractFromAuroraToS3] = None
+        self._base_ops: List[Operator] = []
         self._physical_operators: List[Operator] = []
         self._no_dependees: List[Operator] = []
+
+        # Map of all apply delta operators on a table located in an engine.
+        self._apply_deltas: Dict[Tuple[str, DBType], ApplyDeltas] = {}
+        # List of all transformation operators and their input tables.
+        self._transform_inputs: List[Tuple[RunTransformation, List[str]]] = []
 
     def get_plan(self) -> PhysicalDataSyncPlan:
         tables_to_extract = {}
@@ -62,28 +72,44 @@ class PlanConverter:
             # physical operators for dependees.
             pop = _ProcessingOp(op)
             pop.output_location = _DeltaLocation.S3Text
-            (
-                pop.output_insert_delta_s3_path,
-                pop.output_delete_delta_s3_path,
-            ) = extract_paths
+            pop.output_s3_location = extract_paths
             self._processing_ops[op] = pop
             self._ready_to_process.append(pop)
 
             # Keep track of these intermediate objects so that they can be
             # deleted afterwards.
-            self._intermediate_s3_objects.append(extract_paths[0])
-            self._intermediate_s3_objects.append(extract_paths[1])
+            self._intermediate_s3_objects.append(
+                extract_paths.writes_path().path_with_file()
+            )
+            self._intermediate_s3_objects.append(
+                extract_paths.deletes_path().path_with_file()
+            )
 
         # The base operators should be `ExtractDeltas` operators. We create one
         # Aurora extraction physical operator to ensure that we extract a
         # transactionally-consistent snapshot. This is the base op.
         self._extract_op = ExtractFromAuroraToS3(tables_to_extract)
         self._physical_operators.append(self._extract_op)
+        self._base_ops.append(self._extract_op)
 
         # Process operations until they have all be processed.
         while len(self._ready_to_process) > 0:
             pop = self._ready_to_process.popleft()
             self._process_logical_op(pop)
+
+        # Add additional dependency constraints. We must run the transform
+        # (involving input tables) before applying any deltas.
+        for transform_op, input_tables in self._transform_inputs:
+            engine = transform_op.engine()
+            for tbl in input_tables:
+                key = (tbl, engine)
+                if key not in self._apply_deltas:
+                    continue
+                # Ensures that the transform op runs before the apply delta
+                # does. This is because the transformation code is allowed to
+                # read the input tables, and it should read the tables at their
+                # **old** state.
+                self._apply_deltas[key].add_dependency(transform_op)
 
         # Create cleanup operators.
 
@@ -114,7 +140,7 @@ class PlanConverter:
         delete_s3.add_dependency(commit_op)
         self._physical_operators.append(delete_s3)
 
-        return PhysicalDataSyncPlan(self._extract_op, self._physical_operators)
+        return PhysicalDataSyncPlan(self._base_ops, self._physical_operators)
 
     def reset(self) -> None:
         self._intermediate_s3_objects = []
@@ -123,6 +149,9 @@ class PlanConverter:
         self._ready_to_process.clear()
         self._physical_operators = []
         self._no_dependees = []
+        self._base_ops = []
+        self._apply_deltas.clear()
+        self._transform_inputs.clear()
 
     def _process_logical_op(self, pop: "_ProcessingOp") -> None:
         # Get a list of this logical operator's dependees.
@@ -152,14 +181,38 @@ class PlanConverter:
         # Create a physical operator for this logical op (transform or apply
         # delta). Extractions are a special case and are already handled.
         if isinstance(pop.logical_op, TransformDeltas):
-            phys_op: Optional[Operator] = RunTransformation(
-                pop.logical_op.transform_text(), pop.logical_op.engine()
-            )
-        elif isinstance(pop.logical_op, LogicalApplyDeltas):
-            phys_op = ApplyDeltas(
+            run_trans_op = RunTransformation(
+                pop.logical_op.transform_text(),
+                pop.logical_op.engine(),
                 pop.logical_op.table_name().value,
-                pop.logical_op.location().default_engine(),
             )
+            phys_op: Optional[Operator] = run_trans_op
+            # Store for later processing.
+            self._transform_inputs.append(
+                (
+                    run_trans_op,
+                    list(
+                        map(
+                            lambda dep: dep.table_name().value,
+                            pop.logical_op.dependencies(),
+                        )
+                    ),
+                )
+            )
+
+        elif isinstance(pop.logical_op, LogicalApplyDeltas):
+            assert len(pop.logical_op.dependencies()) == 1
+            delta_dep = pop.logical_op.dependencies()[0]
+            phys_op = ApplyDeltas(
+                onto_table_name=pop.logical_op.table_name().value,
+                from_table_name=delta_dep.table_name().value,
+                engine=pop.logical_op.engine(),
+            )
+            # Store for later processing.
+            self._apply_deltas[
+                (pop.logical_op.table_name().value, pop.logical_op.engine())
+            ] = phys_op
+
         elif isinstance(pop.logical_op, ExtractDeltas):
             phys_op = None
         else:
@@ -172,20 +225,22 @@ class PlanConverter:
                 transform_dest = pop.logical_op.table_name().value
                 transform_dest_table = self._blueprint.get_table(transform_dest)
                 transform_engine = pop.logical_op.engine()
-                phys_op.add_dependency(
-                    CreateTempTable(
-                        insert_delta_table_name(transform_dest),
-                        transform_dest_table.columns,
-                        transform_engine,
-                    )
+                transform_ins_out = CreateTempTable(
+                    insert_delta_table_name(transform_dest),
+                    transform_dest_table.columns,
+                    transform_engine,
                 )
-                phys_op.add_dependency(
-                    CreateTempTable(
-                        delete_delta_table_name(transform_dest),
-                        transform_dest_table.columns,
-                        transform_engine,
-                    )
+                transform_del_out = CreateTempTable(
+                    delete_delta_table_name(transform_dest),
+                    transform_dest_table.columns,
+                    transform_engine,
                 )
+                phys_op.add_dependency(transform_ins_out)
+                phys_op.add_dependency(transform_del_out)
+                self._physical_operators.append(transform_ins_out)
+                self._physical_operators.append(transform_del_out)
+                self._base_ops.append(transform_ins_out)
+                self._base_ops.append(transform_del_out)
                 self._intermediate_tables.extend(
                     [
                         (
@@ -270,9 +325,12 @@ class PlanConverter:
             if dependee_pop.dependencies_left_to_process == 0:
                 self._ready_to_process.append(dependee_pop)
 
-    def _s3_extract_paths_for(self, table_name: str) -> Tuple[str, str]:
+    def _s3_extract_paths_for(self, table_name: str) -> ExtractLocation:
         prefix = "aurora_extract/{}/".format(table_name)
-        return (prefix + "writes/", prefix + "deletes/")
+        return ExtractLocation(
+            S3Path(prefix + "writes/table.tbl"),
+            S3Path(prefix + "deletes/table.tbl"),
+        )
 
     def _attach_movement_ops(
         self,
@@ -284,15 +342,19 @@ class PlanConverter:
         # The purpose of this method is to attach the physical delta movement
         # operators to the dependency graph, and to add an `AdjustDeltas`
         # operator when needed.
-        need_adjust_deltas = isinstance(source_op, ExtractDeltas) and isinstance(
-            dependee, TransformDeltas
+
+        # NOTE: This plan converter still needs a better story for executing
+        # transforms on Athena (we need to prepare the delta tables
+        # appropriately).
+        need_adjust_deltas = isinstance(source_op.logical_op, ExtractDeltas) and (
+            dependee.logical_op.engine() == DBType.Redshift
+            or isinstance(dependee.logical_op, TransformDeltas)
         )
 
         if need_adjust_deltas:
-            assert isinstance(dependee.logical_op, TransformDeltas)
-            dest_table = dependee.logical_op.table_name().value
+            source_table = source_op.logical_op.table_name().value
             dest_table_engine = dependee.logical_op.engine()
-            adjust_delta = AdjustDeltas(dest_table, dest_table_engine)
+            adjust_delta = AdjustDeltas(source_table, dest_table_engine)
             self._physical_operators.append(adjust_delta)
 
             if to_dest_phys_op is None:
@@ -324,8 +386,7 @@ class PlanConverter:
         if source == _DeltaLocation.S3Text and dest == DBType.Redshift:
             # 1. Create tables on Redshift
             # 2. Import from S3
-            assert source_op.output_insert_delta_s3_path is not None
-            assert source_op.output_delete_delta_s3_path is not None
+            assert source_op.output_s3_location is not None
             c1 = CreateTempTable(
                 id_table_name,
                 table.columns,
@@ -338,12 +399,12 @@ class PlanConverter:
             )
             l1 = LoadFromS3(
                 id_table_name,
-                source_op.output_insert_delta_s3_path,
+                source_op.output_s3_location.writes_path().path_with_file(),
                 engine=DBType.Redshift,
             )
             l2 = LoadFromS3(
                 dd_table_name,
-                source_op.output_delete_delta_s3_path,
+                source_op.output_s3_location.deletes_path().path_with_file(),
                 engine=DBType.Redshift,
             )
             c2.add_dependency(c1)
@@ -356,13 +417,16 @@ class PlanConverter:
 
         elif source == _DeltaLocation.S3Text and dest == DBType.Athena:
             # 1. Register the S3 text data as Athena tables
-            assert source_op.output_insert_delta_s3_path is not None
-            assert source_op.output_delete_delta_s3_path is not None
+            assert source_op.output_s3_location is not None
             r1 = RegisterAthenaS3Table(
-                id_table_name, table.columns, source_op.output_insert_delta_s3_path
+                id_table_name,
+                table.columns,
+                source_op.output_s3_location.writes_path().path_prefix(),
             )
             r2 = RegisterAthenaS3Table(
-                dd_table_name, table.primary_key, source_op.output_delete_delta_s3_path
+                dd_table_name,
+                table.primary_key,
+                source_op.output_s3_location.deletes_path().path_prefix(),
             )
             r2.add_dependency(r1)
             out_ops.extend([r1, r2])
@@ -373,8 +437,8 @@ class PlanConverter:
         elif source == _DeltaLocation.Redshift and dest == DBType.Athena:
             # 1. Unload to S3
             # 2. Register Athena tables
-            insert_s3_path = "redshift_unload/{}/inserts/table.tbl".format(table_name)
-            delete_s3_path = "redshift_unload/{}/deletes/table.tbl".format(table_name)
+            insert_s3_path = "redshift_unload/{}/inserts/".format(table_name)
+            delete_s3_path = "redshift_unload/{}/deletes/".format(table_name)
             u1 = UnloadToS3(id_table_name, insert_s3_path, engine=DBType.Redshift)
             u2 = UnloadToS3(dd_table_name, delete_s3_path, engine=DBType.Redshift)
             r1 = RegisterAthenaS3Table(id_table_name, table.columns, insert_s3_path)
@@ -384,6 +448,9 @@ class PlanConverter:
             r2.add_dependency(r1)
             out_ops.extend([u1, u2, r1, r2])
             self._intermediate_s3_objects.extend([insert_s3_path, delete_s3_path])
+            self._intermediate_tables.extend(
+                [(id_table_name, DBType.Athena), (dd_table_name, DBType.Athena)]
+            )
 
         elif source == _DeltaLocation.Redshift and dest == DBType.Aurora:
             # 1. Unload to S3
@@ -404,6 +471,9 @@ class PlanConverter:
             l2.add_dependency(l1)
             out_ops.extend([u1, u2, l1, l2, c1, c2])
             self._intermediate_s3_objects.extend([insert_s3_path, delete_s3_path])
+            self._intermediate_tables.extend(
+                [(id_table_name, DBType.Aurora), (dd_table_name, DBType.Aurora)]
+            )
 
         elif (
             (source == _DeltaLocation.Aurora and dest == DBType.Aurora)
@@ -478,5 +548,4 @@ class _ProcessingOp:
         self.output_location: Optional[_DeltaLocation] = None
 
         # These are relative to the configured S3 extract path.
-        self.output_insert_delta_s3_path: Optional[str] = None
-        self.output_delete_delta_s3_path: Optional[str] = None
+        self.output_s3_location: Optional[ExtractLocation] = None

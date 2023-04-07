@@ -1,4 +1,3 @@
-import asyncio
 import logging
 
 from .operator import Operator
@@ -8,8 +7,14 @@ logger = logging.getLogger(__name__)
 
 
 class RunCommit(Operator):
+    def __repr__(self) -> str:
+        return "RunCommit()"
+
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         aurora = await ctx.aurora()
         redshift = await ctx.redshift()
-        await asyncio.gather(aurora.commit(), redshift.commit())
+        logger.debug("Committing changes on Aurora")
+        await aurora.commit()
+        logger.debug("Committing changes on Redshift")
+        await redshift.commit()
         return self

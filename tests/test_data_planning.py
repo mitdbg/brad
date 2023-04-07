@@ -37,8 +37,11 @@ def test_boostrap_data_blueprint():
     assert "table3" in table_names_str
 
     table1 = blueprint.get_table(TableName("table1"))
-    assert len(table1.locations) == 1
+    assert len(table1.locations) == 2
     assert Location.Aurora in table1.locations
+    # Our heuristic replicates tables that are dependencies of others on
+    # Redshift.
+    assert Location.Redshift in table1.locations
 
     table2 = blueprint.get_table(TableName("table2"))
     assert len(table2.locations) == 2

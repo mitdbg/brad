@@ -43,11 +43,14 @@ def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> DataBlueprint:
             # put a base table on Aurora.
             table.locations.append(Location.Aurora)
 
+            # Other tables may depend on this table. So we also replicate it on
+            # Redshift since we currently run transformations on Redshift.
+            table.locations.append(Location.Redshift)
+
             # If we reach this spot and this flag is true, then no other tables
-            # are dependent on this table. In this case, we replicate it across
-            # the other two engines.
+            # are dependent on this table. In this case, we also replicate it across
+            # Athena
             if expect_standalone_base_table:
-                table.locations.append(Location.Redshift)
                 table.locations.append(Location.S3Iceberg)
 
             is_base_table[table.name] = True

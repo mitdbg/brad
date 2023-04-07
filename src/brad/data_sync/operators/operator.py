@@ -39,7 +39,7 @@ class Operator:
         self._num_pending_dependencies = len(self._dependencies)
 
     def ready_to_run(self) -> bool:
-        return self._num_pending_dependencies == len(self._dependencies)
+        return self._num_pending_dependencies == 0
 
     def mark_dependency_complete(self) -> None:
         self._num_pending_dependencies -= 1

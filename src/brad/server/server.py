@@ -1,16 +1,18 @@
 import asyncio
+import io
 import logging
 from typing import AsyncIterable, List, Tuple
 
 import grpc
 import pyodbc
-import sqlglot
 
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
-from brad.config.strings import AURORA_SEQ_COLUMN
+from brad.data_sync.execution.executor import DataSyncPlanExecutor
+from brad.data_sync.execution.plan_converter import PlanConverter
 from brad.data_sync.manager import DataSyncManager
+from brad.planner.data_sync import make_logical_data_sync_plan
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
@@ -25,10 +27,6 @@ from brad.net.async_connection_acceptor import AsyncConnectionAcceptor
 from brad.query_rep import QueryRep
 
 logger = logging.getLogger(__name__)
-
-_UPDATE_SEQ_EXPR = sqlglot.parse_one(
-    "{} = DEFAULT".format(AURORA_SEQ_COLUMN)
-)  # type: ignore
 
 LINESEP = "\n".encode()
 
@@ -60,6 +58,9 @@ class BradServer(BradInterface):
             Tuple[asyncio.StreamReader, asyncio.StreamWriter]
         ] = []
         self._data_sync_mgr = DataSyncManager(self._config, self._data_blueprint_mgr)
+        self._data_sync_executor = DataSyncPlanExecutor(
+            self._config, self._data_blueprint_mgr
+        )
         self._timed_sync_task = None
         self._forecaster = WorkloadForecaster()
 
@@ -97,6 +98,7 @@ class BradServer(BradInterface):
         if self._config.data_sync_period_seconds > 0:
             loop = asyncio.get_event_loop()
             self._timed_sync_task = loop.create_task(self._run_sync_periodically())
+        await self._data_sync_executor.establish_connections()
 
     async def run_teardown(self):
         if self._timed_sync_task is not None:
@@ -109,6 +111,7 @@ class BradServer(BradInterface):
         self._daemon_connections.clear()
 
         await self._data_sync_mgr.close()
+        await self._data_sync_executor.shutdown()
 
     def _handle_new_daemon_connection(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -193,10 +196,29 @@ class BradServer(BradInterface):
         This method is used to handle BRAD_ prefixed "queries" (i.e., commands
         to run custom functionality like syncing data across the engines).
         """
-        if command == "BRAD_SYNC;":
-            logger.debug("Manually triggered a data sync.")
+        if command == "BRAD_LEGACY_SYNC;":
+            logger.debug("Manually triggered a legacy data sync.")
             await self._data_sync_mgr.run_sync()
             yield "Sync succeeded.".encode()
+
+        elif command == "BRAD_SYNC;" or command == "BRAD_EXPLAIN_SYNC;":
+            plan = make_logical_data_sync_plan(self._data_blueprint_mgr.get_blueprint())
+            phys_plan = PlanConverter(
+                plan, self._data_blueprint_mgr.get_blueprint()
+            ).get_plan()
+
+            if command == "BRAD_SYNC;":
+                logger.debug("Manually triggered a data sync.")
+                await self._data_sync_executor.run_plan(phys_plan)
+                yield "Sync succeeded.".encode()
+            else:
+                out = io.StringIO()
+                plan.print_plan_sequentially(file=out)
+                yield out.getvalue().encode()
+
+                out = io.StringIO()
+                phys_plan.print_plan_sequentially(file=out)
+                yield out.getvalue().encode()
 
         elif command == "BRAD_FORECAST;":
             logger.debug("Manually triggered a workload forecast.")
