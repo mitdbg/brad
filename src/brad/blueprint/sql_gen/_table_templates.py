@@ -16,7 +16,8 @@ AURORA_DELETE_TRIGGER_FN_TEMPLATE = """
         RETURNS trigger AS
     $BODY$
     BEGIN
-    INSERT INTO {shadow_table_name} ({pkey_cols}) VALUES ({pkey_vals});
+    INSERT INTO {shadow_table_name} ({pkey_cols}) VALUES ({pkey_vals})
+        ON CONFLICT DO NOTHING;
     RETURN NULL;
     END;
     $BODY$
