@@ -2,7 +2,6 @@ from typing import Set, List
 
 from brad.config.dbtype import DBType
 from brad.blueprint.data.location import Location
-from brad.blueprint.data.table import TableName
 from brad.server.data_blueprint_manager import DataBlueprintManager
 from brad.routing import Router
 from brad.query_rep import QueryRep
@@ -27,7 +26,7 @@ class LocationAwareRoundRobin(Router):
         location_sets: List[Set[Location]] = []
         for table_name_str in query.tables():
             try:
-                table = blueprint.get_table(TableName(table_name_str))
+                table = blueprint.get_table(table_name_str)
                 location_sets.append(set(table.locations))
             except ValueError:
                 # The query is referencing a non-existent table (could be a CTE

@@ -73,9 +73,7 @@ class DataSyncExecutor:
         logical = self.get_static_logical_plan(blueprint)
 
         # 2. Retrieve the sync bounds for the base tables (data sources).
-        base_tables = list(
-            map(lambda op: op.table_name().value, logical.base_operators())
-        )
+        base_tables = list(map(lambda op: op.table_name(), logical.base_operators()))
         table_bounds = await TableSyncBounds.get_table_sync_bounds_for(base_tables, ctx)
         ctx.set_table_sync_bounds(table_bounds)
 
@@ -84,7 +82,7 @@ class DataSyncExecutor:
         # propagate these markers upwards.
         logger.debug("Table bounds: %s", str(table_bounds))
         for base_op in logical.base_operators():
-            base_table = base_op.table_name().value
+            base_table = base_op.table_name()
             if (
                 base_table not in table_bounds
                 or table_bounds[base_table].can_skip_sync()

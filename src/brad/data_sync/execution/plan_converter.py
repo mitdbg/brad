@@ -79,8 +79,8 @@ class PlanConverter:
                 continue
 
             # Set up the extraction location(s).
-            extract_paths = self._s3_extract_paths_for(op.table_name().value)
-            tables_to_extract[op.table_name().value] = extract_paths
+            extract_paths = self._s3_extract_paths_for(op.table_name())
+            tables_to_extract[op.table_name()] = extract_paths
             pop.output_location = _DeltaLocation.S3Text
             pop.output_s3_location = extract_paths
 
@@ -195,7 +195,7 @@ class PlanConverter:
             run_trans_op = RunTransformation(
                 pop.logical_op.transform_text(),
                 pop.logical_op.engine(),
-                pop.logical_op.table_name().value,
+                pop.logical_op.table_name(),
             )
             phys_op: Optional[Operator] = run_trans_op
             # Store for later processing.
@@ -204,7 +204,7 @@ class PlanConverter:
                     run_trans_op,
                     list(
                         map(
-                            lambda dep: dep.table_name().value,
+                            lambda dep: dep.table_name(),
                             pop.logical_op.dependencies(),
                         )
                     ),
@@ -215,13 +215,13 @@ class PlanConverter:
             assert len(pop.logical_op.dependencies()) == 1
             delta_dep = pop.logical_op.dependencies()[0]
             phys_op = ApplyDeltas(
-                onto_table_name=pop.logical_op.table_name().value,
-                from_table_name=delta_dep.table_name().value,
+                onto_table_name=pop.logical_op.table_name(),
+                from_table_name=delta_dep.table_name(),
                 engine=pop.logical_op.engine(),
             )
             # Store for later processing.
             self._apply_deltas[
-                (pop.logical_op.table_name().value, pop.logical_op.engine())
+                (pop.logical_op.table_name(), pop.logical_op.engine())
             ] = phys_op
 
         elif isinstance(pop.logical_op, ExtractDeltas) or isinstance(
@@ -235,7 +235,7 @@ class PlanConverter:
         if phys_op is not None:
             if isinstance(pop.logical_op, TransformDeltas):
                 # Need to create the destination delta tables.
-                transform_dest = pop.logical_op.table_name().value
+                transform_dest = pop.logical_op.table_name()
                 transform_dest_table = self._blueprint.get_table(transform_dest)
                 transform_engine = pop.logical_op.engine()
                 transform_ins_out = CreateTempTable(
@@ -367,7 +367,7 @@ class PlanConverter:
         )
 
         if need_adjust_deltas:
-            source_table = source_op.logical_op.table_name().value
+            source_table = source_op.logical_op.table_name()
             dest_table_engine = dependee.logical_op.engine()
             adjust_delta = AdjustDeltas(source_table, dest_table_engine)
             self._physical_operators.append(adjust_delta)
@@ -392,7 +392,7 @@ class PlanConverter:
         dest: DBType,
     ) -> List[Operator]:
         out_ops: List[Operator] = []
-        table_name = source_op.logical_op.table_name().value
+        table_name = source_op.logical_op.table_name()
         table = self._blueprint.get_table(table_name)
 
         id_table_name = insert_delta_table_name(table_name)

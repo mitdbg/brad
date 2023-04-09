@@ -1,6 +1,6 @@
 import yaml
 
-from .table import Column, Table, TableName
+from .table import Column, Table
 from typing import List, Set
 
 
@@ -33,13 +33,11 @@ class UserProvidedDataBlueprint:
             columns = list(
                 map(UserProvidedDataBlueprint._parse_column, raw_table["columns"])
             )
-            table_deps: List[TableName] = (
-                list(map(TableName, raw_table["dependencies"]))
-                if "dependencies" in raw_table
-                else []
+            table_deps: List[str] = (
+                list(raw_table["dependencies"]) if "dependencies" in raw_table else []
             )
             transform = raw_table["transform"] if "transform" in raw_table else None
-            tables.append(Table(TableName(name), columns, table_deps, transform, []))
+            tables.append(Table(name, columns, table_deps, transform, []))
 
         return cls(raw_yaml["schema_name"], tables)
 
@@ -62,8 +60,8 @@ class UserProvidedDataBlueprint:
         """
 
         tables_by_name = {tbl.name: tbl for tbl in self.tables}
-        checked: Set[TableName] = set()
-        curr_path: Set[TableName] = set()
+        checked: Set[str] = set()
+        curr_path: Set[str] = set()
 
         # Recursively checks for circular dependencies.
         def check_deps(table: Table):

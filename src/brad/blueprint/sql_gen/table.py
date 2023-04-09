@@ -65,7 +65,7 @@ class TableSqlGenerator:
                 # A view over the source table that excludes the monotonically
                 # increasing sequence column.
                 create_source_view = AURORA_CREATE_SOURCE_VIEW_TEMPLATE.format(
-                    view_name=table.name.value,
+                    view_name=table.name,
                     source_table_name=source_table_name(table),
                     columns=comma_separated_column_names(table.columns),
                 )
@@ -139,7 +139,7 @@ class TableSqlGenerator:
                 # This is just a regular table on Aurora that will not need to
                 # support incremental extraction.
                 sql = AURORA_BARE_OR_REDSHIFT_CREATE_TABLE_TEMPLATE.format(
-                    table_name=table.name.value,
+                    table_name=table.name,
                     columns=comma_separated_column_names_and_types(
                         table.columns, DBType.Aurora
                     ),
@@ -149,7 +149,7 @@ class TableSqlGenerator:
 
         elif location == Location.Redshift:
             sql = AURORA_BARE_OR_REDSHIFT_CREATE_TABLE_TEMPLATE.format(
-                table_name=table.name.value,
+                table_name=table.name,
                 columns=comma_separated_column_names_and_types(
                     table.columns, DBType.Redshift
                 ),
@@ -159,13 +159,11 @@ class TableSqlGenerator:
 
         elif location == Location.S3Iceberg:
             sql = ATHENA_CREATE_TABLE_TEMPLATE.format(
-                table_name=table.name.value,
+                table_name=table.name,
                 columns=comma_separated_column_names_and_types(
                     table.columns, DBType.Athena
                 ),
-                s3_path="{}{}".format(
-                    self._config.athena_s3_data_path, table.name.value
-                ),
+                s3_path="{}{}".format(self._config.athena_s3_data_path, table.name),
             )
             return ([sql], DBType.Athena)
 

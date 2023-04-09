@@ -2,26 +2,6 @@ from .location import Location
 from typing import List, Optional
 
 
-class TableName:
-    def __init__(self, name: str):
-        self._name = name
-
-    @property
-    def value(self) -> str:
-        return self._name
-
-    def __repr__(self) -> str:
-        return self._name
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, TableName):
-            return False
-        return self._name == other._name
-
-    def __hash__(self) -> int:
-        return hash(self._name)
-
-
 class Column:
     """
     Represents a column (its name and type).
@@ -56,9 +36,9 @@ class Table:
 
     def __init__(
         self,
-        name: TableName,
+        name: str,
         columns: List[Column],
-        table_dependencies: List[TableName],
+        table_dependencies: List[str],
         transform_text: Optional[str],
         locations: List[Location],
     ):
@@ -70,7 +50,7 @@ class Table:
         self._primary_key = list(filter(lambda c: c.is_primary, columns))
 
     @property
-    def name(self) -> TableName:
+    def name(self) -> str:
         return self._name
 
     @property
@@ -78,7 +58,7 @@ class Table:
         return self._columns
 
     @property
-    def table_dependencies(self) -> List[TableName]:
+    def table_dependencies(self) -> List[str]:
         return self._table_dependencies
 
     @property
