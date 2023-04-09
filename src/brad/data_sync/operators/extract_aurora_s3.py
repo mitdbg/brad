@@ -16,13 +16,10 @@ from ._extract_aurora_s3_templates import (
 from brad.blueprint.sql_gen.table import comma_separated_column_names
 from brad.config.strings import source_table_name, shadow_table_name
 from brad.data_sync.execution.context import ExecutionContext
+from brad.data_sync.execution.table_sync_bounds import TableSyncBounds, MAX_SEQ
 from brad.data_sync.s3_path import S3Path
 
 logger = logging.getLogger(__name__)
-
-# Represents the largest possible sequence value (BIGSERIAL).
-# Ideally we should be using the DBMS' value.
-_MAX_SEQ = 0xFFFFFFFF_FFFFFFFF
 
 
 class ExtractFromAuroraToS3(Operator):
@@ -71,7 +68,7 @@ class ExtractFromAuroraToS3(Operator):
 
     async def _get_table_extract_bounds(
         self, ctx: ExecutionContext
-    ) -> Dict[str, "_TableSyncBounds"]:
+    ) -> Dict[str, TableSyncBounds]:
         cursor = await ctx.aurora()
 
         # 1. Retrieve the starting sequence values for extraction.
@@ -86,9 +83,9 @@ class ExtractFromAuroraToS3(Operator):
         # always extract a transactionally-consistent snapshot).
 
         # table_name: (main_bound, shadow_bound)
-        table_bounds: Dict[str, _TableSyncBounds] = {}
+        table_bounds: Dict[str, TableSyncBounds] = {}
         async for row in cursor:
-            bounds = _TableSyncBounds()
+            bounds = TableSyncBounds()
             bounds.next_extract_seq = row[1]
             bounds.next_shadow_extract_seq = row[2]
             table_bounds[row[0]] = bounds
@@ -105,7 +102,7 @@ class ExtractFromAuroraToS3(Operator):
             if row is None or row[0] is None:
                 # The scenario when the table is empty.
                 # Ideally we should be using the DBMS' max value for BIGSERIAL.
-                bounds.max_extract_seq = _MAX_SEQ
+                bounds.max_extract_seq = MAX_SEQ
             else:
                 bounds.max_extract_seq = row[0]
 
@@ -119,14 +116,14 @@ class ExtractFromAuroraToS3(Operator):
             if row is None or row[0] is None:
                 # The scenario when the table is empty.
                 # Ideally we should be using the DBMS' max value for BIGSERIAL.
-                bounds.max_shadow_extract_seq = _MAX_SEQ
+                bounds.max_shadow_extract_seq = MAX_SEQ
             else:
                 bounds.max_shadow_extract_seq = row[0]
 
         return table_bounds
 
     async def _export_table_to_s3(
-        self, ctx: ExecutionContext, table_name: str, bounds: "_TableSyncBounds"
+        self, ctx: ExecutionContext, table_name: str, bounds: TableSyncBounds
     ):
         cursor = await ctx.aurora()
 
@@ -169,13 +166,13 @@ class ExtractFromAuroraToS3(Operator):
         await cursor.execute(extract_shadow)
 
     async def _complete_sync(
-        self, ctx: ExecutionContext, table_name: str, bounds: "_TableSyncBounds"
+        self, ctx: ExecutionContext, table_name: str, bounds: TableSyncBounds
     ):
         cursor = await ctx.aurora()
 
-        # NOTE: If any of the max extract sequence values are `_MAX_SEQ`, it
+        # NOTE: If any of the max extract sequence values are `MAX_SEQ`, it
         # indicates that there were no values to extract.
-        if bounds.max_shadow_extract_seq != _MAX_SEQ:
+        if bounds.max_shadow_extract_seq != MAX_SEQ:
             aurora_delete_shadow = DELETE_FROM_SHADOW.format(
                 shadow_table=shadow_table_name(table_name),
                 lower_bound=bounds.next_shadow_extract_seq,
@@ -225,67 +222,6 @@ class ExtractFromAuroraToS3(Operator):
         else:
             # This case should not happen - we skip the sync if both ranges are empty.
             assert False
-
-
-class _TableSyncBounds:
-    def __init__(self):
-        self.next_extract_seq = -1
-        self.max_extract_seq = -1
-
-        self.next_shadow_extract_seq = -1
-        self.max_shadow_extract_seq = -1
-
-    def bounds_set(self) -> bool:
-        return (
-            self.next_extract_seq >= 0
-            and self.max_extract_seq >= 0
-            and self.next_shadow_extract_seq >= 0
-            and self.max_shadow_extract_seq >= 0
-        )
-
-    def can_skip_sync(self) -> bool:
-        # These extract sequence ranges are inclusive. If both ranges are empty,
-        # there were no new writes since the last time the sync ran. So we can
-        # safely skip the sync.
-        return (
-            # _MAX_SEQ means that the table(s) are empty.
-            (
-                self.next_extract_seq > self.max_extract_seq
-                or self.max_extract_seq == _MAX_SEQ
-            )
-            and (
-                self.next_shadow_extract_seq > self.max_shadow_extract_seq
-                or self.max_shadow_extract_seq == _MAX_SEQ
-            )
-        )
-
-    def should_advance_main_seq(self) -> bool:
-        """
-        Returns true when the extraction range is non-empty (and so the next
-        extraction should start at a higher sequence number).
-        """
-        return (
-            self.max_extract_seq != _MAX_SEQ
-            and self.max_extract_seq >= self.next_extract_seq
-        )
-
-    def should_advance_shadow_seq(self) -> bool:
-        """
-        Returns true when the shadow table extraction range is non-empty (and so the next
-        extraction should start at a higher sequence number).
-        """
-        return (
-            self.max_shadow_extract_seq != _MAX_SEQ
-            and self.max_shadow_extract_seq >= self.next_shadow_extract_seq
-        )
-
-    def __repr__(self) -> str:
-        return "TableSyncBounds(main_seq_range=[{}, {}], shadow_seq_range=[{}, {}])".format(
-            self.next_extract_seq,
-            self.max_extract_seq,
-            self.next_shadow_extract_seq,
-            self.max_shadow_extract_seq,
-        )
 
 
 class ExtractLocation:

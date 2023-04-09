@@ -7,6 +7,7 @@ from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
 from brad.data_sync.execution.context import ExecutionContext
 from brad.data_sync.execution.plan_converter import PlanConverter
+from brad.data_sync.execution.table_sync_bounds import TableSyncBounds
 from brad.data_sync.logical_plan import LogicalDataSyncPlan
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
 from brad.planner.data_sync import make_logical_data_sync_plan
@@ -59,11 +60,36 @@ class DataSyncPlanExecutor:
             await aurora.commit()
 
     async def _get_processed_plans_impl(
-        self, blueprint: DataBlueprint, _ctx: ExecutionContext
+        self, blueprint: DataBlueprint, ctx: ExecutionContext
     ) -> Tuple[LogicalDataSyncPlan, PhysicalDataSyncPlan]:
+        # 1. Get the static logical plan.
         logical = self.get_static_logical_plan(blueprint)
-        converter = PlanConverter(logical, blueprint)
-        return logical, converter.get_plan()
+
+        # 2. Retrieve the sync bounds for the base tables (data sources).
+        base_tables = list(
+            map(lambda op: op.table_name().value, logical.base_operators())
+        )
+        table_bounds = await TableSyncBounds.get_table_sync_bounds_for(base_tables, ctx)
+        ctx.set_table_sync_bounds(table_bounds)
+
+        # 3. Process the logical plan: mark base operators as definitely having
+        # no results if they correspond to tables that have no changes. Then
+        # propagate these markers upwards.
+        for base_op in logical.base_operators():
+            base_table = base_op.table_name().value
+            if (
+                base_tables not in table_bounds
+                or table_bounds[base_table].can_skip_sync()
+            ):
+                base_op.set_definitely_empty(True)
+        logical.propagate_definitely_empty()
+
+        # 4. Prune logical operators that we know will not produce any deltas.
+        pruned_logical = logical.prune_empty_ops()
+
+        # 5. Convert the logical plan into a physical plan for later execution.
+        converter = PlanConverter(pruned_logical, blueprint)
+        return pruned_logical, converter.get_plan()
 
     async def _run_plan(
         self, plan: PhysicalDataSyncPlan, ctx: ExecutionContext
