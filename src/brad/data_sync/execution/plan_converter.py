@@ -60,6 +60,9 @@ class PlanConverter:
         self._transform_inputs: List[Tuple[RunTransformation, List[str]]] = []
 
     def get_plan(self) -> PhysicalDataSyncPlan:
+        if len(self._logical_plan.operators()) == 0:
+            return PhysicalDataSyncPlan([], [])
+
         tables_to_extract = {}
         for op in self._logical_plan.base_operators():
             # Sanity check.

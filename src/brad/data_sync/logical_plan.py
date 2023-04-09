@@ -204,7 +204,11 @@ class TransformDeltas(LogicalDataSyncOperator):
 
         for s in self._sources:
             # Sanity check.
-            assert isinstance(s, ExtractDeltas) or isinstance(s, TransformDeltas)
+            assert (
+                isinstance(s, ExtractDeltas)
+                or isinstance(s, TransformDeltas)
+                or isinstance(s, EmptyDeltas)
+            )
             s.add_dependee(self)
 
     def transform_text(self) -> str:

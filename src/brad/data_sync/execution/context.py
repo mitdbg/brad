@@ -1,9 +1,12 @@
 import boto3
-from typing import Dict
+from typing import Dict, TYPE_CHECKING
 
 from brad.blueprint.data import DataBlueprint
 from brad.config.file import ConfigFile
-from brad.data_sync.execution.table_sync_bounds import TableSyncBounds
+
+# Needed to avoid a circular import.
+if TYPE_CHECKING:
+    from brad.data_sync.execution.table_sync_bounds import TableSyncBounds
 
 
 class ExecutionContext:
@@ -33,7 +36,7 @@ class ExecutionContext:
         self._s3_path = self._config.s3_extract_path
 
         # Table bounds (pre-computed) for extraction.
-        self._table_bounds: Dict[str, TableSyncBounds] = {}
+        self._table_bounds: Dict[str, "TableSyncBounds"] = {}
 
         # NOTE: We need to create one per thread.
         self._s3_client = boto3.client(
@@ -78,8 +81,8 @@ class ExecutionContext:
     def config(self) -> ConfigFile:
         return self._config
 
-    def table_sync_bounds(self) -> Dict[str, TableSyncBounds]:
+    def table_sync_bounds(self) -> Dict[str, "TableSyncBounds"]:
         return self._table_bounds
 
-    def set_table_sync_bounds(self, bounds: Dict[str, TableSyncBounds]) -> None:
+    def set_table_sync_bounds(self, bounds: Dict[str, "TableSyncBounds"]) -> None:
         self._table_bounds = bounds
