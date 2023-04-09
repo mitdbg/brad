@@ -1,6 +1,6 @@
 import sys
 from collections import deque
-from typing import List
+from typing import List, Dict
 
 from brad.config.dbtype import DBType
 from brad.blueprint.data.location import Location
@@ -12,6 +12,10 @@ class LogicalDataSyncOperator:
         self._dependees: List["LogicalDataSyncOperator"] = []
         self._table_name = table_name
         self._engine = engine
+
+        # Used to prune parts of the plan that we are sure will not produce any
+        # deltas. This happens when a table has not had any changes.
+        self._definitely_empty = False
 
     def table_name(self) -> TableName:
         return self._table_name
@@ -30,6 +34,12 @@ class LogicalDataSyncOperator:
     def dependencies(self) -> List["LogicalDataSyncOperator"]:
         raise NotImplementedError
 
+    def is_definitely_empty(self) -> bool:
+        return self._definitely_empty
+
+    def set_definitely_empty(self, definitely_empty: bool) -> None:
+        self._definitely_empty = definitely_empty
+
 
 class LogicalDataSyncPlan:
     def __init__(
@@ -45,6 +55,98 @@ class LogicalDataSyncPlan:
 
     def base_operators(self) -> List[LogicalDataSyncOperator]:
         return self._base_operators
+
+    def reset_definitely_empty(self) -> None:
+        for op in self._operators:
+            op.set_definitely_empty(False)
+
+    def propagate_definitely_empty(self) -> None:
+        """
+        Propagates the "definitely empty" markers upwards from the base
+        operators.
+
+        If all of an operator's dependencies are "definitely empty" (and it has
+        at least one dependency), then that operator will be empty too.
+        """
+        visited = set()
+
+        def visit(op: LogicalDataSyncOperator) -> None:
+            if op in visited:
+                return
+            visited.add(op)
+            for dep in op.dependencies():
+                visit(dep)
+            if len(op.dependencies()) > 0 and all(
+                map(lambda dep: dep.is_definitely_empty(), op.dependencies())
+            ):
+                op.set_definitely_empty(True)
+
+        for op in self._operators:
+            if len(op.dependees()) > 0:
+                continue
+            visit(op)
+
+    def prune_empty_ops(self) -> "LogicalDataSyncPlan":
+        """
+        Returns a new plan with the subtrees that produce no deltas removed.
+        This plan can be empty!
+
+        This should only be called on a logical plan that was generated from the
+        blueprint and that has had `propagate_definitely_empty()` called.
+        """
+
+        # A map from old operator to new operator.
+        new_ops: Dict[LogicalDataSyncOperator, LogicalDataSyncOperator] = {}
+
+        def process(op: LogicalDataSyncOperator) -> LogicalDataSyncOperator:
+            if op in new_ops:
+                return new_ops[op]
+
+            if op.is_definitely_empty():
+                new_op: LogicalDataSyncOperator = EmptyDeltas(
+                    op.table_name(), op.engine()
+                )
+                new_ops[op] = new_op
+                return new_op
+
+            new_deps = []
+            for dep in op.dependencies():
+                new_deps.append(process(dep))
+
+            if isinstance(op, ApplyDeltas):
+                assert len(new_deps) == 1
+                new_op = ApplyDeltas(new_deps[0], op.table_name(), op.location())
+            elif isinstance(op, TransformDeltas):
+                new_op = TransformDeltas(
+                    new_deps, op.transform_text(), op.table_name(), op.engine()
+                )
+            elif isinstance(op, ExtractDeltas):
+                assert len(new_deps) == 0
+                new_op = ExtractDeltas(op.table_name())
+            else:
+                # `EmptyDeltas` are not meant to be possible here.
+                raise AssertionError
+
+            new_ops[op] = new_op
+            return new_op
+
+        for op in self._operators:
+            if len(op.dependees()) > 0:
+                continue
+            process(op)
+
+        relevant_new_ops = []
+        new_base_ops = []
+
+        for nop in new_ops.values():
+            if isinstance(nop, EmptyDeltas) and len(nop.dependees()) == 0:
+                # Filter out top-level `EmptyDeltas`
+                continue
+            relevant_new_ops.append(nop)
+            if len(nop.dependencies()) == 0:
+                new_base_ops.append(nop)
+
+        return LogicalDataSyncPlan(relevant_new_ops, new_base_ops)
 
     def print_plan_sequentially(self, file=sys.stdout) -> None:
         """
@@ -102,7 +204,11 @@ class TransformDeltas(LogicalDataSyncOperator):
 
         for s in self._sources:
             # Sanity check.
-            assert isinstance(s, ExtractDeltas) or isinstance(s, TransformDeltas)
+            assert (
+                isinstance(s, ExtractDeltas)
+                or isinstance(s, TransformDeltas)
+                or isinstance(s, EmptyDeltas)
+            )
             s.add_dependee(self)
 
     def transform_text(self) -> str:
@@ -150,4 +256,18 @@ class ApplyDeltas(LogicalDataSyncOperator):
     def __repr__(self) -> str:
         return "".join(
             ["ApplyDeltas(", str(self._table_name), ", location=", self._location, ")"]
+        )
+
+
+class EmptyDeltas(LogicalDataSyncOperator):
+    """
+    Used as a placeholder for a table that we know will not have any deltas.
+    """
+
+    def dependencies(self) -> List[LogicalDataSyncOperator]:
+        return []
+
+    def __repr__(self) -> str:
+        return "".join(
+            ["EmptyDeltas(", str(self._table_name), ", engine=", self.engine(), ")"]
         )

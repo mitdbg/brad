@@ -12,6 +12,7 @@ from brad.data_sync.logical_plan import (
     ExtractDeltas,
     TransformDeltas,
     ApplyDeltas as LogicalApplyDeltas,
+    EmptyDeltas,
 )
 from brad.data_sync.operators import Operator
 from brad.data_sync.operators.adjust_deltas import AdjustDeltas
@@ -59,22 +60,29 @@ class PlanConverter:
         self._transform_inputs: List[Tuple[RunTransformation, List[str]]] = []
 
     def get_plan(self) -> PhysicalDataSyncPlan:
+        if len(self._logical_plan.operators()) == 0:
+            return PhysicalDataSyncPlan([], [])
+
         tables_to_extract = {}
         for op in self._logical_plan.base_operators():
             # Sanity check.
-            assert isinstance(op, ExtractDeltas)
-
-            # Set up the extraction location(s).
-            extract_paths = self._s3_extract_paths_for(op.table_name().value)
-            tables_to_extract[op.table_name().value] = extract_paths
+            assert isinstance(op, ExtractDeltas) or isinstance(op, EmptyDeltas)
 
             # Create a processing op so that we can generate the correct
             # physical operators for dependees.
             pop = _ProcessingOp(op)
-            pop.output_location = _DeltaLocation.S3Text
-            pop.output_s3_location = extract_paths
             self._processing_ops[op] = pop
             self._ready_to_process.append(pop)
+
+            if isinstance(op, EmptyDeltas):
+                # Nothing more to do for `EmptyDeltas`.
+                continue
+
+            # Set up the extraction location(s).
+            extract_paths = self._s3_extract_paths_for(op.table_name().value)
+            tables_to_extract[op.table_name().value] = extract_paths
+            pop.output_location = _DeltaLocation.S3Text
+            pop.output_s3_location = extract_paths
 
             # Keep track of these intermediate objects so that they can be
             # deleted afterwards.
@@ -167,9 +175,11 @@ class PlanConverter:
                 elif isinstance(dependee_pop.logical_op, LogicalApplyDeltas):
                     # This operator does not "produce" deltas.
                     pass
-                elif isinstance(dependee_pop.logical_op, ExtractDeltas):
-                    # All `ExtractDeltas` should be base operators. They should
-                    # not be a dependee.
+                elif isinstance(dependee_pop.logical_op, ExtractDeltas) or isinstance(
+                    dependee_pop.logical_op, EmptyDeltas
+                ):
+                    # All `ExtractDeltas` and `EmptyDeltas` should be base
+                    # operators. They should not be a dependee.
                     raise AssertionError
                 else:
                     raise AssertionError
@@ -179,7 +189,8 @@ class PlanConverter:
                 dependees.append(self._processing_ops[dependee])
 
         # Create a physical operator for this logical op (transform or apply
-        # delta). Extractions are a special case and are already handled.
+        # delta). Extractions and empty deltas are special cases and are already
+        # handled.
         if isinstance(pop.logical_op, TransformDeltas):
             run_trans_op = RunTransformation(
                 pop.logical_op.transform_text(),
@@ -213,7 +224,9 @@ class PlanConverter:
                 (pop.logical_op.table_name().value, pop.logical_op.engine())
             ] = phys_op
 
-        elif isinstance(pop.logical_op, ExtractDeltas):
+        elif isinstance(pop.logical_op, ExtractDeltas) or isinstance(
+            pop.logical_op, EmptyDeltas
+        ):
             phys_op = None
         else:
             raise AssertionError
@@ -268,7 +281,6 @@ class PlanConverter:
 
         # Create additional physical operators to "move" the deltas produced by
         # this op into the engines that are needed by the dependee operators.
-        assert pop.output_location is not None
         to_dest: Dict[DBType, Optional[Operator]] = {}
         for dependee_pop in dependees:
             if isinstance(dependee_pop.logical_op, TransformDeltas):
@@ -346,7 +358,10 @@ class PlanConverter:
         # NOTE: This plan converter still needs a better story for executing
         # transforms on Athena (we need to prepare the delta tables
         # appropriately).
-        need_adjust_deltas = isinstance(source_op.logical_op, ExtractDeltas) and (
+        need_adjust_deltas = (
+            isinstance(source_op.logical_op, ExtractDeltas)
+            or isinstance(source_op.logical_op, EmptyDeltas)
+        ) and (
             dependee.logical_op.engine() == DBType.Redshift
             or isinstance(dependee.logical_op, TransformDeltas)
         )
@@ -373,7 +388,7 @@ class PlanConverter:
     def _generate_movement_ops(
         self,
         source_op: "_ProcessingOp",
-        source: "_DeltaLocation",
+        source: Optional["_DeltaLocation"],
         dest: DBType,
     ) -> List[Operator]:
         out_ops: List[Operator] = []
@@ -471,6 +486,39 @@ class PlanConverter:
             l2.add_dependency(l1)
             out_ops.extend([u1, u2, l1, l2, c1, c2])
             self._intermediate_s3_objects.extend([insert_s3_path, delete_s3_path])
+            self._intermediate_tables.extend(
+                [(id_table_name, DBType.Aurora), (dd_table_name, DBType.Aurora)]
+            )
+
+        elif source is None and dest == DBType.Redshift:
+            # Create empty delta tables on the destination.
+            assert isinstance(source_op.logical_op, EmptyDeltas)
+            c1 = CreateTempTable(id_table_name, table.columns, engine=DBType.Redshift)
+            c2 = CreateTempTable(
+                dd_table_name, table.primary_key, engine=DBType.Redshift
+            )
+            c2.add_dependency(c1)
+            out_ops.extend([c1, c2])
+            self._intermediate_tables.extend(
+                [(id_table_name, DBType.Redshift), (dd_table_name, DBType.Redshift)]
+            )
+
+        elif source is None and dest == DBType.Athena:
+            assert isinstance(source_op.logical_op, EmptyDeltas)
+            c1 = CreateTempTable(id_table_name, table.columns, engine=DBType.Athena)
+            c2 = CreateTempTable(dd_table_name, table.primary_key, engine=DBType.Athena)
+            c2.add_dependency(c1)
+            out_ops.extend([c1, c2])
+            self._intermediate_tables.extend(
+                [(id_table_name, DBType.Athena), (dd_table_name, DBType.Athena)]
+            )
+
+        elif source is None and dest == DBType.Aurora:
+            assert isinstance(source_op.logical_op, EmptyDeltas)
+            c1 = CreateTempTable(id_table_name, table.columns, engine=DBType.Aurora)
+            c2 = CreateTempTable(dd_table_name, table.primary_key, engine=DBType.Aurora)
+            c2.add_dependency(c1)
+            out_ops.extend([c1, c2])
             self._intermediate_tables.extend(
                 [(id_table_name, DBType.Aurora), (dd_table_name, DBType.Aurora)]
             )
