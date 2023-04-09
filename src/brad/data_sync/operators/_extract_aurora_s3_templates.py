@@ -1,13 +1,5 @@
 from brad.config.strings import AURORA_EXTRACT_PROGRESS_TABLE_NAME, AURORA_SEQ_COLUMN
 
-# Used to get the state of data synchronization (i.e., where did we "stop" last time the sync job ran?)
-GET_NEXT_EXTRACT_TEMPLATE = (
-    "SELECT table_name, next_extract_seq, next_shadow_extract_seq FROM "
-    + AURORA_EXTRACT_PROGRESS_TABLE_NAME
-    + " WHERE table_name IN ({extract_tables})"
-)
-GET_MAX_EXTRACT_TEMPLATE = "SELECT MAX(" + AURORA_SEQ_COLUMN + ") FROM {table_name}"
-
 
 # Used to export data from Aurora to S3.
 EXTRACT_S3_TEMPLATE = """

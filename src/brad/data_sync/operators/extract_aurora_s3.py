@@ -3,8 +3,6 @@ from typing import Dict
 
 from .operator import Operator
 from ._extract_aurora_s3_templates import (
-    GET_NEXT_EXTRACT_TEMPLATE,
-    GET_MAX_EXTRACT_TEMPLATE,
     EXTRACT_S3_TEMPLATE,
     EXTRACT_FROM_MAIN_TEMPLATE,
     EXTRACT_FROM_SHADOW_TEMPLATE,
@@ -34,21 +32,15 @@ class ExtractFromAuroraToS3(Operator):
 
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         # 1. Retrieve the sequence ranges for extraction.
-        table_bounds = await self._get_table_extract_bounds(ctx)
+        table_bounds = ctx.table_sync_bounds()
 
-        # 2. Remove tables that do not need to be extracted.
-        can_skip = []
-        for table_name, bounds in table_bounds.items():
-            # Sanity check.
-            assert bounds.bounds_set(), table_name
-            if bounds.can_skip_sync():
-                can_skip.append(table_name)
-        for table_name in can_skip:
-            logger.debug(
-                "Skipping extracting '%s' because it has not experienced new writes.",
-                table_name,
-            )
-            del table_bounds[table_name]
+        # 2. Verify that all tables to be extracted are in `table_bounds` and
+        # are not to be skipped (we would have pruned these tables already).
+        for table_name in self._to_extract.keys():
+            assert table_name in table_bounds
+            bounds = table_bounds[table_name]
+            assert bounds.bounds_set()
+            assert not bounds.can_skip_sync()
 
         # 3. Run the extraction.
         for table_name, bounds in table_bounds.items():
@@ -62,65 +54,8 @@ class ExtractFromAuroraToS3(Operator):
 
         cursor = await ctx.aurora()
         await cursor.commit()
-        ctx.set_extracted_tables(list(table_bounds.keys()))
 
         return self
-
-    async def _get_table_extract_bounds(
-        self, ctx: ExecutionContext
-    ) -> Dict[str, TableSyncBounds]:
-        cursor = await ctx.aurora()
-
-        # 1. Retrieve the starting sequence values for extraction.
-        q = GET_NEXT_EXTRACT_TEMPLATE.format(
-            extract_tables=", ".join(map("'{}'".format, self._to_extract.keys()))
-        )
-        logger.debug("Executing on Aurora %s", q)
-        await cursor.execute(q)
-
-        # NOTE: A lower bound for the shadow table is not absolutely needed
-        # because we run under strict serializable isolation (to ensure we
-        # always extract a transactionally-consistent snapshot).
-
-        # table_name: (main_bound, shadow_bound)
-        table_bounds: Dict[str, TableSyncBounds] = {}
-        async for row in cursor:
-            bounds = TableSyncBounds()
-            bounds.next_extract_seq = row[1]
-            bounds.next_shadow_extract_seq = row[2]
-            table_bounds[row[0]] = bounds
-
-        # 2. Retrieve the current upper bounds for extraction.
-        for table_name, bounds in table_bounds.items():
-            # Main table.
-            q = GET_MAX_EXTRACT_TEMPLATE.format(
-                table_name=source_table_name(table_name)
-            )
-            logger.debug("Executing on Aurora %s", q)
-            await cursor.execute(q)
-            row = await cursor.fetchone()
-            if row is None or row[0] is None:
-                # The scenario when the table is empty.
-                # Ideally we should be using the DBMS' max value for BIGSERIAL.
-                bounds.max_extract_seq = MAX_SEQ
-            else:
-                bounds.max_extract_seq = row[0]
-
-            # Shadow table.
-            q = GET_MAX_EXTRACT_TEMPLATE.format(
-                table_name=shadow_table_name(table_name)
-            )
-            logger.debug("Executing on Aurora %s", q)
-            await cursor.execute(q)
-            row = await cursor.fetchone()
-            if row is None or row[0] is None:
-                # The scenario when the table is empty.
-                # Ideally we should be using the DBMS' max value for BIGSERIAL.
-                bounds.max_shadow_extract_seq = MAX_SEQ
-            else:
-                bounds.max_shadow_extract_seq = row[0]
-
-        return table_bounds
 
     async def _export_table_to_s3(
         self, ctx: ExecutionContext, table_name: str, bounds: TableSyncBounds

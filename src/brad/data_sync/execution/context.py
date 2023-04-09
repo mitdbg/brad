@@ -1,5 +1,5 @@
 import boto3
-from typing import List, Dict
+from typing import Dict
 
 from brad.blueprint.data import DataBlueprint
 from brad.config.file import ConfigFile
@@ -32,8 +32,7 @@ class ExecutionContext:
         self._s3_region = self._config.s3_extract_region
         self._s3_path = self._config.s3_extract_path
 
-        # Extracted tables.
-        self._extracted_tables: List[str] = []
+        # Table bounds (pre-computed) for extraction.
         self._table_bounds: Dict[str, TableSyncBounds] = {}
 
         # NOTE: We need to create one per thread.
@@ -81,9 +80,6 @@ class ExecutionContext:
 
     def table_sync_bounds(self) -> Dict[str, TableSyncBounds]:
         return self._table_bounds
-
-    def set_extracted_tables(self, tables: List[str]) -> None:
-        self._extracted_tables = tables
 
     def set_table_sync_bounds(self, bounds: Dict[str, TableSyncBounds]) -> None:
         self._table_bounds = bounds
