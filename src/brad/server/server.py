@@ -201,10 +201,13 @@ class BradServer(BradInterface):
 
         elif command == "BRAD_SYNC;":
             logger.debug("Manually triggered a data sync.")
-            await self._data_sync_executor.run_sync(
+            ran_sync = await self._data_sync_executor.run_sync(
                 self._data_blueprint_mgr.get_blueprint()
             )
-            yield "Sync succeeded.".encode()
+            if ran_sync:
+                yield "Sync succeeded.".encode()
+            else:
+                yield "Sync skipped. No new writes to sync.".encode()
 
         elif command == "BRAD_EXPLAIN_SYNC_STATIC;":
             logical_plan = self._data_sync_executor.get_static_logical_plan(

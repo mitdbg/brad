@@ -41,10 +41,17 @@ class DataSyncPlanExecutor:
             return
         await self._engines.close()
 
-    async def run_sync(self, blueprint: DataBlueprint) -> None:
+    async def run_sync(self, blueprint: DataBlueprint) -> bool:
         ctx = self._new_execution_context()
         _, phys_plan = await self._get_processed_plans_impl(blueprint, ctx)
+        if len(phys_plan.all_operators()) == 0:
+            # There is nothing to execute. But we must commit the transaction
+            # that looked up the extraction ranges.
+            aurora = await ctx.aurora()
+            await aurora.commit()
+            return False
         await self._run_plan(phys_plan, ctx)
+        return True
 
     def get_static_logical_plan(self, blueprint: DataBlueprint) -> LogicalDataSyncPlan:
         return make_logical_data_sync_plan(blueprint)
@@ -75,10 +82,11 @@ class DataSyncPlanExecutor:
         # 3. Process the logical plan: mark base operators as definitely having
         # no results if they correspond to tables that have no changes. Then
         # propagate these markers upwards.
+        logger.debug("Table bounds: %s", str(table_bounds))
         for base_op in logical.base_operators():
             base_table = base_op.table_name().value
             if (
-                base_tables not in table_bounds
+                base_table not in table_bounds
                 or table_bounds[base_table].can_skip_sync()
             ):
                 base_op.set_definitely_empty(True)
