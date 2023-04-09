@@ -43,14 +43,14 @@ class ExtractFromAuroraToS3(Operator):
             assert not bounds.can_skip_sync()
 
         # 3. Run the extraction.
-        for table_name, bounds in table_bounds.items():
-            await self._export_table_to_s3(ctx, table_name, bounds)
+        for table_name in self._to_extract.keys():
+            await self._export_table_to_s3(ctx, table_name, table_bounds[table_name])
 
         # 4. Update the extraction progress tables.
         # We can safely resume the data sync from the extracted data saved in S3
         # if needed.
-        for table_name, bounds in table_bounds.items():
-            await self._complete_sync(ctx, table_name, bounds)
+        for table_name in self._to_extract.keys():
+            await self._complete_sync(ctx, table_name, table_bounds[table_name])
 
         cursor = await ctx.aurora()
         await cursor.commit()
