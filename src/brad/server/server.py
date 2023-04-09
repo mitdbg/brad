@@ -9,8 +9,7 @@ import pyodbc
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
-from brad.data_sync.execution.executor import DataSyncPlanExecutor
-from brad.data_sync.manager import DataSyncManager
+from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
@@ -55,8 +54,7 @@ class BradServer(BradInterface):
         self._daemon_connections: List[
             Tuple[asyncio.StreamReader, asyncio.StreamWriter]
         ] = []
-        self._data_sync_mgr = DataSyncManager(self._config, self._data_blueprint_mgr)
-        self._data_sync_executor = DataSyncPlanExecutor(
+        self._data_sync_executor = DataSyncExecutor(
             self._config, self._data_blueprint_mgr
         )
         self._timed_sync_task = None
@@ -92,7 +90,6 @@ class BradServer(BradInterface):
 
     async def run_setup(self):
         await self._data_blueprint_mgr.load()
-        await self._data_sync_mgr.establish_connections()
         if self._config.data_sync_period_seconds > 0:
             loop = asyncio.get_event_loop()
             self._timed_sync_task = loop.create_task(self._run_sync_periodically())
@@ -108,7 +105,6 @@ class BradServer(BradInterface):
             await writer.wait_closed()
         self._daemon_connections.clear()
 
-        await self._data_sync_mgr.close()
         await self._data_sync_executor.shutdown()
 
     def _handle_new_daemon_connection(
@@ -194,12 +190,8 @@ class BradServer(BradInterface):
         This method is used to handle BRAD_ prefixed "queries" (i.e., commands
         to run custom functionality like syncing data across the engines).
         """
-        if command == "BRAD_LEGACY_SYNC;":
-            logger.debug("Manually triggered a legacy data sync.")
-            await self._data_sync_mgr.run_sync()
-            yield "Sync succeeded.".encode()
 
-        elif command == "BRAD_SYNC;":
+        if command == "BRAD_SYNC;":
             logger.debug("Manually triggered a data sync.")
             ran_sync = await self._data_sync_executor.run_sync(
                 self._data_blueprint_mgr.get_blueprint()
@@ -242,4 +234,6 @@ class BradServer(BradInterface):
             await asyncio.sleep(self._config.data_sync_period_seconds)
             logger.debug("Starting an auto data sync.")
             # NOTE: This will be an async function.
-            self._data_sync_mgr.run_sync()
+            await self._data_sync_executor.run_sync(
+                self._data_blueprint_mgr.get_blueprint()
+            )

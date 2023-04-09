@@ -17,7 +17,7 @@ from brad.server.engine_connections import EngineConnections
 logger = logging.getLogger(__name__)
 
 
-class DataSyncPlanExecutor:
+class DataSyncExecutor:
     def __init__(
         self, config: ConfigFile, data_blueprint_mgr: DataBlueprintManager
     ) -> None:
