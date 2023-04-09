@@ -1,11 +1,15 @@
 import logging
 from collections import deque
-from typing import Optional
+from typing import Optional, Tuple
 
+from brad.blueprint.data import DataBlueprint
 from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
 from brad.data_sync.execution.context import ExecutionContext
+from brad.data_sync.execution.plan_converter import PlanConverter
+from brad.data_sync.logical_plan import LogicalDataSyncPlan
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
+from brad.planner.data_sync import make_logical_data_sync_plan
 from brad.server.data_blueprint_manager import DataBlueprintManager
 from brad.server.engine_connections import EngineConnections
 
@@ -36,12 +40,38 @@ class DataSyncPlanExecutor:
             return
         await self._engines.close()
 
-    async def run_plan(self, plan: PhysicalDataSyncPlan) -> None:
+    async def run_sync(self, blueprint: DataBlueprint) -> None:
+        ctx = self._new_execution_context()
+        _, phys_plan = await self._get_processed_plans_impl(blueprint, ctx)
+        await self._run_plan(phys_plan, ctx)
+
+    def get_static_logical_plan(self, blueprint: DataBlueprint) -> LogicalDataSyncPlan:
+        return make_logical_data_sync_plan(blueprint)
+
+    async def get_processed_plans(
+        self, blueprint: DataBlueprint
+    ) -> Tuple[LogicalDataSyncPlan, PhysicalDataSyncPlan]:
+        ctx = self._new_execution_context()
+        try:
+            return await self._get_processed_plans_impl(blueprint, ctx)
+        finally:
+            aurora = await ctx.aurora()
+            await aurora.commit()
+
+    async def _get_processed_plans_impl(
+        self, blueprint: DataBlueprint, _ctx: ExecutionContext
+    ) -> Tuple[LogicalDataSyncPlan, PhysicalDataSyncPlan]:
+        logical = self.get_static_logical_plan(blueprint)
+        converter = PlanConverter(logical, blueprint)
+        return logical, converter.get_plan()
+
+    async def _run_plan(
+        self, plan: PhysicalDataSyncPlan, ctx: ExecutionContext
+    ) -> None:
         # 1. Reset all operators (their metadata) to prepare for execution.
         for op in plan.all_operators():
             op.reset_ready_to_run()
 
-        ctx = self._new_execution_context()
         ready_to_run = deque([*plan.base_ops()])
 
         # Sanity check.

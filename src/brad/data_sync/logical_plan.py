@@ -13,6 +13,10 @@ class LogicalDataSyncOperator:
         self._table_name = table_name
         self._engine = engine
 
+        # Used to prune parts of the plan that we are sure will not produce any
+        # deltas. This happens when a table has not had any changes.
+        self._definitely_no_results = False
+
     def table_name(self) -> TableName:
         return self._table_name
 
@@ -29,6 +33,12 @@ class LogicalDataSyncOperator:
 
     def dependencies(self) -> List["LogicalDataSyncOperator"]:
         raise NotImplementedError
+
+    def definitely_no_results(self) -> bool:
+        return self._definitely_no_results
+
+    def mark_definitely_no_results(self) -> None:
+        self._definitely_no_results = True
 
 
 class LogicalDataSyncPlan:
@@ -150,4 +160,22 @@ class ApplyDeltas(LogicalDataSyncOperator):
     def __repr__(self) -> str:
         return "".join(
             ["ApplyDeltas(", str(self._table_name), ", location=", self._location, ")"]
+        )
+
+
+class EmptyDeltas(LogicalDataSyncOperator):
+    """
+    Used as a placeholder for a table that we know will not have any deltas.
+    """
+
+    def __init__(self, table_name: TableName, location: Location):
+        super().__init__(table_name, location.default_engine())
+        self._location = location
+
+    def dependencies(self) -> List[LogicalDataSyncOperator]:
+        return []
+
+    def __repr__(self) -> str:
+        return "".join(
+            ["EmptyDeltas(", str(self._table_name), ", location=", self._location, ")"]
         )

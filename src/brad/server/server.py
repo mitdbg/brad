@@ -10,9 +10,7 @@ import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
 from brad.data_sync.execution.executor import DataSyncPlanExecutor
-from brad.data_sync.execution.plan_converter import PlanConverter
 from brad.data_sync.manager import DataSyncManager
-from brad.planner.data_sync import make_logical_data_sync_plan
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
@@ -201,24 +199,32 @@ class BradServer(BradInterface):
             await self._data_sync_mgr.run_sync()
             yield "Sync succeeded.".encode()
 
-        elif command == "BRAD_SYNC;" or command == "BRAD_EXPLAIN_SYNC;":
-            plan = make_logical_data_sync_plan(self._data_blueprint_mgr.get_blueprint())
-            phys_plan = PlanConverter(
-                plan, self._data_blueprint_mgr.get_blueprint()
-            ).get_plan()
+        elif command == "BRAD_SYNC;":
+            logger.debug("Manually triggered a data sync.")
+            await self._data_sync_executor.run_sync(
+                self._data_blueprint_mgr.get_blueprint()
+            )
+            yield "Sync succeeded.".encode()
 
-            if command == "BRAD_SYNC;":
-                logger.debug("Manually triggered a data sync.")
-                await self._data_sync_executor.run_plan(phys_plan)
-                yield "Sync succeeded.".encode()
-            else:
-                out = io.StringIO()
-                plan.print_plan_sequentially(file=out)
-                yield out.getvalue().encode()
+        elif command == "BRAD_EXPLAIN_SYNC_STATIC;":
+            logical_plan = self._data_sync_executor.get_static_logical_plan(
+                self._data_blueprint_mgr.get_blueprint()
+            )
+            out = io.StringIO()
+            logical_plan.print_plan_sequentially(file=out)
+            yield out.getvalue().encode()
 
-                out = io.StringIO()
-                phys_plan.print_plan_sequentially(file=out)
-                yield out.getvalue().encode()
+        elif command == "BRAD_EXPLAIN_SYNC;":
+            logical, physical = await self._data_sync_executor.get_processed_plans(
+                self._data_blueprint_mgr.get_blueprint()
+            )
+            out = io.StringIO()
+            logical.print_plan_sequentially(file=out)
+            yield out.getvalue().encode()
+
+            out = io.StringIO()
+            physical.print_plan_sequentially(file=out)
+            yield out.getvalue().encode()
 
         elif command == "BRAD_FORECAST;":
             logger.debug("Manually triggered a workload forecast.")
