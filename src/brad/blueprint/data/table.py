@@ -1,5 +1,6 @@
-from .location import Location
 from typing import List, Optional
+
+from brad.config.dbtype import DBType
 
 
 class Column:
@@ -29,7 +30,7 @@ class Table:
     """
     Holds metadata that BRAD needs to know about a table:
     - Its schema (name, columns, primary key columns)
-    - Physical locations
+    - The engines on which the table is located
     - Its dependencies
     - The transformation to use when propagating changes from the dependencies
     """
@@ -40,7 +41,7 @@ class Table:
         columns: List[Column],
         table_dependencies: List[str],
         transform_text: Optional[str],
-        locations: List[Location],
+        locations: List[DBType],
     ):
         self._name = name
         self._columns = columns
@@ -66,7 +67,7 @@ class Table:
         return self._transform_text
 
     @property
-    def locations(self) -> List[Location]:
+    def locations(self) -> List[DBType]:
         return self._locations
 
     @property

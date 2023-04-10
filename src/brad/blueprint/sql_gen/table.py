@@ -1,7 +1,6 @@
 from typing import List, Tuple
 
 from brad.blueprint.data import DataBlueprint
-from brad.blueprint.data.location import Location
 from brad.blueprint.data.table import Column, Table
 from brad.config.dbtype import DBType
 from brad.config.file import ConfigFile
@@ -34,14 +33,14 @@ class TableSqlGenerator:
         self._blueprint = blueprint
 
     def generate_create_table_sql(
-        self, table: Table, location: Location
+        self, table: Table, location: DBType
     ) -> Tuple[List[str], DBType]:
         """
         Returns SQL queries that should be used to create `table` on `location`,
         along with the engine on which to execute the queries.
         """
 
-        if location == Location.Aurora:
+        if location == DBType.Aurora:
             if table.name in self._blueprint.base_table_names:
                 # This table needs to support incremental extraction. We need to
                 # create several additional structures to support this extraction.
@@ -147,7 +146,7 @@ class TableSqlGenerator:
                 )
                 return ([sql], DBType.Aurora)
 
-        elif location == Location.Redshift:
+        elif location == DBType.Redshift:
             sql = AURORA_BARE_OR_REDSHIFT_CREATE_TABLE_TEMPLATE.format(
                 table_name=table.name,
                 columns=comma_separated_column_names_and_types(
@@ -157,7 +156,7 @@ class TableSqlGenerator:
             )
             return ([sql], DBType.Redshift)
 
-        elif location == Location.S3Iceberg:
+        elif location == DBType.Athena:
             sql = ATHENA_CREATE_TABLE_TEMPLATE.format(
                 table_name=table.name,
                 columns=comma_separated_column_names_and_types(
@@ -189,7 +188,7 @@ class TableSqlGenerator:
         )
         for base_table_name in self._blueprint.base_table_names:
             base_table = self._blueprint.get_table(base_table_name)
-            if Location.Aurora not in base_table.locations:
+            if DBType.Aurora not in base_table.locations:
                 continue
             queries.append(initialize_template.format(table_name=base_table_name))
 

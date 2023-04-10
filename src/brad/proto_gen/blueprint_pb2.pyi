@@ -4,11 +4,11 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
 
-AURORA: DataLocation
+ATHENA: Engine
+AURORA: Engine
 DESCRIPTOR: _descriptor.FileDescriptor
-REDSHIFT: DataLocation
-S3_ICEBERG: DataLocation
-UNKNOWN: DataLocation
+REDSHIFT: Engine
+UNKNOWN: Engine
 
 class DataBlueprint(_message.Message):
     __slots__ = ["schema_name", "tables"]
@@ -26,9 +26,9 @@ class Table(_message.Message):
     TABLE_NAME_FIELD_NUMBER: _ClassVar[int]
     columns: _containers.RepeatedCompositeFieldContainer[TableColumn]
     dependencies: TableDependency
-    locations: _containers.RepeatedScalarFieldContainer[DataLocation]
+    locations: _containers.RepeatedScalarFieldContainer[Engine]
     table_name: str
-    def __init__(self, table_name: _Optional[str] = ..., columns: _Optional[_Iterable[_Union[TableColumn, _Mapping]]] = ..., locations: _Optional[_Iterable[_Union[DataLocation, str]]] = ..., dependencies: _Optional[_Union[TableDependency, _Mapping]] = ...) -> None: ...
+    def __init__(self, table_name: _Optional[str] = ..., columns: _Optional[_Iterable[_Union[TableColumn, _Mapping]]] = ..., locations: _Optional[_Iterable[_Union[Engine, str]]] = ..., dependencies: _Optional[_Union[TableDependency, _Mapping]] = ...) -> None: ...
 
 class TableColumn(_message.Message):
     __slots__ = ["data_type", "is_primary", "name"]
@@ -48,5 +48,5 @@ class TableDependency(_message.Message):
     transform: str
     def __init__(self, source_table_names: _Optional[_Iterable[str]] = ..., transform: _Optional[str] = ...) -> None: ...
 
-class DataLocation(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):  # type: ignore
+class Engine(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):  # type: ignore
     __slots__ = []  # type: ignore
