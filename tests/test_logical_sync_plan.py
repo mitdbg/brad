@@ -1,4 +1,4 @@
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.data_sync.logical_plan import (
     ApplyDeltas,
     EmptyDeltas,
@@ -10,7 +10,7 @@ from brad.data_sync.logical_plan import (
 
 def test_propagation_simple():
     e = ExtractDeltas("test")
-    a = ApplyDeltas(e, "test2", DBType.Aurora)
+    a = ApplyDeltas(e, "test2", Engine.Aurora)
     plan = LogicalDataSyncPlan([e, a], [e])
     plan.reset_definitely_empty()
     e.set_definitely_empty(True)
@@ -23,17 +23,17 @@ def test_propagation_simple():
 def test_propagation():
     e1 = ExtractDeltas("test1")
     e2 = ExtractDeltas("test2")
-    t1 = TransformDeltas([e1, e2], "", "test3", DBType.Redshift)
-    t2 = TransformDeltas([t1], "", "test4", DBType.Redshift)
+    t1 = TransformDeltas([e1, e2], "", "test3", Engine.Redshift)
+    t2 = TransformDeltas([t1], "", "test4", Engine.Redshift)
 
-    a1r = ApplyDeltas(e1, "test1", DBType.Redshift)
-    a1a = ApplyDeltas(e1, "test1", DBType.Athena)
-    a2r = ApplyDeltas(e2, "test2", DBType.Redshift)
-    a2a = ApplyDeltas(e2, "test2", DBType.Athena)
-    a3r = ApplyDeltas(t1, "test3", DBType.Redshift)
-    a3a = ApplyDeltas(t1, "test3", DBType.Athena)
-    a4r = ApplyDeltas(t2, "test4", DBType.Redshift)
-    a4a = ApplyDeltas(t2, "test4", DBType.Athena)
+    a1r = ApplyDeltas(e1, "test1", Engine.Redshift)
+    a1a = ApplyDeltas(e1, "test1", Engine.Athena)
+    a2r = ApplyDeltas(e2, "test2", Engine.Redshift)
+    a2a = ApplyDeltas(e2, "test2", Engine.Athena)
+    a3r = ApplyDeltas(t1, "test3", Engine.Redshift)
+    a3a = ApplyDeltas(t1, "test3", Engine.Athena)
+    a4r = ApplyDeltas(t2, "test4", Engine.Redshift)
+    a4a = ApplyDeltas(t2, "test4", Engine.Athena)
 
     all_ops = [e1, e2, t1, t2, a1r, a1a, a2r, a2a, a3r, a3a, a4r, a4a]
     plan = LogicalDataSyncPlan(all_ops, [e1, e2])
@@ -67,7 +67,7 @@ def test_propagation():
 
 def test_pruning_simple():
     e = ExtractDeltas("test")
-    a = ApplyDeltas(e, "test2", DBType.Aurora)
+    a = ApplyDeltas(e, "test2", Engine.Aurora)
     plan = LogicalDataSyncPlan([e, a], [e])
     plan.reset_definitely_empty()
     e.set_definitely_empty(True)
@@ -81,17 +81,17 @@ def test_pruning_simple():
 def test_pruning():
     e1 = ExtractDeltas("test1")
     e2 = ExtractDeltas("test2")
-    t1 = TransformDeltas([e1, e2], "", "test3", DBType.Redshift)
-    t2 = TransformDeltas([t1], "", "test4", DBType.Redshift)
+    t1 = TransformDeltas([e1, e2], "", "test3", Engine.Redshift)
+    t2 = TransformDeltas([t1], "", "test4", Engine.Redshift)
 
-    a1r = ApplyDeltas(e1, "test1", DBType.Redshift)
-    a1a = ApplyDeltas(e1, "test1", DBType.Athena)
-    a2r = ApplyDeltas(e2, "test2", DBType.Redshift)
-    a2a = ApplyDeltas(e2, "test2", DBType.Athena)
-    a3r = ApplyDeltas(t1, "test3", DBType.Redshift)
-    a3a = ApplyDeltas(t1, "test3", DBType.Athena)
-    a4r = ApplyDeltas(t2, "test4", DBType.Redshift)
-    a4a = ApplyDeltas(t2, "test4", DBType.Athena)
+    a1r = ApplyDeltas(e1, "test1", Engine.Redshift)
+    a1a = ApplyDeltas(e1, "test1", Engine.Athena)
+    a2r = ApplyDeltas(e2, "test2", Engine.Redshift)
+    a2a = ApplyDeltas(e2, "test2", Engine.Athena)
+    a3r = ApplyDeltas(t1, "test3", Engine.Redshift)
+    a3a = ApplyDeltas(t1, "test3", Engine.Athena)
+    a4r = ApplyDeltas(t2, "test4", Engine.Redshift)
+    a4a = ApplyDeltas(t2, "test4", Engine.Athena)
 
     all_ops = [e1, e2, t1, t2, a1r, a1a, a2r, a2a, a3r, a3a, a4r, a4a]
     plan = LogicalDataSyncPlan(all_ops, [e1, e2])

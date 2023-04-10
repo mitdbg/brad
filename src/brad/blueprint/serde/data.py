@@ -1,6 +1,6 @@
 from brad.blueprint.data import DataBlueprint
 from brad.blueprint.data.table import Column, Table
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 
 import brad.proto_gen.blueprint_pb2 as b
 
@@ -52,12 +52,12 @@ def _table_column_to_proto(col: Column) -> b.TableColumn:
     )
 
 
-def _location_to_proto(engine: DBType) -> b.Engine:
-    if engine == DBType.Aurora:
+def _location_to_proto(engine: Engine) -> b.Engine:
+    if engine == Engine.Aurora:
         return b.Engine.AURORA  # type: ignore
-    elif engine == DBType.Redshift:
+    elif engine == Engine.Redshift:
         return b.Engine.REDSHIFT  # type: ignore
-    elif engine == DBType.Athena:
+    elif engine == Engine.Athena:
         return b.Engine.ATHENA  # type: ignore
     else:
         return b.Engine.UNKNOWN  # type: ignore
@@ -80,12 +80,12 @@ def _table_column_from_proto(col: b.TableColumn) -> Column:
     return Column(name=col.name, data_type=col.data_type, is_primary=col.is_primary)
 
 
-def _location_from_proto(engine: b.Engine) -> DBType:
+def _location_from_proto(engine: b.Engine) -> Engine:
     if engine == b.Engine.AURORA:  # type: ignore
-        return DBType.Aurora
+        return Engine.Aurora
     elif engine == b.Engine.REDSHIFT:  # type: ignore
-        return DBType.Redshift
+        return Engine.Redshift
     elif engine == b.Engine.ATHENA:  # type: ignore
-        return DBType.Athena
+        return Engine.Athena
     else:
         raise RuntimeError("Unsupported data location {}".format(str(engine)))

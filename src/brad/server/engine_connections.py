@@ -3,7 +3,7 @@ import aioodbc
 import pyodbc
 from typing import Optional
 
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 
 logger = logging.getLogger(__name__)
@@ -32,17 +32,17 @@ class EngineConnections:
         )
         logger.debug("Connecting to Athena...")
         athena = await aioodbc.connect(
-            dsn=config.get_odbc_connection_string(DBType.Athena, schema_name),
+            dsn=config.get_odbc_connection_string(Engine.Athena, schema_name),
             autocommit=autocommit,
         )
         logger.debug("Connecting to Aurora...")
         aurora = await aioodbc.connect(
-            dsn=config.get_odbc_connection_string(DBType.Aurora, schema_name),
+            dsn=config.get_odbc_connection_string(Engine.Aurora, schema_name),
             autocommit=autocommit,
         )
         logger.debug("Connecting to Redshift...")
         redshift = await aioodbc.connect(
-            dsn=config.get_odbc_connection_string(DBType.Redshift, schema_name),
+            dsn=config.get_odbc_connection_string(Engine.Redshift, schema_name),
             autocommit=autocommit,
         )
         await redshift.execute("SET enable_result_cache_for_session = off")
@@ -66,17 +66,17 @@ class EngineConnections:
         )
         logger.debug("Connecting to Athena...")
         athena = pyodbc.connect(
-            config.get_odbc_connection_string(DBType.Athena, schema_name),
+            config.get_odbc_connection_string(Engine.Athena, schema_name),
             autocommit=autocommit,
         )
         logger.debug("Connecting to Aurora...")
         aurora = pyodbc.connect(
-            config.get_odbc_connection_string(DBType.Aurora, schema_name),
+            config.get_odbc_connection_string(Engine.Aurora, schema_name),
             autocommit=autocommit,
         )
         logger.debug("Connecting to Redshift...")
         redshift = pyodbc.connect(
-            config.get_odbc_connection_string(DBType.Redshift, schema_name),
+            config.get_odbc_connection_string(Engine.Redshift, schema_name),
             autocommit=autocommit,
         )
         redshift.execute("SET enable_result_cache_for_session = off")
@@ -93,12 +93,12 @@ class EngineConnections:
     def schema_name(self) -> Optional[str]:
         return self._schema_name
 
-    def get_connection(self, db: DBType):
-        if db == DBType.Athena:
+    def get_connection(self, db: Engine):
+        if db == Engine.Athena:
             return self._athena
-        elif db == DBType.Aurora:
+        elif db == Engine.Aurora:
             return self._aurora
-        elif db == DBType.Redshift:
+        elif db == Engine.Redshift:
             return self._redshift
         else:
             raise AssertionError("Unsupported database type: " + str(db))

@@ -2,7 +2,7 @@ import logging
 
 from .operator import Operator
 from brad.data_sync.execution.context import ExecutionContext
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class LoadFromS3(Operator):
     Loads data (stored on S3) into a table on an engine.
     """
 
-    def __init__(self, table_name: str, relative_s3_path: str, engine: DBType) -> None:
+    def __init__(self, table_name: str, relative_s3_path: str, engine: Engine) -> None:
         """
         NOTE: All S3 paths are relative to the extract path, specified in the
         configuration.
@@ -57,9 +57,9 @@ class LoadFromS3(Operator):
         )
 
     async def execute(self, ctx: ExecutionContext) -> "Operator":
-        if self._engine == DBType.Aurora:
+        if self._engine == Engine.Aurora:
             return await self._execute_aurora(ctx)
-        elif self._engine == DBType.Redshift:
+        elif self._engine == Engine.Redshift:
             return await self._execute_redshift(ctx)
         else:
             # N.B. Athena is not supported.

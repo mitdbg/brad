@@ -1,7 +1,7 @@
 import logging
 import pyodbc
 
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.server.data_blueprint_manager import DataBlueprintManager
 from brad.server.engine_connections import EngineConnections
@@ -36,9 +36,9 @@ def drop_schema(args):
 
     # 3. Connect to the underlying engines without an explicit database.
     cxns = EngineConnections.connect_sync(config, autocommit=True)
-    redshift = cxns.get_connection(DBType.Redshift).cursor()
-    aurora = cxns.get_connection(DBType.Aurora).cursor()
-    athena = cxns.get_connection(DBType.Athena).cursor()
+    redshift = cxns.get_connection(Engine.Redshift).cursor()
+    aurora = cxns.get_connection(Engine.Aurora).cursor()
+    athena = cxns.get_connection(Engine.Athena).cursor()
 
     # 4. Drop the underlying "databases" if they exist.
     athena.execute("DROP DATABASE IF EXISTS {} CASCADE".format(args.schema_name))

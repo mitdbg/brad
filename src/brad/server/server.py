@@ -7,7 +7,7 @@ import grpc
 import pyodbc
 
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.routing import Router
@@ -40,11 +40,11 @@ class BradServer(BradInterface):
         if routing_policy == RoutingPolicy.Default:
             self._router: Router = LocationAwareRoundRobin(self._data_blueprint_mgr)
         elif routing_policy == RoutingPolicy.AlwaysAthena:
-            self._router = AlwaysOneRouter(DBType.Athena)
+            self._router = AlwaysOneRouter(Engine.Athena)
         elif routing_policy == RoutingPolicy.AlwaysAurora:
-            self._router = AlwaysOneRouter(DBType.Aurora)
+            self._router = AlwaysOneRouter(Engine.Aurora)
         elif routing_policy == RoutingPolicy.AlwaysRedshift:
-            self._router = AlwaysOneRouter(DBType.Redshift)
+            self._router = AlwaysOneRouter(Engine.Redshift)
         else:
             raise RuntimeError(
                 "Unsupported routing policy: {}".format(str(routing_policy))

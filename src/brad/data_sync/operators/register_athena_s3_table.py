@@ -4,7 +4,7 @@ from typing import List
 from .operator import Operator
 from brad.blueprint.data.table import Column
 from brad.blueprint.sql_gen.table import comma_separated_column_names_and_types
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.data_sync.execution.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class RegisterAthenaS3Table(Operator):
         query = _REGISTER_TABLE_TEMPLATE.format(
             table_name=self._table_name,
             columns=comma_separated_column_names_and_types(
-                self._columns, DBType.Athena
+                self._columns, Engine.Athena
             ),
             s3_bucket=ctx.s3_bucket(),
             s3_path="{}{}".format(ctx.s3_path(), self._relative_s3_path),

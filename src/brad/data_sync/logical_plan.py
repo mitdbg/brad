@@ -2,11 +2,11 @@ import sys
 from collections import deque
 from typing import List, Dict
 
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 
 
 class LogicalDataSyncOperator:
-    def __init__(self, table_name: str, engine: DBType) -> None:
+    def __init__(self, table_name: str, engine: Engine) -> None:
         self._dependees: List["LogicalDataSyncOperator"] = []
         self._table_name = table_name
         self._engine = engine
@@ -18,7 +18,7 @@ class LogicalDataSyncOperator:
     def table_name(self) -> str:
         return self._table_name
 
-    def engine(self) -> DBType:
+    def engine(self) -> Engine:
         """The engine associated with this operator."""
         return self._engine
 
@@ -169,12 +169,12 @@ class ExtractDeltas(LogicalDataSyncOperator):
     """
     Extract the deltas from the specified table.
 
-    The location is implicitly `DBType.Aurora` since we only support delta
+    The location is implicitly `Engine.Aurora` since we only support delta
     extraction on Aurora.
     """
 
     def __init__(self, table_name: str) -> None:
-        super().__init__(table_name, DBType.Aurora)
+        super().__init__(table_name, Engine.Aurora)
 
     def dependencies(self) -> List[LogicalDataSyncOperator]:
         return []
@@ -194,7 +194,7 @@ class TransformDeltas(LogicalDataSyncOperator):
         sources: List[LogicalDataSyncOperator],
         transform_text: str,
         table_name: str,
-        engine: DBType,
+        engine: Engine,
     ):
         super().__init__(table_name, engine)
         self._sources = sources
@@ -234,7 +234,7 @@ class ApplyDeltas(LogicalDataSyncOperator):
     """
 
     def __init__(
-        self, source: LogicalDataSyncOperator, table_name: str, location: DBType
+        self, source: LogicalDataSyncOperator, table_name: str, location: Engine
     ):
         super().__init__(table_name, location)
         self._source = source

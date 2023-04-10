@@ -2,7 +2,7 @@ import logging
 
 from .operator import Operator
 from brad.blueprint.sql_gen.table import comma_separated_column_names
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.config.strings import insert_delta_table_name, delete_delta_table_name
 from brad.data_sync.execution.context import ExecutionContext
 
@@ -21,7 +21,7 @@ class AdjustDeltas(Operator):
     Aurora writes to the deletes delta as well.
     """
 
-    def __init__(self, table_name: str, engine: DBType) -> None:
+    def __init__(self, table_name: str, engine: Engine) -> None:
         super().__init__()
         self._table_name = table_name
         self._engine = engine
@@ -45,15 +45,15 @@ class AdjustDeltas(Operator):
             pkey_cols=comma_separated_column_names(table.primary_key),
         )
 
-        if self._engine == DBType.Aurora:
+        if self._engine == Engine.Aurora:
             logger.debug("Running on Aurora: %s", query)
             aurora = await ctx.aurora()
             await aurora.execute(query)
-        elif self._engine == DBType.Redshift:
+        elif self._engine == Engine.Redshift:
             logger.debug("Running on Redshift: %s", query)
             redshift = await ctx.redshift()
             await redshift.execute(query)
-        elif self._engine == DBType.Athena:
+        elif self._engine == Engine.Athena:
             logger.debug("Running on Athena: %s", query)
             athena = await ctx.athena()
             await athena.execute(query)

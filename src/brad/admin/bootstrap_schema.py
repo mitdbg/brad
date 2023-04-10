@@ -2,7 +2,7 @@ import logging
 
 from brad.blueprint.data.user import UserProvidedDataBlueprint
 from brad.blueprint.sql_gen.table import TableSqlGenerator
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.planner.data import bootstrap_data_blueprint
 from brad.server.data_blueprint_manager import DataBlueprintManager
@@ -45,9 +45,9 @@ def bootstrap_schema(args):
     # schema.
     cxns = EngineConnections.connect_sync(config, autocommit=True)
     create_schema = "CREATE DATABASE {}".format(blueprint.schema_name)
-    cxns.get_connection(DBType.Aurora).cursor().execute(create_schema)
-    cxns.get_connection(DBType.Athena).cursor().execute(create_schema)
-    cxns.get_connection(DBType.Redshift).cursor().execute(create_schema)
+    cxns.get_connection(Engine.Aurora).cursor().execute(create_schema)
+    cxns.get_connection(Engine.Athena).cursor().execute(create_schema)
+    cxns.get_connection(Engine.Redshift).cursor().execute(create_schema)
     cxns.close_sync()
     del cxns
 
@@ -55,8 +55,8 @@ def bootstrap_schema(args):
     cxns = EngineConnections.connect_sync(
         config, schema_name=blueprint.schema_name, autocommit=False
     )
-    redshift = cxns.get_connection(DBType.Redshift).cursor()
-    aurora = cxns.get_connection(DBType.Aurora).cursor()
+    redshift = cxns.get_connection(Engine.Redshift).cursor()
+    aurora = cxns.get_connection(Engine.Aurora).cursor()
 
     # 6. Set up the underlying tables.
     sql_gen = TableSqlGenerator(config, blueprint)

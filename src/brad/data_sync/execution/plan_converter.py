@@ -3,7 +3,7 @@ from collections import deque
 from typing import Dict, List, Deque, Optional, Tuple
 
 from brad.blueprint.data import DataBlueprint
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.config.strings import insert_delta_table_name, delete_delta_table_name
 from brad.data_sync.logical_plan import (
     LogicalDataSyncPlan,
@@ -44,7 +44,7 @@ class PlanConverter:
         self._blueprint = blueprint
 
         self._intermediate_s3_objects: List[str] = []
-        self._intermediate_tables: List[Tuple[str, DBType]] = []
+        self._intermediate_tables: List[Tuple[str, Engine]] = []
         self._processing_ops: Dict[LogicalDataSyncOperator, _ProcessingOp] = {}
         self._ready_to_process: Deque[_ProcessingOp] = deque()
 
@@ -54,7 +54,7 @@ class PlanConverter:
         self._no_dependees: List[Operator] = []
 
         # Map of all apply delta operators on a table located in an engine.
-        self._apply_deltas: Dict[Tuple[str, DBType], ApplyDeltas] = {}
+        self._apply_deltas: Dict[Tuple[str, Engine], ApplyDeltas] = {}
         # List of all transformation operators and their input tables.
         self._transform_inputs: List[Tuple[RunTransformation, List[str]]] = []
 
@@ -124,7 +124,7 @@ class PlanConverter:
         # operators that have no dependees. Ideally we only take a dependency on
         # the operators that use the tables being mentioned - but this is
         # simpler to implement.
-        to_drop: Dict[DBType, List[str]] = {}
+        to_drop: Dict[Engine, List[str]] = {}
         drop_ops: List[Operator] = []
         for table_name, engine in self._intermediate_tables:
             if engine not in to_drop:
@@ -280,7 +280,7 @@ class PlanConverter:
 
         # Create additional physical operators to "move" the deltas produced by
         # this op into the engines that are needed by the dependee operators.
-        to_dest: Dict[DBType, Optional[Operator]] = {}
+        to_dest: Dict[Engine, Optional[Operator]] = {}
         for dependee_pop in dependees:
             if isinstance(dependee_pop.logical_op, TransformDeltas) or isinstance(
                 dependee_pop.logical_op, LogicalApplyDeltas
@@ -361,7 +361,7 @@ class PlanConverter:
             isinstance(source_op.logical_op, ExtractDeltas)
             or isinstance(source_op.logical_op, EmptyDeltas)
         ) and (
-            dependee.logical_op.engine() == DBType.Redshift
+            dependee.logical_op.engine() == Engine.Redshift
             or isinstance(dependee.logical_op, TransformDeltas)
         )
 
@@ -388,7 +388,7 @@ class PlanConverter:
         self,
         source_op: "_ProcessingOp",
         source: Optional["_DeltaLocation"],
-        dest: DBType,
+        dest: Engine,
     ) -> List[Operator]:
         out_ops: List[Operator] = []
         table_name = source_op.logical_op.table_name()
@@ -397,39 +397,39 @@ class PlanConverter:
         id_table_name = insert_delta_table_name(table_name)
         dd_table_name = delete_delta_table_name(table_name)
 
-        if source == _DeltaLocation.S3Text and dest == DBType.Redshift:
+        if source == _DeltaLocation.S3Text and dest == Engine.Redshift:
             # 1. Create tables on Redshift
             # 2. Import from S3
             assert source_op.output_s3_location is not None
             c1 = CreateTempTable(
                 id_table_name,
                 table.columns,
-                engine=DBType.Redshift,
+                engine=Engine.Redshift,
             )
             c2 = CreateTempTable(
                 dd_table_name,
                 table.primary_key,
-                engine=DBType.Redshift,
+                engine=Engine.Redshift,
             )
             l1 = LoadFromS3(
                 id_table_name,
                 source_op.output_s3_location.writes_path().path_with_file(),
-                engine=DBType.Redshift,
+                engine=Engine.Redshift,
             )
             l2 = LoadFromS3(
                 dd_table_name,
                 source_op.output_s3_location.deletes_path().path_with_file(),
-                engine=DBType.Redshift,
+                engine=Engine.Redshift,
             )
             c2.add_dependency(c1)
             l1.add_dependency(c2)
             l2.add_dependency(l1)
             out_ops.extend([c1, c2, l1, l2])
             self._intermediate_tables.extend(
-                [(id_table_name, DBType.Redshift), (dd_table_name, DBType.Redshift)]
+                [(id_table_name, Engine.Redshift), (dd_table_name, Engine.Redshift)]
             )
 
-        elif source == _DeltaLocation.S3Text and dest == DBType.Athena:
+        elif source == _DeltaLocation.S3Text and dest == Engine.Athena:
             # 1. Register the S3 text data as Athena tables
             assert source_op.output_s3_location is not None
             r1 = RegisterAthenaS3Table(
@@ -445,16 +445,16 @@ class PlanConverter:
             r2.add_dependency(r1)
             out_ops.extend([r1, r2])
             self._intermediate_tables.extend(
-                [(id_table_name, DBType.Athena), (dd_table_name, DBType.Athena)]
+                [(id_table_name, Engine.Athena), (dd_table_name, Engine.Athena)]
             )
 
-        elif source == _DeltaLocation.Redshift and dest == DBType.Athena:
+        elif source == _DeltaLocation.Redshift and dest == Engine.Athena:
             # 1. Unload to S3
             # 2. Register Athena tables
             insert_s3_path = "redshift_unload/{}/inserts/".format(table_name)
             delete_s3_path = "redshift_unload/{}/deletes/".format(table_name)
-            u1 = UnloadToS3(id_table_name, insert_s3_path, engine=DBType.Redshift)
-            u2 = UnloadToS3(dd_table_name, delete_s3_path, engine=DBType.Redshift)
+            u1 = UnloadToS3(id_table_name, insert_s3_path, engine=Engine.Redshift)
+            u2 = UnloadToS3(dd_table_name, delete_s3_path, engine=Engine.Redshift)
             r1 = RegisterAthenaS3Table(id_table_name, table.columns, insert_s3_path)
             r2 = RegisterAthenaS3Table(dd_table_name, table.primary_key, delete_s3_path)
             u2.add_dependency(u1)
@@ -463,21 +463,21 @@ class PlanConverter:
             out_ops.extend([u1, u2, r1, r2])
             self._intermediate_s3_objects.extend([insert_s3_path, delete_s3_path])
             self._intermediate_tables.extend(
-                [(id_table_name, DBType.Athena), (dd_table_name, DBType.Athena)]
+                [(id_table_name, Engine.Athena), (dd_table_name, Engine.Athena)]
             )
 
-        elif source == _DeltaLocation.Redshift and dest == DBType.Aurora:
+        elif source == _DeltaLocation.Redshift and dest == Engine.Aurora:
             # 1. Unload to S3
             # 2. Create Aurora tables
             # 3. Import from S3
             insert_s3_path = "redshift_unload/{}/inserts/table.tbl".format(table_name)
             delete_s3_path = "redshift_unload/{}/deletes/table.tbl".format(table_name)
-            u1 = UnloadToS3(id_table_name, insert_s3_path, engine=DBType.Redshift)
-            u2 = UnloadToS3(dd_table_name, delete_s3_path, engine=DBType.Redshift)
-            c1 = CreateTempTable(id_table_name, table.columns, engine=DBType.Aurora)
-            c2 = CreateTempTable(dd_table_name, table.primary_key, engine=DBType.Aurora)
-            l1 = LoadFromS3(id_table_name, insert_s3_path, engine=DBType.Aurora)
-            l2 = LoadFromS3(dd_table_name, delete_s3_path, engine=DBType.Aurora)
+            u1 = UnloadToS3(id_table_name, insert_s3_path, engine=Engine.Redshift)
+            u2 = UnloadToS3(dd_table_name, delete_s3_path, engine=Engine.Redshift)
+            c1 = CreateTempTable(id_table_name, table.columns, engine=Engine.Aurora)
+            c2 = CreateTempTable(dd_table_name, table.primary_key, engine=Engine.Aurora)
+            l1 = LoadFromS3(id_table_name, insert_s3_path, engine=Engine.Aurora)
+            l2 = LoadFromS3(dd_table_name, delete_s3_path, engine=Engine.Aurora)
             u2.add_dependency(u1)
             c1.add_dependency(u2)
             c2.add_dependency(c1)
@@ -486,46 +486,46 @@ class PlanConverter:
             out_ops.extend([u1, u2, l1, l2, c1, c2])
             self._intermediate_s3_objects.extend([insert_s3_path, delete_s3_path])
             self._intermediate_tables.extend(
-                [(id_table_name, DBType.Aurora), (dd_table_name, DBType.Aurora)]
+                [(id_table_name, Engine.Aurora), (dd_table_name, Engine.Aurora)]
             )
 
-        elif source is None and dest == DBType.Redshift:
+        elif source is None and dest == Engine.Redshift:
             # Create empty delta tables on the destination.
             assert isinstance(source_op.logical_op, EmptyDeltas)
-            c1 = CreateTempTable(id_table_name, table.columns, engine=DBType.Redshift)
+            c1 = CreateTempTable(id_table_name, table.columns, engine=Engine.Redshift)
             c2 = CreateTempTable(
-                dd_table_name, table.primary_key, engine=DBType.Redshift
+                dd_table_name, table.primary_key, engine=Engine.Redshift
             )
             c2.add_dependency(c1)
             out_ops.extend([c1, c2])
             self._intermediate_tables.extend(
-                [(id_table_name, DBType.Redshift), (dd_table_name, DBType.Redshift)]
-            )
-
-        elif source is None and dest == DBType.Athena:
-            assert isinstance(source_op.logical_op, EmptyDeltas)
-            c1 = CreateTempTable(id_table_name, table.columns, engine=DBType.Athena)
-            c2 = CreateTempTable(dd_table_name, table.primary_key, engine=DBType.Athena)
-            c2.add_dependency(c1)
-            out_ops.extend([c1, c2])
-            self._intermediate_tables.extend(
-                [(id_table_name, DBType.Athena), (dd_table_name, DBType.Athena)]
+                [(id_table_name, Engine.Redshift), (dd_table_name, Engine.Redshift)]
             )
 
-        elif source is None and dest == DBType.Aurora:
+        elif source is None and dest == Engine.Athena:
             assert isinstance(source_op.logical_op, EmptyDeltas)
-            c1 = CreateTempTable(id_table_name, table.columns, engine=DBType.Aurora)
-            c2 = CreateTempTable(dd_table_name, table.primary_key, engine=DBType.Aurora)
+            c1 = CreateTempTable(id_table_name, table.columns, engine=Engine.Athena)
+            c2 = CreateTempTable(dd_table_name, table.primary_key, engine=Engine.Athena)
             c2.add_dependency(c1)
             out_ops.extend([c1, c2])
             self._intermediate_tables.extend(
-                [(id_table_name, DBType.Aurora), (dd_table_name, DBType.Aurora)]
+                [(id_table_name, Engine.Athena), (dd_table_name, Engine.Athena)]
+            )
+
+        elif source is None and dest == Engine.Aurora:
+            assert isinstance(source_op.logical_op, EmptyDeltas)
+            c1 = CreateTempTable(id_table_name, table.columns, engine=Engine.Aurora)
+            c2 = CreateTempTable(dd_table_name, table.primary_key, engine=Engine.Aurora)
+            c2.add_dependency(c1)
+            out_ops.extend([c1, c2])
+            self._intermediate_tables.extend(
+                [(id_table_name, Engine.Aurora), (dd_table_name, Engine.Aurora)]
             )
 
         elif (
-            (source == _DeltaLocation.Aurora and dest == DBType.Aurora)
-            or (source == _DeltaLocation.Redshift and dest == DBType.Redshift)
-            or (source == _DeltaLocation.S3AthenaIceberg and dest == DBType.Athena)
+            (source == _DeltaLocation.Aurora and dest == Engine.Aurora)
+            or (source == _DeltaLocation.Redshift and dest == Engine.Redshift)
+            or (source == _DeltaLocation.S3AthenaIceberg and dest == Engine.Athena)
         ):
             # No movement ops needed.
             pass
@@ -554,12 +554,12 @@ class _DeltaLocation(enum.Enum):
     S3Text = "s3_text"
 
     @classmethod
-    def from_engine(cls, engine: DBType) -> "_DeltaLocation":
-        if engine == DBType.Aurora:
+    def from_engine(cls, engine: Engine) -> "_DeltaLocation":
+        if engine == Engine.Aurora:
             return _DeltaLocation.Aurora
-        elif engine == DBType.Athena:
+        elif engine == Engine.Athena:
             return _DeltaLocation.S3AthenaIceberg
-        elif engine == DBType.Redshift:
+        elif engine == Engine.Redshift:
             return _DeltaLocation.Redshift
         else:
             raise AssertionError

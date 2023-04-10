@@ -1,7 +1,7 @@
 import yaml
 from typing import Optional
 
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.routing.policy import RoutingPolicy
 
 
@@ -24,12 +24,12 @@ class ConfigFile:
 
     @property
     def athena_s3_data_path(self) -> str:
-        return _ensure_slash_terminated(self._raw[DBType.Athena]["s3_data_path"])
+        return _ensure_slash_terminated(self._raw[Engine.Athena]["s3_data_path"])
 
     @property
     def redshift_s3_iam_role(self) -> str:
         """Needed when importing data from S3."""
-        return self._raw[DBType.Redshift]["s3_iam_role"]
+        return self._raw[Engine.Redshift]["s3_iam_role"]
 
     @property
     def aws_access_key(self) -> str:
@@ -70,12 +70,12 @@ class ConfigFile:
     def routing_policy(self) -> RoutingPolicy:
         return RoutingPolicy.from_str(self._raw["routing_policy"])
 
-    def get_odbc_connection_string(self, db: DBType, schema_name: Optional[str]) -> str:
+    def get_odbc_connection_string(self, db: Engine, schema_name: Optional[str]) -> str:
         if db not in self._raw:
             raise AssertionError("Unhandled database type: " + str(db))
 
         config = self._raw[db]
-        if db is DBType.Athena:
+        if db is Engine.Athena:
             cstr = "Driver={{{}}};AwsRegion={};S3OutputLocation={};AuthenticationType=IAM Credentials;UID={};PWD={};".format(
                 config["odbc_driver"],
                 config["aws_region"],
@@ -87,7 +87,7 @@ class ConfigFile:
                 cstr += "Schema={};".format(schema_name)
             return cstr
 
-        elif db is DBType.Aurora or db is DBType.Redshift:
+        elif db is Engine.Aurora or db is Engine.Redshift:
             cstr = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};".format(
                 config["odbc_driver"],
                 config["host"],
@@ -97,7 +97,7 @@ class ConfigFile:
             )
             if schema_name is not None:
                 cstr += "Database={};".format(schema_name)
-            elif db is DBType.Redshift:
+            elif db is Engine.Redshift:
                 # Redshift requires a database name to be specified. As far as
                 # we know, there is always a `dev` database. We connect without
                 # a database when we are bootstrapping a new database.
