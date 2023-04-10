@@ -1,12 +1,12 @@
-from brad.blueprint.data.user import UserProvidedDataBlueprint
-from brad.planner.data import bootstrap_data_blueprint
-from brad.blueprint.serde.data import (
-    serialize_data_blueprint,
-    deserialize_data_blueprint,
+from brad.blueprint.user import UserProvidedBlueprint
+from brad.planner.data import bootstrap_blueprint
+from brad.blueprint.serde import (
+    serialize_blueprint,
+    deserialize_blueprint,
 )
 
 
-def test_data_blueprint_serde():
+def test_blueprint_serde():
     table_config = """
       schema_name: test
       tables:
@@ -28,12 +28,10 @@ def test_data_blueprint_serde():
               data_type: BIGINT
               primary_key: true
     """
-    user = UserProvidedDataBlueprint.load_from_yaml_str(table_config)
-    blueprint_orig = bootstrap_data_blueprint(user)
-    blueprint_after = deserialize_data_blueprint(
-        serialize_data_blueprint(blueprint_orig)
-    )
+    user = UserProvidedBlueprint.load_from_yaml_str(table_config)
+    blueprint_orig = bootstrap_blueprint(user)
+    blueprint_after = deserialize_blueprint(serialize_blueprint(blueprint_orig))
 
     # Sanity check assertions.
-    assert blueprint_orig.schema_name == blueprint_after.schema_name
-    assert len(blueprint_orig.tables) == len(blueprint_after.tables)
+    assert blueprint_orig.schema_name() == blueprint_after.schema_name()
+    assert len(blueprint_orig.tables()) == len(blueprint_after.tables())

@@ -1,4 +1,4 @@
-from brad.blueprint.data.table import Table
+from brad.blueprint.table import Table
 
 
 def source_table_name(table: str | Table) -> str:

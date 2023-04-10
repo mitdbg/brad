@@ -4,34 +4,33 @@ from .table import Column, Table
 from typing import List, Set
 
 
-class UserProvidedDataBlueprint:
+class UserProvidedBlueprint:
     """
-    Represents a "user-provided" logical data blueprint. This data blueprint
-    contains a list of the tables, their schemas, dependencies, and transforms
-    between the tables.
+    Represents a "user-provided" logical blueprint. This data blueprint contains
+    a list of the tables, their schemas, dependencies, and transforms between
+    the tables.
 
     BRAD's planner will convert this user-provided logical blueprint into a
-    physical data blueprint (contains details about table placement and
-    replication).
+    physical blueprint (contains details about table placement and replication).
     """
 
     @classmethod
-    def load_from_yaml_file(cls, path: str) -> "UserProvidedDataBlueprint":
+    def load_from_yaml_file(cls, path: str) -> "UserProvidedBlueprint":
         with open(path, "r", encoding="UTF-8") as file:
             raw_yaml = yaml.load(file, Loader=yaml.Loader)
         return cls._load_from_raw_yaml(raw_yaml)
 
     @classmethod
-    def load_from_yaml_str(cls, yaml_str: str) -> "UserProvidedDataBlueprint":
+    def load_from_yaml_str(cls, yaml_str: str) -> "UserProvidedBlueprint":
         return cls._load_from_raw_yaml(yaml.load(yaml_str, Loader=yaml.Loader))
 
     @classmethod
-    def _load_from_raw_yaml(cls, raw_yaml) -> "UserProvidedDataBlueprint":
+    def _load_from_raw_yaml(cls, raw_yaml) -> "UserProvidedBlueprint":
         tables: List[Table] = []
         for raw_table in raw_yaml["tables"]:
             name = raw_table["table_name"]
             columns = list(
-                map(UserProvidedDataBlueprint._parse_column, raw_table["columns"])
+                map(UserProvidedBlueprint._parse_column, raw_table["columns"])
             )
             table_deps: List[str] = (
                 list(raw_table["dependencies"]) if "dependencies" in raw_table else []

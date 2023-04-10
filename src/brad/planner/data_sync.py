@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 
-from brad.blueprint.data.blueprint import DataBlueprint
-from brad.blueprint.data.table import Table
+from brad.blueprint.blueprint import Blueprint
+from brad.blueprint.table import Table
 from brad.config.engine import Engine
 from brad.data_sync.logical_plan import (
     LogicalDataSyncPlan,
@@ -12,7 +12,7 @@ from brad.data_sync.logical_plan import (
 )
 
 
-def make_logical_data_sync_plan(blueprint: DataBlueprint) -> LogicalDataSyncPlan:
+def make_logical_data_sync_plan(blueprint: Blueprint) -> LogicalDataSyncPlan:
     # For each table, the operator whose output is the table's deltas.
     delta_operators: Dict[str, Optional[LogicalDataSyncOperator]] = {}
     all_operators: List[LogicalDataSyncOperator] = []
@@ -118,7 +118,7 @@ def make_logical_data_sync_plan(blueprint: DataBlueprint) -> LogicalDataSyncPlan
         return delta_source_for_this_table
 
     # Actually process the tables.
-    for table in blueprint.tables:
+    for table in blueprint.tables():
         process_table(table)
 
     # Filter the operator list to remove operators with no dependencies and no

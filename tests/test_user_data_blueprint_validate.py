@@ -1,6 +1,6 @@
 import pytest
 
-from brad.blueprint.data.user import UserProvidedDataBlueprint
+from brad.blueprint.user import UserProvidedBlueprint
 
 
 def test_validate_ok():
@@ -25,7 +25,7 @@ def test_validate_ok():
               data_type: BIGINT
               primary_key: true
     """
-    user = UserProvidedDataBlueprint.load_from_yaml_str(table_config)
+    user = UserProvidedBlueprint.load_from_yaml_str(table_config)
     user.validate()
 
 
@@ -41,7 +41,7 @@ def test_dependency_on_undeclared_table():
           dependencies:
             - table2
     """
-    user = UserProvidedDataBlueprint.load_from_yaml_str(table_config)
+    user = UserProvidedBlueprint.load_from_yaml_str(table_config)
     with pytest.raises(RuntimeError) as ex:
         user.validate()
         assert "undeclared" in str(ex)
@@ -59,7 +59,7 @@ def test_circular_1():
           dependencies:
             - table1
     """
-    user = UserProvidedDataBlueprint.load_from_yaml_str(table_config)
+    user = UserProvidedBlueprint.load_from_yaml_str(table_config)
     with pytest.raises(RuntimeError) as ex:
         user.validate()
         assert "circular" in str(ex)
@@ -85,7 +85,7 @@ def test_circular_2():
           dependencies:
             - table1
     """
-    user = UserProvidedDataBlueprint.load_from_yaml_str(table_config)
+    user = UserProvidedBlueprint.load_from_yaml_str(table_config)
     with pytest.raises(RuntimeError) as ex:
         user.validate()
         assert "circular" in str(ex)
@@ -119,7 +119,7 @@ def test_circular_3():
           dependencies:
             - table2
     """
-    user = UserProvidedDataBlueprint.load_from_yaml_str(table_config)
+    user = UserProvidedBlueprint.load_from_yaml_str(table_config)
     with pytest.raises(RuntimeError) as ex:
         user.validate()
         assert "circular" in str(ex)

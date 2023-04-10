@@ -1,7 +1,7 @@
 from typing import List, Tuple
 
-from brad.blueprint.data import DataBlueprint
-from brad.blueprint.data.table import Column, Table
+from brad.blueprint import Blueprint
+from brad.blueprint.table import Column, Table
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.strings import (
@@ -28,7 +28,7 @@ from ._table_templates import (
 
 
 class TableSqlGenerator:
-    def __init__(self, config: ConfigFile, blueprint: DataBlueprint):
+    def __init__(self, config: ConfigFile, blueprint: Blueprint):
         self._config = config
         self._blueprint = blueprint
 
@@ -41,7 +41,7 @@ class TableSqlGenerator:
         """
 
         if location == Engine.Aurora:
-            if table.name in self._blueprint.base_table_names:
+            if table.name in self._blueprint.base_table_names():
                 # This table needs to support incremental extraction. We need to
                 # create several additional structures to support this extraction.
                 columns_with_types = comma_separated_column_names_and_types(
@@ -186,7 +186,7 @@ class TableSqlGenerator:
             + AURORA_EXTRACT_PROGRESS_TABLE_NAME
             + " (table_name, next_extract_seq, next_shadow_extract_seq) VALUES ('{table_name}', 0, 0)"
         )
-        for base_table_name in self._blueprint.base_table_names:
+        for base_table_name in self._blueprint.base_table_names():
             base_table = self._blueprint.get_table(base_table_name)
             if Engine.Aurora not in base_table.locations:
                 continue
