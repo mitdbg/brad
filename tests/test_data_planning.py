@@ -1,5 +1,5 @@
 from brad.blueprint.data.user import UserProvidedDataBlueprint
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.planner.data import bootstrap_data_blueprint
 
 
@@ -37,21 +37,21 @@ def test_boostrap_data_blueprint():
 
     table1 = blueprint.get_table("table1")
     assert len(table1.locations) == 2
-    assert DBType.Aurora in table1.locations
+    assert Engine.Aurora in table1.locations
     # Our heuristic replicates tables that are dependencies of others on
     # Redshift.
-    assert DBType.Redshift in table1.locations
+    assert Engine.Redshift in table1.locations
 
     table2 = blueprint.get_table("table2")
     assert len(table2.locations) == 2
-    assert DBType.Redshift in table2.locations
-    assert DBType.Athena in table2.locations
+    assert Engine.Redshift in table2.locations
+    assert Engine.Athena in table2.locations
 
     table3 = blueprint.get_table("table3")
     assert len(table3.locations) == 3
-    assert DBType.Aurora in table3.locations
-    assert DBType.Redshift in table3.locations
-    assert DBType.Athena in table3.locations
+    assert Engine.Aurora in table3.locations
+    assert Engine.Redshift in table3.locations
+    assert Engine.Athena in table3.locations
 
     # Table 1 is a base table and it is only present on Aurora.
     assert len(table1.table_dependencies) == 0

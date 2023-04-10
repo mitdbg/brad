@@ -3,7 +3,7 @@ from typing import Dict
 from brad.blueprint.data import DataBlueprint
 from brad.blueprint.data.user import UserProvidedDataBlueprint
 from brad.blueprint.data.table import Table
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 
 
 def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> DataBlueprint:
@@ -41,17 +41,17 @@ def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> DataBlueprint:
         if len(table.table_dependencies) == 0:
             # Writes implicitly always originate on Aurora, so we will always
             # put a base table on Aurora.
-            table.locations.append(DBType.Aurora)
+            table.locations.append(Engine.Aurora)
 
             # Other tables may depend on this table. So we also replicate it on
             # Redshift since we currently run transformations on Redshift.
-            table.locations.append(DBType.Redshift)
+            table.locations.append(Engine.Redshift)
 
             # If we reach this spot and this flag is true, then no other tables
             # are dependent on this table. In this case, we also replicate it across
             # Athena
             if expect_standalone_base_table:
-                table.locations.append(DBType.Athena)
+                table.locations.append(Engine.Athena)
 
             is_base_table[table.name] = True
             return
@@ -62,8 +62,8 @@ def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> DataBlueprint:
             process_table(tables_by_name[dep_tbl_name], expect_standalone_base_table)
 
         # This table will be replicated on Redshift and S3.
-        table.locations.append(DBType.Redshift)
-        table.locations.append(DBType.Athena)
+        table.locations.append(Engine.Redshift)
+        table.locations.append(Engine.Athena)
 
         is_base_table[table.name] = False
 

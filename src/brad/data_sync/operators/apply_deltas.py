@@ -2,7 +2,7 @@ import logging
 from .operator import Operator
 
 from brad.blueprint.sql_gen.table import comma_separated_column_names
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.config.strings import delete_delta_table_name, insert_delta_table_name
 from brad.data_sync.execution.context import ExecutionContext
 
@@ -47,7 +47,7 @@ _ATHENA_MERGE_COMMAND = """
 
 class ApplyDeltas(Operator):
     def __init__(
-        self, onto_table_name: str, from_table_name: str, engine: DBType
+        self, onto_table_name: str, from_table_name: str, engine: Engine
     ) -> None:
         super().__init__()
         self._onto_table_name = onto_table_name
@@ -68,13 +68,13 @@ class ApplyDeltas(Operator):
         )
 
     async def execute(self, ctx: ExecutionContext) -> "Operator":
-        if self._engine == DBType.Aurora:
+        if self._engine == Engine.Aurora:
             aurora = await ctx.aurora()
             return await self._execute_aurora_redshift(ctx, aurora)
-        elif self._engine == DBType.Redshift:
+        elif self._engine == Engine.Redshift:
             redshift = await ctx.redshift()
             return await self._execute_aurora_redshift(ctx, redshift)
-        elif self._engine == DBType.Athena:
+        elif self._engine == Engine.Athena:
             return await self._execute_athena(ctx)
         else:
             raise RuntimeError("Unsupported engine {}".format(self._engine))

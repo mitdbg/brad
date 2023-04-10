@@ -3,7 +3,7 @@ from typing import List
 
 from .operator import Operator
 from brad.data_sync.execution.context import ExecutionContext
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ class DropTables(Operator):
     Drops tables on the given engine with the given names.
     """
 
-    def __init__(self, table_names: List[str], engine: DBType) -> None:
+    def __init__(self, table_names: List[str], engine: Engine) -> None:
         super().__init__()
         self._table_names = table_names
         self._engine = engine
@@ -32,21 +32,21 @@ class DropTables(Operator):
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         query_template = "DROP TABLE {}"
 
-        if self._engine == DBType.Aurora:
+        if self._engine == Engine.Aurora:
             for table in self._table_names:
                 query = query_template.format(table)
                 logger.debug("Running on Aurora: %s", query)
                 aurora = await ctx.aurora()
                 await aurora.execute(query)
 
-        elif self._engine == DBType.Redshift:
+        elif self._engine == Engine.Redshift:
             for table in self._table_names:
                 query = query_template.format(table)
                 logger.debug("Running on Redshift: %s", query)
                 redshift = await ctx.redshift()
                 await redshift.execute(query)
 
-        elif self._engine == DBType.Athena:
+        elif self._engine == Engine.Athena:
             for table in self._table_names:
                 query = query_template.format(table)
                 logger.debug("Running on Athena: %s", query)

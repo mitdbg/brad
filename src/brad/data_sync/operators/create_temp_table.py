@@ -5,7 +5,7 @@ from .operator import Operator
 from brad.data_sync.execution.context import ExecutionContext
 from brad.blueprint.data.table import Column
 from brad.blueprint.sql_gen.table import comma_separated_column_names_and_types
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class CreateTempTable(Operator):
     used to create temporary tables used during a data sync (e.g., to hold deltas).
     """
 
-    def __init__(self, table_name: str, columns: List[Column], engine: DBType) -> None:
+    def __init__(self, table_name: str, columns: List[Column], engine: Engine) -> None:
         super().__init__()
         self._table_name = table_name
         self._columns = columns
@@ -34,11 +34,11 @@ class CreateTempTable(Operator):
         )
 
     async def execute(self, ctx: ExecutionContext) -> "Operator":
-        if self._engine == DBType.Aurora:
+        if self._engine == Engine.Aurora:
             return await self._execute_aurora(ctx)
-        elif self._engine == DBType.Redshift:
+        elif self._engine == Engine.Redshift:
             return await self._execute_redshift(ctx)
-        elif self._engine == DBType.Athena:
+        elif self._engine == Engine.Athena:
             return await self._execute_athena(ctx)
         else:
             raise RuntimeError("Unsupported engine {}".format(self._engine))

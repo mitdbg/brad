@@ -1,7 +1,7 @@
 import logging
 
 from .operator import Operator
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.data_sync.execution.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ class RunTransformation(Operator):
     be set up.
     """
 
-    def __init__(self, transform: str, engine: DBType, for_table: str) -> None:
+    def __init__(self, transform: str, engine: Engine, for_table: str) -> None:
         super().__init__()
         self._transform = transform
         self._engine = engine
@@ -30,24 +30,24 @@ class RunTransformation(Operator):
             ]
         )
 
-    def engine(self) -> DBType:
+    def engine(self) -> Engine:
         return self._engine
 
     async def execute(self, ctx: ExecutionContext) -> "Operator":
         queries = self._transform.split(";")
         logger.debug("Will run %d queries as part of this transform.", len(queries))
 
-        if self._engine == DBType.Aurora:
+        if self._engine == Engine.Aurora:
             for query in queries:
                 logger.debug("Running transform query on Aurora: %s", query)
                 aurora = await ctx.aurora()
                 await aurora.execute(query)
-        elif self._engine == DBType.Redshift:
+        elif self._engine == Engine.Redshift:
             for query in queries:
                 logger.debug("Running transform query on Redshift: %s", query)
                 redshift = await ctx.redshift()
                 await redshift.execute(query)
-        elif self._engine == DBType.Athena:
+        elif self._engine == Engine.Athena:
             for query in queries:
                 logger.debug("Running transform query on Athena: %s", query)
                 athena = await ctx.athena()

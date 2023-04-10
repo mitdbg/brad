@@ -1,6 +1,6 @@
 from typing import Set, List
 
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.server.data_blueprint_manager import DataBlueprintManager
 from brad.routing import Router
 from brad.query_rep import QueryRep
@@ -16,13 +16,13 @@ class LocationAwareRoundRobin(Router):
         self._data_blueprint_mgr = data_blueprint_mgr
         self._curr_idx = 0
 
-    def engine_for(self, query: QueryRep) -> DBType:
+    def engine_for(self, query: QueryRep) -> Engine:
         if query.is_data_modification_query():
-            return DBType.Aurora
+            return Engine.Aurora
 
         blueprint = self._data_blueprint_mgr.get_blueprint()
 
-        location_sets: List[Set[DBType]] = []
+        location_sets: List[Set[Engine]] = []
         for table_name_str in query.tables():
             try:
                 table = blueprint.get_table(table_name_str)
@@ -32,7 +32,7 @@ class LocationAwareRoundRobin(Router):
                 # - the parser does not differentiate between CTE tables and
                 # "actual" tables).
                 pass
-        locations: List[DBType] = (
+        locations: List[Engine] = (
             list(set.intersection(*location_sets)) if len(location_sets) > 0 else []
         )
 

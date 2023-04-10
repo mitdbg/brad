@@ -2,7 +2,7 @@ from typing import List, Tuple
 
 from brad.blueprint.data import DataBlueprint
 from brad.blueprint.data.table import Column, Table
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.strings import (
     AURORA_EXTRACT_PROGRESS_TABLE_NAME,
@@ -33,19 +33,19 @@ class TableSqlGenerator:
         self._blueprint = blueprint
 
     def generate_create_table_sql(
-        self, table: Table, location: DBType
-    ) -> Tuple[List[str], DBType]:
+        self, table: Table, location: Engine
+    ) -> Tuple[List[str], Engine]:
         """
         Returns SQL queries that should be used to create `table` on `location`,
         along with the engine on which to execute the queries.
         """
 
-        if location == DBType.Aurora:
+        if location == Engine.Aurora:
             if table.name in self._blueprint.base_table_names:
                 # This table needs to support incremental extraction. We need to
                 # create several additional structures to support this extraction.
                 columns_with_types = comma_separated_column_names_and_types(
-                    table.columns, DBType.Aurora
+                    table.columns, Engine.Aurora
                 )
                 pkey_columns = comma_separated_column_names(table.primary_key)
 
@@ -73,7 +73,7 @@ class TableSqlGenerator:
                 create_shadow_table = AURORA_SEQ_CREATE_TABLE_TEMPLATE.format(
                     table_name=shadow_table_name(table),
                     columns=comma_separated_column_names_and_types(
-                        table.primary_key, DBType.Aurora
+                        table.primary_key, Engine.Aurora
                     ),
                     pkey_columns=pkey_columns,
                 )
@@ -131,7 +131,7 @@ class TableSqlGenerator:
                         create_update_trigger_fn,
                         create_update_trigger,
                     ],
-                    DBType.Aurora,
+                    Engine.Aurora,
                 )
 
             else:
@@ -140,36 +140,36 @@ class TableSqlGenerator:
                 sql = AURORA_BARE_OR_REDSHIFT_CREATE_TABLE_TEMPLATE.format(
                     table_name=table.name,
                     columns=comma_separated_column_names_and_types(
-                        table.columns, DBType.Aurora
+                        table.columns, Engine.Aurora
                     ),
                     pkey_columns=comma_separated_column_names(table.primary_key),
                 )
-                return ([sql], DBType.Aurora)
+                return ([sql], Engine.Aurora)
 
-        elif location == DBType.Redshift:
+        elif location == Engine.Redshift:
             sql = AURORA_BARE_OR_REDSHIFT_CREATE_TABLE_TEMPLATE.format(
                 table_name=table.name,
                 columns=comma_separated_column_names_and_types(
-                    table.columns, DBType.Redshift
+                    table.columns, Engine.Redshift
                 ),
                 pkey_columns=comma_separated_column_names(table.primary_key),
             )
-            return ([sql], DBType.Redshift)
+            return ([sql], Engine.Redshift)
 
-        elif location == DBType.Athena:
+        elif location == Engine.Athena:
             sql = ATHENA_CREATE_TABLE_TEMPLATE.format(
                 table_name=table.name,
                 columns=comma_separated_column_names_and_types(
-                    table.columns, DBType.Athena
+                    table.columns, Engine.Athena
                 ),
                 s3_path="{}{}".format(self._config.athena_s3_data_path, table.name),
             )
-            return ([sql], DBType.Athena)
+            return ([sql], Engine.Athena)
 
         else:
             raise RuntimeError("Unsupported location {}".format(location))
 
-    def generate_extraction_progress_set_up_table_sql(self) -> Tuple[List[str], DBType]:
+    def generate_extraction_progress_set_up_table_sql(self) -> Tuple[List[str], Engine]:
         queries = []
 
         # Create the extraction progress table.
@@ -188,18 +188,18 @@ class TableSqlGenerator:
         )
         for base_table_name in self._blueprint.base_table_names:
             base_table = self._blueprint.get_table(base_table_name)
-            if DBType.Aurora not in base_table.locations:
+            if Engine.Aurora not in base_table.locations:
                 continue
             queries.append(initialize_template.format(table_name=base_table_name))
 
-        return (queries, DBType.Aurora)
+        return (queries, Engine.Aurora)
 
 
 def comma_separated_column_names(cols: List[Column]) -> str:
     return ", ".join(map(lambda c: c.name, cols))
 
 
-def comma_separated_column_names_and_types(cols: List[Column], for_db: DBType) -> str:
+def comma_separated_column_names_and_types(cols: List[Column], for_db: Engine) -> str:
     return ", ".join(
         map(
             lambda c: "{} {}".format(c.name, _type_for(c.data_type, for_db)),
@@ -208,22 +208,22 @@ def comma_separated_column_names_and_types(cols: List[Column], for_db: DBType) -
     )
 
 
-def _type_for(data_type: str, for_db: DBType) -> str:
+def _type_for(data_type: str, for_db: Engine) -> str:
     # A hacky way to ensure we use a supported type in each DBMS (e.g. Athena does
     # not support `TEXT` data).
     if data_type.upper().startswith("CHARACTER"):
-        if for_db == DBType.Athena:
+        if for_db == Engine.Athena:
             return "STRING"
-        elif for_db == DBType.Redshift and data_type.upper() == "CHARACTER VARYING":
+        elif for_db == Engine.Redshift and data_type.upper() == "CHARACTER VARYING":
             return "VARCHAR(MAX)"
-        elif for_db == DBType.Redshift and data_type.upper().startswith(
+        elif for_db == Engine.Redshift and data_type.upper().startswith(
             "CHARACTER VARYING"
         ):
             return "VARCHAR(256)"
-    if data_type.upper() == "TEXT" and for_db == DBType.Athena:
+    if data_type.upper() == "TEXT" and for_db == Engine.Athena:
         return "STRING"
     elif data_type.upper() == "SERIAL" and (
-        for_db == DBType.Athena or for_db == DBType.Redshift
+        for_db == Engine.Athena or for_db == Engine.Redshift
     ):
         return "BIGINT"
     else:

@@ -11,7 +11,7 @@ from brad.blueprint.sql_gen.table import (
     comma_separated_column_names,
 )
 from brad.config.file import ConfigFile
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.config.strings import (
     AURORA_EXTRACT_PROGRESS_TABLE_NAME,
     AURORA_SEQ_COLUMN,
@@ -107,8 +107,8 @@ async def _ensure_empty(
                     logger.error(message)
                     raise RuntimeError(message)
     finally:
-        await engines.get_connection(DBType.Aurora).rollback()
-        await engines.get_connection(DBType.Redshift).rollback()
+        await engines.get_connection(Engine.Aurora).rollback()
+        await engines.get_connection(Engine.Redshift).rollback()
 
 
 async def _load_aurora(
@@ -116,7 +116,7 @@ async def _load_aurora(
     table_name: str,
     table_options,
     aurora_connection,
-) -> DBType:
+) -> Engine:
     logger.info("Loading %s on Aurora...", table_name)
     table = ctx.blueprint.get_table(table_name)
     load_query = _AURORA_LOAD_TEMPLATE.format(
@@ -134,7 +134,7 @@ async def _load_aurora(
     logger.debug("Running on Aurora: %s", load_query)
     await aurora_connection.execute(load_query)
     logger.info("Done loading %s on Aurora!", table_name)
-    return DBType.Aurora
+    return Engine.Aurora
 
 
 async def _load_redshift(
@@ -142,7 +142,7 @@ async def _load_redshift(
     table_name: str,
     table_options,
     redshift_connection,
-) -> DBType:
+) -> Engine:
     logger.info("Loading %s on Redshift...", table_name)
     load_query = _REDSHIFT_LOAD_TEMPLATE.format(
         table_name=table_name,
@@ -158,7 +158,7 @@ async def _load_redshift(
     logger.debug("Running on Redshift %s", load_query)
     await redshift_connection.execute(load_query)
     logger.info("Done loading %s on Redshift!", table_name)
-    return DBType.Redshift
+    return Engine.Redshift
 
 
 async def _load_athena(
@@ -166,7 +166,7 @@ async def _load_athena(
     table_name: str,
     table_options,
     athena_connection,
-) -> DBType:
+) -> Engine:
     logger.info("Loading %s on Athena...", table_name)
     table = ctx.blueprint.get_table(table_name)
 
@@ -178,7 +178,7 @@ async def _load_athena(
     # 1. We need to create a loading table.
     q = _ATHENA_CREATE_LOAD_TABLE.format(
         load_table_name="{}_brad_loading".format(table_name),
-        columns=comma_separated_column_names_and_types(table.columns, DBType.Athena),
+        columns=comma_separated_column_names_and_types(table.columns, Engine.Athena),
         s3_bucket=ctx.s3_bucket,
         s3_path=s3_folder_path,
         options1=(
@@ -208,7 +208,7 @@ async def _load_athena(
     await athena_connection.execute(q)
 
     logger.info("Done loading %s on Athena!", table_name)
-    return DBType.Athena
+    return Engine.Athena
 
 
 async def _update_sync_progress(
@@ -248,8 +248,8 @@ async def _update_sync_progress(
 
 
 def _try_add_task(
-    generator: Iterator[Coroutine[Any, Any, DBType]],
-    dest: List[asyncio.Task[DBType] | Coroutine[Any, Any, DBType]],
+    generator: Iterator[Coroutine[Any, Any, Engine]],
+    dest: List[asyncio.Task[Engine] | Coroutine[Any, Any, Engine]],
 ) -> None:
     try:
         dest.append(next(generator))
@@ -264,7 +264,7 @@ async def bulk_load_impl(args, manifest) -> None:
     blueprint = blueprint_mgr.get_blueprint()
 
     try:
-        running: List[asyncio.Task[DBType] | Coroutine[Any, Any, DBType]] = []
+        running: List[asyncio.Task[Engine] | Coroutine[Any, Any, Engine]] = []
         engines = await EngineConnections.connect(config, manifest["schema_name"])
         if not args.force:
             await _ensure_empty(manifest, blueprint, engines)
@@ -274,39 +274,39 @@ async def bulk_load_impl(args, manifest) -> None:
         )
 
         def load_tasks_for_engine(
-            engine: DBType,
-        ) -> Iterator[Coroutine[Any, Any, DBType]]:
+            engine: Engine,
+        ) -> Iterator[Coroutine[Any, Any, Engine]]:
             for table_options in manifest["tables"]:
                 table_name = table_options["table_name"]
                 table = blueprint.get_table(table_name)
-                if engine == DBType.Aurora and DBType.Aurora in table.locations:
+                if engine == Engine.Aurora and Engine.Aurora in table.locations:
                     yield _load_aurora(
                         ctx,
                         table_name,
                         table_options,
-                        engines.get_connection(DBType.Aurora),
+                        engines.get_connection(Engine.Aurora),
                     )
-                elif engine == DBType.Redshift and DBType.Redshift in table.locations:
+                elif engine == Engine.Redshift and Engine.Redshift in table.locations:
                     yield _load_redshift(
                         ctx,
                         table_name,
                         table_options,
-                        engines.get_connection(DBType.Redshift),
+                        engines.get_connection(Engine.Redshift),
                     )
-                elif engine == DBType.Athena and DBType.Athena in table.locations:
+                elif engine == Engine.Athena and Engine.Athena in table.locations:
                     yield _load_athena(
                         ctx,
                         table_name,
                         table_options,
-                        engines.get_connection(DBType.Athena),
+                        engines.get_connection(Engine.Athena),
                     )
 
         # 2. Execute the load tasks.
         # The intention is to have one in-flight load task for each engine
         # running concurrently.
-        aurora_loads = load_tasks_for_engine(DBType.Aurora)
-        redshift_loads = load_tasks_for_engine(DBType.Redshift)
-        athena_loads = load_tasks_for_engine(DBType.Athena)
+        aurora_loads = load_tasks_for_engine(Engine.Aurora)
+        redshift_loads = load_tasks_for_engine(Engine.Redshift)
+        athena_loads = load_tasks_for_engine(Engine.Athena)
 
         if args.sequential:
             for t in aurora_loads:
@@ -330,20 +330,20 @@ async def bulk_load_impl(args, manifest) -> None:
 
                 for task in done:
                     engine = task.result()
-                    if engine == DBType.Aurora:
+                    if engine == Engine.Aurora:
                         _try_add_task(aurora_loads, running)
-                    elif engine == DBType.Redshift:
+                    elif engine == Engine.Redshift:
                         _try_add_task(redshift_loads, running)
-                    elif engine == DBType.Athena:
+                    elif engine == Engine.Athena:
                         _try_add_task(athena_loads, running)
 
-        await engines.get_connection(DBType.Aurora).commit()
-        await engines.get_connection(DBType.Redshift).commit()
+        await engines.get_connection(Engine.Aurora).commit()
+        await engines.get_connection(Engine.Redshift).commit()
         # Athena does not support transactions.
 
         # Update the sync tables.
         await _update_sync_progress(
-            manifest, blueprint, engines.get_connection(DBType.Aurora)
+            manifest, blueprint, engines.get_connection(Engine.Aurora)
         )
 
     except:

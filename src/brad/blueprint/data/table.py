@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 
 
 class Column:
@@ -41,7 +41,7 @@ class Table:
         columns: List[Column],
         table_dependencies: List[str],
         transform_text: Optional[str],
-        locations: List[DBType],
+        locations: List[Engine],
     ):
         self._name = name
         self._columns = columns
@@ -67,7 +67,7 @@ class Table:
         return self._transform_text
 
     @property
-    def locations(self) -> List[DBType]:
+    def locations(self) -> List[Engine]:
         return self._locations
 
     @property

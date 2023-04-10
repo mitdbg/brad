@@ -3,7 +3,7 @@ from collections import deque
 from typing import Optional, Tuple
 
 from brad.blueprint.data import DataBlueprint
-from brad.config.dbtype import DBType
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.data_sync.execution.context import ExecutionContext
 from brad.data_sync.execution.plan_converter import PlanConverter
@@ -32,7 +32,7 @@ class DataSyncExecutor:
         self._engines = await EngineConnections.connect(
             self._config, self._data_blueprint_mgr.schema_name, autocommit=False
         )
-        await self._engines.get_connection(DBType.Aurora).execute(
+        await self._engines.get_connection(Engine.Aurora).execute(
             "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE"
         )
 
@@ -124,9 +124,9 @@ class DataSyncExecutor:
     def _new_execution_context(self) -> ExecutionContext:
         assert self._engines is not None
         return ExecutionContext(
-            aurora=self._engines.get_connection(DBType.Aurora),
-            athena=self._engines.get_connection(DBType.Athena),
-            redshift=self._engines.get_connection(DBType.Redshift),
+            aurora=self._engines.get_connection(Engine.Aurora),
+            athena=self._engines.get_connection(Engine.Athena),
+            redshift=self._engines.get_connection(Engine.Redshift),
             blueprint=self._data_blueprint_mgr.get_blueprint(),
             config=self._config,
         )
