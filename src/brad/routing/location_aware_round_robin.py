@@ -32,7 +32,9 @@ class LocationAwareRoundRobin(Router):
                 # - the parser does not differentiate between CTE tables and
                 # "actual" tables).
                 pass
-        locations: List[DBType] = list(set.intersection(*location_sets))
+        locations: List[DBType] = (
+            list(set.intersection(*location_sets)) if len(location_sets) > 0 else []
+        )
 
         if len(locations) == 0:
             # This happens when a query references a set of tables that do not

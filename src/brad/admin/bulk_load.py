@@ -6,7 +6,6 @@ from collections import namedtuple
 from typing import Any, Coroutine, Iterator, List
 
 from brad.blueprint.data import DataBlueprint
-from brad.blueprint.data.location import Location
 from brad.blueprint.sql_gen.table import (
     comma_separated_column_names_and_types,
     comma_separated_column_names,
@@ -94,8 +93,7 @@ async def _ensure_empty(
             table_name = load_table["table_name"]
             table = blueprint.get_table(table_name)
 
-            for loc in table.locations:
-                engine = _location_to_engine(loc)
+            for engine in table.locations:
                 conn = engines.get_connection(engine)
                 cursor = await conn.cursor()
                 await cursor.execute("SELECT COUNT(*) FROM {}".format(table_name))
@@ -103,7 +101,7 @@ async def _ensure_empty(
                 if row[0] != 0:
                     message = "Table {} on {} is non-empty ({} rows). You can only bulk load non-empty tables.".format(
                         table_name,
-                        loc,
+                        engine,
                         row[0],
                     )
                     logger.error(message)
@@ -111,17 +109,6 @@ async def _ensure_empty(
     finally:
         await engines.get_connection(DBType.Aurora).rollback()
         await engines.get_connection(DBType.Redshift).rollback()
-
-
-def _location_to_engine(location: Location) -> DBType:
-    if location == Location.Aurora:
-        return DBType.Aurora
-    elif location == Location.Redshift:
-        return DBType.Redshift
-    elif location == Location.S3Iceberg:
-        return DBType.Athena
-    else:
-        raise RuntimeError("Unsupported location {}".format(location))
 
 
 async def _load_aurora(
@@ -292,21 +279,21 @@ async def bulk_load_impl(args, manifest) -> None:
             for table_options in manifest["tables"]:
                 table_name = table_options["table_name"]
                 table = blueprint.get_table(table_name)
-                if engine == DBType.Aurora and Location.Aurora in table.locations:
+                if engine == DBType.Aurora and DBType.Aurora in table.locations:
                     yield _load_aurora(
                         ctx,
                         table_name,
                         table_options,
                         engines.get_connection(DBType.Aurora),
                     )
-                elif engine == DBType.Redshift and Location.Redshift in table.locations:
+                elif engine == DBType.Redshift and DBType.Redshift in table.locations:
                     yield _load_redshift(
                         ctx,
                         table_name,
                         table_options,
                         engines.get_connection(DBType.Redshift),
                     )
-                elif engine == DBType.Athena and Location.S3Iceberg in table.locations:
+                elif engine == DBType.Athena and DBType.Athena in table.locations:
                     yield _load_athena(
                         ctx,
                         table_name,
