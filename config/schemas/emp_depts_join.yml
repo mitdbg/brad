@@ -5,7 +5,7 @@ tables:
   - table_name: employees
     columns:
       - name: e_id
-        data_type: BIGINT
+        data_type: SERIAL
         primary_key: true
       - name: e_full_name
         data_type: TEXT
@@ -17,7 +17,7 @@ tables:
   - table_name: departments
     columns:
       - name: d_id
-        data_type: BIGINT
+        data_type: SERIAL
         primary_key: true
       - name: d_name
         data_type: TEXT
