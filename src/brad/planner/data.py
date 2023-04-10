@@ -1,12 +1,12 @@
 from typing import Dict
 
-from brad.blueprint.data import DataBlueprint
-from brad.blueprint.data.user import UserProvidedDataBlueprint
-from brad.blueprint.data.table import Table
+from brad.blueprint import Blueprint
+from brad.blueprint.user import UserProvidedDataBlueprint
+from brad.blueprint.table import Table
 from brad.config.engine import Engine
 
 
-def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> DataBlueprint:
+def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> Blueprint:
     """
     Generates a data blueprint from a user-provided blueprint. This function is
     used for bootstrapping the system (generating the first data blueprint from
@@ -79,4 +79,4 @@ def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> DataBlueprint:
             continue
         process_table(table, expect_standalone_base_table=True)
 
-    return DataBlueprint(user.schema_name, list(tables_by_name.values()))
+    return Blueprint(user.schema_name, list(tables_by_name.values()), None, None, None)

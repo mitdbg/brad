@@ -15,7 +15,7 @@ from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
 from brad.routing.policy import RoutingPolicy
 from brad.server.brad_interface import BradInterface
-from brad.server.data_blueprint_manager import DataBlueprintManager
+from brad.server.blueprint_manager import BlueprintManager
 from brad.server.errors import QueryError
 from brad.server.grpc import BradGrpc
 from brad.server.session import SessionManager, SessionId
@@ -32,13 +32,13 @@ class BradServer(BradInterface):
     def __init__(self, config: ConfigFile, schema_name: str):
         self._config = config
         self._schema_name = schema_name
-        self._data_blueprint_mgr = DataBlueprintManager(self._config, self._schema_name)
+        self._blueprint_mgr = BlueprintManager(self._config, self._schema_name)
 
         # We have different routing policies for performance evaluation and
         # testing purposes.
         routing_policy = self._config.routing_policy
         if routing_policy == RoutingPolicy.Default:
-            self._router: Router = LocationAwareRoundRobin(self._data_blueprint_mgr)
+            self._router: Router = LocationAwareRoundRobin(self._blueprint_mgr)
         elif routing_policy == RoutingPolicy.AlwaysAthena:
             self._router = AlwaysOneRouter(Engine.Athena)
         elif routing_policy == RoutingPolicy.AlwaysAurora:
@@ -54,9 +54,7 @@ class BradServer(BradInterface):
         self._daemon_connections: List[
             Tuple[asyncio.StreamReader, asyncio.StreamWriter]
         ] = []
-        self._data_sync_executor = DataSyncExecutor(
-            self._config, self._data_blueprint_mgr
-        )
+        self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
         self._timed_sync_task = None
         self._forecaster = WorkloadForecaster()
 
@@ -89,7 +87,7 @@ class BradServer(BradInterface):
             logger.info("The BRAD server has shut down.")
 
     async def run_setup(self):
-        await self._data_blueprint_mgr.load()
+        await self._blueprint_mgr.load()
         if self._config.data_sync_period_seconds > 0:
             loop = asyncio.get_event_loop()
             self._timed_sync_task = loop.create_task(self._run_sync_periodically())
@@ -194,7 +192,7 @@ class BradServer(BradInterface):
         if command == "BRAD_SYNC;":
             logger.debug("Manually triggered a data sync.")
             ran_sync = await self._data_sync_executor.run_sync(
-                self._data_blueprint_mgr.get_blueprint()
+                self._blueprint_mgr.get_blueprint()
             )
             if ran_sync:
                 yield "Sync succeeded.".encode()
@@ -203,7 +201,7 @@ class BradServer(BradInterface):
 
         elif command == "BRAD_EXPLAIN_SYNC_STATIC;":
             logical_plan = self._data_sync_executor.get_static_logical_plan(
-                self._data_blueprint_mgr.get_blueprint()
+                self._blueprint_mgr.get_blueprint()
             )
             out = io.StringIO()
             logical_plan.print_plan_sequentially(file=out)
@@ -211,7 +209,7 @@ class BradServer(BradInterface):
 
         elif command == "BRAD_EXPLAIN_SYNC;":
             logical, physical = await self._data_sync_executor.get_processed_plans(
-                self._data_blueprint_mgr.get_blueprint()
+                self._blueprint_mgr.get_blueprint()
             )
             out = io.StringIO()
             logical.print_plan_sequentially(file=out)
@@ -234,6 +232,4 @@ class BradServer(BradInterface):
             await asyncio.sleep(self._config.data_sync_period_seconds)
             logger.debug("Starting an auto data sync.")
             # NOTE: This will be an async function.
-            await self._data_sync_executor.run_sync(
-                self._data_blueprint_mgr.get_blueprint()
-            )
+            await self._data_sync_executor.run_sync(self._blueprint_mgr.get_blueprint())

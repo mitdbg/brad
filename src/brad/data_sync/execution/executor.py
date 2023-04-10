@@ -2,7 +2,7 @@ import logging
 from collections import deque
 from typing import Optional, Tuple
 
-from brad.blueprint.data import DataBlueprint
+from brad.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.data_sync.execution.context import ExecutionContext
@@ -11,18 +11,16 @@ from brad.data_sync.execution.table_sync_bounds import TableSyncBounds
 from brad.data_sync.logical_plan import LogicalDataSyncPlan
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
 from brad.planner.data_sync import make_logical_data_sync_plan
-from brad.server.data_blueprint_manager import DataBlueprintManager
+from brad.server.blueprint_manager import BlueprintManager
 from brad.server.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
 
 class DataSyncExecutor:
-    def __init__(
-        self, config: ConfigFile, data_blueprint_mgr: DataBlueprintManager
-    ) -> None:
+    def __init__(self, config: ConfigFile, blueprint_mgr: BlueprintManager) -> None:
+        self._blueprint_mgr = blueprint_mgr
         self._config = config
-        self._data_blueprint_mgr = data_blueprint_mgr
         self._engines: Optional[EngineConnections] = None
 
     async def establish_connections(self) -> None:
@@ -30,7 +28,7 @@ class DataSyncExecutor:
             "Data sync executor is establishing connections to the underlying engines..."
         )
         self._engines = await EngineConnections.connect(
-            self._config, self._data_blueprint_mgr.schema_name, autocommit=False
+            self._config, self._blueprint_mgr.schema_name, autocommit=False
         )
         await self._engines.get_connection(Engine.Aurora).execute(
             "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE"
@@ -41,7 +39,7 @@ class DataSyncExecutor:
             return
         await self._engines.close()
 
-    async def run_sync(self, blueprint: DataBlueprint) -> bool:
+    async def run_sync(self, blueprint: Blueprint) -> bool:
         ctx = self._new_execution_context()
         _, phys_plan = await self._get_processed_plans_impl(blueprint, ctx)
         if len(phys_plan.all_operators()) == 0:
@@ -53,11 +51,11 @@ class DataSyncExecutor:
         await self._run_plan(phys_plan, ctx)
         return True
 
-    def get_static_logical_plan(self, blueprint: DataBlueprint) -> LogicalDataSyncPlan:
+    def get_static_logical_plan(self, blueprint: Blueprint) -> LogicalDataSyncPlan:
         return make_logical_data_sync_plan(blueprint)
 
     async def get_processed_plans(
-        self, blueprint: DataBlueprint
+        self, blueprint: Blueprint
     ) -> Tuple[LogicalDataSyncPlan, PhysicalDataSyncPlan]:
         ctx = self._new_execution_context()
         try:
@@ -67,7 +65,7 @@ class DataSyncExecutor:
             await aurora.commit()
 
     async def _get_processed_plans_impl(
-        self, blueprint: DataBlueprint, ctx: ExecutionContext
+        self, blueprint: Blueprint, ctx: ExecutionContext
     ) -> Tuple[LogicalDataSyncPlan, PhysicalDataSyncPlan]:
         # 1. Get the static logical plan.
         logical = self.get_static_logical_plan(blueprint)
@@ -127,6 +125,6 @@ class DataSyncExecutor:
             aurora=self._engines.get_connection(Engine.Aurora),
             athena=self._engines.get_connection(Engine.Athena),
             redshift=self._engines.get_connection(Engine.Redshift),
-            blueprint=self._data_blueprint_mgr.get_blueprint(),
+            blueprint=self._blueprint_mgr.get_blueprint(),
             config=self._config,
         )

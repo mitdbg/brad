@@ -2,25 +2,25 @@ import asyncio
 import boto3
 from typing import Any, Dict, Optional
 
-from brad.blueprint.data import DataBlueprint
-from brad.blueprint.serde.data import (
-    serialize_data_blueprint,
-    deserialize_data_blueprint,
+from brad.blueprint import Blueprint
+from brad.blueprint.serde import (
+    serialize_blueprint,
+    deserialize_blueprint,
 )
 from brad.config.file import ConfigFile
 
 _METADATA_KEY_TEMPLATE = "{}{}.brad"
 
 
-class DataBlueprintManager:
+class BlueprintManager:
     """
-    Utility class used for loading and providing access to the current data blueprint.
+    Utility class used for loading and providing access to the current blueprint.
     """
 
     def __init__(self, config: ConfigFile, schema_name: str):
         self._config = config
         self._schema_name = schema_name
-        self._blueprint: Optional[DataBlueprint] = None
+        self._blueprint: Optional[Blueprint] = None
         self._s3_client = boto3.client(
             "s3",
             aws_access_key_id=self._config.aws_access_key,
@@ -29,7 +29,7 @@ class DataBlueprintManager:
 
     async def load(self) -> None:
         """
-        Loads the persisted version of the data blueprint from S3.
+        Loads the persisted version of the blueprint from S3.
         """
 
         loop = asyncio.get_running_loop()
@@ -51,18 +51,18 @@ class DataBlueprintManager:
             return response["Body"].read()
 
         serialized = await loop.run_in_executor(None, _load_response)
-        self._blueprint = deserialize_data_blueprint(serialized)
+        self._blueprint = deserialize_blueprint(serialized)
 
     def load_sync(self) -> None:
         asyncio.run(self.load())
 
     def persist_sync(self) -> None:
         """
-        Persists the current data blueprint to S3.
+        Persists the current blueprint to S3.
         """
 
         assert self._blueprint is not None
-        serialized = serialize_data_blueprint(self._blueprint)
+        serialized = serialize_blueprint(self._blueprint)
         self._s3_client.put_object(
             Body=serialized,
             Bucket=self._config.s3_metadata_bucket,
@@ -73,7 +73,7 @@ class DataBlueprintManager:
 
     def delete_sync(self) -> None:
         """
-        Deletes the persisted data blueprint from S3.
+        Deletes the persisted blueprint from S3.
         """
 
         self._s3_client.delete_object(
@@ -87,9 +87,9 @@ class DataBlueprintManager:
     def schema_name(self) -> str:
         return self._schema_name
 
-    def get_blueprint(self) -> DataBlueprint:
+    def get_blueprint(self) -> Blueprint:
         assert self._blueprint is not None
         return self._blueprint
 
-    def set_blueprint(self, blueprint: DataBlueprint) -> None:
+    def set_blueprint(self, blueprint: Blueprint) -> None:
         self._blueprint = blueprint

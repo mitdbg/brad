@@ -1,6 +1,6 @@
 import pytest
 
-from brad.blueprint.data.user import UserProvidedDataBlueprint
+from brad.blueprint.user import UserProvidedDataBlueprint
 
 
 def test_validate_ok():

@@ -2,7 +2,7 @@ import enum
 from collections import deque
 from typing import Dict, List, Deque, Optional, Tuple
 
-from brad.blueprint.data import DataBlueprint
+from brad.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.config.strings import insert_delta_table_name, delete_delta_table_name
 from brad.data_sync.logical_plan import (
@@ -37,9 +37,7 @@ class PlanConverter:
     Used to convert a logical data sync plan into a physical plan.
     """
 
-    def __init__(
-        self, logical_plan: LogicalDataSyncPlan, blueprint: DataBlueprint
-    ) -> None:
+    def __init__(self, logical_plan: LogicalDataSyncPlan, blueprint: Blueprint) -> None:
         self._logical_plan = logical_plan
         self._blueprint = blueprint
 

@@ -1,7 +1,7 @@
 from typing import Set, List
 
 from brad.config.engine import Engine
-from brad.server.data_blueprint_manager import DataBlueprintManager
+from brad.server.blueprint_manager import BlueprintManager
 from brad.routing import Router
 from brad.query_rep import QueryRep
 
@@ -12,15 +12,15 @@ class LocationAwareRoundRobin(Router):
     locations of the tables referenced.
     """
 
-    def __init__(self, data_blueprint_mgr: DataBlueprintManager):
-        self._data_blueprint_mgr = data_blueprint_mgr
+    def __init__(self, blueprint_mgr: BlueprintManager):
+        self._blueprint_mgr = blueprint_mgr
         self._curr_idx = 0
 
     def engine_for(self, query: QueryRep) -> Engine:
         if query.is_data_modification_query():
             return Engine.Aurora
 
-        blueprint = self._data_blueprint_mgr.get_blueprint()
+        blueprint = self._blueprint_mgr.get_blueprint()
 
         location_sets: List[Set[Engine]] = []
         for table_name_str in query.tables():

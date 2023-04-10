@@ -1,5 +1,5 @@
-from brad.blueprint.data import DataBlueprint
-from brad.blueprint.data.table import Column, Table
+from brad.blueprint import Blueprint
+from brad.blueprint.table import Column, Table
 from brad.config.engine import Engine
 
 import brad.proto_gen.blueprint_pb2 as b
@@ -12,19 +12,22 @@ import brad.proto_gen.blueprint_pb2 as b
 # See https://github.com/protocolbuffers/protobuf/issues/10372
 
 
-def deserialize_data_blueprint(raw_data: bytes) -> DataBlueprint:
+def deserialize_blueprint(raw_data: bytes) -> Blueprint:
     proto = b.DataBlueprint()
     proto.ParseFromString(raw_data)
-    return DataBlueprint(
+    return Blueprint(
         schema_name=proto.schema_name,
         tables=list(map(_table_from_proto, proto.tables)),
+        aurora_provisioning=None,
+        redshift_provisioning=None,
+        router_provider=None,
     )
 
 
-def serialize_data_blueprint(blueprint: DataBlueprint) -> bytes:
+def serialize_blueprint(blueprint: Blueprint) -> bytes:
     proto = b.DataBlueprint(
-        schema_name=blueprint.schema_name,
-        tables=map(_table_to_proto, blueprint.tables),
+        schema_name=blueprint.schema_name(),
+        tables=map(_table_to_proto, blueprint.tables()),
     )
     return proto.SerializeToString()
 

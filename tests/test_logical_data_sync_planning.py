@@ -1,4 +1,4 @@
-from brad.blueprint.data.user import UserProvidedDataBlueprint
+from brad.blueprint.user import UserProvidedDataBlueprint
 from brad.config.engine import Engine
 from brad.data_sync.logical_plan import ExtractDeltas, TransformDeltas, ApplyDeltas
 from brad.planner.data import bootstrap_data_blueprint

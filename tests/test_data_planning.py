@@ -1,4 +1,4 @@
-from brad.blueprint.data.user import UserProvidedDataBlueprint
+from brad.blueprint.user import UserProvidedDataBlueprint
 from brad.config.engine import Engine
 from brad.planner.data import bootstrap_data_blueprint
 
@@ -28,7 +28,7 @@ def test_boostrap_data_blueprint():
     user = UserProvidedDataBlueprint.load_from_yaml_str(table_config)
     blueprint = bootstrap_data_blueprint(user)
 
-    tables = blueprint.tables
+    tables = blueprint.tables()
     table_names_str = list(map(lambda t: t.name, tables))
     assert len(tables) == 3
     assert "table1" in table_names_str
@@ -58,8 +58,8 @@ def test_boostrap_data_blueprint():
 
     # Table 3 is also a base table but it is replicated across Redshift and S3.
     assert len(table3.table_dependencies) == 0
-    assert "table3" in blueprint.base_table_names
+    assert "table3" in blueprint.base_table_names()
 
     # Table 2 is dependent on table 1 and is present on Redshift and S3.
     assert "table1" in table2.table_dependencies
-    assert "table2" not in blueprint.base_table_names
+    assert "table2" not in blueprint.base_table_names()

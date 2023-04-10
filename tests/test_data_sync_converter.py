@@ -1,4 +1,4 @@
-from brad.blueprint.data.user import UserProvidedDataBlueprint
+from brad.blueprint.user import UserProvidedDataBlueprint
 from brad.data_sync.execution.plan_converter import PlanConverter
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
 from brad.planner.data import bootstrap_data_blueprint
