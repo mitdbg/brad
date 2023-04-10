@@ -2,7 +2,7 @@ from typing import Dict, List, Optional
 
 from brad.config.dbtype import DBType
 from brad.blueprint.data.blueprint import DataBlueprint
-from brad.blueprint.data.table import Table, TableName
+from brad.blueprint.data.table import Table
 from brad.blueprint.data.location import Location
 from brad.data_sync.logical_plan import (
     LogicalDataSyncPlan,
@@ -15,7 +15,7 @@ from brad.data_sync.logical_plan import (
 
 def make_logical_data_sync_plan(blueprint: DataBlueprint) -> LogicalDataSyncPlan:
     # For each table, the operator whose output is the table's deltas.
-    delta_operators: Dict[TableName, Optional[LogicalDataSyncOperator]] = {}
+    delta_operators: Dict[str, Optional[LogicalDataSyncOperator]] = {}
     all_operators: List[LogicalDataSyncOperator] = []
     base_operators: List[LogicalDataSyncOperator] = []
 

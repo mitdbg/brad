@@ -4,11 +4,10 @@ from typing import List, Dict
 
 from brad.config.dbtype import DBType
 from brad.blueprint.data.location import Location
-from brad.blueprint.data.table import TableName
 
 
 class LogicalDataSyncOperator:
-    def __init__(self, table_name: TableName, engine: DBType) -> None:
+    def __init__(self, table_name: str, engine: DBType) -> None:
         self._dependees: List["LogicalDataSyncOperator"] = []
         self._table_name = table_name
         self._engine = engine
@@ -17,7 +16,7 @@ class LogicalDataSyncOperator:
         # deltas. This happens when a table has not had any changes.
         self._definitely_empty = False
 
-    def table_name(self) -> TableName:
+    def table_name(self) -> str:
         return self._table_name
 
     def engine(self) -> DBType:
@@ -175,14 +174,14 @@ class ExtractDeltas(LogicalDataSyncOperator):
     extraction on Aurora.
     """
 
-    def __init__(self, table_name: TableName) -> None:
+    def __init__(self, table_name: str) -> None:
         super().__init__(table_name, DBType.Aurora)
 
     def dependencies(self) -> List[LogicalDataSyncOperator]:
         return []
 
     def __repr__(self) -> str:
-        return "".join(["ExtractDeltas(", str(self._table_name), ")"])
+        return "".join(["ExtractDeltas(", self._table_name, ")"])
 
 
 class TransformDeltas(LogicalDataSyncOperator):
@@ -195,7 +194,7 @@ class TransformDeltas(LogicalDataSyncOperator):
         self,
         sources: List[LogicalDataSyncOperator],
         transform_text: str,
-        table_name: TableName,
+        table_name: str,
         engine: DBType,
     ):
         super().__init__(table_name, engine)
@@ -236,7 +235,7 @@ class ApplyDeltas(LogicalDataSyncOperator):
     """
 
     def __init__(
-        self, source: LogicalDataSyncOperator, table_name: TableName, location: Location
+        self, source: LogicalDataSyncOperator, table_name: str, location: Location
     ):
         super().__init__(table_name, location.default_engine())
         self._source = source

@@ -1,9 +1,5 @@
 from brad.blueprint.data import DataBlueprint
-from brad.blueprint.data.table import (
-    Column,
-    Table,
-    TableName,
-)
+from brad.blueprint.data.table import Column, Table
 from brad.blueprint.data.location import Location
 
 import brad.proto_gen.blueprint_pb2 as b
@@ -40,13 +36,11 @@ def serialize_data_blueprint(blueprint: DataBlueprint) -> bytes:
 
 def _table_to_proto(table: Table) -> b.Table:
     return b.Table(
-        table_name=table.name.value,
+        table_name=table.name,
         columns=map(_table_column_to_proto, table.columns),
         locations=map(_location_to_proto, table.locations),
         dependencies=b.TableDependency(
-            source_table_names=map(
-                lambda tbl_name: tbl_name.value, table.table_dependencies
-            ),
+            source_table_names=table.table_dependencies,
             transform=table.transform_text,
         ),
     )
@@ -74,9 +68,9 @@ def _location_to_proto(loc: Location) -> b.DataLocation:
 
 def _table_from_proto(table: b.Table) -> Table:
     return Table(
-        name=TableName(table.table_name),
+        name=table.table_name,
         columns=list(map(_table_column_from_proto, table.columns)),
-        table_dependencies=list(map(TableName, table.dependencies.source_table_names)),
+        table_dependencies=list(table.dependencies.source_table_names),
         transform_text=table.dependencies.transform,
         locations=list(map(_location_from_proto, table.locations)),
     )

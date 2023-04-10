@@ -3,7 +3,7 @@ from brad.blueprint.data.table import Table
 
 def source_table_name(table: str | Table) -> str:
     if isinstance(table, Table):
-        str_name = table.name.value
+        str_name = table.name
     else:
         str_name = table
     return "{}_brad_source".format(str_name)
@@ -11,45 +11,45 @@ def source_table_name(table: str | Table) -> str:
 
 def shadow_table_name(table: str | Table) -> str:
     if isinstance(table, Table):
-        str_name = table.name.value
+        str_name = table.name
     else:
         str_name = table
     return "{}_brad_shadow".format(str_name)
 
 
 def delete_trigger_function_name(table: Table) -> str:
-    return "{}_brad_delete_trigger_fn".format(table.name.value)
+    return "{}_brad_delete_trigger_fn".format(table.name)
 
 
 def delete_trigger_name(table: Table) -> str:
-    return "{}_brad_delete_trigger".format(table.name.value)
+    return "{}_brad_delete_trigger".format(table.name)
 
 
 def update_trigger_function_name(table: Table) -> str:
-    return "{}_brad_update_trigger_fn".format(table.name.value)
+    return "{}_brad_update_trigger_fn".format(table.name)
 
 
 def update_trigger_name(table: Table) -> str:
-    return "{}_brad_update_trigger".format(table.name.value)
+    return "{}_brad_update_trigger".format(table.name)
 
 
 def seq_index_name(table: Table, for_shadow: bool) -> str:
     return "{}_brad_seq_index".format(
-        table.name.value if not for_shadow else shadow_table_name(table)
+        table.name if not for_shadow else shadow_table_name(table)
     )
 
 
 def imported_staging_table_name(table: Table) -> str:
-    return "{}_brad_staging".format(table.name.value)
+    return "{}_brad_staging".format(table.name)
 
 
 def imported_shadow_staging_table_name(table: Table) -> str:
-    return "{}_brad_shadow_staging".format(table.name.value)
+    return "{}_brad_shadow_staging".format(table.name)
 
 
 def insert_delta_table_name(table: str | Table) -> str:
     if isinstance(table, Table):
-        str_name = table.name.value
+        str_name = table.name
     else:
         str_name = table
     return "{}_inserts".format(str_name)
@@ -57,7 +57,7 @@ def insert_delta_table_name(table: str | Table) -> str:
 
 def delete_delta_table_name(table: str | Table) -> str:
     if isinstance(table, Table):
-        str_name = table.name.value
+        str_name = table.name
     else:
         str_name = table
     return "{}_deletes".format(str_name)

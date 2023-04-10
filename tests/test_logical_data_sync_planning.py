@@ -1,5 +1,4 @@
 from brad.blueprint.data.location import Location
-from brad.blueprint.data.table import TableName
 from brad.blueprint.data.user import UserProvidedDataBlueprint
 from brad.data_sync.logical_plan import ExtractDeltas, TransformDeltas, ApplyDeltas
 from brad.planner.data import bootstrap_data_blueprint
@@ -39,12 +38,12 @@ def test_make_logical_data_sync_plan_simple():
         base_tables.append(op.table_name())
 
     # Table 1 is a base table.
-    assert TableName("table1") in base_tables
+    assert "table1" in base_tables
 
     # Table 2 is not a base table.
-    assert TableName("table2") not in base_tables
+    assert "table2" not in base_tables
 
-    table3 = TableName("table3")
+    table3 = "table3"
     table3_locations = blueprint.get_table(table3).locations
 
     if len(table3_locations) > 1 and Location.Aurora in table3_locations:
@@ -62,7 +61,7 @@ def test_make_logical_data_sync_plan_simple():
     for op in dsp.operators():
         if isinstance(op, ApplyDeltas):
             apply_deltas_to.add(op.table_name())
-    assert TableName("table2") in apply_deltas_to
+    assert "table2" in apply_deltas_to
 
 
 def test_make_logical_data_sync_plan_transforms():
@@ -95,10 +94,10 @@ def test_make_logical_data_sync_plan_transforms():
         base_tables.append(op.table_name())
 
     # Table 1 is a base table.
-    assert TableName("table1") in base_tables
+    assert "table1" in base_tables
 
     # Table 2 is not a base table.
-    assert TableName("table2") not in base_tables
+    assert "table2" not in base_tables
 
     # There should be a transform.
     transforms = []
@@ -112,4 +111,4 @@ def test_make_logical_data_sync_plan_transforms():
     for op in dsp.operators():
         if isinstance(op, ApplyDeltas):
             apply_deltas_to.add(op.table_name())
-    assert TableName("table2") in apply_deltas_to
+    assert "table2" in apply_deltas_to

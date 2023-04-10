@@ -1,4 +1,4 @@
-from .table import Table, TableName
+from .table import Table
 
 from typing import List, Set
 
@@ -24,24 +24,22 @@ class DataBlueprint:
         return self._tables
 
     @property
-    def base_table_names(self) -> Set[TableName]:
+    def base_table_names(self) -> Set[str]:
         return self._base_table_names
 
-    def get_table(self, table_name: str | TableName) -> Table:
-        if isinstance(table_name, str):
-            table_name = TableName(table_name)
+    def get_table(self, table_name: str) -> Table:
         try:
             return self._tables_by_name[table_name]
         except KeyError as ex:
             raise ValueError from ex
 
-    def _compute_base_tables(self) -> Set[TableName]:
+    def _compute_base_tables(self) -> Set[str]:
         """
         Compute the base tables in the dependency graph. These are the tables
         with no dependencies.
         """
-        visited: Set[TableName] = set()
-        base_tables: Set[TableName] = set()
+        visited: Set[str] = set()
+        base_tables: Set[str] = set()
 
         # Recursive depth-first traversal.
         def visit_table(table: Table) -> None:
