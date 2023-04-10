@@ -29,7 +29,7 @@ def test_boostrap_data_blueprint():
     blueprint = bootstrap_data_blueprint(user)
 
     tables = blueprint.tables
-    table_names_str = list(map(lambda t: t.name.value, tables))
+    table_names_str = list(map(lambda t: t.name, tables))
     assert len(tables) == 3
     assert "table1" in table_names_str
     assert "table2" in table_names_str
