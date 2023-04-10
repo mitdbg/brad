@@ -132,7 +132,27 @@ async def _load_aurora(
         s3_path=table_options["s3_path"],
     )
     logger.debug("Running on Aurora: %s", load_query)
-    await aurora_connection.execute(load_query)
+    cursor = await aurora_connection.cursor()
+    await cursor.execute(load_query)
+
+    # Reset the next sequence values for SERIAL/BIGSERIAL types after a bulk
+    # load (Aurora does not automatically update it).
+    for column in table.columns:
+        if column.data_type != "SERIAL" and column.data_type != "BIGSERIAL":
+            continue
+        q = "SELECT MAX({}) FROM {}".format(column.name, source_table_name(table))
+        logger.debug("Running on Aurora: %s", q)
+        await cursor.execute(q)
+        row = await cursor.fetchone()
+        if row is None:
+            continue
+        max_serial_val = row[0]
+        q = "ALTER SEQUENCE {}_{}_seq RESTART WITH {}".format(
+            source_table_name(table), column.name, str(max_serial_val + 1)
+        )
+        logger.debug("Running on Aurora: %s", q)
+        await cursor.execute(q)
+
     logger.info("Done loading %s on Aurora!", table_name)
     return Engine.Aurora
 
