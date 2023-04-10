@@ -44,7 +44,7 @@ def bootstrap_schema(args):
     # 4. Connect to the underlying engines and create "databases" for the
     # schema.
     cxns = EngineConnections.connect_sync(config, autocommit=True)
-    create_schema = "CREATE DATABASE {}".format(blueprint.schema_name)
+    create_schema = "CREATE DATABASE {}".format(blueprint.schema_name())
     cxns.get_connection(Engine.Aurora).cursor().execute(create_schema)
     cxns.get_connection(Engine.Athena).cursor().execute(create_schema)
     cxns.get_connection(Engine.Redshift).cursor().execute(create_schema)
@@ -53,7 +53,7 @@ def bootstrap_schema(args):
 
     # 5. Now re-connect to the underlying engines with the schema name.
     cxns = EngineConnections.connect_sync(
-        config, schema_name=blueprint.schema_name, autocommit=False
+        config, schema_name=blueprint.schema_name(), autocommit=False
     )
     redshift = cxns.get_connection(Engine.Redshift).cursor()
     aurora = cxns.get_connection(Engine.Aurora).cursor()
@@ -61,7 +61,7 @@ def bootstrap_schema(args):
     # 6. Set up the underlying tables.
     sql_gen = TableSqlGenerator(config, blueprint)
 
-    for table in blueprint.tables:
+    for table in blueprint.tables():
         for location in table.locations:
             logger.info(
                 "Creating table '%s' on %s...",
@@ -93,7 +93,7 @@ def bootstrap_schema(args):
     aurora.commit()
 
     # 11. Persist the data blueprint.
-    blueprint_mgr = BlueprintManager(config, blueprint.schema_name)
+    blueprint_mgr = BlueprintManager(config, blueprint.schema_name())
     blueprint_mgr.set_blueprint(blueprint)
     blueprint_mgr.persist_sync()
 

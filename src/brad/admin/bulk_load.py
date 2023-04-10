@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from collections import namedtuple
 from typing import Any, Coroutine, Iterator, List
 
-from brad.blueprint.data import DataBlueprint
+from brad.blueprint import Blueprint
 from brad.blueprint.sql_gen.table import (
     comma_separated_column_names_and_types,
     comma_separated_column_names,
@@ -17,7 +17,7 @@ from brad.config.strings import (
     AURORA_SEQ_COLUMN,
     source_table_name,
 )
-from brad.server.data_blueprint_manager import DataBlueprintManager
+from brad.server.blueprint_manager import BlueprintManager
 from brad.server.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ def register_admin_action(subparser) -> None:
 
 
 async def _ensure_empty(
-    manifest, blueprint: DataBlueprint, engines: EngineConnections
+    manifest, blueprint: Blueprint, engines: EngineConnections
 ) -> None:
     """
     Verifies that the tables being loaded into are empty.
@@ -212,7 +212,7 @@ async def _load_athena(
 
 
 async def _update_sync_progress(
-    manifest, blueprint: DataBlueprint, aurora_connection
+    manifest, blueprint: Blueprint, aurora_connection
 ) -> None:
     """
     Updates BRAD's sync progress table to ensure that later syncs run correctly.
@@ -259,7 +259,7 @@ def _try_add_task(
 
 async def bulk_load_impl(args, manifest) -> None:
     config = ConfigFile(args.config_file)
-    blueprint_mgr = DataBlueprintManager(config, manifest["schema_name"])
+    blueprint_mgr = BlueprintManager(config, manifest["schema_name"])
     await blueprint_mgr.load()
     blueprint = blueprint_mgr.get_blueprint()
 
@@ -358,7 +358,7 @@ async def bulk_load_impl(args, manifest) -> None:
 
 
 def bulk_load(args) -> None:
-    with open(args.manifest_file, "r") as file:
+    with open(args.manifest_file, "r", encoding="UTF-8") as file:
         manifest = yaml.load(file, Loader=yaml.Loader)
 
     executor = ThreadPoolExecutor(max_workers=3)

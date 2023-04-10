@@ -43,7 +43,7 @@ fi
 if [ -z $mode ] || [ $mode == $check_lint ]; then
   echo_blue "Lint (pylint)"
   echo_blue "============="
-  pylint src/brad setup.py tests
+  pylint src/brad/* setup.py tests
   pylint_exit=$?
   echo ""
 fi
