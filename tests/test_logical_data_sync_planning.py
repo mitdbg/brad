@@ -1,7 +1,7 @@
-from brad.blueprint.user import UserProvidedDataBlueprint
+from brad.blueprint.user import UserProvidedBlueprint
 from brad.config.engine import Engine
 from brad.data_sync.logical_plan import ExtractDeltas, TransformDeltas, ApplyDeltas
-from brad.planner.data import bootstrap_data_blueprint
+from brad.planner.data import bootstrap_blueprint
 from brad.planner.data_sync import make_logical_data_sync_plan
 
 
@@ -27,8 +27,8 @@ def test_make_logical_data_sync_plan_simple():
               data_type: BIGINT
               primary_key: true
     """
-    user = UserProvidedDataBlueprint.load_from_yaml_str(table_config)
-    blueprint = bootstrap_data_blueprint(user)
+    user = UserProvidedBlueprint.load_from_yaml_str(table_config)
+    blueprint = bootstrap_blueprint(user)
     dsp = make_logical_data_sync_plan(blueprint)
 
     base_tables = []
@@ -83,8 +83,8 @@ def test_make_logical_data_sync_plan_transforms():
           transform: |
             -- Some transformation code...
     """
-    user = UserProvidedDataBlueprint.load_from_yaml_str(table_config)
-    blueprint = bootstrap_data_blueprint(user)
+    user = UserProvidedBlueprint.load_from_yaml_str(table_config)
+    blueprint = bootstrap_blueprint(user)
     dsp = make_logical_data_sync_plan(blueprint)
 
     base_tables = []

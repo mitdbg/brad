@@ -1,15 +1,15 @@
 from typing import Dict
 
 from brad.blueprint import Blueprint
-from brad.blueprint.user import UserProvidedDataBlueprint
+from brad.blueprint.user import UserProvidedBlueprint
 from brad.blueprint.table import Table
 from brad.config.engine import Engine
 
 
-def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> Blueprint:
+def bootstrap_blueprint(user: UserProvidedBlueprint) -> Blueprint:
     """
-    Generates a data blueprint from a user-provided blueprint. This function is
-    used for bootstrapping the system (generating the first data blueprint from
+    Generates a blueprint from a user-provided blueprint. This function is used
+    for bootstrapping the system (generating the first blueprint from
     user-provided table schemas and dependencies).
 
     Effectively, this function makes decisions as to where to place each table
@@ -18,7 +18,7 @@ def bootstrap_data_blueprint(user: UserProvidedDataBlueprint) -> Blueprint:
     NOTE: This function mutates the passed-in blueprint.
     """
 
-    # NOTE: This code assumes that the given `UserProvidedDataBlueprint` is
+    # NOTE: This code assumes that the given `UserProvidedBlueprint` is
     # "well-formed" (e.g., no circular dependencies).
 
     tables_by_name = {tbl.name: tbl for tbl in user.tables}

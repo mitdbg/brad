@@ -1,6 +1,6 @@
-from brad.blueprint.user import UserProvidedDataBlueprint
+from brad.blueprint.user import UserProvidedBlueprint
 from brad.config.engine import Engine
-from brad.planner.data import bootstrap_data_blueprint
+from brad.planner.data import bootstrap_blueprint
 
 
 def test_boostrap_data_blueprint():
@@ -25,8 +25,8 @@ def test_boostrap_data_blueprint():
               data_type: BIGINT
               primary_key: true
     """
-    user = UserProvidedDataBlueprint.load_from_yaml_str(table_config)
-    blueprint = bootstrap_data_blueprint(user)
+    user = UserProvidedBlueprint.load_from_yaml_str(table_config)
+    blueprint = bootstrap_blueprint(user)
 
     tables = blueprint.tables()
     table_names_str = list(map(lambda t: t.name, tables))

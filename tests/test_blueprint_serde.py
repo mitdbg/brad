@@ -1,5 +1,5 @@
-from brad.blueprint.user import UserProvidedDataBlueprint
-from brad.planner.data import bootstrap_data_blueprint
+from brad.blueprint.user import UserProvidedBlueprint
+from brad.planner.data import bootstrap_blueprint
 from brad.blueprint.serde import (
     serialize_blueprint,
     deserialize_blueprint,
@@ -28,8 +28,8 @@ def test_blueprint_serde():
               data_type: BIGINT
               primary_key: true
     """
-    user = UserProvidedDataBlueprint.load_from_yaml_str(table_config)
-    blueprint_orig = bootstrap_data_blueprint(user)
+    user = UserProvidedBlueprint.load_from_yaml_str(table_config)
+    blueprint_orig = bootstrap_blueprint(user)
     blueprint_after = deserialize_blueprint(serialize_blueprint(blueprint_orig))
 
     # Sanity check assertions.
