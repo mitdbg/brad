@@ -1,5 +1,5 @@
-from brad.blueprint.data.location import Location
 from brad.blueprint.data.user import UserProvidedDataBlueprint
+from brad.config.dbtype import DBType
 from brad.data_sync.logical_plan import ExtractDeltas, TransformDeltas, ApplyDeltas
 from brad.planner.data import bootstrap_data_blueprint
 from brad.planner.data_sync import make_logical_data_sync_plan
@@ -46,7 +46,7 @@ def test_make_logical_data_sync_plan_simple():
     table3 = "table3"
     table3_locations = blueprint.get_table(table3).locations
 
-    if len(table3_locations) > 1 and Location.Aurora in table3_locations:
+    if len(table3_locations) > 1 and DBType.Aurora in table3_locations:
         # Need to extract from it for replication.
         assert table3 in base_tables
     else:

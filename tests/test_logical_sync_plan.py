@@ -1,4 +1,3 @@
-from brad.blueprint.data.location import Location
 from brad.config.dbtype import DBType
 from brad.data_sync.logical_plan import (
     ApplyDeltas,
@@ -11,7 +10,7 @@ from brad.data_sync.logical_plan import (
 
 def test_propagation_simple():
     e = ExtractDeltas("test")
-    a = ApplyDeltas(e, "test2", Location.Aurora)
+    a = ApplyDeltas(e, "test2", DBType.Aurora)
     plan = LogicalDataSyncPlan([e, a], [e])
     plan.reset_definitely_empty()
     e.set_definitely_empty(True)
@@ -27,14 +26,14 @@ def test_propagation():
     t1 = TransformDeltas([e1, e2], "", "test3", DBType.Redshift)
     t2 = TransformDeltas([t1], "", "test4", DBType.Redshift)
 
-    a1r = ApplyDeltas(e1, "test1", Location.Redshift)
-    a1a = ApplyDeltas(e1, "test1", Location.S3Iceberg)
-    a2r = ApplyDeltas(e2, "test2", Location.Redshift)
-    a2a = ApplyDeltas(e2, "test2", Location.S3Iceberg)
-    a3r = ApplyDeltas(t1, "test3", Location.Redshift)
-    a3a = ApplyDeltas(t1, "test3", Location.S3Iceberg)
-    a4r = ApplyDeltas(t2, "test4", Location.Redshift)
-    a4a = ApplyDeltas(t2, "test4", Location.S3Iceberg)
+    a1r = ApplyDeltas(e1, "test1", DBType.Redshift)
+    a1a = ApplyDeltas(e1, "test1", DBType.Athena)
+    a2r = ApplyDeltas(e2, "test2", DBType.Redshift)
+    a2a = ApplyDeltas(e2, "test2", DBType.Athena)
+    a3r = ApplyDeltas(t1, "test3", DBType.Redshift)
+    a3a = ApplyDeltas(t1, "test3", DBType.Athena)
+    a4r = ApplyDeltas(t2, "test4", DBType.Redshift)
+    a4a = ApplyDeltas(t2, "test4", DBType.Athena)
 
     all_ops = [e1, e2, t1, t2, a1r, a1a, a2r, a2a, a3r, a3a, a4r, a4a]
     plan = LogicalDataSyncPlan(all_ops, [e1, e2])
@@ -68,7 +67,7 @@ def test_propagation():
 
 def test_pruning_simple():
     e = ExtractDeltas("test")
-    a = ApplyDeltas(e, "test2", Location.Aurora)
+    a = ApplyDeltas(e, "test2", DBType.Aurora)
     plan = LogicalDataSyncPlan([e, a], [e])
     plan.reset_definitely_empty()
     e.set_definitely_empty(True)
@@ -85,14 +84,14 @@ def test_pruning():
     t1 = TransformDeltas([e1, e2], "", "test3", DBType.Redshift)
     t2 = TransformDeltas([t1], "", "test4", DBType.Redshift)
 
-    a1r = ApplyDeltas(e1, "test1", Location.Redshift)
-    a1a = ApplyDeltas(e1, "test1", Location.S3Iceberg)
-    a2r = ApplyDeltas(e2, "test2", Location.Redshift)
-    a2a = ApplyDeltas(e2, "test2", Location.S3Iceberg)
-    a3r = ApplyDeltas(t1, "test3", Location.Redshift)
-    a3a = ApplyDeltas(t1, "test3", Location.S3Iceberg)
-    a4r = ApplyDeltas(t2, "test4", Location.Redshift)
-    a4a = ApplyDeltas(t2, "test4", Location.S3Iceberg)
+    a1r = ApplyDeltas(e1, "test1", DBType.Redshift)
+    a1a = ApplyDeltas(e1, "test1", DBType.Athena)
+    a2r = ApplyDeltas(e2, "test2", DBType.Redshift)
+    a2a = ApplyDeltas(e2, "test2", DBType.Athena)
+    a3r = ApplyDeltas(t1, "test3", DBType.Redshift)
+    a3a = ApplyDeltas(t1, "test3", DBType.Athena)
+    a4r = ApplyDeltas(t2, "test4", DBType.Redshift)
+    a4a = ApplyDeltas(t2, "test4", DBType.Athena)
 
     all_ops = [e1, e2, t1, t2, a1r, a1a, a2r, a2a, a3r, a3a, a4r, a4a]
     plan = LogicalDataSyncPlan(all_ops, [e1, e2])

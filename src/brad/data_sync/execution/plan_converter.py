@@ -3,7 +3,6 @@ from collections import deque
 from typing import Dict, List, Deque, Optional, Tuple
 
 from brad.blueprint.data import DataBlueprint
-from brad.blueprint.data.table import Location
 from brad.config.dbtype import DBType
 from brad.config.strings import insert_delta_table_name, delete_delta_table_name
 from brad.data_sync.logical_plan import (
@@ -283,10 +282,10 @@ class PlanConverter:
         # this op into the engines that are needed by the dependee operators.
         to_dest: Dict[DBType, Optional[Operator]] = {}
         for dependee_pop in dependees:
-            if isinstance(dependee_pop.logical_op, TransformDeltas):
+            if isinstance(dependee_pop.logical_op, TransformDeltas) or isinstance(
+                dependee_pop.logical_op, LogicalApplyDeltas
+            ):
                 dest = dependee_pop.logical_op.engine()
-            elif isinstance(dependee_pop.logical_op, LogicalApplyDeltas):
-                dest = dependee_pop.logical_op.location().default_engine()
             else:
                 # Should not have any other kinds of logical ops.
                 raise AssertionError
@@ -562,17 +561,6 @@ class _DeltaLocation(enum.Enum):
             return _DeltaLocation.S3AthenaIceberg
         elif engine == DBType.Redshift:
             return _DeltaLocation.Redshift
-        else:
-            raise AssertionError
-
-    @classmethod
-    def from_location(cls, location: Location) -> "_DeltaLocation":
-        if location == Location.Aurora:
-            return _DeltaLocation.Aurora
-        elif location == Location.Redshift:
-            return _DeltaLocation.Redshift
-        elif location == Location.S3Iceberg:
-            return _DeltaLocation.S3AthenaIceberg
         else:
             raise AssertionError
 

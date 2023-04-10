@@ -1,7 +1,6 @@
 from typing import Set, List
 
 from brad.config.dbtype import DBType
-from brad.blueprint.data.location import Location
 from brad.server.data_blueprint_manager import DataBlueprintManager
 from brad.routing import Router
 from brad.query_rep import QueryRep
@@ -23,7 +22,7 @@ class LocationAwareRoundRobin(Router):
 
         blueprint = self._data_blueprint_mgr.get_blueprint()
 
-        location_sets: List[Set[Location]] = []
+        location_sets: List[Set[DBType]] = []
         for table_name_str in query.tables():
             try:
                 table = blueprint.get_table(table_name_str)
@@ -33,7 +32,7 @@ class LocationAwareRoundRobin(Router):
                 # - the parser does not differentiate between CTE tables and
                 # "actual" tables).
                 pass
-        locations = list(set.intersection(*location_sets))
+        locations: List[DBType] = list(set.intersection(*location_sets))
 
         if len(locations) == 0:
             # This happens when a query references a set of tables that do not
@@ -48,13 +47,4 @@ class LocationAwareRoundRobin(Router):
         selected_location = locations[self._curr_idx]
         self._curr_idx += 1
 
-        if selected_location == Location.Aurora:
-            return DBType.Aurora
-        elif selected_location == Location.Redshift:
-            return DBType.Redshift
-        elif selected_location == Location.S3Iceberg:
-            return DBType.Athena
-        else:
-            raise RuntimeError(
-                "Unsupported routing location {}".format(str(selected_location))
-            )
+        return selected_location

@@ -1,9 +1,8 @@
 from typing import Dict, List, Optional
 
-from brad.config.dbtype import DBType
 from brad.blueprint.data.blueprint import DataBlueprint
 from brad.blueprint.data.table import Table
-from brad.blueprint.data.location import Location
+from brad.config.dbtype import DBType
 from brad.data_sync.logical_plan import (
     LogicalDataSyncPlan,
     LogicalDataSyncOperator,
@@ -44,7 +43,7 @@ def make_logical_data_sync_plan(blueprint: DataBlueprint) -> LogicalDataSyncPlan
         if len(table.table_dependencies) == 0:
             # This is a base table. If it has a replica on Aurora, we create an
             # `ExtractDeltas` op.
-            if Location.Aurora in table.locations:
+            if DBType.Aurora in table.locations:
                 extract_op = ExtractDeltas(table.name)
                 all_operators.append(extract_op)
                 base_operators.append(extract_op)
@@ -102,12 +101,11 @@ def make_logical_data_sync_plan(blueprint: DataBlueprint) -> LogicalDataSyncPlan
         # Aurora, it is considered static (we assume writes originate on
         # Aurora).
         is_base_and_static = (
-            len(table.table_dependencies) == 0
-            and Location.Aurora not in table.locations
+            len(table.table_dependencies) == 0 and DBType.Aurora not in table.locations
         )
         if not is_base_and_static:
             for location in table.locations:
-                if len(table.table_dependencies) == 0 and location == Location.Aurora:
+                if len(table.table_dependencies) == 0 and location == DBType.Aurora:
                     # This is a base table. Writes originate from Aurora, so we do
                     # not need to apply deltas to it.
                     continue

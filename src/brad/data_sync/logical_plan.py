@@ -3,7 +3,6 @@ from collections import deque
 from typing import List, Dict
 
 from brad.config.dbtype import DBType
-from brad.blueprint.data.location import Location
 
 
 class LogicalDataSyncOperator:
@@ -114,7 +113,7 @@ class LogicalDataSyncPlan:
 
             if isinstance(op, ApplyDeltas):
                 assert len(new_deps) == 1
-                new_op = ApplyDeltas(new_deps[0], op.table_name(), op.location())
+                new_op = ApplyDeltas(new_deps[0], op.table_name(), op.engine())
             elif isinstance(op, TransformDeltas):
                 new_op = TransformDeltas(
                     new_deps, op.transform_text(), op.table_name(), op.engine()
@@ -170,7 +169,7 @@ class ExtractDeltas(LogicalDataSyncOperator):
     """
     Extract the deltas from the specified table.
 
-    The location is implicitly `Location.Aurora` since we only support delta
+    The location is implicitly `DBType.Aurora` since we only support delta
     extraction on Aurora.
     """
 
@@ -235,9 +234,9 @@ class ApplyDeltas(LogicalDataSyncOperator):
     """
 
     def __init__(
-        self, source: LogicalDataSyncOperator, table_name: str, location: Location
+        self, source: LogicalDataSyncOperator, table_name: str, location: DBType
     ):
-        super().__init__(table_name, location.default_engine())
+        super().__init__(table_name, location)
         self._source = source
         self._location = location
 
@@ -245,9 +244,6 @@ class ApplyDeltas(LogicalDataSyncOperator):
         assert isinstance(source, ExtractDeltas) or isinstance(source, TransformDeltas)
 
         self._source.add_dependee(self)
-
-    def location(self) -> Location:
-        return self._location
 
     def dependencies(self) -> List[LogicalDataSyncOperator]:
         return [self._source]

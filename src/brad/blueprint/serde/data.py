@@ -1,6 +1,6 @@
 from brad.blueprint.data import DataBlueprint
 from brad.blueprint.data.table import Column, Table
-from brad.blueprint.data.location import Location
+from brad.config.dbtype import DBType
 
 import brad.proto_gen.blueprint_pb2 as b
 
@@ -52,15 +52,15 @@ def _table_column_to_proto(col: Column) -> b.TableColumn:
     )
 
 
-def _location_to_proto(loc: Location) -> b.DataLocation:
-    if loc == Location.Aurora:
-        return b.DataLocation.AURORA  # type: ignore
-    elif loc == Location.Redshift:
-        return b.DataLocation.REDSHIFT  # type: ignore
-    elif loc == Location.S3Iceberg:
-        return b.DataLocation.S3_ICEBERG  # type: ignore
+def _location_to_proto(engine: DBType) -> b.Engine:
+    if engine == DBType.Aurora:
+        return b.Engine.AURORA  # type: ignore
+    elif engine == DBType.Redshift:
+        return b.Engine.REDSHIFT  # type: ignore
+    elif engine == DBType.Athena:
+        return b.Engine.ATHENA  # type: ignore
     else:
-        return b.DataLocation.UNKNOWN  # type: ignore
+        return b.Engine.UNKNOWN  # type: ignore
 
 
 # Deserialization
@@ -80,12 +80,12 @@ def _table_column_from_proto(col: b.TableColumn) -> Column:
     return Column(name=col.name, data_type=col.data_type, is_primary=col.is_primary)
 
 
-def _location_from_proto(loc: b.DataLocation) -> Location:
-    if loc == b.DataLocation.AURORA:  # type: ignore
-        return Location.Aurora
-    elif loc == b.DataLocation.REDSHIFT:  # type: ignore
-        return Location.Redshift
-    elif loc == b.DataLocation.S3_ICEBERG:  # type: ignore
-        return Location.S3Iceberg
+def _location_from_proto(engine: b.Engine) -> DBType:
+    if engine == b.Engine.AURORA:  # type: ignore
+        return DBType.Aurora
+    elif engine == b.Engine.REDSHIFT:  # type: ignore
+        return DBType.Redshift
+    elif engine == b.Engine.ATHENA:  # type: ignore
+        return DBType.Athena
     else:
-        raise RuntimeError("Unsupported data location {}".format(str(loc)))
+        raise RuntimeError("Unsupported data location {}".format(str(engine)))
