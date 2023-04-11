@@ -6,148 +6,148 @@ tables:
   - table_name: aka_name
     s3_path: aka_name/aka_name.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: aka_title
     s3_path: aka_title/aka_title.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: cast_info
     s3_path: cast_info/cast_info.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: char_name
     s3_path: char_name/char_name.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: comp_cast_type
     s3_path: comp_cast_type/comp_cast_type.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: company_name
     s3_path: company_name/company_name.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: company_type
     s3_path: company_type/company_type.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: complete_cast
     s3_path: complete_cast/complete_cast.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: info_type
     s3_path: info_type/info_type.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: keyword
     s3_path: keyword/keyword.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: kind_type
     s3_path: kind_type/kind_type.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: link_type
     s3_path: link_type/link_type.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: movie_companies
     s3_path: movie_companies/movie_companies.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: movie_info_idx
     s3_path: movie_info_idx/movie_info_idx.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: movie_info
     s3_path: movie_info/movie_info.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: movie_keyword
     s3_path: movie_keyword/movie_keyword.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: movie_link
     s3_path: movie_link/movie_link.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: name
     s3_path: name/name.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: role_type
     s3_path: role_type/role_type.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: title
     s3_path: title/title.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: person_info
     s3_path: person_info/person_info.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: CSV IGNOREHEADER 1 delimiter '|'
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
 
