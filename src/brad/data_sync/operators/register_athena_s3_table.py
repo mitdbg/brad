@@ -2,7 +2,7 @@ import logging
 from typing import List
 
 from .operator import Operator
-from brad.blueprint.data.table import Column
+from brad.blueprint.table import Column
 from brad.blueprint.sql_gen.table import comma_separated_column_names_and_types
 from brad.config.engine import Engine
 from brad.data_sync.execution.context import ExecutionContext

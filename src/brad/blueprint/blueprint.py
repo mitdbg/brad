@@ -1,29 +1,48 @@
-from .table import Table
+from typing import Callable, List, Set, Optional
 
-from typing import List, Set
+from brad.blueprint.provisioning import AuroraProvisioning, RedshiftProvisioning
+from brad.blueprint.table import Table
+from brad.routing import Router
+
+RouterProvider = Callable[[], Router]
 
 
-class DataBlueprint:
+class Blueprint:
     def __init__(
         self,
         schema_name: str,
         tables: List[Table],
+        # N.B. `Optional` is temporary while we transition the rest of the code
+        # paths over to this new `Blueprint`.
+        aurora_provisioning: Optional[AuroraProvisioning],
+        redshift_provisioning: Optional[RedshiftProvisioning],
+        router_provider: Optional[RouterProvider],
     ):
         self._schema_name = schema_name
         self._tables = tables
+        self._aurora_provisioning = aurora_provisioning
+        self._redshift_provisioning = redshift_provisioning
+        self._router_provider = router_provider
 
+        # Derived properties used for the class' methods.
         self._tables_by_name = {tbl.name: tbl for tbl in self._tables}
         self._base_table_names = self._compute_base_tables()
 
-    @property
     def schema_name(self) -> str:
         return self._schema_name
 
-    @property
     def tables(self) -> List[Table]:
         return self._tables
 
-    @property
+    def aurora_provisioning(self) -> Optional[AuroraProvisioning]:
+        return self._aurora_provisioning
+
+    def redshift_provisioning(self) -> Optional[RedshiftProvisioning]:
+        return self._redshift_provisioning
+
+    def get_router(self) -> Optional[Router]:
+        return self._router_provider() if self._router_provider is not None else None
+
     def base_table_names(self) -> Set[str]:
         return self._base_table_names
 

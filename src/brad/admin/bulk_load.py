@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from collections import namedtuple
 from typing import Any, Coroutine, Iterator, List
 
-from brad.blueprint.data import DataBlueprint
+from brad.blueprint import Blueprint
 from brad.blueprint.sql_gen.table import (
     comma_separated_column_names_and_types,
     comma_separated_column_names,
@@ -17,7 +17,7 @@ from brad.config.strings import (
     AURORA_SEQ_COLUMN,
     source_table_name,
 )
-from brad.server.data_blueprint_manager import DataBlueprintManager
+from brad.server.blueprint_manager import BlueprintManager
 from brad.server.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ def register_admin_action(subparser) -> None:
 
 
 async def _ensure_empty(
-    manifest, blueprint: DataBlueprint, engines: EngineConnections
+    manifest, blueprint: Blueprint, engines: EngineConnections
 ) -> None:
     """
     Verifies that the tables being loaded into are empty.
@@ -132,7 +132,27 @@ async def _load_aurora(
         s3_path=table_options["s3_path"],
     )
     logger.debug("Running on Aurora: %s", load_query)
-    await aurora_connection.execute(load_query)
+    cursor = await aurora_connection.cursor()
+    await cursor.execute(load_query)
+
+    # Reset the next sequence values for SERIAL/BIGSERIAL types after a bulk
+    # load (Aurora does not automatically update it).
+    for column in table.columns:
+        if column.data_type != "SERIAL" and column.data_type != "BIGSERIAL":
+            continue
+        q = "SELECT MAX({}) FROM {}".format(column.name, source_table_name(table))
+        logger.debug("Running on Aurora: %s", q)
+        await cursor.execute(q)
+        row = await cursor.fetchone()
+        if row is None:
+            continue
+        max_serial_val = row[0]
+        q = "ALTER SEQUENCE {}_{}_seq RESTART WITH {}".format(
+            source_table_name(table), column.name, str(max_serial_val + 1)
+        )
+        logger.debug("Running on Aurora: %s", q)
+        await cursor.execute(q)
+
     logger.info("Done loading %s on Aurora!", table_name)
     return Engine.Aurora
 
@@ -212,7 +232,7 @@ async def _load_athena(
 
 
 async def _update_sync_progress(
-    manifest, blueprint: DataBlueprint, aurora_connection
+    manifest, blueprint: Blueprint, aurora_connection
 ) -> None:
     """
     Updates BRAD's sync progress table to ensure that later syncs run correctly.
@@ -238,8 +258,8 @@ async def _update_sync_progress(
             # The table is still empty.
             continue
 
-        q = "UPDATE {} SET next_extract_seq = {}".format(
-            AURORA_EXTRACT_PROGRESS_TABLE_NAME, max_seq + 1
+        q = "UPDATE {} SET next_extract_seq = {} WHERE table_name = '{}'".format(
+            AURORA_EXTRACT_PROGRESS_TABLE_NAME, max_seq + 1, tbl_name
         )
         logger.debug("Running on Aurora %s", q)
         await cursor.execute(q)
@@ -259,7 +279,7 @@ def _try_add_task(
 
 async def bulk_load_impl(args, manifest) -> None:
     config = ConfigFile(args.config_file)
-    blueprint_mgr = DataBlueprintManager(config, manifest["schema_name"])
+    blueprint_mgr = BlueprintManager(config, manifest["schema_name"])
     await blueprint_mgr.load()
     blueprint = blueprint_mgr.get_blueprint()
 
@@ -267,7 +287,10 @@ async def bulk_load_impl(args, manifest) -> None:
         running: List[asyncio.Task[Engine] | Coroutine[Any, Any, Engine]] = []
         engines = await EngineConnections.connect(config, manifest["schema_name"])
         if not args.force:
+            logger.info("Verifying that all tables are empty...")
             await _ensure_empty(manifest, blueprint, engines)
+        else:
+            logger.info("Not checking for empty tables.")
 
         ctx = _LoadContext(
             config, manifest["s3_bucket"], manifest["s3_bucket_region"], blueprint
@@ -308,6 +331,7 @@ async def bulk_load_impl(args, manifest) -> None:
         redshift_loads = load_tasks_for_engine(Engine.Redshift)
         athena_loads = load_tasks_for_engine(Engine.Athena)
 
+        logger.info("Starting the bulk load.")
         if args.sequential:
             for t in aurora_loads:
                 await t
@@ -318,8 +342,8 @@ async def bulk_load_impl(args, manifest) -> None:
 
         else:
             _try_add_task(aurora_loads, running)
-            _try_add_task(athena_loads, running)
             _try_add_task(redshift_loads, running)
+            _try_add_task(athena_loads, running)
 
             while len(running) > 0:
                 done, pending = await asyncio.wait(
@@ -358,7 +382,7 @@ async def bulk_load_impl(args, manifest) -> None:
 
 
 def bulk_load(args) -> None:
-    with open(args.manifest_file, "r") as file:
+    with open(args.manifest_file, "r", encoding="UTF-8") as file:
         manifest = yaml.load(file, Loader=yaml.Loader)
 
     executor = ThreadPoolExecutor(max_workers=3)

@@ -1,7 +1,7 @@
 import boto3
 from typing import Dict, TYPE_CHECKING
 
-from brad.blueprint.data import DataBlueprint
+from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 
 # Needed to avoid a circular import.
@@ -15,7 +15,7 @@ class ExecutionContext:
         aurora,
         athena,
         redshift,
-        blueprint: DataBlueprint,
+        blueprint: Blueprint,
         config: ConfigFile,
     ) -> None:
         self._aurora = aurora
@@ -63,7 +63,7 @@ class ExecutionContext:
             self._redshift_cursor = await self._redshift.cursor()
         return self._redshift_cursor
 
-    def blueprint(self) -> DataBlueprint:
+    def blueprint(self) -> Blueprint:
         return self._blueprint
 
     def s3_bucket(self) -> str:
