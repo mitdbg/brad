@@ -258,8 +258,8 @@ async def _update_sync_progress(
             # The table is still empty.
             continue
 
-        q = "UPDATE {} SET next_extract_seq = {}".format(
-            AURORA_EXTRACT_PROGRESS_TABLE_NAME, max_seq + 1
+        q = "UPDATE {} SET next_extract_seq = {} WHERE table_name = '{}'".format(
+            AURORA_EXTRACT_PROGRESS_TABLE_NAME, max_seq + 1, tbl_name
         )
         logger.debug("Running on Aurora %s", q)
         await cursor.execute(q)
@@ -287,7 +287,10 @@ async def bulk_load_impl(args, manifest) -> None:
         running: List[asyncio.Task[Engine] | Coroutine[Any, Any, Engine]] = []
         engines = await EngineConnections.connect(config, manifest["schema_name"])
         if not args.force:
+            logger.info("Verifying that all tables are empty...")
             await _ensure_empty(manifest, blueprint, engines)
+        else:
+            logger.info("Not checking for empty tables.")
 
         ctx = _LoadContext(
             config, manifest["s3_bucket"], manifest["s3_bucket_region"], blueprint
@@ -328,6 +331,7 @@ async def bulk_load_impl(args, manifest) -> None:
         redshift_loads = load_tasks_for_engine(Engine.Redshift)
         athena_loads = load_tasks_for_engine(Engine.Athena)
 
+        logger.info("Starting the bulk load.")
         if args.sequential:
             for t in aurora_loads:
                 await t
@@ -338,8 +342,8 @@ async def bulk_load_impl(args, manifest) -> None:
 
         else:
             _try_add_task(aurora_loads, running)
-            _try_add_task(athena_loads, running)
             _try_add_task(redshift_loads, running)
+            _try_add_task(athena_loads, running)
 
             while len(running) > 0:
                 done, pending = await asyncio.wait(
