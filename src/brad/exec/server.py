@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import signal
+import multiprocessing as mp
 
 from brad.config.file import ConfigFile
 from brad.server.server import BradServer
@@ -46,12 +47,18 @@ async def shutdown_server(event_loop):
 def handle_exception(event_loop, context):
     message = context.get("exception", context["message"])
     logging.error("Encountered fatal exception: %s", message)
+    logging.error("%s", context)
     if event_loop.is_closed():
         return
     event_loop.create_task(shutdown_server(event_loop))
 
 
 def main(args):
+    # On Unix platforms, the default way to start a process is by forking, which
+    # is not ideal (we do not want to duplicate this process' file
+    # descriptors!).
+    mp.set_start_method("spawn")
+
     set_up_logging(debug_mode=args.debug)
     config = ConfigFile(args.config_file)
 
@@ -66,7 +73,7 @@ def main(args):
     event_loop.set_exception_handler(handle_exception)
 
     try:
-        server = BradServer(config, args.schema_name)
+        server = BradServer(config, args.schema_name, args.debug)
         event_loop.create_task(server.serve_forever())
         event_loop.run_forever()
     finally:

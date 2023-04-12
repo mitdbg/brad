@@ -7,8 +7,17 @@ from brad.routing.policy import RoutingPolicy
 
 class ConfigFile:
     def __init__(self, path: str):
+        self._raw_path = path
         with open(path, "r", encoding="UTF-8") as file:
             self._raw = yaml.load(file, Loader=yaml.Loader)
+
+    @property
+    def raw_path(self) -> str:
+        return self._raw_path
+
+    @property
+    def daemon_log_path(self) -> Optional[str]:
+        return self._raw["daemon_log_file"] if "daemon_log_file" in self._raw else None
 
     @property
     def server_interface(self) -> str:
