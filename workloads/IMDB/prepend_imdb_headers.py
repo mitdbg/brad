@@ -11,7 +11,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string("csv_dir", "imdb", "Directory to IMDB CSVs.")
 
 
-def PrependLine(filename, line):
+def PrependLine(filename: str, line: str) -> None:
     with open(filename, "r+") as f:
         content = f.read()
         f.seek(0, 0)

@@ -2,9 +2,10 @@ import re
 import os
 import numpy as np
 import yaml
+from typing import Mapping, Optional, Union, Any
 
 
-IMDB_TABLE_SIZE = {
+IMDB_TABLE_SIZE: Mapping[str, int] = {
     "aka_name": 901343,
     "aka_title": 361472,
     "cast_info": 36244344,
@@ -29,7 +30,7 @@ IMDB_TABLE_SIZE = {
 }
 
 
-def load_queries(query_dir):
+def load_queries(query_dir: str) -> (list[str], np.ndarray, np.ndarray):
     query_path = os.path.join(query_dir, "all_queries.sql")
     aurora_rt_path = os.path.join(query_dir, "all_queries_aurora_runtime.npy")
     redshift_rt_path = os.path.join(query_dir, "all_queries_redshift_runtime.npy")
@@ -42,7 +43,8 @@ def load_queries(query_dir):
     return queries, aurora_runtime, redshift_runtime
 
 
-def get_table_names(sql, all_tables=None, return_join=False):
+def get_table_names(sql, all_tables: Optional[set[str]] = None, return_join: bool = False) -> \
+        Union[set[str], (set[str], list[str])]:
     table_names = set()
     from_clause = sql.split(" FROM ")[-1].split(" WHERE ")[0]
     join_cond_pat = re.compile(
@@ -79,7 +81,7 @@ def get_table_names(sql, all_tables=None, return_join=False):
     return table_names
 
 
-def format_time_str(hour, time_in_sec):
+def format_time_str(hour: int, time_in_sec: int) -> str:
     assert 0 <= time_in_sec < 3600
     hour_str = f"0{hour}" if hour < 10 else str(hour)
     minute = int(time_in_sec / 60)
@@ -89,7 +91,7 @@ def format_time_str(hour, time_in_sec):
     return f"{hour_str}:{minute_str}:{second_str}"
 
 
-def extract_columns(pg_schema_path):
+def extract_columns(pg_schema_path: str) -> (Mapping[str, list[str]], Mapping[str, list[str]]):
     PK_columns = dict()  # In IMDB workload, PK is always id
     all_columns = dict()
     with open(pg_schema_path, "r") as file:
@@ -133,7 +135,7 @@ def extract_columns(pg_schema_path):
     return PK_columns, all_columns
 
 
-def load_schema_as_dict(pg_schema_path, schema_name):
+def load_schema_as_dict(pg_schema_path: str, schema_name: str) -> Mapping[str, Any]:
     schema = dict()
     schema["schema_name"] = schema_name
     schema["tables"] = []
@@ -173,7 +175,7 @@ def load_schema_as_dict(pg_schema_path, schema_name):
     return schema
 
 
-def reformat_data_type(data_type):
+def reformat_data_type(data_type: str) -> str:
     if "NOT NULL" in data_type:
         data_type = data_type.replace("NOT NULL", "")
     if "character varying" in data_type:
@@ -184,13 +186,13 @@ def reformat_data_type(data_type):
     return data_type
 
 
-def convert_imdb_schema_sql_to_yml(pg_schema_path, save_file="config/schemas/imdb.yml"):
+def convert_imdb_schema_sql_to_yml(pg_schema_path: str, save_file: str = "config/schemas/imdb.yml") -> None:
     schema = load_schema_as_dict(pg_schema_path, "imdb")
     with open(save_file, "w") as file:
         documents = yaml.dump(schema, file)
 
 
-def extract_join_keys(query_dir):
+def extract_join_keys(query_dir: str) -> (set[str], Mapping[str, set[tuple]]):
     queries, _, _ = load_queries(query_dir)
     all_tables = set()
     all_join_conds = dict()

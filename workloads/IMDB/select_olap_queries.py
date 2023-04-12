@@ -1,17 +1,18 @@
 import os
 import numpy as np
+from typing import Optional, Mapping
 from workloads.IMDB.util import load_queries
 
 
 def select_report_queries(
-    query_dir=None,
-    queries=None,
-    aurora_runtime=None,
-    redshift_runtime=None,
-    selected_query_rt_interval=None,
-    save_dir=None,
-    force=False,
-):
+    query_dir: Optional[str] = None,
+    queries: Optional[list[str]] = None,
+    aurora_runtime: Optional[np.ndarray] = None,
+    redshift_runtime: Optional[np.ndarray] = None,
+    selected_query_rt_interval: Optional[Mapping[int, int]] = None,
+    save_dir: Optional[str] = None,
+    force: bool = False,
+) -> list[str]:
     # select and fix a bunch of queries as the repeatedly executed reporting queries
     if save_dir:
         if os.path.exists(save_dir) and len(os.listdir(save_dir)) != 0:
@@ -68,17 +69,17 @@ def select_report_queries(
 
 
 def select_adhoc_queries(
-    query_dir=None,
-    queries=None,
-    aurora_runtime=None,
-    redshift_runtime=None,
-    num_query=1,
-    rt_interval=None,
-    aurora_timeout=False,
-    redshift_timeout=False,
-    save_dir=None,
-    return_query_idx=True,
-):
+    query_dir: Optional[str] = None,
+    queries: Optional[list[str]] = None,
+    aurora_runtime: Optional[np.ndarray] = None,
+    redshift_runtime: Optional[np.ndarray] = None,
+    num_query: int = 1,
+    rt_interval: Optional[Mapping[int, int]] = None,
+    aurora_timeout: bool = False,
+    redshift_timeout: bool = False,
+    save_dir: Optional[str] = None,
+    return_query_idx: bool = True,
+) -> list[str]:
     # randomly select {num_query} queries as the adhoc queries
     # num_query should reflect number of users at a given time
     if num_query == 0:

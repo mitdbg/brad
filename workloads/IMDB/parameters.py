@@ -1,18 +1,18 @@
 import re
-
+from typing import Any, Optional
 
 class _Param:
     """Stores data for a single parameter."""
 
-    def __init__(self, name, default_value, description):
+    def __init__(self, name: str, default_value: Any, description: str):
         self._name = name
         self._value = default_value
         self._description = description
 
-    def Get(self):
+    def Get(self) -> Any:
         return self._value
 
-    def Set(self, value):
+    def Set(self, value: Any) -> None:
         self._value = value
 
 
@@ -27,7 +27,7 @@ class Params:
         self.__dict__["_immutable"] = False
         self._params = {}  # name => _Param
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: Any) -> None:
         if self._immutable:
             raise TypeError("This Params instance is immutable.")
         if name == "_params" or name == "_immutable":
@@ -38,7 +38,7 @@ class Params:
             except KeyError:
                 raise AttributeError(self._KeyErrorString(name))
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Optional[Any]:
         if name == "_params" or name == "_immutable":
             return self.__dict__[name]
         try:
@@ -47,28 +47,28 @@ class Params:
             # cPickle expects __getattr__ to raise AttributeError, not KeyError.
             raise AttributeError(self._KeyErrorString(name))
 
-    def __dir__(self):
+    def __dir__(self) -> list:
         return sorted(self._params.keys())
 
-    def __contains__(self, name):
+    def __contains__(self, name: str) -> bool:
         return name in self._params
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._params)
 
     # Note: This gets called by _Param.__eq__() on nested Params objects.
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
             isinstance(other, Params) and self._params == other._params
         )  # pylint: disable=protected-access
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self == other
 
     def __str__(self):
         return self._ToString(0)
 
-    def _ToString(self, nested_depth):
+    def _ToString(self, nested_depth: int) -> str:
         # Note: We use iteritems() below so as to sort by name.
         sorted_param_strs = [
             v.ToString(nested_depth + 1) for (_, v) in sorted(self._params.items())
@@ -76,10 +76,10 @@ class Params:
         nested_indent = "  " * nested_depth
         return "{\n%s\n%s}" % ("\n".join(sorted_param_strs), nested_indent)
 
-    def __deepcopy__(self, unused_memo):
+    def __deepcopy__(self, unused_memo: Any):
         return self.Copy()
 
-    def Define(self, name, default_value, description):
+    def Define(self, name: str, default_value: Any, description: str) -> None:
         """Defines a parameter.
 
         Args:
@@ -102,7 +102,7 @@ class Params:
             raise AttributeError("Parameter %s is already defined" % name)
         self._params[name] = _Param(name, default_value, description)
 
-    def Freeze(self):
+    def Freeze(self) -> None:
         """Marks this Params as immutable."""
         self._immutable = True
 
@@ -124,7 +124,7 @@ class _RegistryHelper(object):
 Register = _RegistryHelper.Register
 
 
-def Get(name):
+def Get(name: str) -> Params:
     if name not in _RegistryHelper._PARAMS:
         raise LookupError(
             "{} not found in registered params: {}".format(
@@ -141,7 +141,7 @@ def GetAll():
 
 class WorkloadParams(object):
     @classmethod
-    def Params(cls):
+    def Params(cls) -> Params:
         p = Params()
         p.Define(
             "num_days",
@@ -234,7 +234,7 @@ class WorkloadParams(object):
 
 @Register
 class Default(WorkloadParams):
-    def Params(self):
+    def Params(self) -> Params:
         p = super().Params()
         p.num_days = 1
         p.schema_file = "workloads/IMDB/schema.sql"

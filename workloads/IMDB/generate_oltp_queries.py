@@ -1,10 +1,9 @@
-import os
-import numpy as np
 import json
 from workloads.IMDB.util import IMDB_TABLE_SIZE
+from typing import Optional, Mapping
 
 
-def make_init_log_file(txn_generation_ids_offset_file, all_table_name):
+def make_init_log_file(txn_generation_ids_offset_file: str, all_table_name: list[str]) -> None:
     table_ids_offset = dict()
     for table in all_table_name:
         table_ids_offset[table] = 1
@@ -13,16 +12,16 @@ def make_init_log_file(txn_generation_ids_offset_file, all_table_name):
 
 
 def generate_oltp_queries(
-    num_queries,
-    generation_log_file,
-    table_insert_freq,
-    num_tuples_insert,
-    PK_columns,
-    all_columns,
-    all_tables,
-    all_join_keys=None,
-    match_new_pk=False,
-):
+    num_queries: int,
+    generation_log_file: str,
+    table_insert_freq: list[float],
+    num_tuples_insert: int,
+    PK_columns: Mapping[str, list[str]],
+    all_columns: Mapping[str, list[str]],
+    all_tables: list[str],
+    all_join_keys: Optional[list[str]] = None,
+    match_new_pk: bool = False,
+) -> list[str]:
     if num_queries == 0:
         return []
 

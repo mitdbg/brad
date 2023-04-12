@@ -1,5 +1,7 @@
 import os
 import json
+from typing import Optional
+from workloads.IMDB.parameters import Params
 from workloads.IMDB.util import (
     format_time_str,
     IMDB_TABLE_SIZE,
@@ -12,9 +14,8 @@ from workloads.IMDB.generate_oltp_queries import (
 )
 
 
-def simulate_oltp_one_day(param, day=None):
+def simulate_oltp_one_day(param: Params, day: Optional[int] = None) -> None:
     p = param
-
     if day is not None:
         txn_query_dir = os.path.join(p.txn_query_dir, f"{day}")
     else:
@@ -69,7 +70,7 @@ def simulate_oltp_one_day(param, day=None):
             json.dump(user_queries, f)
 
 
-def simulate_oltp(param):
+def simulate_oltp(param: Params) -> None:
     num_day = param.num_days
     if num_day == 1:
         simulate_oltp_one_day(param)
