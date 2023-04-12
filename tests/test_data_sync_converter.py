@@ -1,8 +1,8 @@
 from brad.blueprint.user import UserProvidedBlueprint
 from brad.data_sync.execution.plan_converter import PlanConverter
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
+from brad.data_sync.planner import make_logical_data_sync_plan
 from brad.planner.data import bootstrap_blueprint
-from brad.planner.data_sync import make_logical_data_sync_plan
 
 
 def validate_physical_plan_structure(plan: PhysicalDataSyncPlan):

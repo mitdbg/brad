@@ -32,19 +32,18 @@ INSTALL_REQUIRES = [
     "pyodbc",
     "pyyaml",
     "sqlglot",
-    "boto3",
 ]
 
 DEV_REQUIRES = [
+    "absl-py",
     "black",
     "grpcio-tools",
     "mypy",
+    "numpy",
     "pylint",
     "pytest",
     "types-PyYAML",
     "types-protobuf",
-    "absl-py",
-    "numpy"
 ]
 
 KEYWORDS = []

@@ -10,7 +10,7 @@ from brad.data_sync.execution.plan_converter import PlanConverter
 from brad.data_sync.execution.table_sync_bounds import TableSyncBounds
 from brad.data_sync.logical_plan import LogicalDataSyncPlan
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
-from brad.planner.data_sync import make_logical_data_sync_plan
+from brad.data_sync.planner import make_logical_data_sync_plan
 from brad.server.blueprint_manager import BlueprintManager
 from brad.server.engine_connections import EngineConnections
 
