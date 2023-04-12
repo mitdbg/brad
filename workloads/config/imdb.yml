@@ -1,0 +1,31 @@
+# workload configuration for IMDB workload
+
+data_sync_period_seconds: 0
+
+# Set to always_{aurora, athena, redshift} to force IOHTAP to route all queries
+# to the specified engine. The `default` routing policy uses a predictor to
+# select the most suitable engine.
+routing_policy: default
+
+athena:
+  odbc_driver: Athena
+  aws_region: us-east-1
+  s3_output_path: s3://brad-ziniuw/output/
+  s3_data_path: s3://brad-ziniuw/
+  access_key: AKIA6PAI62DS6YNY5P72
+  access_key_secret: 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
+
+aurora:
+  odbc_driver: PostgreSQL
+  host: database-1.cluster-c39astlavjy2.us-east-1.rds.amazonaws.com
+  port: 5432
+  user: postgres
+  password: postgres
+
+redshift:
+  odbc_driver: Redshift
+  host: brad-redshift-cluster.cmdzoy6ck5ua.us-east-1.redshift.amazonaws.com
+  port: 5439
+  user: awsuser
+  password: Giftedcoconut!#4
+  s3_iam_role: arn:aws:iam::994303725797:role/service-role/AmazonRedshift-CommandsAccessRole-20230330T134537
