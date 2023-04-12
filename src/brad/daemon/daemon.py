@@ -1,33 +1,105 @@
+import asyncio
+import signal
 import logging
-import socket
+import multiprocessing as mp
+
 from brad.config.file import ConfigFile
+from brad.daemon.shutdown import ShutdownDaemon
+from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)
 
 
 class BradDaemon:
-    @classmethod
-    def connect(cls, host: str, config: ConfigFile):
-        server_socket = socket.create_connection((host, config.server_daemon_port))
-        logger.info(
-            "Successfully connected to the server at %s:%d",
-            host,
-            config.server_daemon_port,
-        )
-        return cls(config, server_socket)
+    """
+    Represents BRAD's background process.
 
-    def __init__(self, config: ConfigFile, server_socket: socket.socket):
+    This code is written with the assumption that this daemon is spawned by the
+    BRAD server. In the future, we may want the daemon to be launched
+    independently and for it to communicate with the server via RPCs.
+    """
+
+    def __init__(
+        self,
+        config: ConfigFile,
+        schema_name: str,
+        event_loop: asyncio.AbstractEventLoop,
+        input_queue: mp.Queue,
+        output_queue: mp.Queue,
+    ):
         self._config = config
-        self._server_socket = server_socket
-        self._server_socket_file = self._server_socket.makefile("r")
+        self._schema_name = schema_name
+        self._event_loop = event_loop
+        self._input_queue = input_queue
+        self._output_queue = output_queue
 
-    def __del__(self):
-        self._server_socket_file.close()
-        self._server_socket.close()
-        self._server_socket_file = None
-        self._server_socket = None
+    async def start(self) -> None:
+        """
+        Starts any remaining background tasks.
+        """
+        self._event_loop.create_task(self._read_server_messages())
+        logger.info("The BRAD daemon is running.")
 
-    def run(self):
+    async def _read_server_messages(self) -> None:
+        """
+        Waits for messages from the server and processes them.
+        """
         while True:
-            query = self._server_socket_file.readline().strip()
-            logger.info("Received %s", query)
+            message = await self._event_loop.run_in_executor(
+                None, self._input_queue.get
+            )
+
+            if isinstance(message, ShutdownDaemon):
+                logger.debug("Daemon received shutdown message.")
+                self._event_loop.create_task(self._shutdown())
+                break
+
+            logger.debug("Received message %s", str(message))
+
+    async def _shutdown(self) -> None:
+        logger.info("The BRAD daemon is shutting down...")
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        self._event_loop.stop()
+
+    @staticmethod
+    def launch_in_subprocess(
+        config_path: str,
+        schema_name: str,
+        debug_mode: bool,
+        input_queue: mp.Queue,
+        output_queue: mp.Queue,
+    ) -> None:
+        """
+        Schedule this method to run in a child process to launch the BRAD
+        daemon.
+        """
+        config = ConfigFile(config_path)
+        set_up_logging(filename=config.daemon_log_path, debug_mode=debug_mode)
+
+        event_loop = asyncio.new_event_loop()
+        event_loop.set_debug(enabled=debug_mode)
+        asyncio.set_event_loop(event_loop)
+
+        # Signal handlers are inherited from the parent server process. We want
+        # to ignore these signals since we receive a shutdown signal from the
+        # server directly.
+        for sig in [signal.SIGTERM, signal.SIGINT]:
+            event_loop.add_signal_handler(sig, _noop)
+
+        try:
+            daemon = BradDaemon(
+                config, schema_name, event_loop, input_queue, output_queue
+            )
+            event_loop.create_task(daemon.start())
+            logger.info("The BRAD daemon is starting...")
+            event_loop.run_forever()
+        finally:
+            event_loop.close()
+            logger.info("The BRAD daemon has shut down.")
+
+
+def _noop():
+    pass

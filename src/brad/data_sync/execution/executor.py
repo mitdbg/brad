@@ -38,6 +38,7 @@ class DataSyncExecutor:
         if self._engines is None:
             return
         await self._engines.close()
+        logger.debug("Closed connections to the underlying engines.")
 
     async def run_sync(self, blueprint: Blueprint) -> bool:
         ctx = self._new_execution_context()

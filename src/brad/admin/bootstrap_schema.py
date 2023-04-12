@@ -34,8 +34,9 @@ def bootstrap_schema(args):
     # 1. Load the config.
     config = ConfigFile(args.config_file)
 
-    # 2. Load the user-provided schema.
+    # 2. Load and validate the user-provided schema.
     user = UserProvidedBlueprint.load_from_yaml_file(args.schema_file)
+    user.validate()
 
     # 3. Get the bootstrapped blueprint. Later on this planning phase will be
     # more sophisticated (we'll take the "workload" as input).

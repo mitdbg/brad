@@ -1,7 +1,9 @@
 import asyncio
 import io
 import logging
-from typing import AsyncIterable, List, Tuple
+import queue
+import multiprocessing as mp
+from typing import AsyncIterable, Optional
 
 import grpc
 import pyodbc
@@ -9,6 +11,8 @@ import pyodbc
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
+from brad.daemon.daemon import BradDaemon
+from brad.daemon.shutdown import ShutdownDaemon
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
@@ -20,7 +24,6 @@ from brad.server.errors import QueryError
 from brad.server.grpc import BradGrpc
 from brad.server.session import SessionManager, SessionId
 from brad.forecasting.forecaster import WorkloadForecaster
-from brad.net.async_connection_acceptor import AsyncConnectionAcceptor
 from brad.query_rep import QueryRep
 
 logger = logging.getLogger(__name__)
@@ -29,9 +32,10 @@ LINESEP = "\n".encode()
 
 
 class BradServer(BradInterface):
-    def __init__(self, config: ConfigFile, schema_name: str):
+    def __init__(self, config: ConfigFile, schema_name: str, debug_mode: bool):
         self._config = config
         self._schema_name = schema_name
+        self._debug_mode = debug_mode
         self._blueprint_mgr = BlueprintManager(self._config, self._schema_name)
 
         # We have different routing policies for performance evaluation and
@@ -51,21 +55,19 @@ class BradServer(BradInterface):
             )
 
         self._sessions = SessionManager(self._config, self._schema_name)
-        self._daemon_connections: List[
-            Tuple[asyncio.StreamReader, asyncio.StreamWriter]
-        ] = []
         self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
         self._timed_sync_task = None
         self._forecaster = WorkloadForecaster()
 
+        # Used for managing the daemon process.
+        self._daemon_mp_manager: Optional[mp.managers.SyncManager] = None
+        self._daemon_input_queue: Optional[mp.Queue] = None
+        self._daemon_output_queue: Optional[mp.Queue] = None
+        self._daemon_process: Optional[mp.Process] = None
+
     async def serve_forever(self):
         try:
             await self.run_setup()
-            daemon_acceptor = await AsyncConnectionAcceptor.create(
-                host=self._config.server_interface,
-                port=self._config.server_daemon_port,
-                handler_function=self._handle_new_daemon_connection,
-            )
             grpc_server = grpc.aio.server()
             brad_grpc.add_BradServicer_to_server(BradGrpc(self), grpc_server)
             grpc_server.add_insecure_port(
@@ -74,10 +76,7 @@ class BradServer(BradInterface):
             await grpc_server.start()
             logger.info("The BRAD server has successfully started.")
             logger.info("Listening on port %d.", self._config.server_port)
-            await asyncio.gather(
-                grpc_server.wait_for_termination(),
-                daemon_acceptor.serve_forever(),
-            )
+            await asyncio.gather(grpc_server.wait_for_termination())
         finally:
             # Not ideal, but we need to manually call this method to ensure
             # gRPC's internal shutdown process completes before we return from
@@ -93,23 +92,37 @@ class BradServer(BradInterface):
             self._timed_sync_task = loop.create_task(self._run_sync_periodically())
         await self._data_sync_executor.establish_connections()
 
+        # Launch the daemon process.
+        self._daemon_mp_manager = mp.Manager()
+        self._daemon_input_queue = self._daemon_mp_manager.Queue()
+        self._daemon_output_queue = self._daemon_mp_manager.Queue()
+        self._daemon_process = mp.Process(
+            target=BradDaemon.launch_in_subprocess,
+            args=(
+                self._config.raw_path,
+                self._schema_name,
+                self._debug_mode,
+                self._daemon_input_queue,
+                self._daemon_output_queue,
+            ),
+        )
+        self._daemon_process.start()
+        logger.info("The BRAD daemon process has been started.")
+
     async def run_teardown(self):
+        loop = asyncio.get_event_loop()
+        assert self._daemon_input_queue is not None
+        assert self._daemon_process is not None
+
+        # Tell the daemon process to shut down and wait for it to do so.
+        await loop.run_in_executor(None, self._daemon_input_queue.put, ShutdownDaemon())
+        await loop.run_in_executor(None, self._daemon_process.join)
+
         if self._timed_sync_task is not None:
             await self._timed_sync_task.close()
             self._timed_sync_task = None
 
-        for _, writer in self._daemon_connections:
-            writer.close()
-            await writer.wait_closed()
-        self._daemon_connections.clear()
-
         await self._data_sync_executor.shutdown()
-
-    def _handle_new_daemon_connection(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-    ):
-        logger.debug("Accepted new daemon connection.")
-        self._daemon_connections.append((reader, writer))
 
     async def start_session(self) -> SessionId:
         session_id, _ = await self._sessions.create_new_session()
@@ -165,6 +178,16 @@ class BradServer(BradInterface):
             except pyodbc.ProgrammingError:
                 logger.debug("No rows produced.")
 
+            if self._daemon_input_queue is not None:
+                try:
+                    # Send the query to the daemon. Note that the daemon needs to
+                    # consume these queries quickly enough to avoid an overflow.
+                    self._daemon_input_queue.put(query, block=False)
+                except queue.Full:
+                    logger.warning(
+                        "Daemon input queue is full. Not sending query '%s'", query
+                    )
+
         except QueryError:
             # This is an expected exception. We catch and re-raise it here to
             # avoid triggering the handler below.
@@ -172,16 +195,6 @@ class BradServer(BradInterface):
         except Exception as ex:
             logger.exception("Encountered unexpected exception when handling request.")
             raise QueryError.from_exception(ex)
-
-        # NOTE: What we do here depends on the needs of the background daemon.
-        if query is not None:
-            try:
-                for _, daemon_writer in self._daemon_connections:
-                    daemon_writer.write(str(query).encode())
-                    daemon_writer.write(LINESEP)
-                    await daemon_writer.drain()
-            except:  # pylint: disable=bare-except
-                logger.exception("Exception when sending the query to the daemon.")
 
     async def _handle_internal_command(self, command: str) -> AsyncIterable[bytes]:
         """

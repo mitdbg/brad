@@ -6,9 +6,9 @@ from typing import List, Set
 
 class UserProvidedBlueprint:
     """
-    Represents a "user-provided" logical blueprint. This data blueprint contains
-    a list of the tables, their schemas, dependencies, and transforms between
-    the tables.
+    Represents a "user-provided" logical blueprint. This logical blueprint
+    contains a list of the tables, their schemas, dependencies, and transforms
+    between the tables.
 
     BRAD's planner will convert this user-provided logical blueprint into a
     physical blueprint (contains details about table placement and replication).
