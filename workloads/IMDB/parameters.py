@@ -1,6 +1,7 @@
 import re
 from typing import Any, Optional
 
+
 class _Param:
     """Stores data for a single parameter."""
 

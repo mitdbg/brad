@@ -3,7 +3,9 @@ from workloads.IMDB.util import IMDB_TABLE_SIZE
 from typing import Optional, Mapping
 
 
-def make_init_log_file(txn_generation_ids_offset_file: str, all_table_name: list[str]) -> None:
+def make_init_log_file(
+    txn_generation_ids_offset_file: str, all_table_name: list[str]
+) -> None:
     table_ids_offset = dict()
     for table in all_table_name:
         table_ids_offset[table] = 1

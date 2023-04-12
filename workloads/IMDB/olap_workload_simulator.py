@@ -9,6 +9,7 @@ from workloads.IMDB.select_olap_queries import (
 from workloads.IMDB.util import format_time_str
 from workloads.IMDB.parameters import Params
 
+
 def simulate_olap_one_day(param: Params, day: Optional[int] = None) -> None:
     p = param
     queries, aurora_runtime, redshift_runtime = load_queries(p.analytic_query_dir)
