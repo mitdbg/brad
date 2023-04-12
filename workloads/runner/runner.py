@@ -6,11 +6,11 @@ import asyncio
 from asyncio import PriorityQueue, Queue, Task
 from typing import Any, Final
 
-from brad.runner.client import AsyncClient
-from brad.runner.query import CompletedQuery, PendingQuery, Queries, Query, User
-from brad.runner.reporter import QueryReporter
-from brad.runner.time import get_current_time, get_event_loop_time, measure_time
-from brad.runner.workload import Workload
+from workloads.runner.client import AsyncClient
+from workloads.runner.query import CompletedQuery, PendingQuery, Queries, Query, User
+from workloads.runner.reporter import QueryReporter
+from workloads.runner.time import get_current_time, get_event_loop_time, measure_time
+from workloads.runner.workload import Workload
 
 _MAX_PENDING_QUEUE_SIZE: Final[int] = 10
 

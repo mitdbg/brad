@@ -9,8 +9,8 @@ from typing import Protocol, final, overload
 from attrs import define
 from typing_extensions import override
 
-from brad.runner.generator import ImmutableGenerator
-from brad.runner.time import get_current_time
+from workloads.runner.generator import ImmutableGenerator
+from workloads.runner.time import get_current_time
 
 
 class Schedule(Protocol):

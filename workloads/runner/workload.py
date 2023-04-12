@@ -7,9 +7,9 @@ from typing import final
 from attrs import define, field
 from immutables import Map
 
-from brad.runner.query import ChainedQueries, Queries
-from brad.runner.user import User
-from brad.runner.utils import to_tuple
+from workloads.runner.query import ChainedQueries, Queries
+from workloads.runner.user import User
+from workloads.runner.utils import to_tuple
 
 
 @final

@@ -3,7 +3,7 @@ from typing import Protocol, final
 
 from typing_extensions import override
 
-from brad.runner.query import CompletedQuery
+from workloads.runner.query import CompletedQuery
 
 
 class QueryReporter(Protocol):

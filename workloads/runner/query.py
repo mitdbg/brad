@@ -7,10 +7,10 @@ from typing import Any, TypeAlias, final
 from attrs import define, field
 from typing_extensions import override
 
-from brad.runner.generator import ImmutableGenerator, SqlGenerator
-from brad.runner.schedule import Schedule, ScheduleGenerator
-from brad.runner.user import User
-from brad.runner.utils import to_tuple
+from workloads.runner.generator import ImmutableGenerator, SqlGenerator
+from workloads.runner.schedule import Schedule, ScheduleGenerator
+from workloads.runner.user import User
+from workloads.runner.utils import to_tuple
 
 
 @final

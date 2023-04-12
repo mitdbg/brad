@@ -4,14 +4,14 @@ from typing import AsyncIterator, final
 
 from typing_extensions import override
 
-from brad.runner import run_workload
-from brad.runner.client import AsyncClient
-from brad.runner.query import Query
-from brad.runner.reporter import PrintReporter
-from brad.runner.schedule import Once, Repeat
-from brad.runner.time import get_current_time
-from brad.runner.user import User
-from brad.runner.workload import Workload
+from workloads.runner import run_workload
+from workloads.runner.client import AsyncClient
+from workloads.runner.query import Query
+from workloads.runner.reporter import PrintReporter
+from workloads.runner.schedule import Once, Repeat
+from workloads.runner.time import get_current_time
+from workloads.runner.user import User
+from workloads.runner.workload import Workload
 
 
 @final
