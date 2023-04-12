@@ -5,7 +5,6 @@ import brad
 import brad.exec.admin
 import brad.exec.cli
 import brad.exec.server
-import brad.exec.daemon
 
 
 def main():
@@ -21,7 +20,6 @@ def main():
     subparsers = parser.add_subparsers(title="Commands")
     brad.exec.cli.register_command(subparsers)
     brad.exec.server.register_command(subparsers)
-    brad.exec.daemon.register_command(subparsers)
     brad.exec.admin.register_command(subparsers)
     args = parser.parse_args()
 

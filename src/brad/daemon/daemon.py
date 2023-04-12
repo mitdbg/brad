@@ -1,33 +1,39 @@
 import logging
-import socket
+import multiprocessing as mp
+
 from brad.config.file import ConfigFile
 
 logger = logging.getLogger(__name__)
 
 
 class BradDaemon:
-    @classmethod
-    def connect(cls, host: str, config: ConfigFile):
-        server_socket = socket.create_connection((host, config.server_daemon_port))
-        logger.info(
-            "Successfully connected to the server at %s:%d",
-            host,
-            config.server_daemon_port,
-        )
-        return cls(config, server_socket)
+    """
+    Represents BRAD's background process.
+    """
 
-    def __init__(self, config: ConfigFile, server_socket: socket.socket):
+    def __init__(
+        self,
+        config: ConfigFile,
+        schema_name: str,
+        input_queue: mp.Queue,
+        output_queue: mp.Queue,
+    ):
         self._config = config
-        self._server_socket = server_socket
-        self._server_socket_file = self._server_socket.makefile("r")
-
-    def __del__(self):
-        self._server_socket_file.close()
-        self._server_socket.close()
-        self._server_socket_file = None
-        self._server_socket = None
+        self._schema_name = schema_name
+        self._input_queue = input_queue
+        self._output_queue = output_queue
 
     def run(self):
-        while True:
-            query = self._server_socket_file.readline().strip()
-            logger.info("Received %s", query)
+        pass
+
+    @classmethod
+    def launch_as_subprocess(
+        cls,
+        config_path: str,
+        schema_name: str,
+        input_queue: mp.Queue,
+        output_queue: mp.Queue,
+    ):
+        config = ConfigFile(config_path)
+        daemon = BradDaemon(config, schema_name, input_queue, output_queue)
+        daemon.run()
