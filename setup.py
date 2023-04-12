@@ -14,7 +14,7 @@ NAME = "brad"
 PACKAGES = find_packages(where="src")
 META_PATH = os.path.join("src", "brad", "__init__.py")
 README_PATH = "README.md"
-PYTHON_REQUIRES = ">=3.11"
+PYTHON_REQUIRES = ">=3.10"
 
 PACKAGE_DATA = {}
 PACKAGE_DIR = {"": "src"}
@@ -44,10 +44,7 @@ DEV_REQUIRES = [
     "types-PyYAML",
     "types-protobuf",
     "absl-py",
-    "numpy",
-    "immutables",
-    "attrs",
-    "typing-extensions",
+    "numpy"
 ]
 
 KEYWORDS = []
