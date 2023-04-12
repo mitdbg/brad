@@ -2,11 +2,11 @@ name: Check Code
 
 on:
   push:
-    branches: [ main ]
+    branches: [ zw-workload-runner ]
     paths-ignore:
     - 'cirrus/**'
   pull_request:
-    branches: [ main ]
+    branches: [ zw-workload-runner ]
     paths-ignore:
     - 'cirrus/**'
 
