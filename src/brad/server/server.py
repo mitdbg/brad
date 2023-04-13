@@ -109,6 +109,8 @@ class BradServer(BradInterface):
         logger.info("The BRAD daemon process has been started.")
 
     async def run_teardown(self):
+        await self._sessions.end_all_sessions()
+
         loop = asyncio.get_event_loop()
         assert self._daemon_input_queue is not None
         assert self._daemon_output_queue is not None
