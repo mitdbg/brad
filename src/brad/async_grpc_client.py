@@ -68,7 +68,7 @@ class AsyncBradGrpcClient:
 
     async def run_query(
         self, session_id: SessionId, query: str
-    ) -> AsyncGenerator[bytes | None]:
+    ) -> AsyncGenerator[bytes, None]:
         """
         Send a query to BRAD. The query result will come back row-by-row in
         encoded form. For simplicity, each row is currently encoded as a UTF-8

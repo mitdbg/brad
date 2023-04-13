@@ -16,7 +16,7 @@ _MAX_PENDING_QUEUE_SIZE: Final[int] = 10
 
 
 async def run_workload(
-        workload: Workload, client: AsyncClient[Any], reporter: QueryReporter
+    workload: Workload, client: AsyncClient[Any], reporter: QueryReporter
 ) -> None:
     """
     Run the workload asynchronously with the given client.
@@ -49,14 +49,14 @@ async def run_workload(
 
 
 async def _process_single_query(
-        user: User, query: Query, pending_queue: PriorityQueue[tuple[float, PendingQuery]]
+    user: User, query: Query, pending_queue: PriorityQueue[tuple[float, PendingQuery]]
 ) -> None:
     processed_time = get_current_time()
 
     # Use the event loop time for scheduling purposes
     # since it guarantees monotonicity
     scheduled_time = (
-            get_event_loop_time() + query.schedule.time_until_next().total_seconds()
+        get_event_loop_time() + query.schedule.time_until_next().total_seconds()
     )
 
     await pending_queue.put(
@@ -68,18 +68,18 @@ async def _process_single_query(
 
 
 async def _initial_scheduler_worker(
-        user: User,
-        queries: Queries,
-        pending_queue: PriorityQueue[tuple[float, PendingQuery]],
+    user: User,
+    queries: Queries,
+    pending_queue: PriorityQueue[tuple[float, PendingQuery]],
 ) -> None:
     for query in queries:
         await _process_single_query(user, query, pending_queue)
 
 
 async def _executor_worker(
-        pending_queue: PriorityQueue[tuple[float, PendingQuery]],
-        completed_queue: Queue[CompletedQuery],
-        client: AsyncClient[Any],
+    pending_queue: PriorityQueue[tuple[float, PendingQuery]],
+    completed_queue: Queue[CompletedQuery],
+    client: AsyncClient[Any],
 ) -> None:
     while True:
         scheduled_time, pending_query = await pending_queue.get()
@@ -113,7 +113,7 @@ async def _executor_worker(
 
 
 async def _reporter_worker(
-        completed_queue: Queue[CompletedQuery], reporter: QueryReporter
+    completed_queue: Queue[CompletedQuery], reporter: QueryReporter
 ) -> None:
     while True:
         completed_query = await completed_queue.get()

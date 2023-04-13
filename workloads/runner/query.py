@@ -50,7 +50,7 @@ class PendingQuery:
     processed_time: datetime
 
     def mark_complete(
-            self, result: Sequence[Any], executed_time: datetime, execution_time: timedelta
+        self, result: Sequence[Any], executed_time: datetime, execution_time: timedelta
     ) -> CompletedQuery:
         """Converts this query into a `CompletedQuery`."""
         return CompletedQuery(

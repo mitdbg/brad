@@ -25,10 +25,10 @@ class AsyncClient(Protocol[_Row_co]):
 
     @final
     async def __aexit__(
-            self,
-            exc_type: type[BaseException] | None,
-            exc_value: BaseException | None,
-            traceback: TracebackType | None,
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         # Ignore the arguments, i.e. no need to handle/suppress exception
         await self.close()

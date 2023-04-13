@@ -96,16 +96,16 @@ class Repeat(Schedule):
     @overload
     @staticmethod
     def starting_now(
-            *, interval: timedelta, end_time: datetime = datetime.max
+        *, interval: timedelta, end_time: datetime = datetime.max
     ) -> Repeat:
         ...
 
     @staticmethod
     def starting_now(
-            *,
-            interval: timedelta,
-            end_time: datetime = datetime.max,
-            num_repeat: int | None = None,
+        *,
+        interval: timedelta,
+        end_time: datetime = datetime.max,
+        num_repeat: int | None = None,
     ) -> Repeat:
         """
         Returns a `Repeat` schedule that starts at the current time,
@@ -158,11 +158,11 @@ class ScheduleGenerator(ImmutableGenerator[Schedule]):
 
     @staticmethod
     def evenly_spaced(
-            *,
-            interval: timedelta,
-            start_time: datetime | None = None,
-            end_time: datetime = datetime.max,
-            max_items: int | None = None,
+        *,
+        interval: timedelta,
+        start_time: datetime | None = None,
+        end_time: datetime = datetime.max,
+        max_items: int | None = None,
     ) -> ScheduleGenerator:
         """
         Returns a generator that yields consecutive `Once` schedules
