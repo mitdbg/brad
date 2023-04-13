@@ -6,6 +6,7 @@ import multiprocessing as mp
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.daemon.messages import ShutdownDaemon, NewBlueprint, ReceivedQuery
+from brad.daemon.monitor import Monitor
 from brad.forecasting.forecaster import WorkloadForecaster
 from brad.planner.neighborhood import NeighborhoodSearchPlanner
 from brad.utils import set_up_logging
@@ -36,7 +37,8 @@ class BradDaemon:
         self._input_queue = input_queue
         self._output_queue = output_queue
 
-        self._planner = NeighborhoodSearchPlanner()
+        self._monitor = Monitor(self._config)
+        self._planner = NeighborhoodSearchPlanner(self._monitor)
         self._forecaster = WorkloadForecaster()
 
     async def run_forever(self) -> None:
@@ -45,7 +47,11 @@ class BradDaemon:
         """
         logger.info("The BRAD daemon is running.")
         self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
-        await asyncio.gather(self._read_server_messages(), self._planner.run_forever())
+        await asyncio.gather(
+            self._read_server_messages(),
+            self._planner.run_forever(),
+            self._monitor.run_forever(),
+        )
 
     async def _read_server_messages(self) -> None:
         """
