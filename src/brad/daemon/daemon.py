@@ -3,8 +3,10 @@ import signal
 import logging
 import multiprocessing as mp
 
+from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
-from brad.daemon.shutdown import ShutdownDaemon
+from brad.daemon.messages import ShutdownDaemon, NewBlueprint
+from brad.planner.neighborhood import NeighborhoodSearchPlanner
 from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)
@@ -33,11 +35,14 @@ class BradDaemon:
         self._input_queue = input_queue
         self._output_queue = output_queue
 
+        self._planner = NeighborhoodSearchPlanner()
+
     async def start(self) -> None:
         """
         Starts any remaining background tasks.
         """
         self._event_loop.create_task(self._read_server_messages())
+        self._event_loop.create_task(self._planner.run_forever())
         logger.info("The BRAD daemon is running.")
 
     async def _read_server_messages(self) -> None:
@@ -55,6 +60,14 @@ class BradDaemon:
                 break
 
             logger.debug("Received message %s", str(message))
+
+    async def _handle_new_blueprint(self, blueprint: Blueprint) -> None:
+        """
+        Informs the server about a new blueprint.
+        """
+        await self._event_loop.run_in_executor(
+            None, self._output_queue.put, NewBlueprint(blueprint)
+        )
 
     async def _shutdown(self) -> None:
         logger.info("The BRAD daemon is shutting down...")
@@ -87,7 +100,7 @@ class BradDaemon:
         # to ignore these signals since we receive a shutdown signal from the
         # server directly.
         for sig in [signal.SIGTERM, signal.SIGINT]:
-            event_loop.add_signal_handler(sig, _noop)
+            event_loop.remove_signal_handler(sig)
 
         try:
             daemon = BradDaemon(
@@ -99,7 +112,3 @@ class BradDaemon:
         finally:
             event_loop.close()
             logger.info("The BRAD daemon has shut down.")
-
-
-def _noop():
-    pass

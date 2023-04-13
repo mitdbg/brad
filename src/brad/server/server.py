@@ -12,7 +12,7 @@ import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
-from brad.daemon.shutdown import ShutdownDaemon
+from brad.daemon.messages import ShutdownDaemon, NewBlueprint
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
@@ -246,3 +246,12 @@ class BradServer(BradInterface):
             logger.debug("Starting an auto data sync.")
             # NOTE: This will be an async function.
             await self._data_sync_executor.run_sync(self._blueprint_mgr.get_blueprint())
+
+    async def _read_daemon_messages(self) -> None:
+        assert self._daemon_output_queue is not None
+        loop = asyncio.get_running_loop()
+        while True:
+            message = await loop.run_in_executor(None, self._daemon_output_queue.get)
+
+            if isinstance(message, NewBlueprint):
+                logger.debug("Received new blueprint: %s", message.blueprint)
