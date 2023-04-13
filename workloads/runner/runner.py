@@ -86,7 +86,9 @@ async def _executor_worker(
 
         # Check the scheduled against the event loop time
         current_event_loop_time = get_event_loop_time()
+        
         if current_event_loop_time < scheduled_time:
+            print(scheduled_time - current_event_loop_time)
             await asyncio.sleep(scheduled_time - current_event_loop_time)
 
         with measure_time() as measurement:

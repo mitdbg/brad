@@ -1,6 +1,5 @@
 import grpc
-import asyncio
-from typing import Generator, Optional
+from typing import Generator, Optional, AsyncGenerator
 
 import brad.proto_gen.brad_pb2 as b
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
@@ -44,7 +43,9 @@ class AsyncBradGrpcClient:
         self.close()
 
     def connect(self) -> None:
-        self._channel = grpc.aio.insecure_channel("{}:{}".format(self._host, self._port))
+        self._channel = grpc.aio.insecure_channel(
+            "{}:{}".format(self._host, self._port)
+        )
         self._stub = brad_grpc.BradStub(self._channel)
 
     def close(self) -> None:
@@ -67,7 +68,7 @@ class AsyncBradGrpcClient:
 
     async def run_query(
         self, session_id: SessionId, query: str
-    ) -> Generator[bytes, None, None]:
+    ) -> AsyncGenerator[bytes, None, None]:
         """
         Send a query to BRAD. The query result will come back row-by-row in
         encoded form. For simplicity, each row is currently encoded as a UTF-8

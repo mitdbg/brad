@@ -3,6 +3,9 @@ from datetime import timedelta
 from typing import AsyncIterator, final, Generator, Optional
 
 from typing_extensions import override
+import sys
+
+sys.path.append("..")
 
 from workloads.runner import run_workload
 from workloads.runner.client import AsyncClient
@@ -15,10 +18,12 @@ from workloads.runner.workload import Workload
 from brad.async_grpc_client import AsyncBradGrpcClient
 from brad.config.session import SessionId
 
+
 class BradClient(AsyncClient[str]):
     def __init__(self, host: str, port: int):
         self._impl = AsyncBradGrpcClient(host, port)
         self._session_id: Optional[SessionId] = None
+
     @override
     async def connect(self) -> None:
         self._impl.connect()
@@ -33,11 +38,11 @@ class BradClient(AsyncClient[str]):
     async def execute(self, query: str) -> AsyncIterator[str]:
         res = self._impl.run_query(self._session_id, query)
         async for tup in res:
+            print(tup)
             yield tup
 
 
 async def run_IMDB() -> None:
-
     current_time = get_current_time()
     interval = timedelta(seconds=1)
 
@@ -45,8 +50,11 @@ async def run_IMDB() -> None:
         [
             Workload.serial(
                 [
-                    Query(f"SELECT COUNT(*) FROM info_type WHERE id > {i};",
-                          Once(at=current_time + 0.47 * i * interval)) for i in range(10)
+                    Query(
+                        f"SELECT COUNT(*) FROM info_type WHERE id > {i};",
+                        Once(at=current_time + 0.47 * i * interval),
+                    )
+                    for i in range(10)
                 ],
                 user=User.with_label("Once"),
             ),
@@ -62,7 +70,9 @@ async def run_IMDB() -> None:
                            '%companie%s%' OR "company_type"."id" 
                            BETWEEN 2 AND 3 OR "company_type"."kind" LIKE '%companies%') AND 
                            "company_name"."country_code" NOT LIKE '%[us]%';""",
-                        Repeat.starting_now(interval=interval, num_repeat=20),
+                        Repeat.starting_now(
+                            interval=timedelta(seconds=20), num_repeat=5
+                        ),
                     ),
                 ],
                 user=User.with_label("Repeat"),
