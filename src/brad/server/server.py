@@ -12,7 +12,7 @@ import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
-from brad.daemon.messages import ShutdownDaemon, NewBlueprint
+from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
@@ -96,7 +96,7 @@ class BradServer(BradInterface):
         self._daemon_mp_manager = mp.Manager()
         self._daemon_input_queue = self._daemon_mp_manager.Queue()
         self._daemon_output_queue = self._daemon_mp_manager.Queue()
-        # self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
+        self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
         self._daemon_process = mp.Process(
             target=BradDaemon.launch_in_subprocess,
             args=(
@@ -110,15 +110,18 @@ class BradServer(BradInterface):
         self._daemon_process.start()
         logger.info("The BRAD daemon process has been started.")
 
-
     async def run_teardown(self):
         loop = asyncio.get_event_loop()
         assert self._daemon_input_queue is not None
+        assert self._daemon_output_queue is not None
         assert self._daemon_process is not None
 
         # Tell the daemon process to shut down and wait for it to do so.
         await loop.run_in_executor(None, self._daemon_input_queue.put, ShutdownDaemon())
         await loop.run_in_executor(None, self._daemon_process.join)
+
+        # Important for unblocking our message reader thread.
+        self._daemon_output_queue.put(Sentinel())
 
         if self._timed_sync_task is not None:
             await self._timed_sync_task.close()

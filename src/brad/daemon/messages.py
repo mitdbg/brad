@@ -23,3 +23,10 @@ class ShutdownDaemon:
     """
     Sent from the server to the daemon indicating that it should shut down.
     """
+
+
+class Sentinel:
+    """
+    Used when shutting down the server to unblock threads waiting for a message
+    from the daemon.
+    """
