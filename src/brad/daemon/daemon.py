@@ -36,6 +36,7 @@ class BradDaemon:
         self._output_queue = output_queue
 
         self._planner = NeighborhoodSearchPlanner()
+        self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
 
     async def start(self) -> None:
         """
@@ -100,7 +101,7 @@ class BradDaemon:
         # to ignore these signals since we receive a shutdown signal from the
         # server directly.
         for sig in [signal.SIGTERM, signal.SIGINT]:
-            event_loop.remove_signal_handler(sig)
+            event_loop.add_signal_handler(sig, _noop)
 
         try:
             daemon = BradDaemon(
@@ -112,3 +113,7 @@ class BradDaemon:
         finally:
             event_loop.close()
             logger.info("The BRAD daemon has shut down.")
+
+
+def _noop():
+    pass

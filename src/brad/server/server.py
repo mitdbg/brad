@@ -58,6 +58,7 @@ class BradServer(BradInterface):
         self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
         self._timed_sync_task = None
         self._forecaster = WorkloadForecaster()
+        self._daemon_messages_task = None
 
         # Used for managing the daemon process.
         self._daemon_mp_manager: Optional[mp.managers.SyncManager] = None
@@ -76,7 +77,7 @@ class BradServer(BradInterface):
             await grpc_server.start()
             logger.info("The BRAD server has successfully started.")
             logger.info("Listening on port %d.", self._config.server_port)
-            await asyncio.gather(grpc_server.wait_for_termination())
+            await grpc_server.wait_for_termination()
         finally:
             # Not ideal, but we need to manually call this method to ensure
             # gRPC's internal shutdown process completes before we return from
@@ -88,14 +89,14 @@ class BradServer(BradInterface):
     async def run_setup(self):
         await self._blueprint_mgr.load()
         if self._config.data_sync_period_seconds > 0:
-            loop = asyncio.get_event_loop()
-            self._timed_sync_task = loop.create_task(self._run_sync_periodically())
+            self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
         await self._data_sync_executor.establish_connections()
 
         # Launch the daemon process.
         self._daemon_mp_manager = mp.Manager()
         self._daemon_input_queue = self._daemon_mp_manager.Queue()
         self._daemon_output_queue = self._daemon_mp_manager.Queue()
+        # self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
         self._daemon_process = mp.Process(
             target=BradDaemon.launch_in_subprocess,
             args=(
@@ -108,6 +109,7 @@ class BradServer(BradInterface):
         )
         self._daemon_process.start()
         logger.info("The BRAD daemon process has been started.")
+
 
     async def run_teardown(self):
         loop = asyncio.get_event_loop()
@@ -244,7 +246,6 @@ class BradServer(BradInterface):
         while True:
             await asyncio.sleep(self._config.data_sync_period_seconds)
             logger.debug("Starting an auto data sync.")
-            # NOTE: This will be an async function.
             await self._data_sync_executor.run_sync(self._blueprint_mgr.get_blueprint())
 
     async def _read_daemon_messages(self) -> None:
