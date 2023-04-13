@@ -19,6 +19,7 @@ class PrintReporter(QueryReporter):
         self, completed_query: CompletedQuery, verbose: bool = False
     ) -> None:
         if verbose:
+            print("Done executing query : ", end="")
             print(completed_query)
         else:
             print(

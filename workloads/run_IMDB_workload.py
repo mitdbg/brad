@@ -12,17 +12,17 @@ from workloads.runner.schedule import Once, Repeat
 from workloads.runner.time import get_current_time
 from workloads.runner.user import User
 from workloads.runner.workload import Workload
-from brad.grpc_client import BradGrpcClient
+from brad.async_grpc_client import AsyncBradGrpcClient
 from brad.config.session import SessionId
 
 class BradClient(AsyncClient[str]):
     def __init__(self, host: str, port: int):
-        self._impl = BradGrpcClient(host, port)
+        self._impl = AsyncBradGrpcClient(host, port)
         self._session_id: Optional[SessionId] = None
     @override
     async def connect(self) -> None:
         self._impl.connect()
-        self._session_id = self._impl._session_id
+        self._session_id = await self._impl.start_session()
 
     @override
     async def close(self) -> None:
@@ -31,8 +31,8 @@ class BradClient(AsyncClient[str]):
 
     @override
     async def execute(self, query: str) -> AsyncIterator[str]:
-        res = self._impl.run_query(query)
-        for tup in res:
+        res = self._impl.run_query(self._session_id, query)
+        async for tup in res:
             yield tup
 
 
@@ -45,15 +45,23 @@ async def run_IMDB() -> None:
         [
             Workload.serial(
                 [
-                    Query(f"SELECT COUNT(*) FROM info_type WHERE id > {i};", Once(at=current_time + 0.47 * i * interval))
-                    for i in range(10)
+                    Query(f"SELECT COUNT(*) FROM info_type WHERE id > {i};",
+                          Once(at=current_time + 0.47 * i * interval)) for i in range(10)
                 ],
                 user=User.with_label("Once"),
             ),
             Workload.serial(
                 [
                     Query(
-                        "SELECT COUNT(*) FROM title;",
+                        """SELECT MAX("title"."episode_nr" + "movie_companies"."movie_id") 
+                           as agg_0 FROM "company_type" LEFT OUTER JOIN "movie_companies" 
+                           ON "company_type"."id" = "movie_companies"."company_type_id" LEFT OUTER JOIN "title" 
+                           ON "movie_companies"."movie_id" = "title"."id" LEFT OUTER JOIN "company_name" ON 
+                           "movie_companies"."company_id" = "company_name"."id"  WHERE "title"."title" NOT LIKE '%t%he%' 
+                           AND "movie_companies"."note" NOT LIKE '%media)%' AND ("company_type"."kind" NOT LIKE 
+                           '%companie%s%' OR "company_type"."id" 
+                           BETWEEN 2 AND 3 OR "company_type"."kind" LIKE '%companies%') AND 
+                           "company_name"."country_code" NOT LIKE '%[us]%';""",
                         Repeat.starting_now(interval=interval, num_repeat=20),
                     ),
                 ],
