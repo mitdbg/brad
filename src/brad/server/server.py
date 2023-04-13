@@ -12,7 +12,7 @@ import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
-from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel
+from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel, ReceivedQuery
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
@@ -23,7 +23,6 @@ from brad.server.blueprint_manager import BlueprintManager
 from brad.server.errors import QueryError
 from brad.server.grpc import BradGrpc
 from brad.server.session import SessionManager, SessionId
-from brad.forecasting.forecaster import WorkloadForecaster
 from brad.query_rep import QueryRep
 
 logger = logging.getLogger(__name__)
@@ -57,7 +56,6 @@ class BradServer(BradInterface):
         self._sessions = SessionManager(self._config, self._schema_name)
         self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
         self._timed_sync_task = None
-        self._forecaster = WorkloadForecaster()
         self._daemon_messages_task = None
 
         # Used for managing the daemon process.
@@ -154,10 +152,8 @@ class BradServer(BradInterface):
                     yield output
                 return
 
-            query_rep = QueryRep(query)
-            self._forecaster.process(query_rep)
-
             # 2. Select an engine for the query.
+            query_rep = QueryRep(query)
             engine_to_use = self._router.engine_for(query_rep)
             logger.debug("Routing '%s' to %s", query, engine_to_use)
 
@@ -187,7 +183,7 @@ class BradServer(BradInterface):
                 try:
                     # Send the query to the daemon. Note that the daemon needs to
                     # consume these queries quickly enough to avoid an overflow.
-                    self._daemon_input_queue.put(query, block=False)
+                    self._daemon_input_queue.put(ReceivedQuery(query), block=False)
                 except queue.Full:
                     logger.warning(
                         "Daemon input queue is full. Not sending query '%s'", query
@@ -236,11 +232,6 @@ class BradServer(BradInterface):
             out = io.StringIO()
             physical.print_plan_sequentially(file=out)
             yield out.getvalue().encode()
-
-        elif command == "BRAD_FORECAST;":
-            logger.debug("Manually triggered a workload forecast.")
-            self._forecaster.forecast()
-            yield "Forecast succeeded.".encode()
 
         else:
             yield "Unknown internal command: {}".format(command).encode()

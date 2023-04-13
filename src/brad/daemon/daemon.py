@@ -5,7 +5,8 @@ import multiprocessing as mp
 
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
-from brad.daemon.messages import ShutdownDaemon, NewBlueprint
+from brad.daemon.messages import ShutdownDaemon, NewBlueprint, ReceivedQuery
+from brad.forecasting.forecaster import WorkloadForecaster
 from brad.planner.neighborhood import NeighborhoodSearchPlanner
 from brad.utils import set_up_logging
 
@@ -36,13 +37,14 @@ class BradDaemon:
         self._output_queue = output_queue
 
         self._planner = NeighborhoodSearchPlanner()
-        self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
+        self._forecaster = WorkloadForecaster()
 
     async def run_forever(self) -> None:
         """
         Starts running the daemon.
         """
         logger.info("The BRAD daemon is running.")
+        self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
         await asyncio.gather(self._read_server_messages(), self._planner.run_forever())
 
     async def _read_server_messages(self) -> None:
@@ -59,7 +61,15 @@ class BradDaemon:
                 self._event_loop.create_task(self._shutdown())
                 break
 
-            logger.debug("Received message %s", str(message))
+            elif isinstance(message, ReceivedQuery):
+                # Might be a good idea to record this query string for offline
+                # processing (it's a query trace).
+                query_str = message.query_str
+                logger.debug("Received query %s", query_str)
+                self._forecaster.process(query_str)
+
+            else:
+                logger.debug("Received message %s", str(message))
 
     async def _handle_new_blueprint(self, blueprint: Blueprint) -> None:
         """
