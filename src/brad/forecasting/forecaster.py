@@ -1,8 +1,10 @@
-from brad.forecasting.query_parser import QueryParser
 import argparse
 import os
 from sqlglot import exp
 import sys
+
+from brad.forecasting.query_parser import QueryParser
+from brad.query_rep import QueryRep
 
 MAX_JOINS = 10
 
@@ -38,7 +40,8 @@ class WorkloadForecaster:
     #         len(filtered_attributes),
     #     )
 
-    def process(self, query_rep):
+    def process(self, query_str):
+        query_rep = QueryRep(query_str)
         parsed = query_rep.ast()
 
         # Count joins

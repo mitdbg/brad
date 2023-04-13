@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Dict, Tuple, Optional
 
@@ -58,8 +59,17 @@ class SessionManager:
             return None
         return self._sessions[session_id]
 
-    async def end_session(self, session_id: SessionId):
+    async def end_session(self, session_id: SessionId) -> None:
         session = self._sessions[session_id]
         await session.close()
         logger.debug("Ended session %s", session_id)
         del self._sessions[session_id]
+
+    async def end_all_sessions(self) -> None:
+        logger.debug("Ending all remaining sessions...")
+        end_tasks = []
+        for session_id, session in self._sessions.items():
+            end_tasks.append(session.close())
+            logger.debug("Ended session %s", session_id)
+        await asyncio.gather(*end_tasks)
+        self._sessions.clear()

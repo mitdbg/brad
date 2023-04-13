@@ -3,8 +3,12 @@ import signal
 import logging
 import multiprocessing as mp
 
+from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
-from brad.daemon.shutdown import ShutdownDaemon
+from brad.daemon.messages import ShutdownDaemon, NewBlueprint, ReceivedQuery
+from brad.daemon.monitor import Monitor
+from brad.forecasting.forecaster import WorkloadForecaster
+from brad.planner.neighborhood import NeighborhoodSearchPlanner
 from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)
@@ -23,6 +27,7 @@ class BradDaemon:
         self,
         config: ConfigFile,
         schema_name: str,
+        current_blueprint: Blueprint,
         event_loop: asyncio.AbstractEventLoop,
         input_queue: mp.Queue,
         output_queue: mp.Queue,
@@ -33,12 +38,25 @@ class BradDaemon:
         self._input_queue = input_queue
         self._output_queue = output_queue
 
-    async def start(self) -> None:
+        self._current_blueprint = current_blueprint
+        self._monitor = Monitor(self._config)
+        self._planner = NeighborhoodSearchPlanner(
+            current_blueprint=self._current_blueprint,
+            monitor=self._monitor,
+        )
+        self._forecaster = WorkloadForecaster()
+
+    async def run_forever(self) -> None:
         """
-        Starts any remaining background tasks.
+        Starts running the daemon.
         """
-        self._event_loop.create_task(self._read_server_messages())
         logger.info("The BRAD daemon is running.")
+        self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
+        await asyncio.gather(
+            self._read_server_messages(),
+            self._planner.run_forever(),
+            self._monitor.run_forever(),
+        )
 
     async def _read_server_messages(self) -> None:
         """
@@ -54,7 +72,24 @@ class BradDaemon:
                 self._event_loop.create_task(self._shutdown())
                 break
 
-            logger.debug("Received message %s", str(message))
+            elif isinstance(message, ReceivedQuery):
+                # Might be a good idea to record this query string for offline
+                # processing (it's a query trace).
+                query_str = message.query_str
+                logger.debug("Received query %s", query_str)
+                self._forecaster.process(query_str)
+
+            else:
+                logger.debug("Received message %s", str(message))
+
+    async def _handle_new_blueprint(self, blueprint: Blueprint) -> None:
+        """
+        Informs the server about a new blueprint.
+        """
+        self._current_blueprint = blueprint
+        await self._event_loop.run_in_executor(
+            None, self._output_queue.put, NewBlueprint(blueprint)
+        )
 
     async def _shutdown(self) -> None:
         logger.info("The BRAD daemon is shutting down...")
@@ -68,6 +103,7 @@ class BradDaemon:
     def launch_in_subprocess(
         config_path: str,
         schema_name: str,
+        current_blueprint: Blueprint,
         debug_mode: bool,
         input_queue: mp.Queue,
         output_queue: mp.Queue,
@@ -91,9 +127,14 @@ class BradDaemon:
 
         try:
             daemon = BradDaemon(
-                config, schema_name, event_loop, input_queue, output_queue
+                config,
+                schema_name,
+                current_blueprint,
+                event_loop,
+                input_queue,
+                output_queue,
             )
-            event_loop.create_task(daemon.start())
+            event_loop.create_task(daemon.run_forever())
             logger.info("The BRAD daemon is starting...")
             event_loop.run_forever()
         finally:

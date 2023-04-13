@@ -12,7 +12,7 @@ import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
-from brad.daemon.shutdown import ShutdownDaemon
+from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel, ReceivedQuery
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
@@ -23,7 +23,6 @@ from brad.server.blueprint_manager import BlueprintManager
 from brad.server.errors import QueryError
 from brad.server.grpc import BradGrpc
 from brad.server.session import SessionManager, SessionId
-from brad.forecasting.forecaster import WorkloadForecaster
 from brad.query_rep import QueryRep
 
 logger = logging.getLogger(__name__)
@@ -57,7 +56,7 @@ class BradServer(BradInterface):
         self._sessions = SessionManager(self._config, self._schema_name)
         self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
         self._timed_sync_task = None
-        self._forecaster = WorkloadForecaster()
+        self._daemon_messages_task = None
 
         # Used for managing the daemon process.
         self._daemon_mp_manager: Optional[mp.managers.SyncManager] = None
@@ -76,7 +75,7 @@ class BradServer(BradInterface):
             await grpc_server.start()
             logger.info("The BRAD server has successfully started.")
             logger.info("Listening on port %d.", self._config.server_port)
-            await asyncio.gather(grpc_server.wait_for_termination())
+            await grpc_server.wait_for_termination()
         finally:
             # Not ideal, but we need to manually call this method to ensure
             # gRPC's internal shutdown process completes before we return from
@@ -88,19 +87,20 @@ class BradServer(BradInterface):
     async def run_setup(self):
         await self._blueprint_mgr.load()
         if self._config.data_sync_period_seconds > 0:
-            loop = asyncio.get_event_loop()
-            self._timed_sync_task = loop.create_task(self._run_sync_periodically())
+            self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
         await self._data_sync_executor.establish_connections()
 
         # Launch the daemon process.
         self._daemon_mp_manager = mp.Manager()
         self._daemon_input_queue = self._daemon_mp_manager.Queue()
         self._daemon_output_queue = self._daemon_mp_manager.Queue()
+        self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
         self._daemon_process = mp.Process(
             target=BradDaemon.launch_in_subprocess,
             args=(
                 self._config.raw_path,
                 self._schema_name,
+                self._blueprint_mgr.get_blueprint(),
                 self._debug_mode,
                 self._daemon_input_queue,
                 self._daemon_output_queue,
@@ -110,13 +110,19 @@ class BradServer(BradInterface):
         logger.info("The BRAD daemon process has been started.")
 
     async def run_teardown(self):
+        await self._sessions.end_all_sessions()
+
         loop = asyncio.get_event_loop()
         assert self._daemon_input_queue is not None
+        assert self._daemon_output_queue is not None
         assert self._daemon_process is not None
 
         # Tell the daemon process to shut down and wait for it to do so.
         await loop.run_in_executor(None, self._daemon_input_queue.put, ShutdownDaemon())
         await loop.run_in_executor(None, self._daemon_process.join)
+
+        # Important for unblocking our message reader thread.
+        self._daemon_output_queue.put(Sentinel())
 
         if self._timed_sync_task is not None:
             await self._timed_sync_task.close()
@@ -149,10 +155,8 @@ class BradServer(BradInterface):
                     yield output
                 return
 
-            query_rep = QueryRep(query)
-            self._forecaster.process(query_rep)
-
             # 2. Select an engine for the query.
+            query_rep = QueryRep(query)
             engine_to_use = self._router.engine_for(query_rep)
             logger.debug("Routing '%s' to %s", query, engine_to_use)
 
@@ -182,7 +186,7 @@ class BradServer(BradInterface):
                 try:
                     # Send the query to the daemon. Note that the daemon needs to
                     # consume these queries quickly enough to avoid an overflow.
-                    self._daemon_input_queue.put(query, block=False)
+                    self._daemon_input_queue.put(ReceivedQuery(query), block=False)
                 except queue.Full:
                     logger.warning(
                         "Daemon input queue is full. Not sending query '%s'", query
@@ -232,11 +236,6 @@ class BradServer(BradInterface):
             physical.print_plan_sequentially(file=out)
             yield out.getvalue().encode()
 
-        elif command == "BRAD_FORECAST;":
-            logger.debug("Manually triggered a workload forecast.")
-            self._forecaster.forecast()
-            yield "Forecast succeeded.".encode()
-
         else:
             yield "Unknown internal command: {}".format(command).encode()
 
@@ -244,5 +243,15 @@ class BradServer(BradInterface):
         while True:
             await asyncio.sleep(self._config.data_sync_period_seconds)
             logger.debug("Starting an auto data sync.")
-            # NOTE: This will be an async function.
             await self._data_sync_executor.run_sync(self._blueprint_mgr.get_blueprint())
+
+    async def _read_daemon_messages(self) -> None:
+        assert self._daemon_output_queue is not None
+        loop = asyncio.get_running_loop()
+        while True:
+            message = await loop.run_in_executor(None, self._daemon_output_queue.get)
+
+            if isinstance(message, NewBlueprint):
+                # This is where we launch any reconfigurations needed to realize
+                # the new blueprint.
+                logger.debug("Received new blueprint: %s", message.blueprint)
