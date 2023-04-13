@@ -1,5 +1,5 @@
 import grpc
-from typing import Generator, Optional, AsyncGenerator
+from typing import Optional, AsyncGenerator
 
 import brad.proto_gen.brad_pb2 as b
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
@@ -68,7 +68,7 @@ class AsyncBradGrpcClient:
 
     async def run_query(
         self, session_id: SessionId, query: str
-    ) -> AsyncGenerator[bytes, None, None]:
+    ) -> AsyncGenerator[bytes | None]:
         """
         Send a query to BRAD. The query result will come back row-by-row in
         encoded form. For simplicity, each row is currently encoded as a UTF-8

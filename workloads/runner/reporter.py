@@ -1,6 +1,5 @@
 from abc import abstractmethod
 from typing import Protocol, final
-
 from typing_extensions import override
 
 from workloads.runner.query import CompletedQuery
@@ -16,7 +15,7 @@ class QueryReporter(Protocol):
 class PrintReporter(QueryReporter):
     @override
     async def report(
-        self, completed_query: CompletedQuery, verbose: bool = False
+            self, completed_query: CompletedQuery, verbose: bool = False
     ) -> None:
         if verbose:
             print("Done executing query : ", end="")

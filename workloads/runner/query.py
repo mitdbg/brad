@@ -3,9 +3,9 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from datetime import datetime, timedelta
 from typing import Any, TypeAlias, final
+from typing_extensions import override
 
 from attrs import define, field
-from typing_extensions import override
 
 from workloads.runner.generator import ImmutableGenerator, SqlGenerator
 from workloads.runner.schedule import Schedule, ScheduleGenerator
@@ -50,7 +50,7 @@ class PendingQuery:
     processed_time: datetime
 
     def mark_complete(
-        self, result: Sequence[Any], executed_time: datetime, execution_time: timedelta
+            self, result: Sequence[Any], executed_time: datetime, execution_time: timedelta
     ) -> CompletedQuery:
         """Converts this query into a `CompletedQuery`."""
         return CompletedQuery(

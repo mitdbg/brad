@@ -1,9 +1,9 @@
 import asyncio
+import sys
 from datetime import timedelta
 from typing import AsyncIterator, final
-
 from typing_extensions import override
-import sys
+
 sys.path.append("..")
 
 from workloads.runner import run_workload

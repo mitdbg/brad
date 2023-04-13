@@ -5,9 +5,9 @@ from abc import abstractmethod
 from collections.abc import Iterator
 from datetime import datetime, timedelta
 from typing import Protocol, final, overload
+from typing_extensions import override
 
 from attrs import define
-from typing_extensions import override
 
 from workloads.runner.generator import ImmutableGenerator
 from workloads.runner.time import get_current_time
@@ -96,16 +96,16 @@ class Repeat(Schedule):
     @overload
     @staticmethod
     def starting_now(
-        *, interval: timedelta, end_time: datetime = datetime.max
+            *, interval: timedelta, end_time: datetime = datetime.max
     ) -> Repeat:
         ...
 
     @staticmethod
     def starting_now(
-        *,
-        interval: timedelta,
-        end_time: datetime = datetime.max,
-        num_repeat: int | None = None,
+            *,
+            interval: timedelta,
+            end_time: datetime = datetime.max,
+            num_repeat: int | None = None,
     ) -> Repeat:
         """
         Returns a `Repeat` schedule that starts at the current time,
@@ -158,11 +158,11 @@ class ScheduleGenerator(ImmutableGenerator[Schedule]):
 
     @staticmethod
     def evenly_spaced(
-        *,
-        interval: timedelta,
-        start_time: datetime | None = None,
-        end_time: datetime = datetime.max,
-        max_items: int | None = None,
+            *,
+            interval: timedelta,
+            start_time: datetime | None = None,
+            end_time: datetime = datetime.max,
+            max_items: int | None = None,
     ) -> ScheduleGenerator:
         """
         Returns a generator that yields consecutive `Once` schedules

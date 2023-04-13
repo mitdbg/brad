@@ -1,6 +1,6 @@
 import asyncio
 from datetime import timedelta
-from typing import AsyncIterator, final, Generator, Optional
+from typing import AsyncIterator, Optional
 
 from typing_extensions import override
 import sys
@@ -38,7 +38,6 @@ class BradClient(AsyncClient[str]):
     async def execute(self, query: str) -> AsyncIterator[str]:
         res = self._impl.run_query(self._session_id, query)
         async for tup in res:
-            print(tup)
             yield tup
 
 
