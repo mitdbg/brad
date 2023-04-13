@@ -38,13 +38,12 @@ class BradDaemon:
         self._planner = NeighborhoodSearchPlanner()
         self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
 
-    async def start(self) -> None:
+    async def run_forever(self) -> None:
         """
-        Starts any remaining background tasks.
+        Starts running the daemon.
         """
-        self._event_loop.create_task(self._read_server_messages())
-        self._event_loop.create_task(self._planner.run_forever())
         logger.info("The BRAD daemon is running.")
+        await asyncio.gather(self._read_server_messages(), self._planner.run_forever())
 
     async def _read_server_messages(self) -> None:
         """
@@ -107,7 +106,7 @@ class BradDaemon:
             daemon = BradDaemon(
                 config, schema_name, event_loop, input_queue, output_queue
             )
-            event_loop.create_task(daemon.start())
+            event_loop.create_task(daemon.run_forever())
             logger.info("The BRAD daemon is starting...")
             event_loop.run_forever()
         finally:
