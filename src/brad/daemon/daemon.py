@@ -27,6 +27,7 @@ class BradDaemon:
         self,
         config: ConfigFile,
         schema_name: str,
+        current_blueprint: Blueprint,
         event_loop: asyncio.AbstractEventLoop,
         input_queue: mp.Queue,
         output_queue: mp.Queue,
@@ -37,8 +38,12 @@ class BradDaemon:
         self._input_queue = input_queue
         self._output_queue = output_queue
 
+        self._current_blueprint = current_blueprint
         self._monitor = Monitor(self._config)
-        self._planner = NeighborhoodSearchPlanner(self._monitor)
+        self._planner = NeighborhoodSearchPlanner(
+            current_blueprint=self._current_blueprint,
+            monitor=self._monitor,
+        )
         self._forecaster = WorkloadForecaster()
 
     async def run_forever(self) -> None:
@@ -81,6 +86,7 @@ class BradDaemon:
         """
         Informs the server about a new blueprint.
         """
+        self._current_blueprint = blueprint
         await self._event_loop.run_in_executor(
             None, self._output_queue.put, NewBlueprint(blueprint)
         )
@@ -97,6 +103,7 @@ class BradDaemon:
     def launch_in_subprocess(
         config_path: str,
         schema_name: str,
+        current_blueprint: Blueprint,
         debug_mode: bool,
         input_queue: mp.Queue,
         output_queue: mp.Queue,
@@ -120,7 +127,12 @@ class BradDaemon:
 
         try:
             daemon = BradDaemon(
-                config, schema_name, event_loop, input_queue, output_queue
+                config,
+                schema_name,
+                current_blueprint,
+                event_loop,
+                input_queue,
+                output_queue,
             )
             event_loop.create_task(daemon.run_forever())
             logger.info("The BRAD daemon is starting...")

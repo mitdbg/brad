@@ -100,6 +100,7 @@ class BradServer(BradInterface):
             args=(
                 self._config.raw_path,
                 self._schema_name,
+                self._blueprint_mgr.get_blueprint(),
                 self._debug_mode,
                 self._daemon_input_queue,
                 self._daemon_output_queue,
@@ -251,4 +252,6 @@ class BradServer(BradInterface):
             message = await loop.run_in_executor(None, self._daemon_output_queue.get)
 
             if isinstance(message, NewBlueprint):
+                # This is where we launch any reconfigurations needed to realize
+                # the new blueprint.
                 logger.debug("Received new blueprint: %s", message.blueprint)

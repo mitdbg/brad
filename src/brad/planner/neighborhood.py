@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+from brad.blueprint import Blueprint
 from brad.daemon.monitor import Monitor
 from brad.planner import BlueprintPlanner
 
@@ -8,8 +9,9 @@ logger = logging.getLogger(__name__)
 
 
 class NeighborhoodSearchPlanner(BlueprintPlanner):
-    def __init__(self, monitor: Monitor) -> None:
+    def __init__(self, current_blueprint: Blueprint, monitor: Monitor) -> None:
         super().__init__()
+        self._current_blueprint = current_blueprint
         # The intention is to decouple the planner and monitor down the line
         # when it is clear how we want to process the metrics provided by the
         # monitor.
