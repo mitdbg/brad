@@ -1,6 +1,6 @@
 from typing import Callable, List, Set, Optional
 
-from brad.blueprint.provisioning import AuroraProvisioning, RedshiftProvisioning
+from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.table import Table
 from brad.routing import Router
 
@@ -12,10 +12,8 @@ class Blueprint:
         self,
         schema_name: str,
         tables: List[Table],
-        # N.B. `Optional` is temporary while we transition the rest of the code
-        # paths over to this new `Blueprint`.
-        aurora_provisioning: Optional[AuroraProvisioning],
-        redshift_provisioning: Optional[RedshiftProvisioning],
+        aurora_provisioning: Provisioning,
+        redshift_provisioning: Provisioning,
         router_provider: Optional[RouterProvider],
     ):
         self._schema_name = schema_name
@@ -34,10 +32,10 @@ class Blueprint:
     def tables(self) -> List[Table]:
         return self._tables
 
-    def aurora_provisioning(self) -> Optional[AuroraProvisioning]:
+    def aurora_provisioning(self) -> Provisioning:
         return self._aurora_provisioning
 
-    def redshift_provisioning(self) -> Optional[RedshiftProvisioning]:
+    def redshift_provisioning(self) -> Provisioning:
         return self._redshift_provisioning
 
     def get_router(self) -> Optional[Router]:

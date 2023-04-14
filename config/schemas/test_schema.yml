@@ -11,3 +11,12 @@ tables:
         data_type: TEXT
       - name: value
         data_type: BIGINT
+
+provisioning:
+  aurora:
+    instance_type: db.r6g.large
+    num_nodes: 1
+
+  redshift:
+    instance_type: dc2.large
+    num_nodes: 1

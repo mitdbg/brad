@@ -1,4 +1,5 @@
 from brad.blueprint import Blueprint
+from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.table import Column, Table
 from brad.config.engine import Engine
 
@@ -13,21 +14,24 @@ import brad.proto_gen.blueprint_pb2 as b
 
 
 def deserialize_blueprint(raw_data: bytes) -> Blueprint:
-    proto = b.DataBlueprint()
+    proto = b.Blueprint()
     proto.ParseFromString(raw_data)
     return Blueprint(
         schema_name=proto.schema_name,
         tables=list(map(_table_from_proto, proto.tables)),
-        aurora_provisioning=None,
-        redshift_provisioning=None,
+        aurora_provisioning=_provisioning_from_proto(proto.aurora),
+        redshift_provisioning=_provisioning_from_proto(proto.redshift),
         router_provider=None,
     )
 
 
 def serialize_blueprint(blueprint: Blueprint) -> bytes:
-    proto = b.DataBlueprint(
+    proto = b.Blueprint(
         schema_name=blueprint.schema_name(),
         tables=map(_table_to_proto, blueprint.tables()),
+        aurora=_provisioning_to_proto(blueprint.aurora_provisioning()),
+        redshift=_provisioning_to_proto(blueprint.redshift_provisioning()),
+        policy=None,
     )
     return proto.SerializeToString()
 
@@ -66,6 +70,13 @@ def _location_to_proto(engine: Engine) -> b.Engine:
         return b.Engine.UNKNOWN  # type: ignore
 
 
+def _provisioning_to_proto(prov: Provisioning) -> b.Provisioning:
+    return b.Provisioning(
+        instance_type=prov.instance_type(),
+        num_nodes=prov.num_nodes(),
+    )
+
+
 # Deserialization
 
 
@@ -92,3 +103,10 @@ def _location_from_proto(engine: b.Engine) -> Engine:
         return Engine.Athena
     else:
         raise RuntimeError("Unsupported data location {}".format(str(engine)))
+
+
+def _provisioning_from_proto(prov: b.Provisioning) -> Provisioning:
+    return Provisioning(
+        instance_type=prov.instance_type,
+        num_nodes=prov.num_nodes,
+    )
