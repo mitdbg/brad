@@ -9,6 +9,9 @@ import grpc
 import pyodbc
 
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
+
+from brad.blueprint import Blueprint
+from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
@@ -255,6 +258,14 @@ class BradServer(BradInterface):
             message = await loop.run_in_executor(None, self._daemon_output_queue.get)
 
             if isinstance(message, NewBlueprint):
-                # This is where we launch any reconfigurations needed to realize
-                # the new blueprint.
-                logger.debug("Received new blueprint: %s", message.blueprint)
+                await self._handle_new_blueprint(message.blueprint)
+
+    async def _handle_new_blueprint(self, new_blueprint: Blueprint) -> None:
+        # This is where we launch any reconfigurations needed to realize
+        # the new blueprint.
+        logger.debug("Received new blueprint: %s", new_blueprint)
+        curr_blueprint = self._blueprint_mgr.get_blueprint()
+        _diff = BlueprintDiff.of(curr_blueprint, new_blueprint)
+
+        # - Provisioning changes handled here (if there are blueprint changes).
+        # - Need to update the blueprint stored in the manager.
