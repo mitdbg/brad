@@ -79,4 +79,11 @@ def bootstrap_blueprint(user: UserProvidedBlueprint) -> Blueprint:
             continue
         process_table(table, expect_standalone_base_table=True)
 
-    return Blueprint(user.schema_name, list(tables_by_name.values()), None, None, None)
+    # We pass through the provisioning hints provided by the user.
+    return Blueprint(
+        user.schema_name,
+        list(tables_by_name.values()),
+        user.aurora_provisioning(),
+        user.redshift_provisioning(),
+        None,
+    )

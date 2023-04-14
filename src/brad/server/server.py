@@ -9,6 +9,9 @@ import grpc
 import pyodbc
 
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
+
+from brad.blueprint import Blueprint
+from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
@@ -200,13 +203,16 @@ class BradServer(BradInterface):
             logger.exception("Encountered unexpected exception when handling request.")
             raise QueryError.from_exception(ex)
 
-    async def _handle_internal_command(self, command: str) -> AsyncIterable[bytes]:
+    async def _handle_internal_command(self, command_raw: str) -> AsyncIterable[bytes]:
         """
         This method is used to handle BRAD_ prefixed "queries" (i.e., commands
         to run custom functionality like syncing data across the engines).
         """
+        # Clean up the command. We remove the trailing semicolon (;), remove any
+        # whitespace, and capitalize the command.
+        command = command_raw[:-1].strip().upper()
 
-        if command == "BRAD_SYNC;":
+        if command == "BRAD_SYNC":
             logger.debug("Manually triggered a data sync.")
             ran_sync = await self._data_sync_executor.run_sync(
                 self._blueprint_mgr.get_blueprint()
@@ -216,7 +222,7 @@ class BradServer(BradInterface):
             else:
                 yield "Sync skipped. No new writes to sync.".encode()
 
-        elif command == "BRAD_EXPLAIN_SYNC_STATIC;":
+        elif command == "BRAD_EXPLAIN_SYNC_STATIC":
             logical_plan = self._data_sync_executor.get_static_logical_plan(
                 self._blueprint_mgr.get_blueprint()
             )
@@ -224,7 +230,7 @@ class BradServer(BradInterface):
             logical_plan.print_plan_sequentially(file=out)
             yield out.getvalue().encode()
 
-        elif command == "BRAD_EXPLAIN_SYNC;":
+        elif command == "BRAD_EXPLAIN_SYNC":
             logical, physical = await self._data_sync_executor.get_processed_plans(
                 self._blueprint_mgr.get_blueprint()
             )
@@ -252,6 +258,14 @@ class BradServer(BradInterface):
             message = await loop.run_in_executor(None, self._daemon_output_queue.get)
 
             if isinstance(message, NewBlueprint):
-                # This is where we launch any reconfigurations needed to realize
-                # the new blueprint.
-                logger.debug("Received new blueprint: %s", message.blueprint)
+                await self._handle_new_blueprint(message.blueprint)
+
+    async def _handle_new_blueprint(self, new_blueprint: Blueprint) -> None:
+        # This is where we launch any reconfigurations needed to realize
+        # the new blueprint.
+        logger.debug("Received new blueprint: %s", new_blueprint)
+        curr_blueprint = self._blueprint_mgr.get_blueprint()
+        _diff = BlueprintDiff.of(curr_blueprint, new_blueprint)
+
+        # - Provisioning changes handled here (if there are blueprint changes).
+        # - Need to update the blueprint stored in the manager.

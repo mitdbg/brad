@@ -10,13 +10,33 @@ DESCRIPTOR: _descriptor.FileDescriptor
 REDSHIFT: Engine
 UNKNOWN: Engine
 
-class DataBlueprint(_message.Message):
-    __slots__ = ["schema_name", "tables"]
+class Blueprint(_message.Message):
+    __slots__ = ["aurora", "policy", "redshift", "schema_name", "tables"]
+    AURORA_FIELD_NUMBER: _ClassVar[int]
+    POLICY_FIELD_NUMBER: _ClassVar[int]
+    REDSHIFT_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_NAME_FIELD_NUMBER: _ClassVar[int]
     TABLES_FIELD_NUMBER: _ClassVar[int]
+    aurora: Provisioning
+    policy: RoutingPolicy
+    redshift: Provisioning
     schema_name: str
     tables: _containers.RepeatedCompositeFieldContainer[Table]
-    def __init__(self, schema_name: _Optional[str] = ..., tables: _Optional[_Iterable[_Union[Table, _Mapping]]] = ...) -> None: ...
+    def __init__(self, schema_name: _Optional[str] = ..., tables: _Optional[_Iterable[_Union[Table, _Mapping]]] = ..., aurora: _Optional[_Union[Provisioning, _Mapping]] = ..., redshift: _Optional[_Union[Provisioning, _Mapping]] = ..., policy: _Optional[_Union[RoutingPolicy, _Mapping]] = ...) -> None: ...
+
+class Provisioning(_message.Message):
+    __slots__ = ["instance_type", "num_nodes"]
+    INSTANCE_TYPE_FIELD_NUMBER: _ClassVar[int]
+    NUM_NODES_FIELD_NUMBER: _ClassVar[int]
+    instance_type: str
+    num_nodes: int
+    def __init__(self, instance_type: _Optional[str] = ..., num_nodes: _Optional[int] = ...) -> None: ...
+
+class RoutingPolicy(_message.Message):
+    __slots__ = ["policy"]
+    POLICY_FIELD_NUMBER: _ClassVar[int]
+    policy: bytes
+    def __init__(self, policy: _Optional[bytes] = ...) -> None: ...
 
 class Table(_message.Message):
     __slots__ = ["columns", "dependencies", "locations", "table_name"]

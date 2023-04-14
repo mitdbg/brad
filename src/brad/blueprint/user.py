@@ -1,14 +1,20 @@
 import yaml
-
-from .table import Column, Table
 from typing import List, Set
+
+from .provisioning import Provisioning
+from .table import Column, Table
 
 
 class UserProvidedBlueprint:
     """
     Represents a "user-provided" logical blueprint. This logical blueprint
-    contains a list of the tables, their schemas, dependencies, and transforms
-    between the tables.
+    contains
+
+      - A list of the tables
+      - The table schemas
+      - Table dependencies
+      - Transforms across tables
+      - A starting provisioning for Redshift and Aurora
 
     BRAD's planner will convert this user-provided logical blueprint into a
     physical blueprint (contains details about table placement and replication).
@@ -38,11 +44,40 @@ class UserProvidedBlueprint:
             transform = raw_table["transform"] if "transform" in raw_table else None
             tables.append(Table(name, columns, table_deps, transform, []))
 
-        return cls(raw_yaml["schema_name"], tables)
+        if "provisioning" in raw_yaml:
+            aurora = raw_yaml["provisioning"]["aurora"]
+            redshift = raw_yaml["provisioning"]["redshift"]
+            aurora_provisioning = Provisioning(
+                aurora["instance_type"], aurora["num_nodes"]
+            )
+            redshift_provisioning = Provisioning(
+                redshift["instance_type"], redshift["num_nodes"]
+            )
+        else:
+            # These are our defaults.
+            aurora_provisioning = Provisioning(
+                instance_type="db.r6g.large", num_nodes=1
+            )
+            redshift_provisioning = Provisioning(instance_type="dc2.large", num_nodes=1)
 
-    def __init__(self, schema_name: str, tables: List[Table]):
+        return cls(
+            raw_yaml["schema_name"],
+            tables,
+            aurora_provisioning,
+            redshift_provisioning,
+        )
+
+    def __init__(
+        self,
+        schema_name: str,
+        tables: List[Table],
+        aurora_provisioning: Provisioning,
+        redshift_provisioning: Provisioning,
+    ):
         self._schema_name = schema_name
         self._tables = tables
+        self._aurora_provisioning = aurora_provisioning
+        self._redshift_provisioning = redshift_provisioning
 
     @property
     def schema_name(self) -> str:
@@ -51,6 +86,12 @@ class UserProvidedBlueprint:
     @property
     def tables(self) -> List[Table]:
         return self._tables
+
+    def aurora_provisioning(self) -> Provisioning:
+        return self._aurora_provisioning
+
+    def redshift_provisioning(self) -> Provisioning:
+        return self._redshift_provisioning
 
     def validate(self) -> None:
         """
