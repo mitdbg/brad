@@ -1,5 +1,8 @@
 from absl import app
 from absl import flags
+import sys
+sys.path.append("..")
+
 import workloads.IMDB.parameters as parameters
 from workloads.IMDB.olap_workload_simulator import simulate_olap
 from workloads.IMDB.oltp_workload_simulator import simulate_oltp
