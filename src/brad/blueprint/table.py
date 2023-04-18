@@ -25,6 +25,9 @@ class Column:
     def is_primary(self) -> bool:
         return self._is_primary
 
+    def clone(self) -> "Column":
+        return Column(self._name, self._data_type, self._is_primary)
+
 
 class Table:
     """
@@ -73,3 +76,12 @@ class Table:
     @property
     def primary_key(self) -> List[Column]:
         return self._primary_key
+
+    def clone(self) -> "Table":
+        return Table(
+            self._name,
+            [col.clone() for col in self._columns],
+            self._table_dependencies.copy(),
+            self._transform_text,
+            self._locations.copy(),
+        )

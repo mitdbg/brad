@@ -1,0 +1,247 @@
+[
+  {
+    "instance_type": "db.t3.medium",
+    "vcpus": 2,
+    "memory_mib": 4096,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.t4g.medium",
+    "vcpus": 2,
+    "memory_mib": 4096,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.t3.large",
+    "vcpus": 2,
+    "memory_mib": 8192,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.t4g.large",
+    "vcpus": 2,
+    "memory_mib": 8192,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r5.large",
+    "vcpus": 2,
+    "memory_mib": 16384,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6g.large",
+    "vcpus": 2,
+    "memory_mib": 16384,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6i.large",
+    "vcpus": 2,
+    "memory_mib": 16384,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.x2g.large",
+    "vcpus": 2,
+    "memory_mib": 32768,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r5.xlarge",
+    "vcpus": 4,
+    "memory_mib": 32768,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6g.xlarge",
+    "vcpus": 4,
+    "memory_mib": 32768,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6i.xlarge",
+    "vcpus": 4,
+    "memory_mib": 32768,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.x2g.xlarge",
+    "vcpus": 4,
+    "memory_mib": 65536,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r5.2xlarge",
+    "vcpus": 8,
+    "memory_mib": 65536,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6g.2xlarge",
+    "vcpus": 8,
+    "memory_mib": 65536,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6i.2xlarge",
+    "vcpus": 8,
+    "memory_mib": 65536,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.x2g.2xlarge",
+    "vcpus": 8,
+    "memory_mib": 131072,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r5.4xlarge",
+    "vcpus": 16,
+    "memory_mib": 131072,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6g.4xlarge",
+    "vcpus": 16,
+    "memory_mib": 131072,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6i.4xlarge",
+    "vcpus": 16,
+    "memory_mib": 131072,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.x2g.4xlarge",
+    "vcpus": 16,
+    "memory_mib": 262144,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r5.8xlarge",
+    "vcpus": 32,
+    "memory_mib": 262144,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6g.8xlarge",
+    "vcpus": 32,
+    "memory_mib": 262144,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6i.8xlarge",
+    "vcpus": 32,
+    "memory_mib": 262144,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.x2g.8xlarge",
+    "vcpus": 32,
+    "memory_mib": 524288,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r5.12xlarge",
+    "vcpus": 48,
+    "memory_mib": 393216,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6g.12xlarge",
+    "vcpus": 48,
+    "memory_mib": 393216,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6i.12xlarge",
+    "vcpus": 48,
+    "memory_mib": 393216,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.x2g.12xlarge",
+    "vcpus": 48,
+    "memory_mib": 786432,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r5.16xlarge",
+    "vcpus": 64,
+    "memory_mib": 524288,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6g.16xlarge",
+    "vcpus": 64,
+    "memory_mib": 524288,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6i.16xlarge",
+    "vcpus": 64,
+    "memory_mib": 524288,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.x2g.16xlarge",
+    "vcpus": 64,
+    "memory_mib": 1048576,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r5.24xlarge",
+    "vcpus": 96,
+    "memory_mib": 786432,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6i.24xlarge",
+    "vcpus": 96,
+    "memory_mib": 786432,
+    "min_nodes": 1,
+    "max_nodes": 15
+  },
+  {
+    "instance_type": "db.r6i.32xlarge",
+    "vcpus": 128,
+    "memory_mib": 1048576,
+    "min_nodes": 1,
+    "max_nodes": 15
+  }
+]
