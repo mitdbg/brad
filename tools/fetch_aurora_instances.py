@@ -113,6 +113,11 @@ def main():
     specs.extend(X2G_INSTANCES)
     specs.sort(key=spec_sort_key)
 
+    for s in specs:
+        # Aurora only allows up to 15 replicas.
+        s["min_nodes"] = 1
+        s["max_nodes"] = 15
+
     with open(args.output_file, "w", encoding="UTF-8") as out_file:
         json.dump(specs, out_file, indent=2)
 
