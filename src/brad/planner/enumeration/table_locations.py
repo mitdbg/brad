@@ -104,7 +104,7 @@ class _TableLocations:
         elif idx == 2:
             self.on_athena = not self.on_athena
         else:
-            raise ValueError("Index out of switch range: " + idx)
+            raise ValueError("Index out of switch range: " + str(idx))
 
     @classmethod
     def from_locations(cls, locations: List[Engine]) -> "_TableLocations":
