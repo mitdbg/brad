@@ -1,0 +1,153 @@
+schema_name: hattrick
+
+# Use PostgreSQL data types. Make sure the data type is supported in Athena too.
+tables:
+  - table_name: part
+    columns:
+      - name: p_partkey
+        data_type: INT
+        primary_key: true
+      - name: p_name
+        data_type: CHARACTER VARYING(22)
+      - name: p_mfgr
+        data_type: CHARACTER VARYING(7)
+      - name: p_brand1
+        data_type: CHARACTER VARYING(9)
+      - name: p_color
+        data_type: CHARACTER VARYING(11)
+      - name: p_type
+        data_type: CHARACTER VARYING(25)
+      - name: p_size
+        data_type: INT
+      - name: p_container
+        data_type: CHARACTER VARYING(10)
+      - name: p_price
+        data_type: DECIMAL
+
+  - table_name: customer
+    columns:
+      - name: c_custkey
+        data_type: INT
+        primary_key: true
+      - name: c_name
+        data_type: CHARACTER VARYING(25)
+      - name: c_address
+        data_type: CHARACTER VARYING(25)
+      - name: c_city
+        data_type: CHARACTER VARYING(10)
+      - name: c_nation
+        data_type: CHARACTER VARYING(15)
+      - name: c_region
+        data_type: CHARACTER VARYING(12)
+      - name: c_phone
+        data_type: CHARACTER VARYING(15)
+      - name: c_mktsegment
+        data_type: CHARACTER VARYING(10)
+      - name: c_paymentcnt
+        data_type: INT
+
+  - table_name: supplier
+    columns:
+      - name: s_suppkey
+        data_type: INT
+        primary_key: true
+      - name: s_name
+        data_type: CHARACTER VARYING(25)
+      - name: s_address
+        data_type: CHARACTER VARYING(25)
+      - name: s_city
+        data_type: CHARACTER VARYING(10)
+      - name: s_nation
+        data_type: CHARACTER VARYING(15)
+      - name: s_region
+        data_type: CHARACTER VARYING(12)
+      - name: s_phone
+        data_type: CHARACTER VARYING(15)
+      - name: s_ytd
+        data_type: DECIMAL
+
+  - table_name: date
+    columns:
+      - name: d_datekey
+        data_type: INT
+        primary_key: true
+      - name: d_date
+        data_type: CHARACTER VARYING(18)
+      - name: d_dateofweek
+        data_type: CHARACTER VARYING(9)
+      - name: d_month
+        data_type: CHARACTER VARYING(9)
+      - name: d_year
+        data_type: INT
+      - name: d_yearmonthnum
+        data_type: INT
+      - name: d_yearmonth
+        data_type: CHARACTER VARYING(7)
+      - name: d_daynuminweek
+        data_type: INT
+      - name: d_daynuminmonth
+        data_type: INT
+      - name: d_daynuminyear
+        data_type: INT
+      - name: d_monthnuminyear
+        data_type: INT
+      - name: d_weeknuminyear
+        data_type: INT
+      - name: d_sellingseason
+        data_type: CHARACTER VARYING(15)
+      - name: d_lastdayinweekfl
+        data_type: BOOLEAN
+      - name: d_lastdayinmonthfl
+        data_type: BOOLEAN
+      - name: d_holidayfl
+        data_type: BOOLEAN
+      - name: d_weekdayfl
+        data_type: BOOLEAN
+
+  - table_name: lineorder
+    columns:
+      - name: lo_orderkey
+        data_type: INT
+        primary_key: true
+      - name: lo_linenumber
+        data_type: INT
+        primary_key: true
+      - name: lo_custkey
+        data_type: INT
+      - name: lo_partkey
+        data_type: INT
+      - name: lo_suppkey
+        data_type: INT
+      - name: lo_orderdate
+        data_type: INT
+      - name: lo_ordpriority
+        data_type: CHARACTER VARYING(15)
+      - name: lo_shippriority
+        data_type: CHARACTER VARYING(1)
+      - name: lo_quantity
+        data_type: INT
+      - name: lo_extendedprice
+        data_type: DECIMAL
+      - name: lo_discount
+        data_type: INT
+      - name: lo_revenue
+        data_type: DECIMAL
+      - name: lo_supplycost
+        data_type: DECIMAL
+      - name: lo_tax
+        data_type: INT
+      - name: lo_commitdate
+        data_type: INT
+      - name: lo_shipmode
+        data_type: CHARACTER VARYING(10)
+
+  - table_name: history
+    columns:
+      - name: h_orderkey
+        data_type: INT
+        primary_key: true
+      - name: h_custkey
+        data_type: INT
+        primary_key: true
+      - name: h_amount
+        data_type: DECIMAL
