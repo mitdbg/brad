@@ -89,3 +89,17 @@ python --run Default
 ```
 
 
+### Working with the HATtrick benchmark
+
+Clone the HATtrick repository to get the HATtrick benchmark tools:
+
+https://github.com/UWHustle/HATtrick
+
+To generate data:
+- Modify the `UserInput.cpp` file to set the scale factor (`SF`) and data
+  delimiter (our scripts are configured for `|`).
+- Compile the tools: `make all`
+- Run `./HATtrickBench -gen -pa output_dir` to generate the data.
+
+Copy the data to S3 and use the schema and manifest files under `config` to
+bootstrap and bulk load the data into BRAD respectively.
