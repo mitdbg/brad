@@ -10,6 +10,8 @@ tables:
       - name: p_name
         data_type: CHARACTER VARYING(22)
       - name: p_mfgr
+        data_type: CHARACTER VARYING(6)
+      - name: p_category
         data_type: CHARACTER VARYING(7)
       - name: p_brand1
         data_type: CHARACTER VARYING(9)
@@ -30,19 +32,19 @@ tables:
         data_type: INT
         primary_key: true
       - name: c_name
-        data_type: CHARACTER VARYING(25)
+        data_type: CHARACTER VARYING(50)
       - name: c_address
-        data_type: CHARACTER VARYING(25)
+        data_type: CHARACTER VARYING(50)
       - name: c_city
-        data_type: CHARACTER VARYING(10)
+        data_type: CHARACTER VARYING(20)
       - name: c_nation
-        data_type: CHARACTER VARYING(15)
+        data_type: CHARACTER VARYING(30)
       - name: c_region
-        data_type: CHARACTER VARYING(12)
+        data_type: CHARACTER VARYING(24)
       - name: c_phone
-        data_type: CHARACTER VARYING(15)
+        data_type: CHARACTER VARYING(30)
       - name: c_mktsegment
-        data_type: CHARACTER VARYING(10)
+        data_type: CHARACTER VARYING(20)
       - name: c_paymentcnt
         data_type: INT
 

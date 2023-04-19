@@ -5,37 +5,37 @@ schema_name: hattrick
 tables:
   - table_name: part
     s3_path: hattrick/sf10/part/part.tbl
-    aurora_options: FORMAT TEXT, ESCAPE ''\'', DELIMITER ''|''
+    aurora_options: FORMAT TEXT, DELIMITER ''|''
     redshift_options: DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
 
   - table_name: customer
     s3_path: hattrick/sf10/customer/customer.tbl
-    aurora_options: FORMAT TEXT, ESCAPE ''\'', DELIMITER ''|''
+    aurora_options: FORMAT TEXT, DELIMITER ''|''
     redshift_options: DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
 
   - table_name: supplier
     s3_path: hattrick/sf10/supplier/supplier.tbl
-    aurora_options: FORMAT TEXT, ESCAPE ''\'', DELIMITER ''|''
+    aurora_options: FORMAT TEXT, DELIMITER ''|''
     redshift_options: DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
 
   - table_name: date
     s3_path: hattrick/sf10/date/date.tbl
-    aurora_options: FORMAT TEXT, ESCAPE ''\'', DELIMITER ''|''
+    aurora_options: FORMAT TEXT, DELIMITER ''|''
     redshift_options: DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
 
   - table_name: lineorder
     s3_path: hattrick/sf10/lineorder/lineorder.tbl
-    aurora_options: FORMAT TEXT, ESCAPE ''\'', DELIMITER ''|''
+    aurora_options: FORMAT TEXT, DELIMITER ''|''
     redshift_options: DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
 
   - table_name: history
     s3_path: hattrick/sf10/history/history.tbl
-    aurora_options: FORMAT TEXT, ESCAPE ''\'', DELIMITER ''|''
+    aurora_options: FORMAT TEXT, DELIMITER ''|''
     redshift_options: DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
 
