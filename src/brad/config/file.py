@@ -78,7 +78,7 @@ class ConfigFile:
     @property
     def routing_policy(self) -> RoutingPolicy:
         return RoutingPolicy.from_str(self._raw["routing_policy"])
-    
+
     @property
     def redshift_cluster_id(self) -> str:
         return self._raw[Engine.Redshift]["host"].split(".")[0]
