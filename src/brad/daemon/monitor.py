@@ -7,7 +7,6 @@ import brad.daemon as daemon
 from datetime import datetime, timedelta
 import boto3
 import pandas as pd
-from pandas import Timestamp
 import time
 
 
@@ -25,6 +24,12 @@ class Monitor:
         while True:
             self._add_metrics()
             time.sleep(300)  # Read every 5 minutes
+
+    def read_k_most_recent(self, k=1) -> pd.DataFrame | None:
+        return None if self._values.empty else self._values.tail(k)
+
+    def read_between(self, start_time, end_time) -> pd.DataFrame | None:
+        return None if self._values.empty else self._values.loc[start_time:end_time]
 
     def _load_monitored_metrics(
         self,
@@ -113,7 +118,10 @@ class Monitor:
         data = {
             result["Id"]: result["Values"] for result in response["MetricDataResults"]
         }
-        df = pd.DataFrame(data, index=response["MetricDataResults"][0]["Timestamps"])
+        df = pd.DataFrame(
+            data, index=pd.DatetimeIndex(response["MetricDataResults"][0]["Timestamps"])
+        )
+        df.index = df.index.tz_localize(None)
 
         self._values = (
             df.copy()
