@@ -1,5 +1,6 @@
 import boto3
 from datetime import datetime, timedelta
+from typing import List
 
 
 class MetricReader:
@@ -7,29 +8,45 @@ class MetricReader:
     Utility class used for accessing monitoring metrics for the deployed services.
     """
 
-    def __init__(self, service: str, metric_name: str, stat: str, epoch_minutes: int):
+    def __init__(
+        self,
+        service: str,
+        metric_name: str,
+        stats: List[str],
+        epoch_minutes: int,
+        redshift_cluster_id: str = "",
+    ):
         if epoch_minutes > 60 * 24:
             raise ValueError(
                 f"epoch_minutes can be at most 1440 (one day), not {epoch_minutes}"
             )
-        self.service = service
-        self.metric_name = metric_name
-        self.stat = stat
-        self.epoch_minutes = epoch_minutes
-        self.client = boto3.client("cloudwatch")
         if service == "redshift":
+            if redshift_cluster_id == "":
+                raise ValueError(
+                    "To read metrics from redshift, must specify redshift_cluster_id"
+                )
             self.namespace = "AWS/Redshift"
         elif service == "aurora":
             self.namespace = "AWS/RDS"
 
-    # Stats for the i-th epoch, for negative i.
-    # Epoch 0 is currently in progress, positive epochs are in the future.
-    def get_stats(self, i: int = -1, end: datetime = datetime.now()):
-        if i >= 0:
-            raise ValueError(
-                "Can only get stats for past epochs (negative values of i)"
-            )
+        self.service = service
+        self.metric_name = metric_name
+        self.stats = stats
+        self.epoch_minutes = epoch_minutes
+        self.redshift_cluster_id = redshift_cluster_id
+        self.client = boto3.client("cloudwatch")
 
+    # Stats for the epochs between i (inclusive) and j (exclusive), for negative i and nonpositive j.
+    # Epoch 0 is currently in progress, positive epochs are in the future.
+    def get_stats(self, i: int = -1, j: int = 0):
+        if i >= 0 or j > 0:
+            raise ValueError(
+                "Can only get stats for past epochs (negative values of i and nonpositive values of j)"
+            )
+        if i >= j:
+            raise ValueError("Must have i < j")
+
+        end = datetime.now()
         end_floor = (
             end
             - timedelta(
@@ -38,13 +55,13 @@ class MetricReader:
                 seconds=end.second,
                 microseconds=end.microsecond,
             )
-            - timedelta(minutes=self.epoch_minutes * (-i - 1))
+            - timedelta(minutes=self.epoch_minutes * -j)
         )
-        start = end_floor - timedelta(minutes=self.epoch_minutes)
+        start = end_floor - timedelta(minutes=self.epoch_minutes * (j - i))
 
         if self.service == "redshift":
             dimensions = [
-                {"Name": "ClusterIdentifier", "Value": "brad-redshift"},
+                {"Name": "ClusterIdentifier", "Value": self.redshift_cluster_id},
             ]
         elif self.service == "aurora":
             dimensions = [
@@ -58,20 +75,28 @@ class MetricReader:
             StartTime=start,
             EndTime=end_floor,
             Period=self.epoch_minutes * 60,
-            Statistics=[self.stat],
-            Unit="Percent",
+            Statistics=self.stats,
         )
 
-        return response["Datapoints"][0][self.stat]
+        points = response["Datapoints"]
+        points.reverse()
+
+        for ep, point in enumerate(points):
+            point["EpochStart"] = point.pop("Timestamp")
+            point["Service"] = self.service
+            point["Metric"] = response["Label"]
+            point["Epoch"] = i + ep
+
+        return points
 
 
 if __name__ == "__main__":
-    mr = MetricReader("redshift", "CPUUtilization", "Average", 60)
+    mr = MetricReader(
+        "redshift", "CPUUtilization", ["Average", "Maximum"], 60, "brad-redshift"
+    )
     print(mr.get_stats())
     print(mr.get_stats(i=-2))
-    print(mr.get_stats(end=datetime.now() - timedelta(days=1)))
 
-    mr2 = MetricReader("aurora", "CPUUtilization", "Average", 30)
+    mr2 = MetricReader("aurora", "CPUUtilization", ["Average"], 30)
     print(mr2.get_stats())
     print(mr2.get_stats(i=-2))
-    print(mr2.get_stats(end=datetime.now() - timedelta(days=1)))

@@ -1,0 +1,118 @@
+{
+    "epoch_length": {
+        "weeks": 0,
+        "days": 1,
+        "hours": 0,
+        "minutes": 0
+    },
+    "monitored_metrics": [
+        {
+            "engine": "redshift",
+            "metrics": {
+                "CPUUtilization": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "ReadIOPS": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "ReadLatency": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "ReadThroughput": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "WriteIOPS": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "WriteLatency": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "WriteThroughput": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ]
+            }
+        },
+        {
+            "engine": "aurora",
+            "metrics": {
+                "CPUUtilization": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "ReadIOPS": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "ReadLatency": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "ReadThroughput": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "WriteIOPS": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "WriteLatency": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "WriteThroughput": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ]
+            }
+        }
+    ]
+}
