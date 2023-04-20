@@ -68,7 +68,10 @@ class Monitor:
             elif engine == Engine.Redshift:
                 namespace = "AWS/Redshift"
                 dimensions = [
-                    {"Name": "ClusterIdentifier", "Value": self._config.redshift_cluster_id},
+                    {
+                        "Name": "ClusterIdentifier",
+                        "Value": self._config.redshift_cluster_id,
+                    },
                 ]
 
             for metric_name, stats_list in self._metrics[engine].items():
@@ -87,41 +90,39 @@ class Monitor:
                         "ReturnData": True,
                     }
                     metric_data_queries.append(metric_data_query)
-        
-        return metric_data_queries
 
+        return metric_data_queries
 
     def _add_metrics(self):
         # Retrieve datapoints
         now = datetime.now()
         end_time = now - (now - datetime.min) % self._epoch_length
-        start_time = end_time - self._epoch_length
+        start_time = end_time - 3 * self._epoch_length
 
         if not self._values.empty:
-            start_time = self._values.loc[self._values.index[-1], "Timestamp"]
+            start_time = self._values.index[-1]
 
         response = self._client.get_metric_data(
             MetricDataQueries=self._queries,
             StartTime=start_time,
             EndTime=end_time,
-            ScanBy='TimestampAscending'
+            ScanBy="TimestampAscending",
         )
 
-        print(response)
+        # Append only the new rows to the internal representation
+        data = {
+            result["Id"]: result["Values"] for result in response["MetricDataResults"]
+        }
+        df = pd.DataFrame(data, index=response["MetricDataResults"][0]["Timestamps"])
 
-        """ points = response["Datapoints"]
-        points.reverse()
-
-        for ep, point in enumerate(points):
-            point["EpochStart"] = point.pop("Timestamp")
-            point["Service"] = self.service
-            point["Metric"] = response["Label"]
-            point["Epoch"] = i + ep
-
-        return points """
+        self._values = (
+            df.copy()
+            if self._values.empty
+            else pd.concat([self._values, df.loc[df.index > self._values.index[-1]]])
+        )
 
 
 if __name__ == "__main__":
     c = ConfigFile("../../../config/config.yml")
     monitor = Monitor(c)
-    monitor._add_metrics()
+    monitor.run_forever()
