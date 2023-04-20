@@ -4,18 +4,27 @@ from typing import Dict, List, Tuple
 import json
 from brad.config.engine import Engine
 import brad.daemon as daemon
-from datetime import timedelta
+from datetime import datetime, timedelta
+import boto3
+import pandas as pd
+from pandas import Timestamp
+import time
 
 
 class Monitor:
     def __init__(self, config: ConfigFile) -> None:
         self._config = config
         self._epoch_length, self._metrics = self._load_monitored_metrics()
+        self._client = boto3.client("cloudwatch")
+        self._queries = self._create_queries()
+        self._values = pd.DataFrame()
 
     async def run_forever(self) -> None:
         # Flesh out the monitor - maintain running averages of the underlying
         # engines' metrics.
-        pass
+        while True:
+            self._add_metrics()
+            time.sleep(300)  # Read every 5 minutes
 
     def _load_monitored_metrics(
         self,
@@ -45,6 +54,74 @@ class Monitor:
 
         return epoch_length, metrics_map
 
+    def _create_queries(self):
+        # Create the metric data queries
+        metric_data_queries = []
+        for engine in self._metrics:
+            namespace = ""
+            dimensions = []
+            if engine == Engine.Aurora:
+                namespace = "AWS/RDS"
+                dimensions = [
+                    {"Name": "EngineName", "Value": "aurora-postgresql"},
+                ]
+            elif engine == Engine.Redshift:
+                namespace = "AWS/Redshift"
+                dimensions = [
+                    {"Name": "ClusterIdentifier", "Value": self._config.redshift_cluster_id},
+                ]
+
+            for metric_name, stats_list in self._metrics[engine].items():
+                for stat in stats_list:
+                    metric_data_query = {
+                        "Id": f"{engine}_{metric_name}_{stat}",
+                        "MetricStat": {
+                            "Metric": {
+                                "Namespace": namespace,
+                                "MetricName": metric_name,
+                                "Dimensions": dimensions,
+                            },
+                            "Period": int(self._epoch_length.total_seconds()),
+                            "Stat": stat,
+                        },
+                        "ReturnData": True,
+                    }
+                    metric_data_queries.append(metric_data_query)
+        
+        return metric_data_queries
+
+
+    def _add_metrics(self):
+        # Retrieve datapoints
+        now = datetime.now()
+        end_time = now - (now - datetime.min) % self._epoch_length
+        start_time = end_time - self._epoch_length
+
+        if not self._values.empty:
+            start_time = self._values.loc[self._values.index[-1], "Timestamp"]
+
+        response = self._client.get_metric_data(
+            MetricDataQueries=self._queries,
+            StartTime=start_time,
+            EndTime=end_time,
+            ScanBy='TimestampAscending'
+        )
+
+        print(response)
+
+        """ points = response["Datapoints"]
+        points.reverse()
+
+        for ep, point in enumerate(points):
+            point["EpochStart"] = point.pop("Timestamp")
+            point["Service"] = self.service
+            point["Metric"] = response["Label"]
+            point["Epoch"] = i + ep
+
+        return points """
+
 
 if __name__ == "__main__":
-    monitor = Monitor()
+    c = ConfigFile("../../../config/config.yml")
+    monitor = Monitor(c)
+    monitor._add_metrics()
