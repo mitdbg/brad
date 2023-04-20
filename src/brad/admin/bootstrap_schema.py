@@ -63,7 +63,8 @@ def bootstrap_schema(args):
     sql_gen = TableSqlGenerator(config, blueprint)
 
     for table in blueprint.tables():
-        for location in table.locations:
+        table_locations = blueprint.get_table_locations(table.name)
+        for location in table_locations:
             logger.info(
                 "Creating table '%s' on %s...",
                 table.name,

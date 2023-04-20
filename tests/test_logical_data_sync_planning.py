@@ -44,7 +44,7 @@ def test_make_logical_data_sync_plan_simple():
     assert "table2" not in base_tables
 
     table3 = "table3"
-    table3_locations = blueprint.get_table(table3).locations
+    table3_locations = blueprint.get_table_locations(table3)
 
     if len(table3_locations) > 1 and Engine.Aurora in table3_locations:
         # Need to extract from it for replication.

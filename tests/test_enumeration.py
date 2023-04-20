@@ -1,5 +1,4 @@
 from brad.blueprint.provisioning import Provisioning
-from brad.blueprint.table import Table
 from brad.config.engine import Engine
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.enumeration.table_locations import TableLocationEnumerator
@@ -37,7 +36,7 @@ def test_provisioning_enumerate_redshift():
 
 def test_table_placement_enumerate():
     enumerator = TableLocationEnumerator()
-    tables = [Table("table", [], [], None, [Engine.Aurora])]
+    tables = {"table": [Engine.Aurora]}
 
     # Simple sanity check assertions.
     count = 0

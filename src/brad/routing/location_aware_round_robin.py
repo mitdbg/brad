@@ -25,8 +25,8 @@ class LocationAwareRoundRobin(Router):
         location_sets: List[Set[Engine]] = []
         for table_name_str in query.tables():
             try:
-                table = blueprint.get_table(table_name_str)
-                location_sets.append(set(table.locations))
+                table_locations = blueprint.get_table_locations(table_name_str)
+                location_sets.append(set(table_locations))
             except ValueError:
                 # The query is referencing a non-existent table (could be a CTE
                 # - the parser does not differentiate between CTE tables and

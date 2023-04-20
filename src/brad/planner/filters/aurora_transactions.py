@@ -20,7 +20,7 @@ class AuroraTransactions(Filter):
         for table in candidate.tables():
             if (
                 table.name in self._transactional_tables
-                and Engine.Aurora not in table.locations
+                and Engine.Aurora not in candidate.get_table_locations(table.name)
             ):
                 return False
         return True

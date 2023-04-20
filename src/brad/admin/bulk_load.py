@@ -91,9 +91,9 @@ async def _ensure_empty(
     try:
         for load_table in manifest["tables"]:
             table_name = load_table["table_name"]
-            table = blueprint.get_table(table_name)
+            table_locations = blueprint.get_table_locations(table_name)
 
-            for engine in table.locations:
+            for engine in table_locations:
                 conn = engines.get_connection(engine)
                 cursor = await conn.cursor()
                 await cursor.execute("SELECT COUNT(*) FROM {}".format(table_name))
@@ -301,22 +301,22 @@ async def bulk_load_impl(args, manifest) -> None:
         ) -> Iterator[Coroutine[Any, Any, Engine]]:
             for table_options in manifest["tables"]:
                 table_name = table_options["table_name"]
-                table = blueprint.get_table(table_name)
-                if engine == Engine.Aurora and Engine.Aurora in table.locations:
+                table_locations = blueprint.get_table_locations(table_name)
+                if engine == Engine.Aurora and Engine.Aurora in table_locations:
                     yield _load_aurora(
                         ctx,
                         table_name,
                         table_options,
                         engines.get_connection(Engine.Aurora),
                     )
-                elif engine == Engine.Redshift and Engine.Redshift in table.locations:
+                elif engine == Engine.Redshift and Engine.Redshift in table_locations:
                     yield _load_redshift(
                         ctx,
                         table_name,
                         table_options,
                         engines.get_connection(Engine.Redshift),
                     )
-                elif engine == Engine.Athena and Engine.Athena in table.locations:
+                elif engine == Engine.Athena and Engine.Athena in table_locations:
                     yield _load_athena(
                         ctx,
                         table_name,

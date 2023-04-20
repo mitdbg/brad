@@ -1,3 +1,5 @@
+from typing import Tuple, List
+
 from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.table import Column, Table
@@ -18,7 +20,8 @@ def deserialize_blueprint(raw_data: bytes) -> Blueprint:
     proto.ParseFromString(raw_data)
     return Blueprint(
         schema_name=proto.schema_name,
-        tables=list(map(_table_from_proto, proto.tables)),
+        table_schemas=list(map(_table_from_proto, proto.tables)),
+        table_locations=dict(map(_table_locations_from_proto, proto.tables)),
         aurora_provisioning=_provisioning_from_proto(proto.aurora),
         redshift_provisioning=_provisioning_from_proto(proto.redshift),
         router_provider=None,
@@ -28,7 +31,7 @@ def deserialize_blueprint(raw_data: bytes) -> Blueprint:
 def serialize_blueprint(blueprint: Blueprint) -> bytes:
     proto = b.Blueprint(
         schema_name=blueprint.schema_name(),
-        tables=map(_table_to_proto, blueprint.tables()),
+        tables=map(_tables_with_locations_to_proto, blueprint.tables_with_locations()),
         aurora=_provisioning_to_proto(blueprint.aurora_provisioning()),
         redshift=_provisioning_to_proto(blueprint.redshift_provisioning()),
         policy=None,
@@ -41,11 +44,14 @@ def serialize_blueprint(blueprint: Blueprint) -> bytes:
 # Serialization
 
 
-def _table_to_proto(table: Table) -> b.Table:
+def _tables_with_locations_to_proto(
+    table_with_locations: Tuple[Table, List[Engine]]
+) -> b.Table:
+    table, locations = table_with_locations
     return b.Table(
         table_name=table.name,
         columns=map(_table_column_to_proto, table.columns),
-        locations=map(_location_to_proto, table.locations),
+        locations=map(_location_to_proto, locations),
         dependencies=b.TableDependency(
             source_table_names=table.table_dependencies,
             transform=table.transform_text,
@@ -86,12 +92,16 @@ def _table_from_proto(table: b.Table) -> Table:
         columns=list(map(_table_column_from_proto, table.columns)),
         table_dependencies=list(table.dependencies.source_table_names),
         transform_text=table.dependencies.transform,
-        locations=list(map(_location_from_proto, table.locations)),
     )
 
 
 def _table_column_from_proto(col: b.TableColumn) -> Column:
     return Column(name=col.name, data_type=col.data_type, is_primary=col.is_primary)
+
+
+def _table_locations_from_proto(table: b.Table) -> Tuple[str, List[Engine]]:
+    locations = list(map(_location_from_proto, table.locations))
+    return (table.table_name, locations)
 
 
 def _location_from_proto(engine: b.Engine) -> Engine:

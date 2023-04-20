@@ -42,7 +42,7 @@ class UserProvidedBlueprint:
                 list(raw_table["dependencies"]) if "dependencies" in raw_table else []
             )
             transform = raw_table["transform"] if "transform" in raw_table else None
-            tables.append(Table(name, columns, table_deps, transform, []))
+            tables.append(Table(name, columns, table_deps, transform))
 
         if "provisioning" in raw_yaml:
             aurora = raw_yaml["provisioning"]["aurora"]
