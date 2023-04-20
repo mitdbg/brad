@@ -1,6 +1,6 @@
 from brad.config.file import ConfigFile
 import importlib.resources as pkg_resources
-from typing import Dict
+from typing import Dict, List
 import json
 from brad.config.engine import Engine
 import brad.daemon as daemon
@@ -16,7 +16,7 @@ class Monitor:
         # engines' metrics.
         pass
 
-    def _load_monitored_metrics(self) -> Dict[str, Dict[str, int | float]]:
+    def _load_monitored_metrics(self) -> Dict[str, Dict[str, List[str]]]:
         # Load data.
         with pkg_resources.open_text(daemon, "monitored_metrics.json") as data:
             file_contents = json.load(data)
