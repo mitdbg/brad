@@ -32,6 +32,7 @@ INSTALL_REQUIRES = [
     "pyodbc",
     "pyyaml",
     "sqlglot",
+    "pandas"
 ]
 
 DEV_REQUIRES = [
