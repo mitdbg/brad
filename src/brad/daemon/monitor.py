@@ -33,7 +33,7 @@ class Monitor:
 
     def _load_monitored_metrics(
         self,
-    ) -> Tuple[Dict[str, Dict[str, List[str]]], timedelta]:
+    ) -> Tuple[timedelta, Dict[str, Dict[str, List[str]]]]:
         # Load data.
         with pkg_resources.open_text(daemon, "monitored_metrics.json") as data:
             file_contents = json.load(data)
@@ -45,11 +45,11 @@ class Monitor:
             minutes=file_contents["epoch_length"]["minutes"],
         )
 
-        metrics_map = {}
+        metrics_map: Dict[str, Dict[str, List[str]]] = {}
         for f in file_contents["monitored_metrics"]:
             try:
                 eng_name = Engine.from_str(f["engine"])
-            except:
+            except ValueError:
                 continue
 
             metrics_map[eng_name] = {}
@@ -128,9 +128,3 @@ class Monitor:
             if self._values.empty
             else pd.concat([self._values, df.loc[df.index > self._values.index[-1]]])
         )
-
-
-if __name__ == "__main__":
-    c = ConfigFile("../../../config/config.yml")
-    monitor = Monitor(c)
-    monitor.run_forever()
