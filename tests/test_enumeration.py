@@ -35,21 +35,20 @@ def test_provisioning_enumerate_redshift():
 
 
 def test_table_placement_enumerate():
-    enumerator = TableLocationEnumerator()
     tables = {"table": [Engine.Aurora]}
 
     # Simple sanity check assertions.
     count = 0
-    for _ in enumerator.enumerate(tables, 3):
+    for _ in TableLocationEnumerator.enumerate_nearby(tables, 3):
         count += 1
     assert count == 8
 
     count = 0
-    for _ in enumerator.enumerate(tables, 2):
+    for _ in TableLocationEnumerator.enumerate_nearby(tables, 2):
         count += 1
     assert count == 7
 
     count = 0
-    for _ in enumerator.enumerate(tables, 1):
+    for _ in TableLocationEnumerator.enumerate_nearby(tables, 1):
         count += 1
     assert count == 4

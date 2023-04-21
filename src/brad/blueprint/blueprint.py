@@ -53,6 +53,9 @@ class Blueprint:
     def get_router(self) -> Optional[Router]:
         return self._router_provider() if self._router_provider is not None else None
 
+    def router_provider(self) -> Optional[RouterProvider]:
+        return self._router_provider
+
     def base_table_names(self) -> Set[str]:
         return self._base_table_names
 

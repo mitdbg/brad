@@ -14,8 +14,9 @@ class TableLocationEnumerator:
     equally).
     """
 
-    def enumerate(
-        self, base_placement: Dict[str, List[Engine]], max_num_actions: int
+    @staticmethod
+    def enumerate_nearby(
+        base_placement: Dict[str, List[Engine]], max_num_actions: int
     ) -> Iterator[Dict[str, List[Engine]]]:
         """
         Enumerates table placements that are within `max_num_actions` table
