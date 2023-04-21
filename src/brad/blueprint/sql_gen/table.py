@@ -187,8 +187,8 @@ class TableSqlGenerator:
             + " (table_name, next_extract_seq, next_shadow_extract_seq) VALUES ('{table_name}', 0, 0)"
         )
         for base_table_name in self._blueprint.base_table_names():
-            base_table = self._blueprint.get_table(base_table_name)
-            if Engine.Aurora not in base_table.locations:
+            base_table_locations = self._blueprint.get_table_locations(base_table_name)
+            if Engine.Aurora not in base_table_locations:
                 continue
             queries.append(initialize_template.format(table_name=base_table_name))
 

@@ -1,7 +1,5 @@
 from typing import List, Optional
 
-from brad.config.engine import Engine
-
 
 class Column:
     """
@@ -44,13 +42,11 @@ class Table:
         columns: List[Column],
         table_dependencies: List[str],
         transform_text: Optional[str],
-        locations: List[Engine],
     ):
         self._name = name
         self._columns = columns
         self._table_dependencies = table_dependencies
         self._transform_text = transform_text
-        self._locations = locations
         self._primary_key = list(filter(lambda c: c.is_primary, columns))
 
     @property
@@ -70,10 +66,6 @@ class Table:
         return self._transform_text
 
     @property
-    def locations(self) -> List[Engine]:
-        return self._locations
-
-    @property
     def primary_key(self) -> List[Column]:
         return self._primary_key
 
@@ -83,5 +75,4 @@ class Table:
             [col.clone() for col in self._columns],
             self._table_dependencies.copy(),
             self._transform_text,
-            self._locations.copy(),
         )

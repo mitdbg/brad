@@ -69,6 +69,7 @@ def test_provisioning_change():
     changed = Blueprint(
         initial.schema_name(),
         initial.tables(),
+        initial.table_locations(),
         initial.aurora_provisioning(),
         Provisioning(instance_type="dc2.large", num_nodes=4),
         router_provider=None,
@@ -95,9 +96,9 @@ def test_location_change():
                 columns=[],
                 table_dependencies=[],
                 transform_text=None,
-                locations=[Engine.Aurora],
             )
         ],
+        {"table1": [Engine.Aurora]},
         aurora,
         redshift,
         None,
@@ -110,9 +111,9 @@ def test_location_change():
                 columns=[],
                 table_dependencies=[],
                 transform_text=None,
-                locations=[Engine.Aurora, Engine.Redshift],
             )
         ],
+        {"table1": [Engine.Aurora, Engine.Redshift]},
         aurora,
         redshift,
         None,
@@ -136,9 +137,9 @@ def test_location_change():
                 columns=[],
                 table_dependencies=[],
                 transform_text=None,
-                locations=[Engine.Athena],
             )
         ],
+        {"table1": [Engine.Athena]},
         aurora,
         redshift,
         None,

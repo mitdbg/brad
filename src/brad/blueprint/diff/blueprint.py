@@ -10,17 +10,20 @@ class BlueprintDiff:
     def of(cls, old: Blueprint, new: Blueprint) -> Optional["BlueprintDiff"]:
         # This code assumes that there are no table additions/removals, which we
         # do not currently support.
-        old_table_locations = {tbl.name: set(tbl.locations) for tbl in old.tables()}
+        old_table_locations = {
+            name: set(locations_list)
+            for name, locations_list in old.table_locations().items()
+        }
         table_diffs = []
-        for tbl in new.tables():
-            old_locs = old_table_locations[tbl.name]
-            new_locs = set(tbl.locations)
+        for name, new_locations in new.table_locations().items():
+            old_locs = old_table_locations[name]
+            new_locs = set(new_locations)
 
             additions = new_locs.difference(old_locs)
             removals = old_locs.difference(new_locs)
 
             if len(additions) > 0 or len(removals) > 0:
-                table_diffs.append(TableDiff(tbl.name, list(additions), list(removals)))
+                table_diffs.append(TableDiff(name, list(additions), list(removals)))
 
         aurora_diff = ProvisioningDiff.of(
             old.aurora_provisioning(), new.aurora_provisioning()

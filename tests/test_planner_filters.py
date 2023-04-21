@@ -22,26 +22,28 @@ def test_aurora_transactions():
 
     bp1 = Blueprint(
         "schema",
-        tables=[
-            Table("test", [], [], None, locations=[Engine.Aurora]),
-            Table("test2", [], [], None, locations=[Engine.Redshift, Engine.Athena]),
+        table_schemas=[
+            Table("test", [], [], None),
+            Table("test2", [], [], None),
         ],
+        table_locations={
+            "test": [Engine.Aurora],
+            "test2": [Engine.Redshift, Engine.Athena],
+        },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
         router_provider=None,
     )
     bp2 = Blueprint(
         "schema",
-        tables=[
-            Table("test", [], [], None, locations=[Engine.Aurora]),
-            Table(
-                "test2",
-                [],
-                [],
-                None,
-                locations=[Engine.Redshift, Engine.Athena, Engine.Aurora],
-            ),
+        table_schemas=[
+            Table("test", [], [], None),
+            Table("test2", [], [], None),
         ],
+        table_locations={
+            "test": [Engine.Aurora],
+            "test2": [Engine.Redshift, Engine.Athena, Engine.Aurora],
+        },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
         router_provider=None,
@@ -73,34 +75,32 @@ def test_single_engine_execution():
 
     bp1 = Blueprint(
         "schema",
-        tables=[
-            Table("test", [], [], None, locations=[Engine.Aurora]),
-            Table("test2", [], [], None, locations=[Engine.Redshift]),
-            Table("test3", [], [], None, locations=[Engine.Redshift]),
+        table_schemas=[
+            Table("test", [], [], None),
+            Table("test2", [], [], None),
+            Table("test3", [], [], None),
         ],
+        table_locations={
+            "test": [Engine.Aurora],
+            "test2": [Engine.Redshift],
+            "test3": [Engine.Redshift],
+        },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
         router_provider=None,
     )
     bp2 = Blueprint(
         "schema",
-        tables=[
-            Table("test", [], [], None, locations=[Engine.Aurora]),
-            Table(
-                "test2",
-                [],
-                [],
-                None,
-                locations=[Engine.Redshift, Engine.Athena, Engine.Aurora],
-            ),
-            Table(
-                "test3",
-                [],
-                [],
-                None,
-                locations=[Engine.Athena],
-            ),
+        table_schemas=[
+            Table("test", [], [], None),
+            Table("test2", [], [], None),
+            Table("test3", [], [], None),
         ],
+        table_locations={
+            "test": [Engine.Aurora],
+            "test2": [Engine.Redshift, Engine.Athena, Engine.Aurora],
+            "test3": [Engine.Athena],
+        },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
         router_provider=None,
@@ -121,33 +121,48 @@ def test_table_on_engine():
 
     bp1 = Blueprint(
         "schema",
-        tables=[
-            Table("test", [], [], None, locations=[Engine.Aurora]),
-            Table("test2", [], [], None, locations=[Engine.Redshift]),
-            Table("test3", [], [], None, locations=[Engine.Redshift]),
+        table_schemas=[
+            Table("test", [], [], None),
+            Table("test2", [], [], None),
+            Table("test3", [], [], None),
         ],
+        table_locations={
+            "test": [Engine.Aurora],
+            "test2": [Engine.Redshift],
+            "test3": [Engine.Redshift],
+        },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
         router_provider=None,
     )
     bp2 = Blueprint(
         "schema",
-        tables=[
-            Table("test", [], [], None, locations=[Engine.Aurora]),
-            Table("test2", [], [], None, locations=[Engine.Redshift]),
-            Table("test3", [], [], None, locations=[Engine.Redshift]),
+        table_schemas=[
+            Table("test", [], [], None),
+            Table("test2", [], [], None),
+            Table("test3", [], [], None),
         ],
+        table_locations={
+            "test": [Engine.Aurora],
+            "test2": [Engine.Redshift],
+            "test3": [Engine.Redshift],
+        },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 0),
         router_provider=None,
     )
     bp3 = Blueprint(
         "schema",
-        tables=[
-            Table("test", [], [], None, locations=[Engine.Athena]),
-            Table("test2", [], [], None, locations=[Engine.Athena]),
-            Table("test3", [], [], None, locations=[Engine.Aurora]),
+        table_schemas=[
+            Table("test", [], [], None),
+            Table("test2", [], [], None),
+            Table("test3", [], [], None),
         ],
+        table_locations={
+            "test": [Engine.Athena],
+            "test2": [Engine.Athena],
+            "test3": [Engine.Aurora],
+        },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 0),
         router_provider=None,

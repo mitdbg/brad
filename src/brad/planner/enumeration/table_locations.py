@@ -1,7 +1,6 @@
 import itertools
-from typing import List, Iterator
+from typing import List, Iterator, Dict
 
-from brad.blueprint.table import Table
 from brad.config.engine import Engine
 
 
@@ -15,9 +14,10 @@ class TableLocationEnumerator:
     equally).
     """
 
-    def enumerate(
-        self, base_placement: List[Table], max_num_actions: int
-    ) -> Iterator[List[Table]]:
+    @staticmethod
+    def enumerate_nearby(
+        base_placement: Dict[str, List[Engine]], max_num_actions: int
+    ) -> Iterator[Dict[str, List[Engine]]]:
         """
         Enumerates table placements that are within `max_num_actions` table
         movements away from the starting placement.
@@ -39,12 +39,13 @@ class TableLocationEnumerator:
         assert max_num_actions <= max_switches
 
         base_locations = [
-            _TableLocations.from_locations(tbl.locations) for tbl in base_placement
+            _TableLocations.from_locations(table_name, locations)
+            for table_name, locations in base_placement.items()
         ]
-        iter_locations = [
-            _TableLocations.from_locations(tbl.locations) for tbl in base_placement
-        ]
-        candidate_placement = [tbl.clone() for tbl in base_placement]
+        iter_locations = [loc.clone() for loc in base_locations]
+        candidate_placement = {
+            table_name: engines.copy() for table_name, engines in base_placement.items()
+        }
 
         # Special case: no changes.
         yield candidate_placement
@@ -60,10 +61,10 @@ class TableLocationEnumerator:
                     iter_locations[tbl_idx].apply_switch(switch_idx)
 
                 # Generate the placement.
-                for placement, new_locations in zip(
-                    candidate_placement, iter_locations
-                ):
-                    new_locations.into_locations(placement.locations)
+                for new_locations in iter_locations:
+                    new_locations.into_locations(
+                        candidate_placement[new_locations.table_name]
+                    )
 
                 yield candidate_placement
 
@@ -73,7 +74,10 @@ class TableLocationEnumerator:
 
 
 class _TableLocations:
-    def __init__(self, on_aurora: bool, on_redshift: bool, on_athena: bool) -> None:
+    def __init__(
+        self, table_name: str, on_aurora: bool, on_redshift: bool, on_athena: bool
+    ) -> None:
+        self.table_name = table_name
         self.on_aurora = on_aurora
         self.on_redshift = on_redshift
         self.on_athena = on_athena
@@ -107,11 +111,13 @@ class _TableLocations:
             raise ValueError("Index out of switch range: " + str(idx))
 
     @classmethod
-    def from_locations(cls, locations: List[Engine]) -> "_TableLocations":
+    def from_locations(
+        cls, table_name: str, locations: List[Engine]
+    ) -> "_TableLocations":
         on_aurora = Engine.Aurora in locations
         on_redshift = Engine.Redshift in locations
         on_athena = Engine.Athena in locations
-        return cls(on_aurora, on_redshift, on_athena)
+        return cls(table_name, on_aurora, on_redshift, on_athena)
 
     def into_locations(self, dest: List[Engine]) -> None:
         dest.clear()
@@ -121,3 +127,8 @@ class _TableLocations:
             dest.append(Engine.Redshift)
         if self.on_athena:
             dest.append(Engine.Athena)
+
+    def clone(self) -> "_TableLocations":
+        return _TableLocations(
+            self.table_name, self.on_aurora, self.on_redshift, self.on_athena
+        )

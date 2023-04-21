@@ -39,11 +39,13 @@ def make_logical_data_sync_plan(blueprint: Blueprint) -> LogicalDataSyncPlan:
         if table.name in delta_operators:
             return delta_operators[table.name]
 
+        table_locations = blueprint.get_table_locations(table.name)
+
         # 1. Get the operator that will compute deltas to apply to this table.
         if len(table.table_dependencies) == 0:
             # This is a base table. If it has a replica on Aurora, we create an
             # `ExtractDeltas` op.
-            if Engine.Aurora in table.locations:
+            if Engine.Aurora in table_locations:
                 extract_op = ExtractDeltas(table.name)
                 all_operators.append(extract_op)
                 base_operators.append(extract_op)
@@ -101,10 +103,10 @@ def make_logical_data_sync_plan(blueprint: Blueprint) -> LogicalDataSyncPlan:
         # Aurora, it is considered static (we assume writes originate on
         # Aurora).
         is_base_and_static = (
-            len(table.table_dependencies) == 0 and Engine.Aurora not in table.locations
+            len(table.table_dependencies) == 0 and Engine.Aurora not in table_locations
         )
         if not is_base_and_static:
-            for location in table.locations:
+            for location in table_locations:
                 if len(table.table_dependencies) == 0 and location == Engine.Aurora:
                     # This is a base table. Writes originate from Aurora, so we do
                     # not need to apply deltas to it.

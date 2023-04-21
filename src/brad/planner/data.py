@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 from brad.blueprint import Blueprint
 from brad.blueprint.user import UserProvidedBlueprint
@@ -22,6 +22,7 @@ def bootstrap_blueprint(user: UserProvidedBlueprint) -> Blueprint:
     # "well-formed" (e.g., no circular dependencies).
 
     tables_by_name = {tbl.name: tbl for tbl in user.tables}
+    table_locations: Dict[str, List[Engine]] = {tbl.name: [] for tbl in user.tables}
 
     # To start (we'll do something more sophisticated when we have workload
     # information available):
@@ -41,17 +42,17 @@ def bootstrap_blueprint(user: UserProvidedBlueprint) -> Blueprint:
         if len(table.table_dependencies) == 0:
             # Writes implicitly always originate on Aurora, so we will always
             # put a base table on Aurora.
-            table.locations.append(Engine.Aurora)
+            table_locations[table.name].append(Engine.Aurora)
 
             # Other tables may depend on this table. So we also replicate it on
             # Redshift since we currently run transformations on Redshift.
-            table.locations.append(Engine.Redshift)
+            table_locations[table.name].append(Engine.Redshift)
 
             # If we reach this spot and this flag is true, then no other tables
             # are dependent on this table. In this case, we also replicate it across
             # Athena
             if expect_standalone_base_table:
-                table.locations.append(Engine.Athena)
+                table_locations[table.name].append(Engine.Athena)
 
             is_base_table[table.name] = True
             return
@@ -62,8 +63,8 @@ def bootstrap_blueprint(user: UserProvidedBlueprint) -> Blueprint:
             process_table(tables_by_name[dep_tbl_name], expect_standalone_base_table)
 
         # This table will be replicated on Redshift and S3.
-        table.locations.append(Engine.Redshift)
-        table.locations.append(Engine.Athena)
+        table_locations[table.name].append(Engine.Redshift)
+        table_locations[table.name].append(Engine.Athena)
 
         is_base_table[table.name] = False
 
@@ -79,10 +80,14 @@ def bootstrap_blueprint(user: UserProvidedBlueprint) -> Blueprint:
             continue
         process_table(table, expect_standalone_base_table=True)
 
+    # Sanity check: Each table should be present on at least one engine.
+    assert all(map(lambda locs: len(locs) > 0, table_locations.values()))
+
     # We pass through the provisioning hints provided by the user.
     return Blueprint(
         user.schema_name,
         list(tables_by_name.values()),
+        table_locations,
         user.aurora_provisioning(),
         user.redshift_provisioning(),
         None,
