@@ -26,6 +26,15 @@ class Column:
     def clone(self) -> "Column":
         return Column(self._name, self._data_type, self._is_primary)
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Column):
+            return False
+        return (
+            self.name == other.name
+            and self.data_type == other.data_type
+            and self.is_primary == other.is_primary
+        )
+
 
 class Table:
     """
@@ -75,4 +84,14 @@ class Table:
             [col.clone() for col in self._columns],
             self._table_dependencies.copy(),
             self._transform_text,
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Table):
+            return False
+        return (
+            self.name == other.name
+            and self.columns == other.columns
+            and self.table_dependencies == other.table_dependencies
+            and self.transform_text == other.transform_text
         )
