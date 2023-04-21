@@ -71,6 +71,17 @@ class Blueprint:
         except KeyError as ex:
             raise ValueError from ex
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Blueprint):
+            return False
+        return (
+            self.schema_name() == other.schema_name()
+            and self.tables() == other.tables()
+            and self.table_locations() == other.table_locations()
+            and self.aurora_provisioning() == other.aurora_provisioning()
+            and self.redshift_provisioning() == other.redshift_provisioning()
+        )
+
     def _compute_base_tables(self) -> Set[str]:
         """
         Compute the base tables in the dependency graph. These are the tables

@@ -1,7 +1,9 @@
+from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.enumeration.table_locations import TableLocationEnumerator
+from brad.planner.enumeration.neighborhood import NeighborhoodBlueprintEnumerator
 
 
 def test_provisioning_enumerate_aurora():
@@ -52,3 +54,24 @@ def test_table_placement_enumerate():
     for _ in TableLocationEnumerator.enumerate_nearby(tables, 1):
         count += 1
     assert count == 4
+
+
+def test_blueprint_enumerate():
+    enumerator = NeighborhoodBlueprintEnumerator()
+    base_bp = Blueprint(
+        "test",
+        [],
+        {"table1": [Engine.Aurora], "table2": [Engine.Redshift]},
+        aurora_provisioning=Provisioning("db.r6g.large", 1),
+        redshift_provisioning=Provisioning("dc2.large", 1),
+        router_provider=None,
+    )
+
+    # Simple sanity check only.
+    last_bp = None
+    for bp in enumerator.enumerate(base_bp, 2, 2.0):
+        if last_bp is not None:
+            assert last_bp != bp
+        # Must call `.to_blueprint()` to get a copy of the blueprint because
+        # enumeration is done in place.
+        last_bp = bp.to_blueprint()

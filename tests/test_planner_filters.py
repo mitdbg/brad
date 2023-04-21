@@ -5,6 +5,7 @@ from brad.config.engine import Engine
 from brad.planner.workload import Workload
 from brad.planner.workload.query_template import QueryTemplate
 from brad.planner.filters.aurora_transactions import AuroraTransactions
+from brad.planner.filters.no_data_loss import NoDataLoss
 from brad.planner.filters.single_engine_execution import SingleEngineExecution
 from brad.planner.filters.table_on_engine import TableOnEngine
 
@@ -171,3 +172,42 @@ def test_table_on_engine():
     assert bp_filter.is_valid(bp1)
     assert not bp_filter.is_valid(bp2)
     assert bp_filter.is_valid(bp3)
+
+
+def test_no_data_loss():
+    ndl_filter = NoDataLoss()
+    bp1 = Blueprint(
+        "schema",
+        table_schemas=[
+            Table("test", [], [], None),
+            Table("test2", [], [], None),
+            Table("test3", [], [], None),
+        ],
+        table_locations={
+            "test": [Engine.Aurora],
+            "test2": [],
+            "test3": [Engine.Redshift],
+        },
+        aurora_provisioning=Provisioning("db.r6g.large", 1),
+        redshift_provisioning=Provisioning("dc2.large", 1),
+        router_provider=None,
+    )
+    bp2 = Blueprint(
+        "schema",
+        table_schemas=[
+            Table("test", [], [], None),
+            Table("test2", [], [], None),
+            Table("test3", [], [], None),
+        ],
+        table_locations={
+            "test": [Engine.Aurora],
+            "test2": [Engine.Aurora],
+            "test3": [Engine.Redshift],
+        },
+        aurora_provisioning=Provisioning("db.r6g.large", 1),
+        redshift_provisioning=Provisioning("dc2.large", 1),
+        router_provider=None,
+    )
+
+    assert not ndl_filter.is_valid(bp1)
+    assert ndl_filter.is_valid(bp2)
