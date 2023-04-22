@@ -7,7 +7,6 @@ from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.daemon.messages import ShutdownDaemon, NewBlueprint, ReceivedQuery
 from brad.daemon.monitor import Monitor
-from brad.forecasting.forecaster import WorkloadForecaster
 from brad.planner.neighborhood import NeighborhoodSearchPlanner
 from brad.utils import set_up_logging
 
@@ -44,7 +43,6 @@ class BradDaemon:
             current_blueprint=self._current_blueprint,
             monitor=self._monitor,
         )
-        self._forecaster = WorkloadForecaster()
 
     async def run_forever(self) -> None:
         """
@@ -77,7 +75,6 @@ class BradDaemon:
                 # processing (it's a query trace).
                 query_str = message.query_str
                 logger.debug("Received query %s", query_str)
-                self._forecaster.process(query_str)
 
             else:
                 logger.debug("Received message %s", str(message))

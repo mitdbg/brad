@@ -65,13 +65,13 @@ class ConstantForecaster(Forecaster):
 
 
 if __name__ == "__main__":
-    df = pd.DataFrame(
+    dataframe = pd.DataFrame(
         {"a": np.random.randint(1, 10, 10), "b": np.random.randint(1, 10, 10)},
         index=pd.date_range("2022-01-01", "2022-01-10", freq="D", normalize=True),
     )
 
-    f = ConstantForecaster(df, timedelta(days=1))
-    print(df)
+    f = ConstantForecaster(dataframe, timedelta(days=1))
+    print(dataframe)
 
     print("----\nTest at_epochs()\n----")
 
