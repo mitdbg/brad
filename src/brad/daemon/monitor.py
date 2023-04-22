@@ -28,8 +28,15 @@ class Monitor:
     def read_k_most_recent(self, k=1) -> pd.DataFrame | None:
         return None if self._values.empty else self._values.tail(k)
 
+    # Start inclusive, end exclusive
     def read_between(self, start_time, end_time) -> pd.DataFrame | None:
-        return None if self._values.empty else self._values.loc[start_time:end_time]
+        return (
+            None
+            if self._values.empty
+            else self._values.loc[
+                (self._values.index >= start_time) & (self._values.index < end_time)
+            ]
+        )
 
     def _load_monitored_metrics(
         self,
