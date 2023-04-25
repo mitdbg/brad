@@ -1,14 +1,15 @@
-import asyncio
-import boto3
-import importlib.resources as pkg_resources
-import json
-import pandas as pd
-from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
-
-import brad.daemon as daemon
 from brad.config.file import ConfigFile
+import importlib.resources as pkg_resources
+from typing import Dict, List, Tuple
+import json
 from brad.config.engine import Engine
+import brad.daemon as daemon
+from datetime import datetime, timedelta
+import boto3
+import pandas as pd
+import asyncio
+import numpy as np
+from brad.forecasting.constant_forecaster import ConstantForecaster
 
 
 class Monitor:
@@ -18,6 +19,7 @@ class Monitor:
         self._client = boto3.client("cloudwatch")
         self._queries = self._create_queries()
         self._values = pd.DataFrame()
+        self._forecaster = ConstantForecaster(self._values, self._epoch_length)
 
     async def run_forever(self) -> None:
         # Flesh out the monitor - maintain running averages of the underlying
@@ -26,11 +28,36 @@ class Monitor:
             self._add_metrics()
             await asyncio.sleep(300)  # Read every 5 minutes
 
-    def read_k_most_recent(self, k=1) -> pd.DataFrame | None:
-        return None if self._values.empty else self._values.tail(k)
+    def read_k_most_recent(self, k=1, metric_id=None) -> pd.DataFrame | None:
+        if self._values.empty:
+            return None
+        
+        columns = self._values.columns
+        if metric_id:
+            columns = metric_id
+
+        return self._values.tail(k)[[columns]]
+    
+    def read_k_upcoming(self, k=1, metric_id=None) -> pd.DataFrame | None:
+        if self._values.empty:
+            return None
+        
+        # Create empty dataframe with desired index and columns
+        timestamps = [self._values.index[-1] + i * self._epoch_length for i in range(1, k+1)]
+        columns = self._values.columns
+        if metric_id:
+            columns = metric_id
+        df = pd.DataFrame(index=timestamps, columns=columns)
+
+        # Fill in the values
+        for col in columns:
+            vals = self._forecaster.at_epochs(col, 0, k)
+            df.loc[:, col] = vals
+
+        return df
 
     # Start inclusive, end exclusive
-    def read_between(self, start_time, end_time) -> pd.DataFrame | None:
+    def read_between_times(self, start_time, end_time) -> pd.DataFrame | None:
         return (
             None
             if self._values.empty
