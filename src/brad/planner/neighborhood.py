@@ -1,31 +1,127 @@
 import asyncio
 import logging
+from typing import List
 
 from brad.blueprint import Blueprint
+from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner import BlueprintPlanner
+from brad.planner.enumeration.neighborhood import NeighborhoodBlueprintEnumerator
+from brad.planner.filters import Filter
+from brad.planner.filters.aurora_transactions import AuroraTransactions
+from brad.planner.filters.no_data_loss import NoDataLoss
+from brad.planner.filters.single_engine_execution import SingleEngineExecution
+from brad.planner.filters.table_on_engine import TableOnEngine
+from brad.planner.scoring.scaling_scorer import ScalingScorer
+from brad.planner.workload import Workload
 
 logger = logging.getLogger(__name__)
 
 
 class NeighborhoodSearchPlanner(BlueprintPlanner):
-    def __init__(self, current_blueprint: Blueprint, monitor: Monitor) -> None:
+    def __init__(
+        self,
+        current_blueprint: Blueprint,
+        current_workload: Workload,
+        planner_config: PlannerConfig,
+        monitor: Monitor,
+    ) -> None:
         super().__init__()
         self._current_blueprint = current_blueprint
+        self._current_workload = current_workload
         # The intention is to decouple the planner and monitor down the line
         # when it is clear how we want to process the metrics provided by the
         # monitor.
         self._monitor = monitor
 
+        # Workload independent semantic filters.
+        self._workload_independent_filters: List[Filter] = [
+            NoDataLoss(),
+            TableOnEngine(),
+        ]
+        self._scorer = ScalingScorer()
+        self._planner_config = planner_config
+
     async def run_forever(self) -> None:
         while True:
-            logger.debug("Planner is running...")
             await asyncio.sleep(3)
+            logger.debug("Planner is checking if a replan is needed...")
             if self._check_if_metrics_warrant_replanning():
-                # Trigger the replanning
-                pass
+                await self._replan()
+
+    async def _replan(self) -> None:
+        # This will be long-running and will block the event loop. For our
+        # current needs, this is fine since the planner is the main component in
+        # the daemon process.
+        logger.info("Running a replan.")
+        next_workload = self._expected_workload()
+        workload_filters = [
+            AuroraTransactions(next_workload),
+            SingleEngineExecution(next_workload),
+        ]
+
+        # No need to keep around all candidates if we are selecting the best
+        # blueprint. But for debugging purposes it is useful to see what
+        # blueprints are being considered.
+        candidate_set = []
+
+        for bp in NeighborhoodBlueprintEnumerator.enumerate(
+            self._current_blueprint,
+            self._planner_config.max_num_table_moves(),
+            self._planner_config.max_provisioning_multiplier(),
+        ):
+            # Workload-independent filters.
+            # Drop this candidate if any are invalid.
+            if any(
+                map(
+                    # pylint: disable-next=cell-var-from-loop
+                    lambda filt: not filt.is_valid(bp),
+                    self._workload_independent_filters,
+                )
+            ):
+                continue
+
+            # Workload-specific filters.
+            # Drop this candidate if any are invalid.
+            # pylint: disable-next=cell-var-from-loop
+            if any(map(lambda filt: not filt.is_valid(bp), workload_filters)):
+                continue
+
+            # Score the blueprint.
+            score = self._scorer.score(
+                self._current_blueprint, bp, self._current_workload, next_workload
+            )
+
+            # Store the blueprint (for debugging purposes).
+            candidate_set.append((score, bp.to_blueprint()))
+
+        # Sort by score - lower is better.
+        candidate_set.sort(key=lambda parts: parts[0].single_value())
+
+        # Log the candidates.
+        for score, candidate in candidate_set:
+            logger.debug("Score: %s", score)
+            logger.debug("%s", candidate)
+            logger.debug("----------")
+
+        if len(candidate_set) == 0:
+            logger.error("Planner did not find any valid candidate blueprints.")
+            logger.error("Next workload: %s", next_workload)
+            raise RuntimeError("No valid candidates!")
+
+        best_score, best_blueprint = candidate_set[1]
+        logger.info("Selecting a new blueprint with score %s", best_score)
+        logger.info("%s", best_blueprint)
+        self._current_blueprint = best_blueprint
+        self._current_workload = next_workload
+
+        # Emit the next blueprint.
+        await self._notify_new_blueprint(best_blueprint)
 
     def _check_if_metrics_warrant_replanning(self) -> bool:
         # See if the metrics indicate that we should trigger the planning
         # process.
-        return False
+        return True
+
+    def _expected_workload(self) -> Workload:
+        return self._current_workload

@@ -1,0 +1,4 @@
+strategy: neighborhood
+
+max_num_table_moves: 5
+max_provisioning_multiplier: 3

@@ -5,9 +5,11 @@ import multiprocessing as mp
 
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
+from brad.config.planner import PlannerConfig
 from brad.daemon.messages import ShutdownDaemon, NewBlueprint, ReceivedQuery
 from brad.daemon.monitor import Monitor
 from brad.planner.neighborhood import NeighborhoodSearchPlanner
+from brad.planner.workload import Workload
 from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)
@@ -27,12 +29,14 @@ class BradDaemon:
         config: ConfigFile,
         schema_name: str,
         current_blueprint: Blueprint,
+        planner_config: PlannerConfig,
         event_loop: asyncio.AbstractEventLoop,
         input_queue: mp.Queue,
         output_queue: mp.Queue,
     ):
         self._config = config
         self._schema_name = schema_name
+        self._planner_config = planner_config
         self._event_loop = event_loop
         self._input_queue = input_queue
         self._output_queue = output_queue
@@ -41,6 +45,9 @@ class BradDaemon:
         self._monitor = Monitor(self._config)
         self._planner = NeighborhoodSearchPlanner(
             current_blueprint=self._current_blueprint,
+            planner_config=planner_config,
+            # N.B. This is a placeholder
+            current_workload=Workload(templates=[]),
             monitor=self._monitor,
         )
 
@@ -101,6 +108,7 @@ class BradDaemon:
         config_path: str,
         schema_name: str,
         current_blueprint: Blueprint,
+        path_to_planner_config: str,
         debug_mode: bool,
         input_queue: mp.Queue,
         output_queue: mp.Queue,
@@ -111,6 +119,8 @@ class BradDaemon:
         """
         config = ConfigFile(config_path)
         set_up_logging(filename=config.daemon_log_path, debug_mode=debug_mode)
+
+        planner_config = PlannerConfig(path_to_planner_config)
 
         event_loop = asyncio.new_event_loop()
         event_loop.set_debug(enabled=debug_mode)
@@ -127,6 +137,7 @@ class BradDaemon:
                 config,
                 schema_name,
                 current_blueprint,
+                planner_config,
                 event_loop,
                 input_queue,
                 output_queue,
