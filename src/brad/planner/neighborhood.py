@@ -3,6 +3,7 @@ import logging
 from typing import List
 
 from brad.blueprint import Blueprint
+from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner import BlueprintPlanner
 from brad.planner.enumeration.neighborhood import NeighborhoodBlueprintEnumerator
@@ -22,9 +23,8 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         self,
         current_blueprint: Blueprint,
         current_workload: Workload,
+        planner_config: PlannerConfig,
         monitor: Monitor,
-        max_num_table_moves: int,
-        max_provisioning_multiplier: float,
     ) -> None:
         super().__init__()
         self._current_blueprint = current_blueprint
@@ -34,16 +34,13 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         # monitor.
         self._monitor = monitor
 
-        # Used to define the neighborhood.
-        self._max_num_table_moves = max_num_table_moves
-        self._max_provisioning_multiplier = max_provisioning_multiplier
-
         # Workload independent semantic filters.
         self._workload_independent_filters: List[Filter] = [
             NoDataLoss(),
             TableOnEngine(),
         ]
         self._scorer = ScalingScorer()
+        self._planner_config = planner_config
 
     async def run_forever(self) -> None:
         while True:
@@ -70,8 +67,8 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
 
         for bp in NeighborhoodBlueprintEnumerator.enumerate(
             self._current_blueprint,
-            self._max_num_table_moves,
-            self._max_provisioning_multiplier,
+            self._planner_config.max_num_table_moves(),
+            self._planner_config.max_provisioning_multiplier(),
         ):
             # Workload-independent filters.
             # Drop this candidate if any are invalid.
