@@ -47,7 +47,7 @@ async def run_IMDB(param: parameters.Params) -> None:
         workload = read_test_run_workload()
     else:
         workload = make_imdb_workload(p.txn_query_dir, p.analytic_query_dir, p.total_num_txn_users,
-                                      p.total_num_analytic_users, p.reporting_time_window)
+                                      p.total_num_analytic_users)
 
     reporter = PrintReporter()
 
