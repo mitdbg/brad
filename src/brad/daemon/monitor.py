@@ -28,22 +28,26 @@ class Monitor:
             self._add_metrics()
             await asyncio.sleep(300)  # Read every 5 minutes
 
-    def read_k_most_recent(self, k=1, metric_id=None) -> pd.DataFrame | None:
+    def read_k_most_recent(
+        self, k: int = 1, metric_id: str = None
+    ) -> pd.DataFrame | None:
         if self._values.empty:
             return None
-        
+
         columns = self._values.columns
         if metric_id:
             columns = metric_id
 
         return self._values.tail(k)[[columns]]
-    
-    def read_k_upcoming(self, k=1, metric_id=None) -> pd.DataFrame | None:
+
+    def read_k_upcoming(self, k: int = 1, metric_id: str = None) -> pd.DataFrame | None:
         if self._values.empty:
             return None
-        
+
         # Create empty dataframe with desired index and columns
-        timestamps = [self._values.index[-1] + i * self._epoch_length for i in range(1, k+1)]
+        timestamps = [
+            self._values.index[-1] + i * self._epoch_length for i in range(1, k + 1)
+        ]
         columns = self._values.columns
         if metric_id:
             columns = metric_id
@@ -57,7 +61,12 @@ class Monitor:
         return df
 
     # Start inclusive, end exclusive
-    def read_between_times(self, start_time, end_time) -> pd.DataFrame | None:
+    def read_between_times(
+        self, start_time: datetime, end_time: datetime
+    ) -> pd.DataFrame | None:
+        if self._values.empty:
+            return None
+
         return (
             None
             if self._values.empty
