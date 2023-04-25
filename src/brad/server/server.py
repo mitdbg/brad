@@ -15,11 +15,13 @@ from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
+from brad.daemon.monitor import Monitor
 from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel, ReceivedQuery
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
+from brad.routing.rule_based import RuleBased
 from brad.routing.policy import RoutingPolicy
 from brad.server.brad_interface import BradInterface
 from brad.server.blueprint_manager import BlueprintManager
@@ -39,7 +41,7 @@ class BradServer(BradInterface):
         self._schema_name = schema_name
         self._debug_mode = debug_mode
         self._blueprint_mgr = BlueprintManager(self._config, self._schema_name)
-
+        self._monitor = Monitor(self._config)
         # We have different routing policies for performance evaluation and
         # testing purposes.
         routing_policy = self._config.routing_policy
@@ -51,6 +53,8 @@ class BradServer(BradInterface):
             self._router = AlwaysOneRouter(Engine.Aurora)
         elif routing_policy == RoutingPolicy.AlwaysRedshift:
             self._router = AlwaysOneRouter(Engine.Redshift)
+        elif routing_policy == RoutingPolicy.RuleBased:
+            self._router = RuleBased(self._blueprint_mgr, self._monitor)
         else:
             raise RuntimeError(
                 "Unsupported routing policy: {}".format(str(routing_policy))
@@ -76,8 +80,10 @@ class BradServer(BradInterface):
                 "{}:{}".format(self._config.server_interface, self._config.server_port)
             )
             await grpc_server.start()
+
             logger.info("The BRAD server has successfully started.")
             logger.info("Listening on port %d.", self._config.server_port)
+            await self._monitor.run_forever()
             await grpc_server.wait_for_termination()
         finally:
             # Not ideal, but we need to manually call this method to ensure

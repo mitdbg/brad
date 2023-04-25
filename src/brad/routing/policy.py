@@ -6,6 +6,7 @@ class RoutingPolicy(str, enum.Enum):
     AlwaysAthena = "always_athena"
     AlwaysAurora = "always_aurora"
     AlwaysRedshift = "always_redshift"
+    RuleBased = "rule_based"
 
     @staticmethod
     def from_str(candidate: str) -> "RoutingPolicy":

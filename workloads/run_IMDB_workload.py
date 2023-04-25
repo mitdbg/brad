@@ -1,23 +1,23 @@
 import asyncio
-from datetime import timedelta
 from typing import AsyncIterator, Optional
+from absl import app
+from absl import flags
 
 from typing_extensions import override
 import sys
-
 sys.path.append("..")
 
 from workloads.runner import run_workload
 from workloads.runner.client import AsyncClient
-from workloads.runner.query import Query
 from workloads.runner.reporter import PrintReporter
-from workloads.runner.schedule import Once, Repeat
-from workloads.runner.time import get_current_time
-from workloads.runner.user import User
-from workloads.runner.workload import Workload
+from workloads.runner.read_workload import make_imdb_workload, read_test_run_workload
+import workloads.IMDB.parameters as parameters
 from brad.async_grpc_client import AsyncBradGrpcClient
 from brad.config.session import SessionId
 
+
+FLAGS = flags.FLAGS
+flags.DEFINE_string("run", "test", "Experiment config to run.")
 
 class BradClient(AsyncClient[str]):
     def __init__(self, host: str, port: int):
@@ -41,49 +41,28 @@ class BradClient(AsyncClient[str]):
             yield tup
 
 
-async def run_IMDB() -> None:
-    current_time = get_current_time()
-    interval = timedelta(seconds=1)
-
-    workload = Workload.combine(
-        [
-            Workload.serial(
-                [
-                    Query(
-                        f"SELECT COUNT(*) FROM info_type WHERE id > {i};",
-                        Once(at=current_time + 0.47 * i * interval),
-                    )
-                    for i in range(10)
-                ],
-                user=User.with_label("Once"),
-            ),
-            Workload.serial(
-                [
-                    Query(
-                        """SELECT MAX("title"."episode_nr" + "movie_companies"."movie_id") 
-                           as agg_0 FROM "company_type" LEFT OUTER JOIN "movie_companies" 
-                           ON "company_type"."id" = "movie_companies"."company_type_id" LEFT OUTER JOIN "title" 
-                           ON "movie_companies"."movie_id" = "title"."id" LEFT OUTER JOIN "company_name" ON 
-                           "movie_companies"."company_id" = "company_name"."id"  WHERE "title"."title" NOT LIKE '%t%he%' 
-                           AND "movie_companies"."note" NOT LIKE '%media)%' AND ("company_type"."kind" NOT LIKE 
-                           '%companie%s%' OR "company_type"."id" 
-                           BETWEEN 2 AND 3 OR "company_type"."kind" LIKE '%companies%') AND 
-                           "company_name"."country_code" NOT LIKE '%[us]%';""",
-                        Repeat.starting_now(
-                            interval=timedelta(seconds=20), num_repeat=5
-                        ),
-                    ),
-                ],
-                user=User.with_label("Repeat"),
-            ),
-        ]
-    )
+async def run_IMDB(param: parameters.Params) -> None:
+    p = param
+    if p.test_run:
+        workload = read_test_run_workload()
+    else:
+        workload = make_imdb_workload(p.txn_query_dir, p.analytic_query_dir, p.total_num_txn_users,
+                                      p.total_num_analytic_users, p.reporting_time_window)
 
     reporter = PrintReporter()
 
+    # Todo: using multi-threading to speed up
     async with BradClient(host="0.0.0.0", port=6583) as client:
         await run_workload(workload, client, reporter)
 
 
+def Main(argv):
+    del argv  # Unused.
+    name = FLAGS.run
+    print("Looking up params by name:", name)
+    p = parameters.Get(name)
+    asyncio.run(run_IMDB(p))
+
+
 if __name__ == "__main__":
-    asyncio.run(run_IMDB())
+    app.run(Main)
