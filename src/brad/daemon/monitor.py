@@ -1,13 +1,14 @@
-from brad.config.file import ConfigFile
-import importlib.resources as pkg_resources
-from typing import Dict, List, Tuple
-import json
-from brad.config.engine import Engine
-import brad.daemon as daemon
-from datetime import datetime, timedelta
+import asyncio
 import boto3
+import importlib.resources as pkg_resources
+import json
 import pandas as pd
-import time
+from datetime import datetime, timedelta
+from typing import Dict, List, Tuple
+
+import brad.daemon as daemon
+from brad.config.file import ConfigFile
+from brad.config.engine import Engine
 
 
 class Monitor:
@@ -23,7 +24,7 @@ class Monitor:
         # engines' metrics.
         while True:
             self._add_metrics()
-            time.sleep(300)  # Read every 5 minutes
+            await asyncio.sleep(300)  # Read every 5 minutes
 
     def read_k_most_recent(self, k=1) -> pd.DataFrame | None:
         return None if self._values.empty else self._values.tail(k)
