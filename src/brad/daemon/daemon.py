@@ -38,7 +38,8 @@ class BradDaemon:
         self._output_queue = output_queue
 
         self._current_blueprint = current_blueprint
-        self._monitor = Monitor(self._config)
+        # TODO(Amadou): Determine how to pass in specific clusters.
+        self._monitor = Monitor.from_schema_name(current_blueprint.schema_name())
         self._planner = NeighborhoodSearchPlanner(
             current_blueprint=self._current_blueprint,
             monitor=self._monitor,

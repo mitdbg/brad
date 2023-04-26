@@ -69,12 +69,16 @@ class RedshiftProvisioning:
                 response = self.redshift.describe_clusters(
                     ClusterIdentifier=self.cluster_name,
                 )
-                logging.debug(f"Cluster state: {response}")
+                logging.info(f"Cluster state: {response}")
                 cluster = response["Clusters"][0]
                 modifying = cluster["ClusterAvailabilityStatus"] == "Modifying"
                 status = cluster["ClusterStatus"]
                 instance_type = cluster["NodeType"]
                 curr_cluster_size = cluster["NumberOfNodes"]
+                if "Endpoint" not in cluster:
+                    logging.info("Endpoint not yet set")
+                    time.sleep(5.0)
+                    continue
                 endpoint = cluster["Endpoint"]
 
                 # Set default values.
@@ -149,6 +153,7 @@ class RedshiftProvisioning:
                         PubliclyAccessible=True,
                     )
                 else:
+                    print("RERAISING BRAD ERROR: {e}")
                     raise e
 
 

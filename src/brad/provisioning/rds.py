@@ -23,7 +23,7 @@ class RdsProvisioning:
     def __str__(self) -> str:
         return f"RdsCluster(name={self.cluster_name}, instance_type={self.instance_type}, paused={self.paused}, address={self.address}, port={self.port})"
 
-    # Return connection info.
+    # Return connection info (writer address, reader address, port).
     def connection_info(self):
         return (self.address, self.reader_address, self.port)
 
@@ -116,7 +116,7 @@ class RdsProvisioning:
                 response = self.rds.describe_db_clusters(
                     DBClusterIdentifier=self.cluster_name,
                 )
-                logging.debug(f"get_or_create_writer. Response: {response}")
+                logging.info(f"get_or_create_writer. Response: {response}")
                 cluster = response["DBClusters"][0]
                 status = cluster["Status"]
                 # Check if status is stable.
@@ -139,7 +139,7 @@ class RdsProvisioning:
                 self.rds.create_db_instance(
                     DBClusterIdentifier=self.cluster_name,
                     # DBName="dev",
-                    DBInstanceIdentifier="brad-writer",
+                    DBInstanceIdentifier=f"{self.cluster_name}-brad-writer",
                     PubliclyAccessible=True,
                     DBInstanceClass=self.instance_type,
                     Engine="aurora-postgresql",

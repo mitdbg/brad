@@ -1,0 +1,8 @@
+{
+    "redshift": {
+        "CPUUtilization": [25, 90]
+    },
+    "aurora": {
+        "CPUUtilization": [25, 90]
+    }
+}
