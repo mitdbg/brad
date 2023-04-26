@@ -3,9 +3,6 @@
 import argparse
 import boto3
 import json
-from decimal import Decimal
-
-from typing import List, Dict
 
 
 def append_pricing(instance_configs):
@@ -42,8 +39,10 @@ def append_pricing(instance_configs):
         rel = rel["priceDimensions"]
         rel = next(iter(rel.values()))
         hourly_pricing = rel["pricePerUnit"]["USD"]
-        #results.append((instance_config["instance_type"], float(hourly_pricing)))
-        instance_config["usd_per_hour"] = float(hourly_pricing)  # `float` may not be the most ideal.
+        # results.append((instance_config["instance_type"], float(hourly_pricing)))
+        instance_config["usd_per_hour"] = float(
+            hourly_pricing
+        )  # N.B. `float` may not be the most ideal.
 
 
 def main():
