@@ -148,6 +148,9 @@ class Monitor:
                         "Value": self._config.redshift_cluster_id,
                     },
                 ]
+            elif engine == Engine.Athena:
+                namespace = "AWS/Athena"
+                dimensions = []
 
             for metric_name, stats_list in self._metrics[engine].items():
                 for stat in stats_list:
@@ -184,15 +187,20 @@ class Monitor:
             ScanBy="TimestampAscending",
         )
 
-        # Append only the new rows to the internal representation
-        data = {
-            result["Id"]: result["Values"] for result in response["MetricDataResults"]
-        }
-        df = pd.DataFrame(
-            data, index=pd.DatetimeIndex(response["MetricDataResults"][0]["Timestamps"])
-        )
-        df.index = df.index.tz_localize(None)
+        # Parse metrics from json response
+        resp_dict = {}
+        for metric_data in response["MetricDataResults"]:
+            metric_id = metric_data["Id"]
+            metric_timestamps = metric_data["Timestamps"]
+            metric_values = metric_data["Values"]
+            resp_dict[metric_id] = pd.Series(
+                metric_values, index=metric_timestamps, dtype=np.float64
+            )
+        df = pd.DataFrame(resp_dict).fillna(0)
+        df = df.sort_index()
+        df.index = pd.to_datetime(df.index)
 
+        # Append only the new rows to the internal representation
         self._values = (
             df.copy()
             if self._values.empty
