@@ -29,18 +29,18 @@ class Monitor:
             await asyncio.sleep(300)  # Read every 5 minutes
 
     def read_k_most_recent(
-        self, k: int = 1, metric_id: str = None
+        self, k: int = 1, metric_ids: List[str] | None = None
     ) -> pd.DataFrame | None:
         if self._values.empty:
             return None
 
-        columns = self._values.columns
-        if metric_id:
-            columns = metric_id
+        columns = metric_ids if metric_ids else self._values.columns
 
         return self._values.tail(k)[[columns]]
 
-    def read_k_upcoming(self, k: int = 1, metric_id: str = None) -> pd.DataFrame | None:
+    def read_k_upcoming(
+        self, k: int = 1, metric_ids: List[str] | None = None
+    ) -> pd.DataFrame | None:
         if self._values.empty:
             return None
 
@@ -48,32 +48,58 @@ class Monitor:
         timestamps = [
             self._values.index[-1] + i * self._epoch_length for i in range(1, k + 1)
         ]
-        columns = self._values.columns
-        if metric_id:
-            columns = metric_id
+        columns = metric_ids if metric_ids else self._values.columns
         df = pd.DataFrame(index=timestamps, columns=columns)
 
         # Fill in the values
         for col in columns:
-            vals = self._forecaster.at_epochs(col, 0, k)
+            vals = self._forecaster.num_points(col, k)
             df.loc[:, col] = vals
 
         return df
 
-    # Start inclusive, end exclusive
-    def read_between_times(
-        self, start_time: datetime, end_time: datetime
+    # `end_ts` is inclusive
+    def read_upcoming_until(
+        self, end_ts: datetime, metric_ids: List[str] | None = None
     ) -> pd.DataFrame | None:
         if self._values.empty:
             return None
 
-        return (
-            None
-            if self._values.empty
-            else self._values.loc[
-                (self._values.index >= start_time) & (self._values.index < end_time)
-            ]
+        k = (end_ts - self._values[-1]) // self._epoch_length
+        return self.read_k_upcoming(k, metric_ids)
+
+    # Both ends inclusive
+    def read_between_times(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        metric_ids: List[str] | None = None,
+    ) -> pd.DataFrame | None:
+        if self._values.empty:
+            return None
+
+        past = self._df.loc[
+            (self._df.index >= start_time) & (self._df.index <= end_time)
+        ]
+        future = self.read_upcoming_until(end_time, metric_ids)
+
+        return pd.concat([past, future], axis=0)
+
+    # Both ends inclusive
+    def read_between_epochs(
+        self, start_epoch: int, end_epoch: int
+    ) -> pd.DataFrame | None:
+        if self._values.empty:
+            return None
+
+        past = self.read_k_most_recent(max(0, -start_epoch)).head(
+            end_epoch - start_epoch + 1
         )
+        future = self.read_k_upcoming(max(0, end_epoch + 1)).tail(
+            end_epoch - start_epoch + 1
+        )
+
+        return pd.concat([past, future], axis=0)
 
     def _load_monitored_metrics(
         self,
