@@ -36,6 +36,7 @@ class ScalingScorer(Scorer):
         redshift_prov_cost = (
             _REDSHIFT_PRICING[redshift_prov.instance_type()] * redshift_prov.num_nodes()
         )
+        _total_prov_cost = aurora_prov_cost + redshift_prov_cost
 
         # TODO: Scan costs.
 
@@ -44,11 +45,7 @@ class ScalingScorer(Scorer):
         # - Table movement monetary costs (Athena)
         # - Redshift scale up / down time
         # - Aurora scale up / down time
-        bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
-        if bp_diff is None:
-            transition_score = 0
-        else:
-            pass
+        _bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
 
         # N.B. This is a placeholder value.
         return Score(1.0, 1.0, 1.0)
