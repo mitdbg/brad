@@ -1,6 +1,6 @@
 from brad.config.file import ConfigFile
 import importlib.resources as pkg_resources
-from typing import Dict, List, Tuple
+from typing import List
 import json
 from brad.config.engine import Engine
 import brad.daemon as daemon
@@ -15,9 +15,8 @@ from brad.forecasting.constant_forecaster import ConstantForecaster
 class Monitor:
     def __init__(self, config: ConfigFile) -> None:
         self._config = config
-        self._epoch_length, self._metrics_map = self._load_monitored_metrics()
         self._client = boto3.client("cloudwatch")
-        self._queries, self._metric_ids = self._create_queries()
+        self._setup()
         self._values = pd.DataFrame(columns=self._metric_ids)
         self._forecaster = ConstantForecaster(self._values, self._epoch_length)
 
@@ -99,39 +98,27 @@ class Monitor:
 
         return pd.concat([past, future], axis=0)
 
-    def _load_monitored_metrics(
-        self,
-    ) -> Tuple[timedelta, Dict[str, Dict[str, List[str]]]]:
+    def _setup(self):
         # Load data.
         with pkg_resources.open_text(daemon, "monitored_metrics.json") as data:
             file_contents = json.load(data)
 
-        epoch_length = timedelta(
+        self._epoch_length = timedelta(
             weeks=file_contents["epoch_length"]["weeks"],
             days=file_contents["epoch_length"]["days"],
             hours=file_contents["epoch_length"]["hours"],
             minutes=file_contents["epoch_length"]["minutes"],
         )
 
-        metrics_map: Dict[str, Dict[str, List[str]]] = {}
+        # Create the cloudwatch queries and list the metric ids used
+        self._queries = []
+        self._metric_ids = []
         for f in file_contents["monitored_metrics"]:
             try:
-                eng_name = Engine.from_str(f["engine"])
+                engine = Engine.from_str(f["engine"])
             except ValueError:
                 continue
 
-            metrics_map[eng_name] = {}
-
-            for m in f["metrics"]:
-                metrics_map[eng_name][m] = f["metrics"][m]
-
-        return epoch_length, metrics_map
-
-    def _create_queries(self) -> Tuple[List[Dict], List[str]]:
-        # Create the metric data queries
-        metric_data_queries = []
-        metric_ids = []
-        for engine in self._metrics_map:
             namespace = ""
             dimensions = []
             if engine == Engine.Aurora:
@@ -149,12 +136,11 @@ class Monitor:
                 ]
             elif engine == Engine.Athena:
                 namespace = "AWS/Athena"
-                dimensions = []
 
-            for metric_name, stats_list in self._metrics_map[engine].items():
+            for metric_name, stats_list in f["metrics"].items():
                 for stat in stats_list:
                     metric_id = f"{engine}_{metric_name}_{stat}"
-                    metric_ids.append(metric_id)
+                    self._metric_ids.append(metric_id)
                     metric_data_query = {
                         "Id": metric_id,
                         "MetricStat": {
@@ -168,9 +154,7 @@ class Monitor:
                         },
                         "ReturnData": True,
                     }
-                    metric_data_queries.append(metric_data_query)
-
-        return metric_data_queries, metric_ids
+                    self._queries.append(metric_data_query)
 
     def _add_metrics(self):
         # Retrieve datapoints
