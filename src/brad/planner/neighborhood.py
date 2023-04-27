@@ -39,7 +39,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             NoDataLoss(),
             TableOnEngine(),
         ]
-        self._scorer = ScalingScorer()
+        self._scorer = ScalingScorer(self._monitor)
         self._planner_config = planner_config
 
     async def run_forever(self) -> None:
