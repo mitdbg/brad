@@ -38,7 +38,7 @@ class ScalingScorer(Scorer):
         )
         _total_prov_cost = aurora_prov_cost + redshift_prov_cost
 
-        # TODO: Scan costs.
+        # NOTE: Add scan costs.
 
         # Transition score:
         # - Table movement (size * transmission rate)
