@@ -78,8 +78,8 @@ class Monitor:
         if self._values.empty:
             return None
 
-        past = self._df.loc[
-            (self._df.index >= start_time) & (self._df.index <= end_time)
+        past = self._values.loc[
+            (self._values.index >= start_time) & (self._values.index <= end_time)
         ]
         future = self.read_upcoming_until(end_time, metric_ids)
 
