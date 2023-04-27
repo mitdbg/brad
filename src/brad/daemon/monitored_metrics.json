@@ -113,6 +113,25 @@
                     "Maximum"
                 ]
             }
+        },
+        {
+            "engine": "athena",
+            "metrics": {
+                "ProcessedBytes": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "TotalExecutionTime": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ]
+            }
         }
     ]
 }

@@ -1,14 +1,15 @@
-import asyncio
-import boto3
-import importlib.resources as pkg_resources
-import json
-import pandas as pd
-from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
-
-import brad.daemon as daemon
 from brad.config.file import ConfigFile
+import importlib.resources as pkg_resources
+from typing import Dict, List, Tuple
+import json
 from brad.config.engine import Engine
+import brad.daemon as daemon
+from datetime import datetime, timedelta
+import boto3
+import pandas as pd
+import asyncio
+import numpy as np
+from brad.forecasting.constant_forecaster import ConstantForecaster
 
 
 class Monitor:
@@ -17,27 +18,86 @@ class Monitor:
         self._epoch_length, self._metrics = self._load_monitored_metrics()
         self._client = boto3.client("cloudwatch")
         self._queries = self._create_queries()
-        self._values = pd.DataFrame()
+        self._values = pd.DataFrame(index=pd.DatetimeIndex([]), columns=self._queries)
+        self._forecaster = ConstantForecaster(self._values, self._epoch_length)
 
     async def run_forever(self) -> None:
         # Flesh out the monitor - maintain running averages of the underlying
         # engines' metrics.
         while True:
             self._add_metrics()
-            await asyncio.sleep(300)  # Read every 5 minutes
+            await asyncio.sleep(60)  # Read every minute
 
-    def read_k_most_recent(self, k=1) -> pd.DataFrame | None:
-        return None if self._values.empty else self._values.tail(k)
+    def read_k_most_recent(
+        self, k: int = 1, metric_ids: List[str] | None = None
+    ) -> pd.DataFrame:
+        if self._values.empty:
+            return self._values
 
-    # Start inclusive, end exclusive
-    def read_between(self, start_time, end_time) -> pd.DataFrame | None:
-        return (
-            None
-            if self._values.empty
-            else self._values.loc[
-                (self._values.index >= start_time) & (self._values.index < end_time)
-            ]
+        columns = metric_ids if metric_ids else list(self._values.columns)
+
+        return self._values.tail(k)[columns]
+
+    def read_k_upcoming(
+        self, k: int = 1, metric_ids: List[str] | None = None
+    ) -> pd.DataFrame:
+        if self._values.empty:
+            return self._values
+
+        # Create empty dataframe with desired index and columns
+        timestamps = [
+            self._values.index[-1] + i * self._epoch_length for i in range(1, k + 1)
+        ]
+        columns = metric_ids if metric_ids else self._values.columns
+        df = pd.DataFrame(index=timestamps, columns=columns)
+
+        # Fill in the values
+        for col in columns:
+            vals = self._forecaster.num_points(col, k)
+            df[col] = vals
+
+        return df
+
+    # `end_ts` is inclusive
+    def read_upcoming_until(
+        self, end_ts: datetime, metric_ids: List[str] | None = None
+    ) -> pd.DataFrame:
+        if self._values.empty:
+            return self._values
+
+        k = (end_ts - self._values.index[-1]) // self._epoch_length
+        return self.read_k_upcoming(k, metric_ids)
+
+    # Both ends inclusive
+    def read_between_times(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        metric_ids: List[str] | None = None,
+    ) -> pd.DataFrame:
+        if self._values.empty:
+            return self._values
+
+        past = self._values.loc[
+            (self._values.index >= start_time) & (self._values.index <= end_time)
+        ]
+        future = self.read_upcoming_until(end_time, metric_ids)
+
+        return pd.concat([past, future], axis=0)
+
+    # Both ends inclusive
+    def read_between_epochs(self, start_epoch: int, end_epoch: int) -> pd.DataFrame:
+        if self._values.empty:
+            return self._values
+
+        past = self.read_k_most_recent(max(0, -start_epoch)).head(
+            end_epoch - start_epoch + 1
         )
+        future = self.read_k_upcoming(max(0, end_epoch + 1)).tail(
+            end_epoch - start_epoch + 1
+        )
+
+        return pd.concat([past, future], axis=0)
 
     def _load_monitored_metrics(
         self,
@@ -86,6 +146,9 @@ class Monitor:
                         "Value": self._config.redshift_cluster_id,
                     },
                 ]
+            elif engine == Engine.Athena:
+                namespace = "AWS/Athena"
+                dimensions = []
 
             for metric_name, stats_list in self._metrics[engine].items():
                 for stat in stats_list:
@@ -122,17 +185,23 @@ class Monitor:
             ScanBy="TimestampAscending",
         )
 
-        # Append only the new rows to the internal representation
-        data = {
-            result["Id"]: result["Values"] for result in response["MetricDataResults"]
-        }
-        df = pd.DataFrame(
-            data, index=pd.DatetimeIndex(response["MetricDataResults"][0]["Timestamps"])
-        )
-        df.index = df.index.tz_localize(None)
+        # Parse metrics from json response
+        resp_dict = {}
+        for metric_data in response["MetricDataResults"]:
+            metric_id = metric_data["Id"]
+            metric_timestamps = metric_data["Timestamps"]
+            metric_values = metric_data["Values"]
+            resp_dict[metric_id] = pd.Series(
+                metric_values, index=metric_timestamps, dtype=np.float64
+            )
+        df = pd.DataFrame(resp_dict).fillna(0)
+        df = df.sort_index()
+        df.index = pd.to_datetime(df.index)
 
+        # Append only the new rows to the internal representation
         self._values = (
             df.copy()
             if self._values.empty
             else pd.concat([self._values, df.loc[df.index > self._values.index[-1]]])
         )
+        self._forecaster.update_df_pointer(self._values)
