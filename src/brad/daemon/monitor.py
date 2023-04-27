@@ -18,7 +18,7 @@ class Monitor:
         self._epoch_length, self._metrics = self._load_monitored_metrics()
         self._client = boto3.client("cloudwatch")
         self._queries = self._create_queries()
-        self._values = pd.DataFrame()
+        self._values = pd.DataFrame(index=pd.DatetimeIndex([]), columns=self._queries)
         self._forecaster = ConstantForecaster(self._values, self._epoch_length)
 
     async def run_forever(self) -> None:
@@ -26,7 +26,7 @@ class Monitor:
         # engines' metrics.
         while True:
             self._add_metrics()
-            await asyncio.sleep(300)  # Read every 5 minutes
+            await asyncio.sleep(60)  # Read every minute
 
     def read_k_most_recent(
         self, k: int = 1, metric_ids: List[str] | None = None
@@ -34,9 +34,9 @@ class Monitor:
         if self._values.empty:
             return None
 
-        columns = metric_ids if metric_ids else self._values.columns
+        columns = metric_ids if metric_ids else list(self._values.columns)
 
-        return self._values.tail(k)[[columns]]
+        return self._values.tail(k)[columns]
 
     def read_k_upcoming(
         self, k: int = 1, metric_ids: List[str] | None = None
@@ -54,7 +54,7 @@ class Monitor:
         # Fill in the values
         for col in columns:
             vals = self._forecaster.num_points(col, k)
-            df.loc[:, col] = vals
+            df[col] = vals
 
         return df
 
@@ -172,7 +172,7 @@ class Monitor:
         # Retrieve datapoints
         now = datetime.now()
         end_time = now - (now - datetime.min) % self._epoch_length
-        start_time = end_time - 10 * self._epoch_length
+        start_time = end_time - 3 * self._epoch_length
 
         if not self._values.empty:
             start_time = self._values.index[-1]
@@ -198,3 +198,4 @@ class Monitor:
             if self._values.empty
             else pd.concat([self._values, df.loc[df.index > self._values.index[-1]]])
         )
+        self._forecaster.update_df_pointer(self._values)

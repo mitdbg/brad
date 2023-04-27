@@ -10,6 +10,9 @@ class ConstantForecaster(Forecaster):
     def __init__(self, df: pd.DataFrame, epoch_length: timedelta) -> None:
         self._df = df
         self._epoch_length = epoch_length
+    
+    def update_df_pointer(self, df: pd.DataFrame) -> None:
+        self._df = df
 
     # Returns empty list if `num_points` is <= 0
     def num_points(self, metric_id: str, num_points: int) -> List[float]:

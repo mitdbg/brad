@@ -1,0 +1,70 @@
+from brad.daemon.monitor import Monitor
+from brad.config.file import ConfigFile
+import asyncio
+from pandas.testing import assert_frame_equal
+
+
+def test_read_k_most_recent():
+    asyncio.run(f1())
+
+
+async def f1():
+    m = Monitor(ConfigFile("./config/config.yml"))
+    task = asyncio.create_task(m.run_forever())
+
+    while m._values.empty:
+        await asyncio.sleep(3)
+
+    df = m.read_k_most_recent(3)
+    t = m._values.tail(3)
+    task.cancel()
+
+    assert df.shape[0] == 3
+    assert df.shape[1] == len(m._queries)
+    assert_frame_equal(df, t)
+
+
+def test_read_k_upcoming():
+    asyncio.run(f2())
+
+
+async def f2():
+    m = Monitor(ConfigFile("./config/config.yml"))
+    task = asyncio.create_task(m.run_forever())
+
+    while m._values.empty:
+        await asyncio.sleep(3)
+
+    df = m.read_k_upcoming(5)
+    t = m._values.tail(1)
+    task.cancel()
+
+    assert df.shape[0] == 5
+    assert df.shape[1] == len(m._queries)
+    for i in range(5):
+        assert_frame_equal(
+            df.head(i + 1).tail(1).reset_index(drop=True), t.reset_index(drop=True)
+        )
+
+
+""" def test_read_upcoming_until():
+    asyncio.run(f3())
+
+async def f3():
+    return
+
+
+
+def test_read_between_times():
+    asyncio.run(f4())
+
+async def f4():
+    return
+
+
+def test_read_between_epochs():
+    asyncio.run(f5())
+
+async def f5():
+    return
+ """
