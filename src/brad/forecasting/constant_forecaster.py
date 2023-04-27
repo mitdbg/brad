@@ -10,7 +10,7 @@ class ConstantForecaster(Forecaster):
     def __init__(self, df: pd.DataFrame, epoch_length: timedelta) -> None:
         self._df = df
         self._epoch_length = epoch_length
-    
+
     def update_df_pointer(self, df: pd.DataFrame) -> None:
         self._df = df
 

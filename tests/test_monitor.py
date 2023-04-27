@@ -103,6 +103,7 @@ async def f4():
 def test_read_between_epochs():
     asyncio.run(f5())
 
+
 async def f5():
     m = Monitor(ConfigFile("./config/config.yml"))
     task = asyncio.create_task(m.run_forever())
