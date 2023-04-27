@@ -65,7 +65,7 @@ class Monitor:
         if self._values.empty:
             return None
 
-        k = (end_ts - self._values[-1]) // self._epoch_length
+        k = (end_ts - self._values.index[-1]) // self._epoch_length
         return self.read_k_upcoming(k, metric_ids)
 
     # Both ends inclusive

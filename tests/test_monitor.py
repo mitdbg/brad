@@ -13,7 +13,7 @@ async def f1():
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
-        await asyncio.sleep(3)
+        await asyncio.sleep(1)
 
     df = m.read_k_most_recent(3)
     t = m._values.tail(3)
@@ -33,7 +33,7 @@ async def f2():
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
-        await asyncio.sleep(3)
+        await asyncio.sleep(1)
 
     df = m.read_k_upcoming(5)
     t = m._values.tail(1)
@@ -47,15 +47,32 @@ async def f2():
         )
 
 
-""" def test_read_upcoming_until():
+def test_read_upcoming_until():
     asyncio.run(f3())
 
 async def f3():
-    return
+    m = Monitor(ConfigFile("./config/config.yml"))
+    task = asyncio.create_task(m.run_forever())
+
+    while m._values.empty:
+        await asyncio.sleep(1)
+
+    end_ts = m._values.index[-1] + 7 * m._epoch_length
+
+    df = m.read_upcoming_until(end_ts)
+    t = m._values.tail(1)
+    task.cancel()
+
+    assert df.shape[0] == 7
+    assert df.shape[1] == len(m._queries)
+    for i in range(7):
+        assert_frame_equal(
+            df.head(i + 1).tail(1).reset_index(drop=True), t.reset_index(drop=True)
+        )
 
 
 
-def test_read_between_times():
+"""def test_read_between_times():
     asyncio.run(f4())
 
 async def f4():
