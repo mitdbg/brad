@@ -3,6 +3,8 @@ from brad.config.file import ConfigFile
 import asyncio
 from pandas.testing import assert_frame_equal
 
+# pylint: disable=protected-access
+
 
 def test_read_k_most_recent():
     asyncio.run(f1())

@@ -2,8 +2,6 @@ from brad.forecasting import Forecaster
 import pandas as pd
 from typing import List
 from datetime import datetime, timedelta
-import numpy as np
-import math
 
 
 class ConstantForecaster(Forecaster):

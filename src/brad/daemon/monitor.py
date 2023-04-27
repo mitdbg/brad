@@ -30,9 +30,9 @@ class Monitor:
 
     def read_k_most_recent(
         self, k: int = 1, metric_ids: List[str] | None = None
-    ) -> pd.DataFrame | None:
+    ) -> pd.DataFrame:
         if self._values.empty:
-            return None
+            return self._values
 
         columns = metric_ids if metric_ids else list(self._values.columns)
 
@@ -40,9 +40,9 @@ class Monitor:
 
     def read_k_upcoming(
         self, k: int = 1, metric_ids: List[str] | None = None
-    ) -> pd.DataFrame | None:
+    ) -> pd.DataFrame:
         if self._values.empty:
-            return None
+            return self._values
 
         # Create empty dataframe with desired index and columns
         timestamps = [
@@ -61,9 +61,9 @@ class Monitor:
     # `end_ts` is inclusive
     def read_upcoming_until(
         self, end_ts: datetime, metric_ids: List[str] | None = None
-    ) -> pd.DataFrame | None:
+    ) -> pd.DataFrame:
         if self._values.empty:
-            return None
+            return self._values
 
         k = (end_ts - self._values.index[-1]) // self._epoch_length
         return self.read_k_upcoming(k, metric_ids)
@@ -74,9 +74,9 @@ class Monitor:
         start_time: datetime,
         end_time: datetime,
         metric_ids: List[str] | None = None,
-    ) -> pd.DataFrame | None:
+    ) -> pd.DataFrame:
         if self._values.empty:
-            return None
+            return self._values
 
         past = self._values.loc[
             (self._values.index >= start_time) & (self._values.index <= end_time)
@@ -86,11 +86,9 @@ class Monitor:
         return pd.concat([past, future], axis=0)
 
     # Both ends inclusive
-    def read_between_epochs(
-        self, start_epoch: int, end_epoch: int
-    ) -> pd.DataFrame | None:
+    def read_between_epochs(self, start_epoch: int, end_epoch: int) -> pd.DataFrame:
         if self._values.empty:
-            return None
+            return self._values
 
         past = self.read_k_most_recent(max(0, -start_epoch)).head(
             end_epoch - start_epoch + 1
