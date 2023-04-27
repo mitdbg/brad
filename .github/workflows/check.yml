@@ -45,5 +45,5 @@ jobs:
       if: success() || failure()
 
     - name: Run Tests (pytest)
-      run: pytest --ignore=test_monitor.py
+      run: pytest --ignore=tests/test_monitor.py
       if: success() || failure()
