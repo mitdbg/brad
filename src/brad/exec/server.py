@@ -28,6 +28,12 @@ def register_command(subparsers):
         help="The name of the schema to run against.",
     )
     parser.add_argument(
+        "--planner-config-file",
+        type=str,
+        required=True,
+        help="Path to the blueprint planner's configuration file.",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="Set to enable debug logging.",
@@ -73,7 +79,9 @@ def main(args):
     event_loop.set_exception_handler(handle_exception)
 
     try:
-        server = BradServer(config, args.schema_name, args.debug)
+        server = BradServer(
+            config, args.schema_name, args.planner_config_file, args.debug
+        )
         event_loop.create_task(server.serve_forever())
         event_loop.run_forever()
     finally:

@@ -34,11 +34,18 @@ LINESEP = "\n".encode()
 
 
 class BradServer(BradInterface):
-    def __init__(self, config: ConfigFile, schema_name: str, debug_mode: bool):
+    def __init__(
+        self,
+        config: ConfigFile,
+        schema_name: str,
+        path_to_planner_config: str,
+        debug_mode: bool,
+    ):
         self._config = config
         self._schema_name = schema_name
         self._debug_mode = debug_mode
         self._blueprint_mgr = BlueprintManager(self._config, self._schema_name)
+        self._path_to_planner_config = path_to_planner_config
 
         # We have different routing policies for performance evaluation and
         # testing purposes.
@@ -104,6 +111,7 @@ class BradServer(BradInterface):
                 self._config.raw_path,
                 self._schema_name,
                 self._blueprint_mgr.get_blueprint(),
+                self._path_to_planner_config,
                 self._debug_mode,
                 self._daemon_input_queue,
                 self._daemon_output_queue,

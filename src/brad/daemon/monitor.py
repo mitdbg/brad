@@ -1,3 +1,4 @@
+import asyncio
 from brad.config.file import ConfigFile
 from importlib.resources import files, as_file
 from typing import Dict, List, Tuple
@@ -8,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from botocore.exceptions import ClientError
 import pandas as pd
-import time
 
 
 # Return the id of a metric in the dataframe.
@@ -50,9 +50,7 @@ class Monitor:
         # engines' metrics.
         while True:
             self._add_metrics()
-            # Just for testing.
-            print(self._values.head())
-            time.sleep(300)  # Read every 5 minutes
+            await asyncio.sleep(300)  # Read every 5 minutes
 
     def read_k_most_recent(self, k=1) -> pd.DataFrame | None:
         return None if self._values.empty else self._values.tail(k)
