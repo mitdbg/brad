@@ -124,7 +124,8 @@ class Monitor:
             if engine == Engine.Aurora:
                 namespace = "AWS/RDS"
                 dimensions = [
-                    {"Name": "EngineName", "Value": "aurora-postgresql"},
+                    {"Name": "DBClusterIdentifier", "Value": "brad-aurora"},
+                    {},
                 ]
             elif engine == Engine.Redshift:
                 namespace = "AWS/Redshift"
@@ -137,24 +138,29 @@ class Monitor:
             elif engine == Engine.Athena:
                 namespace = "AWS/Athena"
 
-            for metric_name, stats_list in f["metrics"].items():
-                for stat in stats_list:
-                    metric_id = f"{engine}_{metric_name}_{stat}"
-                    self._metric_ids.append(metric_id)
-                    metric_data_query = {
-                        "Id": metric_id,
-                        "MetricStat": {
-                            "Metric": {
-                                "Namespace": namespace,
-                                "MetricName": metric_name,
-                                "Dimensions": dimensions,
+            roles = f.get("roles", [""])
+            for role in roles:
+                for metric_name, stats_list in f["metrics"].items():
+                    for stat in stats_list:
+                        metric_id = f"{engine}_{metric_name}_{stat}"
+                        if role != "":
+                            metric_id = f"{engine}_{role}_{metric_name}_{stat}"
+                            dimensions[1] = {"Name": "Role", "Value": role}
+                        self._metric_ids.append(metric_id)
+                        metric_data_query = {
+                            "Id": metric_id,
+                            "MetricStat": {
+                                "Metric": {
+                                    "Namespace": namespace,
+                                    "MetricName": metric_name,
+                                    "Dimensions": dimensions.copy(),
+                                },
+                                "Period": int(self._epoch_length.total_seconds()),
+                                "Stat": stat,
                             },
-                            "Period": int(self._epoch_length.total_seconds()),
-                            "Stat": stat,
-                        },
-                        "ReturnData": True,
-                    }
-                    self._queries.append(metric_data_query)
+                            "ReturnData": True,
+                        }
+                        self._queries.append(metric_data_query)
 
     def _add_metrics(self):
         # Retrieve datapoints
