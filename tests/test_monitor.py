@@ -100,9 +100,25 @@ async def f4():
         )
 
 
-"""def test_read_between_epochs():
+def test_read_between_epochs():
     asyncio.run(f5())
 
 async def f5():
-    return
- """
+    m = Monitor(ConfigFile("./config/config.yml"))
+    task = asyncio.create_task(m.run_forever())
+
+    while m._values.empty:
+        await asyncio.sleep(1)
+
+    df = m.read_between_epochs(-2, 1)
+    t = m._values.tail(2)
+    task.cancel()
+
+    assert df.shape[0] == 4
+    assert df.shape[1] == len(m._queries)
+    assert_frame_equal(df.head(2), t)
+    for i in range(2):
+        assert_frame_equal(
+            df.head(i + 3).tail(1).reset_index(drop=True),
+            t.tail(1).reset_index(drop=True),
+        )
