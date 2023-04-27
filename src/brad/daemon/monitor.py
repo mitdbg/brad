@@ -172,7 +172,7 @@ class Monitor:
         # Retrieve datapoints
         now = datetime.now()
         end_time = now - (now - datetime.min) % self._epoch_length
-        start_time = end_time - 3 * self._epoch_length
+        start_time = end_time - 10 * self._epoch_length
 
         if not self._values.empty:
             start_time = self._values.index[-1]
