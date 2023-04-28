@@ -126,11 +126,37 @@ class Repeat(Schedule):
 
         # Second overload: `end_time`
         assert end_time is not None
-        return Repeat(
-            interval=interval,
-            start_time=start_time,
-            end_time=end_time,
-        )
+        return Repeat(interval=interval, start_time=start_time, end_time=end_time,)
+
+    @staticmethod
+    def starting_at(
+        *,
+        start_time: datetime,
+        interval: timedelta,
+        end_time: datetime = datetime.max,
+        num_repeat: int | None = None,
+    ) -> Repeat:
+        """
+        Returns a `Repeat` schedule that starts at the current time,
+        and ends either at `end_time` or after `num_repeat` repeats.
+        """
+        if start_time is None:
+            start_time = get_current_time()
+
+        # First overload: `num_repeat`
+        if num_repeat is not None:
+            if num_repeat < 1:
+                raise ValueError("`num_repeat` must be at least 1")
+
+            return Repeat(
+                interval=interval,
+                start_time=start_time,
+                end_time=start_time + num_repeat * interval,
+            )
+
+        # Second overload: `end_time`
+        assert end_time is not None
+        return Repeat(interval=interval, start_time=start_time, end_time=end_time,)
 
 
 class ScheduleGenerator(ImmutableGenerator[Schedule]):

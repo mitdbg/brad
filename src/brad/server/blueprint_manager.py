@@ -42,10 +42,7 @@ class BlueprintManager:
                 ),
             )
 
-        response = await loop.run_in_executor(
-            None,
-            _get_s3,
-        )
+        response = await loop.run_in_executor(None, _get_s3,)
 
         def _load_response() -> bytes:
             return response["Body"].read()
