@@ -42,9 +42,9 @@ class Workload:
         self._table_sizes_mb.clear()
         for table, locations in blueprint.tables_with_locations():
             for loc in locations:
-                self._table_sizes_mb[(table, loc)] = await table_sizer.table_size_mb(
-                    table, loc
-                )
+                self._table_sizes_mb[
+                    (table.name, loc)
+                ] = await table_sizer.table_size_mb(table.name, loc)
 
     def table_size_on_engine(self, table_name: str, location: Engine) -> Optional[int]:
         try:

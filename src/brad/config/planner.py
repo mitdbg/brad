@@ -41,5 +41,8 @@ class PlannerConfig:
     def aurora_load_rate_mb_per_s(self) -> float:
         return float(self._raw["aurora_load_rate_mb_per_s"])
 
-    def athena_import_rate_mb_per_s(self) -> float:
-        return float(self._raw["athena_import_rate_mb_per_s"])
+    def athena_extract_rate_mb_per_s(self) -> float:
+        return float(self._raw["athena_extract_rate_mb_per_s"])
+
+    def athena_load_rate_mb_per_s(self) -> float:
+        return float(self._raw["athena_load_rate_mb_per_s"])

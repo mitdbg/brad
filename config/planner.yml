@@ -24,4 +24,6 @@ redshift_load_rate_mb_per_s: 10.0
 aurora_extract_rate_mb_per_s: 10.0
 aurora_load_rate_mb_per_s: 10.0
 
-athena_import_rate_mb_per_s: 10.0
+# Extracting / loading in Athena corresponds to a conversion to/from Iceberg.
+athena_extract_rate_mb_per_s: 10.0
+athena_load_rate_mb_per_s: 10.0
