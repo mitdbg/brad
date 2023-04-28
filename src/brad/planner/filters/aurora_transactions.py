@@ -11,10 +11,8 @@ class AuroraTransactions(Filter):
 
     def __init__(self, workload: Workload) -> None:
         self._transactional_tables = set()
-        for template in workload.templates():
-            if not template.is_transactional():
-                continue
-            self._transactional_tables.update(template.tables())
+        for query in workload.transactional_queries():
+            self._transactional_tables.update(query.tables())
 
     def is_valid(self, candidate: Blueprint) -> bool:
         for table in candidate.tables():

@@ -47,7 +47,7 @@ class BradDaemon:
             current_blueprint=self._current_blueprint,
             planner_config=planner_config,
             # N.B. This is a placeholder
-            current_workload=Workload(templates=[]),
+            current_workload=Workload.empty(),
             monitor=self._monitor,
         )
 
