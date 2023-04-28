@@ -15,10 +15,12 @@ from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
+from brad.daemon.monitor import Monitor
 from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel, ReceivedQuery
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
+from brad.routing.rule_based import RuleBased
 from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
 from brad.routing.policy import RoutingPolicy
 from brad.server.brad_interface import BradInterface
@@ -58,6 +60,9 @@ class BradServer(BradInterface):
             self._router = AlwaysOneRouter(Engine.Aurora)
         elif routing_policy == RoutingPolicy.AlwaysRedshift:
             self._router = AlwaysOneRouter(Engine.Redshift)
+        elif routing_policy == RoutingPolicy.RuleBased:
+            self._monitor = Monitor(self._config)
+            self._router = RuleBased(self._blueprint_mgr, self._monitor)
         else:
             raise RuntimeError(
                 "Unsupported routing policy: {}".format(str(routing_policy))
@@ -85,6 +90,9 @@ class BradServer(BradInterface):
             await grpc_server.start()
             logger.info("The BRAD server has successfully started.")
             logger.info("Listening on port %d.", self._config.server_port)
+
+            # Todo: uncomment the following line to support Rule_based router
+            # await asyncio.gather(self._monitor.run_forever(), grpc_server.wait_for_termination())
             await grpc_server.wait_for_termination()
         finally:
             # Not ideal, but we need to manually call this method to ensure
