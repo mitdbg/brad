@@ -66,6 +66,6 @@ class RuleBased(Router):
             if self._monitor is None:
                 return ideal_location_rank[0]
             else:
-                sys_metric = self._monitor.read_k_most_recent(k=1)
+                # sys_metric = self._monitor.read_k_most_recent(k=1)
                 # Todo: understand sys_metric format and design rules to filter ideal_location_rank
                 return ideal_location_rank[0]
