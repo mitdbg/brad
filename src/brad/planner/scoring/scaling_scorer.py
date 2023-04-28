@@ -1,19 +1,24 @@
 import importlib.resources as pkg_resources
 import json
+import math
 from typing import Dict
 
 from .score import Scorer, Score
 import brad.planner.scoring.data as score_data
+
 from brad.blueprint import Blueprint
 from brad.blueprint.diff.blueprint import BlueprintDiff
+from brad.config.engine import Engine
+from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner.workload import Workload
 
 
 class ScalingScorer(Scorer):
-    def __init__(self, monitor: Monitor) -> None:
+    def __init__(self, monitor: Monitor, planner_config: PlannerConfig) -> None:
         # For access to metrics.
         self._monitor = monitor
+        self._planner_config = planner_config
 
     def score(
         self,
@@ -22,6 +27,17 @@ class ScalingScorer(Scorer):
         current_workload: Workload,
         next_workload: Workload,
     ) -> Score:
+        return Score(
+            1.0,
+            self._operational_cost_score(next_blueprint, next_workload),
+            self._transition_score(current_blueprint, next_blueprint, current_workload),
+        )
+
+    def _operational_cost_score(
+        self,
+        next_blueprint: Blueprint,
+        _next_workload: Workload,
+    ) -> float:
         # Operational monetary score:
         # - Provisioning costs for an hour
         # - Aurora scans cost
@@ -36,19 +52,130 @@ class ScalingScorer(Scorer):
         redshift_prov_cost = (
             _REDSHIFT_PRICING[redshift_prov.instance_type()] * redshift_prov.num_nodes()
         )
-        _total_prov_cost = aurora_prov_cost + redshift_prov_cost
+        # NOTE: Still need to include scan costs. This depends on the routing policy.
+        return aurora_prov_cost + redshift_prov_cost
 
-        # NOTE: Add scan costs.
-
+    def _transition_score(
+        self,
+        current_blueprint: Blueprint,
+        next_blueprint: Blueprint,
+        current_workload: Workload,
+    ) -> float:
         # Transition score:
         # - Table movement (size * transmission rate)
         # - Table movement monetary costs (Athena)
         # - Redshift scale up / down time
         # - Aurora scale up / down time
-        _bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
+        bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
+        if bp_diff is None:
+            transition_score = 0.0
+        else:
+            # Provisioning changes.
+            redshift_prov_time_s = (
+                self._planner_config.redshift_provisioning_change_time_s()
+                if bp_diff.redshift_diff() is not None
+                else 0
+            )
+            aurora_prov_time_s = (
+                self._planner_config.aurora_provisioning_change_time_s()
+                if bp_diff.aurora_diff() is not None
+                else 0
+            )
 
-        # N.B. This is a placeholder value.
-        return Score(1.0, 1.0, 1.0)
+            # Table movement.
+            movement_cost = 0.0
+            movement_time_s = 0.0
+            for tbl_diff in bp_diff.table_diffs():
+                table_name = tbl_diff.table_name()
+                move_to = tbl_diff.added_locations()
+                move_from = self._best_extract_engine(current_blueprint, table_name)
+                source_table_size_mb = current_workload.table_size_on_engine(
+                    table_name, move_from
+                )
+                assert source_table_size_mb is not None
+
+                # Extraction scoring.
+                if move_from == Engine.Athena:
+                    movement_time_s += (
+                        source_table_size_mb
+                        / self._planner_config.athena_extract_rate_mb_per_s()
+                    )
+                    movement_cost += (
+                        self._planner_config.athena_usd_per_mb_scanned()
+                        * source_table_size_mb
+                    )
+
+                elif move_from == Engine.Aurora:
+                    movement_time_s += (
+                        source_table_size_mb
+                        / self._planner_config.aurora_extract_rate_mb_per_s()
+                    )
+
+                elif move_from == Engine.Redshift:
+                    movement_time_s += (
+                        source_table_size_mb
+                        / self._planner_config.redshift_extract_rate_mb_per_s()
+                    )
+
+                # Import scoring.
+                for into_loc in move_to:
+                    # Need to assume the table will have the same size as on the
+                    # source engine. This is not necessarily true when Redshift
+                    # is the source, because it uses compression.
+                    if into_loc == Engine.Athena:
+                        movement_time_s += (
+                            source_table_size_mb
+                            / self._planner_config.athena_load_rate_mb_per_s()
+                        )
+                        movement_cost += (
+                            self._planner_config.athena_usd_per_mb_scanned()
+                            * source_table_size_mb
+                        )
+
+                    elif into_loc == Engine.Aurora:
+                        movement_time_s += (
+                            source_table_size_mb
+                            / self._planner_config.aurora_load_rate_mb_per_s()
+                        )
+
+                    elif into_loc == Engine.Redshift:
+                        movement_time_s += (
+                            source_table_size_mb
+                            / self._planner_config.redshift_load_rate_mb_per_s()
+                        )
+
+            transition_time_s = (
+                redshift_prov_time_s + aurora_prov_time_s + movement_time_s
+            )
+            transition_cost = movement_cost
+            transition_score = math.sqrt(transition_time_s * transition_cost)
+
+        return transition_score
+
+    def _best_extract_engine(self, blueprint: Blueprint, table_name: str) -> Engine:
+        """
+        Returns the best source engine to extract a table from.
+        """
+        options = []
+        for loc in blueprint.get_table_locations(table_name):
+            if loc == Engine.Aurora:
+                options.append(
+                    (loc, self._planner_config.aurora_extract_rate_mb_per_s())
+                )
+            elif loc == Engine.Athena:
+                options.append(
+                    (loc, self._planner_config.athena_extract_rate_mb_per_s())
+                )
+            elif loc == Engine.Redshift:
+                options.append(
+                    (loc, self._planner_config.redshift_extract_rate_mb_per_s())
+                )
+        options.sort(key=lambda op: op[1])
+        if len(options) > 1 and options[0][0] == Engine.Athena:
+            # Avoid Athena if possible because we need to pay for extraction.
+            return options[1][0]
+        else:
+            return options[0][0]
 
 
 def _load_instance_pricing(file_name: str) -> Dict[str, float]:
