@@ -33,7 +33,7 @@ INSTALL_REQUIRES = [
     "pyyaml",
     "sqlglot",
     "pandas",
-    "sklearn"
+    "sklearn",
 ]
 
 DEV_REQUIRES = [
