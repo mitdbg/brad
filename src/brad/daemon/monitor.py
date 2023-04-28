@@ -10,15 +10,33 @@ import pandas as pd
 import asyncio
 import numpy as np
 from brad.forecasting.constant_forecaster import ConstantForecaster
+from brad.forecasting.moving_average_forecaster import MovingAverageForecaster
+from brad.forecasting.linear_forecaster import LinearForecaster
+from brad.forecasting import Forecaster
 
 
 class Monitor:
-    def __init__(self, config: ConfigFile) -> None:
+    def __init__(
+        self,
+        config: ConfigFile,
+        forecasting_method: str = "constant",
+        forecasting_window_size: int = 5, # (Up to) how many past samples to base the forecast on
+    ) -> None:
         self._config = config
         self._client = boto3.client("cloudwatch")
         self._setup()
         self._values = pd.DataFrame(columns=self._metric_ids)
-        self._forecaster = ConstantForecaster(self._values, self._epoch_length)
+        self._forecaster: Forecaster
+        if forecasting_method == "constant":
+            self._forecaster = ConstantForecaster(self._values, self._epoch_length)
+        elif forecasting_method == "moving_average":
+            self._forecaster = MovingAverageForecaster(
+                self._values, self._epoch_length, forecasting_window_size
+            )
+        elif forecasting_method == "linear":
+            self._forecaster = LinearForecaster(
+                self._values, self._epoch_length, forecasting_window_size
+            )
 
     async def run_forever(self) -> None:
         # Flesh out the monitor - maintain running averages of the underlying
