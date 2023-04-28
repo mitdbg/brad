@@ -27,6 +27,24 @@ class Monitor:
             self._add_metrics()
             await asyncio.sleep(60)  # Read every minute
 
+    ############
+    # The following functions, prefixed by `read_`, provide different ways to query the monitor for
+    # the values of the metrics of interest. They return a dataframe with a schema that looks like the following:
+    #
+    #                            redshift_CPUUtilization_Average  aurora_WRITER_ReadLatency_Maximum  athena_ProcessedBytes_Sum
+    # 2023-04-25 00:00:00+00:00                         3.191965                                0.0                        0.0
+    # 2023-04-26 00:00:00+00:00                         3.198332                                0.0                        0.0
+    # 2023-04-27 00:00:00+00:00                         3.173024                                0.0                        0.0
+    #
+    # The indices of these dataframes consist of timestamps associated with each epoch.
+    # Each column name is a `metric_id`, consisting of up to 4 underscore-separated fields:
+    #   1. The engine name, from the `engine` field in `monitored_metrics`, within `monitored_metrics.json`
+    #   2. For aurora, the instance role, from the `roles` field in `monitored_metrics`, within `monitored_metrics.json`
+    #   3. The metric name, a key in the `metrics` field in `monitored_metrics` within `monitored_metrics.json`
+    #   4. The reported statistic name, an element within a value in the `metrics` field in `monitored_metrics` within
+    #      `monitored_metrics.json`
+    #
+
     def read_k_most_recent(
         self, k: int = 1, metric_ids: List[str] | None = None
     ) -> pd.DataFrame:
@@ -97,6 +115,8 @@ class Monitor:
         )
 
         return pd.concat([past, future], axis=0)
+
+    ############
 
     def _setup(self):
         # Load data.
