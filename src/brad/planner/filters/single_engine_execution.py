@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Set
 
 from brad.blueprint import Blueprint
 from brad.planner.workload import Workload
@@ -12,11 +12,13 @@ class SingleEngineExecution(Filter):
     """
 
     def __init__(self, workload: Workload) -> None:
-        # Each constraint is a list of tables that must appear together on at
+        # Each constraint is a set of tables that must appear together on at
         # least one engine.
-        self._table_constraints: List[List[str]] = [
-            template.tables() for template in workload.templates()
-        ]
+        constraint_set: Set[List[str]] = set()
+        for query in workload.all_queries():
+            clone = list(query.tables())
+            constraint_set.add(clone)
+        self._table_constraints = list(constraint_set)
 
     def is_valid(self, candidate: Blueprint) -> bool:
         table_locations = candidate.table_locations()
