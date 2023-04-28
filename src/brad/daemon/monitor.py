@@ -20,7 +20,7 @@ class Monitor:
         self,
         config: ConfigFile,
         forecasting_method: str = "constant",
-        forecasting_window_size: int = 5, # (Up to) how many past samples to base the forecast on
+        forecasting_window_size: int = 5,  # (Up to) how many past samples to base the forecast on
     ) -> None:
         self._config = config
         self._client = boto3.client("cloudwatch")
