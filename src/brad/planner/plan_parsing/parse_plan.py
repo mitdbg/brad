@@ -1,15 +1,13 @@
 import collections
 import re
 
-import numpy as np
-
 from brad.planner.plan_parsing.plan_operator import PlanOperator
 from brad.planner.plan_parsing.postgres_utils import plan_statistics
 
-planning_time_regex = re.compile("planning time: (?P<planning_time>\d+.\d+) ms")
-ex_time_regex = re.compile("execution time: (?P<execution_time>\d+.\d+) ms")
-init_plan_regex = re.compile("InitPlan \d+ \(returns \$\d\)")
-join_columns_regex = re.compile("\w+\.\w+ ?= ?\w+\.\w+")
+planning_time_regex = re.compile(r"planning time: (?P<planning_time>\d+.\d+) ms")
+ex_time_regex = re.compile(r"execution time: (?P<execution_time>\d+.\d+) ms")
+init_plan_regex = re.compile(r"InitPlan \d+ \(returns \$\d\)")
+join_columns_regex = re.compile(r"\w+\.\w+ ?= ?\w+\.\w+")
 
 
 def create_node(lines_plan_operator, operators_current_level):
@@ -108,16 +106,9 @@ def parse_plan(analyze_plan_tuples, analyze=True, parse=True):
 def parse_plans(
     explain_rows,
     min_runtime=100,
-    max_runtime=30000,
     parse_baseline=False,
-    cap_queries=None,
     parse_join_conds=False,
-    include_zero_card=False,
-    explain_only=False,
     zero_card_min_runtime=None,
-    db_name=None,
-    timeout_ms=None,
-    target_path=None,
 ):
     # keep track of column statistics
     if zero_card_min_runtime is None:
@@ -132,10 +123,6 @@ def parse_plans(
     no_tables = []
     no_filters = []
     op_perc = collections.defaultdict(int)
-
-    # either only parse explain part of query or skip entirely
-    curr_explain_only = explain_only
-
     alias_dict = dict()
 
     avg_runtime = 0
@@ -149,7 +136,7 @@ def parse_plans(
     )
 
     analyze_plan = verbose_plan
-    tables, filter_columns, operators = plan_statistics(analyze_plan)
+    tables, filter_columns, _ = plan_statistics(analyze_plan)
 
     analyze_plan.parse_columns_bottom_up(
         column_id_mapping,
@@ -188,25 +175,7 @@ def parse_plans(
 
     parsed_plans.append(analyze_plan)
 
-    # statistics in seconds
-    print(
-        f"Table statistics: "
-        f"\n\tmean: {np.mean(no_tables):.1f}"
-        f"\n\tmedian: {np.median(no_tables)}"
-        f"\n\tmax: {np.max(no_tables)}"
-    )
-    print("Operators statistics (appear in x% of queries)")
-    for op, op_count in op_perc.items():
-        print(f"\t{str(op)}: {op_count / len(avg_runtimes) * 100:.0f}%")
-    print(
-        f"Runtime statistics: "
-        f"\n\tmedian: {np.median(avg_runtimes) / 1000:.2f}s"
-        f"\n\tmax: {np.max(avg_runtimes) / 1000:.2f}s"
-        f"\n\tmean: {np.mean(avg_runtimes) / 1000:.2f}s"
-    )
-
     parsed_runs = dict(parsed_plans=parsed_plans)
-
     stats = dict(
         runtimes=str(avg_runtimes), no_tables=str(no_tables), no_filters=str(no_filters)
     )

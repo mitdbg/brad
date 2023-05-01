@@ -105,6 +105,7 @@ class PredicateNode:
                             # column names can be arbitrarily deep, hence find recursively
                             if len(n.children) == 0:
                                 return n.text
+                            # pylint: disable-next=cell-var-from-loop
                             return recursive_inner(n.children[0])
 
                         # sometimes column is in parantheses

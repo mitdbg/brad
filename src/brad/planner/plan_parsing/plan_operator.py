@@ -11,16 +11,16 @@ from brad.planner.plan_parsing.parse_filter import parse_filter, PredicateNode
 from brad.planner.plan_parsing.postgres_utils import child_prod
 
 estimated_regex = re.compile(
-    "\(cost=(?P<est_startup_cost>\d+.\d+)..(?P<est_cost>\d+.\d+) rows=(?P<est_card>\d+) width=(?P<est_width>\d+)\)"
+    r"\(cost=(?P<est_startup_cost>\d+.\d+)..(?P<est_cost>\d+.\d+) rows=(?P<est_card>\d+) width=(?P<est_width>\d+)\)"
 )
 actual_regex = re.compile(
-    "\(actual time=(?P<act_startup_cost>\d+.\d+)..(?P<act_time>\d+.\d+) rows=(?P<act_card>\d+)"
+    r"\(actual time=(?P<act_startup_cost>\d+.\d+)..(?P<act_time>\d+.\d+) rows=(?P<act_card>\d+)"
 )
 op_name_regex = re.compile('->  ([^"(]+)')
-workers_planned_regex = re.compile("Workers Planned: (\d+)")
+workers_planned_regex = re.compile(r"Workers Planned: (\d+)")
 # filter_columns_regex = re.compile('("\S+"."\S+")')
-filter_columns_regex = re.compile("([^\(\)\*\+\-'\= ]+)")
-literal_regex = re.compile("('[^']+'::[^'\)]+)")
+filter_columns_regex = re.compile(r"([^\(\)\*\+\-'\= ]+)")
+literal_regex = re.compile(r"('[^']+'::[^'\)]+)")
 
 
 class PlanOperator(dict):
@@ -293,7 +293,7 @@ class PlanOperator(dict):
                         )
                         if c_id is not None:
                             col_ids.append(c_id)
-                    except:
+                    except:  # pylint: disable=bare-except
                         # not c[1].startswith('agg_')
                         if c[0] != "subgb":
                             # raise ValueError(f"Did not find unique table for column {c}")
