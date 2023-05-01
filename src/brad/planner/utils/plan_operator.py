@@ -229,11 +229,13 @@ class PlanOperator(dict):
                     try:
                         c_id = self.lookup_column_id(c, column_id_mapping, node_tables, partial_column_name_mapping,
                                                      alias_dict)
-                        col_ids.append(c_id)
+                        if c_id is not None:
+                            col_ids.append(c_id)
                     except:
                         # not c[1].startswith('agg_')
                         if c[0] != 'subgb':
-                            raise ValueError(f"Did not find unique table for column {c}")
+                            #raise ValueError(f"Did not find unique table for column {c}")
+                            pass
 
                 output_column['columns'] = col_ids
 
@@ -250,8 +252,8 @@ class PlanOperator(dict):
             if table in table_id_mapping:
                 self.plan_parameters['table'] = table_id_mapping[table]
             else:
-                print(f"!!!!!!{self.plan_parameters['table']} not found")
-                print(table_id_mapping)
+                #print(f"!!!!!!{self.plan_parameters['table']} not found")
+                #print(table_id_mapping)
                 del self.plan_parameters['table']
 
         return node_tables
@@ -282,8 +284,11 @@ class PlanOperator(dict):
         else:
             raise NotImplementedError
 
-        col_id = column_id_mapping[(table, column)]
-        return col_id
+        try:
+            col_id = column_id_mapping[(table, column)]
+            return col_id
+        except KeyError:
+            return None
 
     def merge_recursively(self, node):
         assert self.plan_parameters['op_name'] == node.plan_parameters['op_name']

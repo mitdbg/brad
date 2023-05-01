@@ -102,7 +102,7 @@ def parse_plan(analyze_plan_tuples, analyze=True, parse=True):
     return root_operator, ex_time, planning_time
 
 
-def parse_plans(explain_str, min_runtime=100, max_runtime=30000, parse_baseline=False, cap_queries=None,
+def parse_plans(explain_rows, min_runtime=100, max_runtime=30000, parse_baseline=False, cap_queries=None,
                 parse_join_conds=False, include_zero_card=False, explain_only=False, zero_card_min_runtime=None,
                 db_name=None, timeout_ms=None, target_path=None):
 
@@ -128,7 +128,7 @@ def parse_plans(explain_str, min_runtime=100, max_runtime=30000, parse_baseline=
     avg_runtime = 0
 
     # only explain plan (not executed)
-    verbose_plan, _, _ = parse_plan(explain_str, analyze=False, parse=True)
+    verbose_plan, _, _ = parse_plan(explain_rows, analyze=False, parse=True)
     verbose_plan.parse_lines_recursively(alias_dict=alias_dict, parse_baseline=parse_baseline,
                                             parse_join_conds=parse_join_conds)
 
