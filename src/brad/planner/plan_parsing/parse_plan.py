@@ -3,8 +3,8 @@ import re
 
 import numpy as np
 
-from brad.planner.utils.plan_operator import PlanOperator
-from brad.planner.utils.postgres_utils import plan_statistics
+from brad.planner.plan_parsing.plan_operator import PlanOperator
+from brad.planner.plan_parsing.postgres_utils import plan_statistics
 
 planning_time_regex = re.compile('planning time: (?P<planning_time>\d+.\d+) ms')
 ex_time_regex = re.compile('execution time: (?P<execution_time>\d+.\d+) ms')

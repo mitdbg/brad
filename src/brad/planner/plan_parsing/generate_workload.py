@@ -4,8 +4,8 @@ from enum import Enum
 
 import numpy as np
 
-from brad.planner.utils.column_types import Datatype
-from brad.planner.utils.utils import load_schema_json, load_column_statistics, load_string_statistics
+from brad.planner.plan_parsing.column_types import Datatype
+from brad.planner.plan_parsing.utils import load_schema_json, load_column_statistics, load_string_statistics
 
 
 class Operator(Enum):
