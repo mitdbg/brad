@@ -1,5 +1,6 @@
 from typing import Dict, List, Tuple, Optional, Iterable
 from itertools import chain
+from pathlib import Path
 
 from brad.blueprint import Blueprint
 from brad.query_rep import QueryRep
@@ -24,6 +25,32 @@ class Workload:
     @classmethod
     def empty(cls) -> "Workload":
         return cls([], [], 0.01, 0)
+
+    @classmethod
+    def from_extracted_logs(cls, file_path: str) -> "Workload":
+        """
+        Constructs a workload from extracted query logs. This method does not
+        set the dataset size. Useful for testing purposes.
+        """
+        path = Path(file_path)
+
+        txn_queries = []
+        analytical_queries = []
+
+        with open(path / "oltp.sql") as txns:
+            for txn in txns:
+                if txn.startswith("COMMIT"):
+                    continue
+                txn_queries.append(QueryRep(txn))
+
+        with open(path / "olap.sql") as analytics:
+            for q in analytics:
+                analytical_queries.append(QueryRep(q))
+
+        with open(path / "sample_prob.txt") as sample_file:
+            sampling_prob = float(sample_file.read().strip())
+
+        return cls(analytical_queries, txn_queries, sampling_prob, 0)
 
     def __init__(
         self,
@@ -59,8 +86,29 @@ class Workload:
                     (table.name, loc)
                 ] = await table_sizer.table_size_mb(table.name, loc)
 
+    def set_dataset_size_from_table_sizes(self) -> None:
+        largest_table_mb: Dict[str, int] = {}
+        for (table_name, _), size_mb in self._table_sizes_mb.items():
+            if table_name not in largest_table_mb:
+                largest_table_mb[table_name] = size_mb
+            elif size_mb > largest_table_mb[table_name]:
+                largest_table_mb[table_name] = size_mb
+
+        self._dataset_size_mb = sum(largest_table_mb.values())
+
     def table_size_on_engine(self, table_name: str, location: Engine) -> Optional[int]:
         try:
             return self._table_sizes_mb[(table_name, location)]
         except KeyError:
             return None
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--log-dir", type=str)
+    args = parser.parse_args()
+
+    w = Workload.from_extracted_logs(args.log_dir)
+    print(len(w.analytical_queries()))
+    print(len(w.transactional_queries()))

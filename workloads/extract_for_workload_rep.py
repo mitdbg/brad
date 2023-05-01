@@ -38,9 +38,12 @@ def main():
     )
     parser.add_argument("--oltp-dirs", type=str, nargs="+")
     parser.add_argument("--olap-dirs", type=str, nargs="+")
-    parser.add_argument("--sample-freq", type=float, default=0.01)
-    parser.add_argument("--output-dir", type=str)
+    parser.add_argument("--sample-prob", type=float, default=0.01)
+    parser.add_argument("--output-dir", type=str, required=True)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+
+    random.seed(args.seed)
 
     txn_queries = []
     olap_queries = []
@@ -50,7 +53,7 @@ def main():
             process_data(
                 Path(file_path),
                 is_transactional=True,
-                sampling_probability=args.sample_freq,
+                sampling_probability=args.sample_prob,
             )
         )
     for file_path in args.olap_dirs:
@@ -58,7 +61,7 @@ def main():
             process_data(
                 Path(file_path),
                 is_transactional=False,
-                sampling_probability=args.sample_freq,
+                sampling_probability=args.sample_prob,
             )
         )
 
@@ -69,6 +72,8 @@ def main():
     with open(out_dir / "olap.sql", "w") as out:
         for q in olap_queries:
             print(q, file=out)
+    with open(out_dir / "sample_prob.txt", "w") as out:
+        print(args.sample_prob, file=out)
 
 
 if __name__ == "__main__":
