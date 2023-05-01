@@ -5,50 +5,71 @@ from enum import Enum
 import numpy as np
 
 from brad.planner.plan_parsing.column_types import Datatype
-from brad.planner.plan_parsing.utils import load_schema_json, load_column_statistics, load_string_statistics
+from brad.planner.plan_parsing.utils import (
+    load_schema_json,
+    load_column_statistics,
+    load_string_statistics,
+)
 
 
 class Operator(Enum):
-    NEQ = '!='
-    EQ = '='
-    LEQ = '<='
-    GEQ = '>='
-    LIKE = 'LIKE'
-    NOT_LIKE = 'NOT LIKE'
-    IS_NOT_NULL = 'IS NOT NULL'
-    IS_NULL = 'IS NULL'
-    IN = 'IN'
-    BETWEEN = 'BETWEEN'
+    NEQ = "!="
+    EQ = "="
+    LEQ = "<="
+    GEQ = ">="
+    LIKE = "LIKE"
+    NOT_LIKE = "NOT LIKE"
+    IS_NOT_NULL = "IS NOT NULL"
+    IS_NULL = "IS NULL"
+    IN = "IN"
+    BETWEEN = "BETWEEN"
 
     def __str__(self):
         return self.value
 
 
 class Aggregator(Enum):
-    AVG = 'AVG'
-    SUM = 'SUM'
-    COUNT = 'COUNT'
+    AVG = "AVG"
+    SUM = "SUM"
+    COUNT = "COUNT"
 
     def __str__(self):
         return self.value
 
 
 class ExtendedAggregator(Enum):
-    MIN = 'MIN'
-    MAX = 'MAX'
+    MIN = "MIN"
+    MAX = "MAX"
 
     def __str__(self):
         return self.value
 
 
-def sample_acyclic_aggregation_query(column_stats, string_stats, group_by_threshold, int_neq_predicate_threshold,
-                                     max_cols_per_agg, max_no_aggregates, max_no_group_by, max_no_joins, min_no_joins,
-                                     max_no_predicates, min_no_predicates, relationships_table, schema, randstate,
-                                     complex_predicates,
-                                     max_no_joins_static, max_no_aggregates_static, max_no_predicates_static,
-                                     max_no_group_by_static, left_outer_join_ratio, groupby_limit_prob,
-                                     groupby_having_prob, full_outer_join=False):
-    
+def sample_acyclic_aggregation_query(
+    column_stats,
+    string_stats,
+    group_by_threshold,
+    int_neq_predicate_threshold,
+    max_cols_per_agg,
+    max_no_aggregates,
+    max_no_group_by,
+    max_no_joins,
+    min_no_joins,
+    max_no_predicates,
+    min_no_predicates,
+    relationships_table,
+    schema,
+    randstate,
+    complex_predicates,
+    max_no_joins_static,
+    max_no_aggregates_static,
+    max_no_predicates_static,
+    max_no_group_by_static,
+    left_outer_join_ratio,
+    groupby_limit_prob,
+    groupby_having_prob,
+    full_outer_join=False,
+):
     no_joins = randstate.randint(min_no_predicates, max_no_joins + 1)
     no_predicates = randstate.randint(min_no_predicates + 1, max_no_predicates + 1)
     no_aggregates = randstate.randint(1, max_no_aggregates + 1)
@@ -63,23 +84,36 @@ def sample_acyclic_aggregation_query(column_stats, string_stats, group_by_thresh
     if max_no_group_by_static:
         no_group_bys = max_no_group_by
 
-    start_t, joins, join_tables = sample_acyclic_join(no_joins, relationships_table, schema, randstate,
-                                                      left_outer_join_ratio)
+    start_t, joins, join_tables = sample_acyclic_join(
+        no_joins, relationships_table, schema, randstate, left_outer_join_ratio
+    )
 
-    numerical_aggregation_columns, possible_group_by_columns, predicates = generate_predicates(column_stats,
-                                                                                               complex_predicates,
-                                                                                               group_by_threshold,
-                                                                                               int_neq_predicate_threshold,
-                                                                                               join_tables,
-                                                                                               no_predicates, randstate,
-                                                                                               string_stats)
+    (
+        numerical_aggregation_columns,
+        possible_group_by_columns,
+        predicates,
+    ) = generate_predicates(
+        column_stats,
+        complex_predicates,
+        group_by_threshold,
+        int_neq_predicate_threshold,
+        join_tables,
+        no_predicates,
+        randstate,
+        string_stats,
+    )
     limit = None
     if randstate.rand() < groupby_limit_prob:
         limit = randstate.choice([10, 100, 1000])
 
     group_bys = sample_group_bys(no_group_bys, possible_group_by_columns, randstate)
-    aggregations = sample_aggregations(max_cols_per_agg, no_aggregates, numerical_aggregation_columns, randstate,
-                                       complex_predicates=complex_predicates)
+    aggregations = sample_aggregations(
+        max_cols_per_agg,
+        no_aggregates,
+        numerical_aggregation_columns,
+        randstate,
+        complex_predicates=complex_predicates,
+    )
     having_clause = None
     if randstate.rand() < groupby_having_prob:
         idx = randstate.randint(0, len(aggregations))
@@ -88,31 +122,80 @@ def sample_acyclic_aggregation_query(column_stats, string_stats, group_by_thresh
         op = rand_choice(randstate, [Operator.LEQ, Operator.GEQ, Operator.NEQ])
         having_clause = (idx, literal, op)
 
-    q = GenQuery(aggregations, group_bys, joins, predicates, start_t, list(join_tables), limit=limit,
-                 having_clause=having_clause, full_outer_join=full_outer_join)
+    q = GenQuery(
+        aggregations,
+        group_bys,
+        joins,
+        predicates,
+        start_t,
+        list(join_tables),
+        limit=limit,
+        having_clause=having_clause,
+        full_outer_join=full_outer_join,
+    )
     return q
 
 
-def generate_predicates(column_stats, complex_predicates, group_by_threshold, int_neq_predicate_threshold, join_tables,
-                        no_predicates, randstate, string_stats):
-    numerical_aggregation_columns, possible_columns, possible_string_columns, \
-    possible_group_by_columns, table_predicates, string_table_predicates = analyze_columns(
-        column_stats, group_by_threshold, join_tables, string_stats, complex_predicates)
+def generate_predicates(
+    column_stats,
+    complex_predicates,
+    group_by_threshold,
+    int_neq_predicate_threshold,
+    join_tables,
+    no_predicates,
+    randstate,
+    string_stats,
+):
+    (
+        numerical_aggregation_columns,
+        possible_columns,
+        possible_string_columns,
+        possible_group_by_columns,
+        table_predicates,
+        string_table_predicates,
+    ) = analyze_columns(
+        column_stats, group_by_threshold, join_tables, string_stats, complex_predicates
+    )
     if complex_predicates:
-        predicates = sample_complex_predicates(column_stats, string_stats, int_neq_predicate_threshold, no_predicates,
-                                               possible_columns,
-                                               possible_string_columns, table_predicates, string_table_predicates,
-                                               randstate)
+        predicates = sample_complex_predicates(
+            column_stats,
+            string_stats,
+            int_neq_predicate_threshold,
+            no_predicates,
+            possible_columns,
+            possible_string_columns,
+            table_predicates,
+            string_table_predicates,
+            randstate,
+        )
     else:
-        predicates = sample_predicates(column_stats, int_neq_predicate_threshold, no_predicates, possible_columns,
-                                       table_predicates, randstate)
+        predicates = sample_predicates(
+            column_stats,
+            int_neq_predicate_threshold,
+            no_predicates,
+            possible_columns,
+            table_predicates,
+            randstate,
+        )
     return numerical_aggregation_columns, possible_group_by_columns, predicates
 
 
 class GenQuery:
-
-    def __init__(self, aggregations, group_bys, joins, predicates, start_t, join_tables, alias_dict=None,
-                 inner_groupby=None, subquery_alias=None, limit=None, having_clause=None, full_outer_join=False):
+    def __init__(
+        self,
+        aggregations,
+        group_bys,
+        joins,
+        predicates,
+        start_t,
+        join_tables,
+        alias_dict=None,
+        inner_groupby=None,
+        subquery_alias=None,
+        limit=None,
+        having_clause=None,
+        full_outer_join=False,
+    ):
         if alias_dict is None:
             alias_dict = dict()
         self.aggregations = aggregations
@@ -144,14 +227,14 @@ class GenQuery:
                     ta = self.alias_dict[table]
                 else:
                     ta = table
-                if sql.count(f"\"{ta}\"") == 2:
+                if sql.count(f'"{ta}"') == 2:
                     # this left outer join will not be necessary on this table because of no other filters
                     # randomly add a dummy filter
                     if type(tables[table]) == list:
                         col = tables[table][0]
                     else:
                         col = tables[table]
-                    added_filter.append(f"\"{ta}\".\"{col}\" IS NOT NULL")
+                    added_filter.append(f'"{ta}"."{col}" IS NOT NULL')
             if len(added_filter) != 0:
                 added_sql = " AND ".join(added_filter)
                 sql = sql[:-1] + " AND " + added_sql + ";"
@@ -159,27 +242,32 @@ class GenQuery:
 
     def generate_sql_query(self, semicolon=True):
         # group_bys
-        group_by_str = ''
-        order_by_str = ''
+        group_by_str = ""
+        order_by_str = ""
 
         group_by_cols = []
         if len(self.group_bys) > 0:
-            group_by_cols = [f'"{table}"."{column}"' for table, column, _ in self.group_bys]
-            group_by_col_str = ', '.join(group_by_cols)
-            group_by_str = f' GROUP BY {group_by_col_str}'
-            order_by_str = f' ORDER BY {group_by_col_str}'
+            group_by_cols = [
+                f'"{table}"."{column}"' for table, column, _ in self.group_bys
+            ]
+            group_by_col_str = ", ".join(group_by_cols)
+            group_by_str = f" GROUP BY {group_by_col_str}"
+            order_by_str = f" ORDER BY {group_by_col_str}"
 
         # aggregations
         aggregation_str_list = []
         for i, (aggregator, columns) in enumerate(self.aggregations):
             if aggregator == Aggregator.COUNT:
-                aggregation_str_list.append(f'COUNT(*)')
+                aggregation_str_list.append(f"COUNT(*)")
             else:
-                agg_cols = ' + '.join([f'"{table}"."{col}"' for table, col in columns])
-                aggregation_str_list.append(f'{str(aggregator)}({agg_cols})')
-        aggregation_str = ', '.join(group_by_cols + [f'{agg} as agg_{i}' for i, agg in enumerate(aggregation_str_list)])
-        if aggregation_str == '':
-            aggregation_str = '*'
+                agg_cols = " + ".join([f'"{table}"."{col}"' for table, col in columns])
+                aggregation_str_list.append(f"{str(aggregator)}({agg_cols})")
+        aggregation_str = ", ".join(
+            group_by_cols
+            + [f"{agg} as agg_{i}" for i, agg in enumerate(aggregation_str_list)]
+        )
+        if aggregation_str == "":
+            aggregation_str = "*"
 
         # having clause
         having_str = ""
@@ -202,19 +290,23 @@ class GenQuery:
             exists_preds = []
             for q_rec, not_exist in self.exists_predicates:
                 if not_exist:
-                    exists_preds.append(f'NOT EXISTS ({q_rec.generate_sql_query(semicolon=False)})')
+                    exists_preds.append(
+                        f"NOT EXISTS ({q_rec.generate_sql_query(semicolon=False)})"
+                    )
                 else:
-                    exists_preds.append(f'EXISTS ({q_rec.generate_sql_query(semicolon=False)})')
-            exists_preds = ' AND '.join(exists_preds)
-            if predicate_str == '':
-                predicate_str += f' WHERE {exists_preds} '
+                    exists_preds.append(
+                        f"EXISTS ({q_rec.generate_sql_query(semicolon=False)})"
+                    )
+            exists_preds = " AND ".join(exists_preds)
+            if predicate_str == "":
+                predicate_str += f" WHERE {exists_preds} "
             else:
-                predicate_str += f' AND {exists_preds}'
+                predicate_str += f" AND {exists_preds}"
 
         check_tables = dict()
         # join
         if self.inner_groupby is not None:
-            join_str = f'({self.inner_groupby.generate_sql_query(semicolon=False)}) {self.subquery_alias}'
+            join_str = f"({self.inner_groupby.generate_sql_query(semicolon=False)}) {self.subquery_alias}"
 
         else:
             already_repl = set()
@@ -238,11 +330,15 @@ class GenQuery:
                     join_kw = "JOIN" if left_outer else "LEFT OUTER JOIN"
                 if join_kw == "LEFT OUTER JOIN":
                     check_tables[table_r] = column_r
-                join_str += f' {join_kw} {repl_alias(table_r)}'
-                join_cond = ' AND '.join([f'{repl_alias(table_l, no_alias_intro=True)}."{col_l}" = '
-                                          f'{repl_alias(table_r, no_alias_intro=True)}."{col_r}"'
-                                          for col_l, col_r in zip(column_l, column_r)])
-                join_str += f' ON {join_cond}'
+                join_str += f" {join_kw} {repl_alias(table_r)}"
+                join_cond = " AND ".join(
+                    [
+                        f'{repl_alias(table_l, no_alias_intro=True)}."{col_l}" = '
+                        f'{repl_alias(table_r, no_alias_intro=True)}."{col_r}"'
+                        for col_l, col_r in zip(column_l, column_r)
+                    ]
+                )
+                join_str += f" ON {join_cond}"
 
         limit_str = ""
         if self.limit is not None:
@@ -251,20 +347,41 @@ class GenQuery:
         sql_query = f"SELECT {aggregation_str} FROM {join_str} {predicate_str}{group_by_str}{having_str}{order_by_str}{limit_str}".strip()
 
         if semicolon:
-            sql_query += ';'
+            sql_query += ";"
 
         sql_query = self.check_every_table_has_predicate(check_tables, sql_query)
         return sql_query
 
 
-def generate_workload(dataset, target_path, num_queries=100, max_no_joins=3, min_no_joins=0, max_no_predicates=3,
-                      min_no_predicates=0, max_no_aggregates=3,
-                      max_no_group_by=3, max_cols_per_agg=2, group_by_threshold=10000, int_neq_predicate_threshold=100,
-                      seed=0, complex_predicates=False, force=False, max_no_joins_static=False,
-                      max_no_aggregates_static=False, max_no_predicates_static=False, max_no_group_by_static=False,
-                      left_outer_join_ratio=0.0, groupby_limit_prob=0.0, groupby_having_prob=0.0,
-                      exists_predicate_prob=0.0, max_no_exists=0, outer_groupby_prob=0.0, no_joins_dist=[],
-                      full_outer_join=False):
+def generate_workload(
+    dataset,
+    target_path,
+    num_queries=100,
+    max_no_joins=3,
+    min_no_joins=0,
+    max_no_predicates=3,
+    min_no_predicates=0,
+    max_no_aggregates=3,
+    max_no_group_by=3,
+    max_cols_per_agg=2,
+    group_by_threshold=10000,
+    int_neq_predicate_threshold=100,
+    seed=0,
+    complex_predicates=False,
+    force=False,
+    max_no_joins_static=False,
+    max_no_aggregates_static=False,
+    max_no_predicates_static=False,
+    max_no_group_by_static=False,
+    left_outer_join_ratio=0.0,
+    groupby_limit_prob=0.0,
+    groupby_having_prob=0.0,
+    exists_predicate_prob=0.0,
+    max_no_exists=0,
+    outer_groupby_prob=0.0,
+    no_joins_dist=[],
+    full_outer_join=False,
+):
     randstate = np.random.RandomState(seed)
 
     if os.path.exists(target_path) and not force:
@@ -295,31 +412,67 @@ def generate_workload(dataset, target_path, num_queries=100, max_no_joins=3, min
         tries = 0
         desired_query = False
         while not desired_query:
-            q = sample_acyclic_aggregation_query(column_stats, string_stats, group_by_threshold,
-                                                 int_neq_predicate_threshold,
-                                                 max_cols_per_agg, max_no_aggregates, max_no_group_by, max_no_joins,
-                                                 min_no_joins, max_no_predicates, min_no_predicates,
-                                                 relationships_table,
-                                                 schema, randstate,
-                                                 complex_predicates, max_no_joins_static, max_no_aggregates_static,
-                                                 max_no_predicates_static, max_no_group_by_static,
-                                                 left_outer_join_ratio, groupby_limit_prob, groupby_having_prob,
-                                                 full_outer_join=full_outer_join)
+            q = sample_acyclic_aggregation_query(
+                column_stats,
+                string_stats,
+                group_by_threshold,
+                int_neq_predicate_threshold,
+                max_cols_per_agg,
+                max_no_aggregates,
+                max_no_group_by,
+                max_no_joins,
+                min_no_joins,
+                max_no_predicates,
+                min_no_predicates,
+                relationships_table,
+                schema,
+                randstate,
+                complex_predicates,
+                max_no_joins_static,
+                max_no_aggregates_static,
+                max_no_predicates_static,
+                max_no_group_by_static,
+                left_outer_join_ratio,
+                groupby_limit_prob,
+                groupby_having_prob,
+                full_outer_join=full_outer_join,
+            )
 
             # retry maybe
-            desired_query |= check_matches_criteria(q, complex_predicates, max_no_aggregates, max_no_aggregates_static,
-                                                    max_no_group_by, max_no_group_by_static, max_no_joins,
-                                                    max_no_joins_static, max_no_predicates, max_no_predicates_static)
+            desired_query |= check_matches_criteria(
+                q,
+                complex_predicates,
+                max_no_aggregates,
+                max_no_aggregates_static,
+                max_no_group_by,
+                max_no_group_by_static,
+                max_no_joins,
+                max_no_joins_static,
+                max_no_predicates,
+                max_no_predicates_static,
+            )
 
             # samples subqueries (self joins) for exists / not exists predicates and adds to query
-            sample_exists_subqueries(column_stats, complex_predicates, exists_predicate_prob, group_by_threshold,
-                                     int_neq_predicate_threshold, max_no_exists, q, randstate, relationships_table,
-                                     string_stats, full_outer_join=full_outer_join)
+            sample_exists_subqueries(
+                column_stats,
+                complex_predicates,
+                exists_predicate_prob,
+                group_by_threshold,
+                int_neq_predicate_threshold,
+                max_no_exists,
+                q,
+                randstate,
+                relationships_table,
+                string_stats,
+                full_outer_join=full_outer_join,
+            )
 
             # potentially sample outer query with another group by
             outer_groupby = randstate.rand() < outer_groupby_prob
             if outer_groupby:
-                q = sample_outer_groupby(complex_predicates, q, randstate, full_outer_join=full_outer_join)
+                q = sample_outer_groupby(
+                    complex_predicates, q, randstate, full_outer_join=full_outer_join
+                )
 
             if desired_query:
                 sql_query = q.generate_sql_query()
@@ -331,8 +484,10 @@ def generate_workload(dataset, target_path, num_queries=100, max_no_joins=3, min
             else:
                 tries += 1
                 if tries > 10000:
-                    raise ValueError("Did not find a valid query after 10000 trials. "
-                                     "Please check if your conditions can be fulfilled")
+                    raise ValueError(
+                        "Did not find a valid query after 10000 trials. "
+                        "Please check if your conditions can be fulfilled"
+                    )
 
     # Sample queries to fulfill distribution
     keep = [True for _ in range(len(queries))]
@@ -340,11 +495,13 @@ def generate_workload(dataset, target_path, num_queries=100, max_no_joins=3, min
     if no_joins_dist and len(no_joins_dist) != 0:
         # Normalize distribution
         s = sum(no_joins_dist)
-        no_joins_dist = [i/s for i in no_joins_dist]
+        no_joins_dist = [i / s for i in no_joins_dist]
 
         # How many queries should we keep for each number of joins?
         max_feasible_total_queries = min(np.divide(no_joins_hist, no_joins_dist))
-        count_per_no_joins = [int(i * max_feasible_total_queries) for i in no_joins_dist]
+        count_per_no_joins = [
+            int(i * max_feasible_total_queries) for i in no_joins_dist
+        ]
 
         # Set appropriate flags in `keep`
         seen_per_no_joins = [0 for _ in no_joins_hist]
@@ -358,38 +515,59 @@ def generate_workload(dataset, target_path, num_queries=100, max_no_joins=3, min
     target_dir = os.path.dirname(target_path)
     os.makedirs(target_dir, exist_ok=True)
     with open(target_path, "w") as text_file:
-        text_file.write('\n'.join([q for k, q in zip(keep,queries) if k]))
+        text_file.write("\n".join([q for k, q in zip(keep, queries) if k]))
     with open(target_path + "_histogram", "w") as text_file:
-        text_file.write(','.join([str(i) for i in count_per_no_joins]) + "\n")
+        text_file.write(",".join([str(i) for i in count_per_no_joins]) + "\n")
 
 
 def sample_outer_groupby(complex_predicates, q, randstate, full_outer_join=False):
-    subquery_alias = 'subgb'
+    subquery_alias = "subgb"
     outer_aggs = []
     for i, (_, cols) in enumerate(q.aggregations):
         l = list(Aggregator)
         if complex_predicates:
             l += list(ExtendedAggregator)
         agg_type = rand_choice(randstate, l)
-        outer_aggs.append((agg_type, [[subquery_alias, f'agg_{i}']]))
+        outer_aggs.append((agg_type, [[subquery_alias, f"agg_{i}"]]))
     outer_groupby = []
     if len(q.group_bys) > 0:
-        outer_groupby = rand_choice(randstate, q.group_bys,
-                                    no_elements=randstate.randint(0, len(q.group_bys)),
-                                    replace=False)
+        outer_groupby = rand_choice(
+            randstate,
+            q.group_bys,
+            no_elements=randstate.randint(0, len(q.group_bys)),
+            replace=False,
+        )
         outer_groupby = [(subquery_alias, c, x) for _, c, x in outer_groupby]
-    q = GenQuery(outer_aggs, outer_groupby, [], PredicateOperator(LogicalOperator.AND, []),
-                 None, q.join_tables, inner_groupby=q, subquery_alias=subquery_alias, full_outer_join=full_outer_join)
+    q = GenQuery(
+        outer_aggs,
+        outer_groupby,
+        [],
+        PredicateOperator(LogicalOperator.AND, []),
+        None,
+        q.join_tables,
+        inner_groupby=q,
+        subquery_alias=subquery_alias,
+        full_outer_join=full_outer_join,
+    )
     return q
 
 
-def sample_exists_subqueries(column_stats, complex_predicates, exists_ratio, group_by_threshold,
-                             int_neq_predicate_threshold, max_no_exists, q, randstate, relationships_table,
-                             string_stats, full_outer_join=False):
+def sample_exists_subqueries(
+    column_stats,
+    complex_predicates,
+    exists_ratio,
+    group_by_threshold,
+    int_neq_predicate_threshold,
+    max_no_exists,
+    q,
+    randstate,
+    relationships_table,
+    string_stats,
+    full_outer_join=False,
+):
     exists_subquery = randstate.rand() < exists_ratio
     eligible_exist = list(set(q.join_tables).intersection(relationships_table.keys()))
     if exists_subquery and len(eligible_exist) > 0:
-
         no_exists = randstate.randint(1, max_no_exists + 1)
 
         alias_dict = dict()
@@ -400,11 +578,11 @@ def sample_exists_subqueries(column_stats, complex_predicates, exists_ratio, gro
             alias_table = randstate.choice(eligible_exist)
 
             if alias_table not in alias_dict:
-                alias_dict[alias_table] = f'{alias_table.lower()}_1'
+                alias_dict[alias_table] = f"{alias_table.lower()}_1"
             chosen_aliases.add(alias_dict[alias_table])
 
             for i in range(2, int(1e10)):
-                subquery_alias = f'{alias_table.lower()}_{i}'
+                subquery_alias = f"{alias_table.lower()}_{i}"
                 if subquery_alias not in chosen_aliases:
                     rec_alias_dict = {alias_table: subquery_alias}
                     exist_tables.append((alias_table, rec_alias_dict))
@@ -416,9 +594,16 @@ def sample_exists_subqueries(column_stats, complex_predicates, exists_ratio, gro
         # for each table generate exists subquery
         for t, rec_alias_dict in exist_tables:
             no_rec_pred = randstate.randint(1, 3)
-            _, _, predicates = generate_predicates(column_stats, complex_predicates, group_by_threshold,
-                                                   int_neq_predicate_threshold, [t], no_rec_pred, randstate,
-                                                   string_stats)
+            _, _, predicates = generate_predicates(
+                column_stats,
+                complex_predicates,
+                group_by_threshold,
+                int_neq_predicate_threshold,
+                [t],
+                no_rec_pred,
+                randstate,
+                string_stats,
+            )
             possible_cols = set()
             for ct, _, _ in relationships_table[t]:
                 possible_cols.update(ct)
@@ -427,23 +612,45 @@ def sample_exists_subqueries(column_stats, complex_predicates, exists_ratio, gro
             key_exist_col = randstate.choice(list(possible_cols))
 
             op = randstate.choice([Operator.EQ, Operator.NEQ])
-            self_pred = ColumnPredicate(t, key_exist_col, op, f'{alias_dict[t]}."{key_exist_col}"')
+            self_pred = ColumnPredicate(
+                t, key_exist_col, op, f'{alias_dict[t]}."{key_exist_col}"'
+            )
             if type(predicates) == ColumnPredicate or len(predicates.children) > 0:
                 p = PredicateOperator(LogicalOperator.AND, [predicates, self_pred])
             else:
                 p = self_pred
 
-            q_rec = GenQuery([], [], [], p, t, [t], alias_dict=rec_alias_dict, full_outer_join=full_outer_join)
+            q_rec = GenQuery(
+                [],
+                [],
+                [],
+                p,
+                t,
+                [t],
+                alias_dict=rec_alias_dict,
+                full_outer_join=full_outer_join,
+            )
             q.append_exists_predicate(q_rec, randstate.choice([True, False]))
 
 
-def check_matches_criteria(q, complex_predicates, max_no_aggregates,
-                           max_no_aggregates_static, max_no_group_by, max_no_group_by_static, max_no_joins,
-                           max_no_joins_static, max_no_predicates, max_no_predicates_static):
+def check_matches_criteria(
+    q,
+    complex_predicates,
+    max_no_aggregates,
+    max_no_aggregates_static,
+    max_no_group_by,
+    max_no_group_by_static,
+    max_no_joins,
+    max_no_joins_static,
+    max_no_predicates,
+    max_no_predicates_static,
+):
     desired_query = True
-    if (max_no_joins_static and len(q.joins) < max_no_joins) or \
-            (max_no_aggregates_static and len(q.aggregations) < max_no_aggregates) or \
-            (max_no_group_by_static and len(q.group_bys) < max_no_group_by):
+    if (
+        (max_no_joins_static and len(q.joins) < max_no_joins)
+        or (max_no_aggregates_static and len(q.aggregations) < max_no_aggregates)
+        or (max_no_group_by_static and len(q.group_bys) < max_no_group_by)
+    ):
         desired_query = False
     if max_no_predicates_static:
         if complex_predicates:
@@ -458,22 +665,40 @@ def sample_group_bys(no_group_bys, possible_group_by_columns, randstate):
     group_bys = []
     if no_group_bys > 0:
         no_group_bys = min(no_group_bys, len(possible_group_by_columns))
-        group_bys = rand_choice(randstate, possible_group_by_columns, no_elements=no_group_bys, replace=False)
+        group_bys = rand_choice(
+            randstate,
+            possible_group_by_columns,
+            no_elements=no_group_bys,
+            replace=False,
+        )
         # group_bys = randstate.sample(possible_group_by_columns, no_group_bys)
     return group_bys
 
 
-def sample_aggregations(max_cols_per_agg, no_aggregates, numerical_aggregation_columns, randstate,
-                        complex_predicates=False):
+def sample_aggregations(
+    max_cols_per_agg,
+    no_aggregates,
+    numerical_aggregation_columns,
+    randstate,
+    complex_predicates=False,
+):
     aggregations = []
     if no_aggregates > 0:
         for i in range(no_aggregates):
-            no_agg_cols = min(randstate.randint(1, max_cols_per_agg + 1), len(numerical_aggregation_columns))
+            no_agg_cols = min(
+                randstate.randint(1, max_cols_per_agg + 1),
+                len(numerical_aggregation_columns),
+            )
             l = list(Aggregator)
             if complex_predicates:
                 l += list(ExtendedAggregator)
             agg = rand_choice(randstate, l)
-            cols = rand_choice(randstate, numerical_aggregation_columns, no_elements=no_agg_cols, replace=False)
+            cols = rand_choice(
+                randstate,
+                numerical_aggregation_columns,
+                no_elements=no_agg_cols,
+                replace=False,
+            )
             # cols = randstate.sample(numerical_aggregation_columns, no_agg_cols)
             if agg == Aggregator.COUNT:
                 cols = []
@@ -502,17 +727,19 @@ class ColumnPredicate:
         elif self.operator == Operator.IS_NULL:
             predicates_str = f'"{self.table}"."{self.col_name}" IS NULL'
         else:
-            predicates_str = f'"{self.table}"."{self.col_name}" {str(self.operator)} {self.literal}'
+            predicates_str = (
+                f'"{self.table}"."{self.col_name}" {str(self.operator)} {self.literal}'
+            )
 
         if top_operator:
-            predicates_str = f' WHERE {predicates_str}'
+            predicates_str = f" WHERE {predicates_str}"
 
         return predicates_str
 
 
 class LogicalOperator(Enum):
-    AND = 'AND'
-    OR = 'OR'
+    AND = "AND"
+    OR = "OR"
 
     def __str__(self):
         return self.value
@@ -529,58 +756,87 @@ class PredicateOperator:
         return self.to_sql(top_operator=True)
 
     def to_sql(self, top_operator=False):
-        sql = ''
+        sql = ""
         if len(self.children) > 0:
             # if len(self.children) == 1:
             #     return self.children[0].to_sql(top_operator=top_operator)
 
             predicates_str_list = [c.to_sql() for c in self.children]
-            sql = f' {str(self.logical_op)} '.join(predicates_str_list)
+            sql = f" {str(self.logical_op)} ".join(predicates_str_list)
 
             if top_operator:
-                sql = f' WHERE {sql}'
+                sql = f" WHERE {sql}"
             elif len(self.children) > 1:
-                sql = f'({sql})'
+                sql = f"({sql})"
 
         return sql
 
 
 class PredicateChain(Enum):
-    SIMPLE = 'SIMPLE'
-    OR_OR = 'OR_OR'
-    OR = 'OR'
-    OR_AND = 'OR_AND'
+    SIMPLE = "SIMPLE"
+    OR_OR = "OR_OR"
+    OR = "OR"
+    OR_AND = "OR_AND"
 
     def __str__(self):
         return self.value
 
 
-def sample_complex_predicates(column_stats, string_stats, int_neq_predicate_threshold, no_predicates, possible_columns,
-                              possible_string_columns, table_predicates, string_table_predicates, randstate,
-                              p_or=0.05, p_or_or=0.05, p_or_and=0.05, p_second_column=0.5):
+def sample_complex_predicates(
+    column_stats,
+    string_stats,
+    int_neq_predicate_threshold,
+    no_predicates,
+    possible_columns,
+    possible_string_columns,
+    table_predicates,
+    string_table_predicates,
+    randstate,
+    p_or=0.05,
+    p_or_or=0.05,
+    p_or_and=0.05,
+    p_second_column=0.5,
+):
     # weight the prob of being sampled by number of columns in table
     # make sure we do not just have conditions on one table with many columns
     weights = [1 / table_predicates[t] for t, col_name in possible_columns]
-    weights += [1 / string_table_predicates[t] for t, col_name in possible_string_columns]
+    weights += [
+        1 / string_table_predicates[t] for t, col_name in possible_string_columns
+    ]
     weights = np.array(weights)
     weights /= np.sum(weights)
 
     possible_columns += possible_string_columns
     no_predicates = min(no_predicates, len(possible_columns))
-    predicate_col_idx = randstate.choice(range(len(possible_columns)), no_predicates, p=weights, replace=False)
+    predicate_col_idx = randstate.choice(
+        range(len(possible_columns)), no_predicates, p=weights, replace=False
+    )
     predicate_columns = [possible_columns[i] for i in predicate_col_idx]
     predicates = []
     for [t, col_name] in predicate_columns:
-
         # sample which predicate chain
-        predicate_options = [PredicateChain.SIMPLE, PredicateChain.OR, PredicateChain.OR_OR, PredicateChain.OR_AND]
+        predicate_options = [
+            PredicateChain.SIMPLE,
+            PredicateChain.OR,
+            PredicateChain.OR_OR,
+            PredicateChain.OR_AND,
+        ]
         pred_weights = [1 - p_or - p_or_or - p_or_and, p_or, p_or_or, p_or_and]
-        pred_chain_idx = randstate.choice(range(len(predicate_options)), 1, p=pred_weights)[0]
+        pred_chain_idx = randstate.choice(
+            range(len(predicate_options)), 1, p=pred_weights
+        )[0]
         pred_chain = predicate_options[pred_chain_idx]
 
         # sample first predicate
-        p = sample_predicate(string_stats, column_stats, t, col_name, int_neq_predicate_threshold, randstate,
-                             complex_predicate=True)
+        p = sample_predicate(
+            string_stats,
+            column_stats,
+            t,
+            col_name,
+            int_neq_predicate_threshold,
+            randstate,
+            complex_predicate=True,
+        )
         if p is None:
             continue
 
@@ -590,16 +846,33 @@ def sample_complex_predicates(column_stats, string_stats, int_neq_predicate_thre
             # sample if we use another column condition
             second_column = randstate.uniform() < p_second_column
             if second_column:
-                potential_2nd_col = [c2 for t2, c2 in possible_columns
-                                     if t2 == t and c2 != col_name and [t2, c2] not in predicate_columns]
+                potential_2nd_col = [
+                    c2
+                    for t2, c2 in possible_columns
+                    if t2 == t and c2 != col_name and [t2, c2] not in predicate_columns
+                ]
                 if len(potential_2nd_col) == 0:
                     continue
                 second_col = rand_choice(randstate, potential_2nd_col)
-                p2 = sample_predicate(string_stats, column_stats, t, second_col, int_neq_predicate_threshold, randstate,
-                                      complex_predicate=True)
+                p2 = sample_predicate(
+                    string_stats,
+                    column_stats,
+                    t,
+                    second_col,
+                    int_neq_predicate_threshold,
+                    randstate,
+                    complex_predicate=True,
+                )
             else:
-                p2 = sample_predicate(string_stats, column_stats, t, col_name, int_neq_predicate_threshold, randstate,
-                                      complex_predicate=True)
+                p2 = sample_predicate(
+                    string_stats,
+                    column_stats,
+                    t,
+                    col_name,
+                    int_neq_predicate_threshold,
+                    randstate,
+                    complex_predicate=True,
+                )
             if p2 is None:
                 continue
 
@@ -607,16 +880,27 @@ def sample_complex_predicates(column_stats, string_stats, int_neq_predicate_thre
             if pred_chain == PredicateChain.OR:
                 complex_pred = PredicateOperator(LogicalOperator.OR, [p, p2])
             else:
-                p3 = sample_predicate(string_stats, column_stats, t, col_name, int_neq_predicate_threshold, randstate,
-                                      complex_predicate=True)
+                p3 = sample_predicate(
+                    string_stats,
+                    column_stats,
+                    t,
+                    col_name,
+                    int_neq_predicate_threshold,
+                    randstate,
+                    complex_predicate=True,
+                )
                 if p3 is None:
                     complex_pred = PredicateOperator(LogicalOperator.OR, [p, p2])
                 else:
                     if pred_chain == PredicateChain.OR_OR:
-                        complex_pred = PredicateOperator(LogicalOperator.OR, [p, p2, p3])
+                        complex_pred = PredicateOperator(
+                            LogicalOperator.OR, [p, p2, p3]
+                        )
                     elif pred_chain == PredicateChain.OR_AND:
-                        complex_pred = PredicateOperator(LogicalOperator.OR, [p, PredicateOperator(LogicalOperator.AND,
-                                                                                                   [p2, p3])])
+                        complex_pred = PredicateOperator(
+                            LogicalOperator.OR,
+                            [p, PredicateOperator(LogicalOperator.AND, [p2, p3])],
+                        )
             predicates.append(complex_pred)
 
     if len(predicates) == 1:
@@ -625,19 +909,33 @@ def sample_complex_predicates(column_stats, string_stats, int_neq_predicate_thre
     return PredicateOperator(LogicalOperator.AND, predicates)
 
 
-def sample_predicate(string_stats, column_stats, t, col_name, int_neq_predicate_threshold, randstate,
-                     complex_predicate=False, p_like=0.5, p_is_not_null=0.1, p_in=0.5, p_between=0.3,
-                     p_not_like=0.5, p_mid_string_whitespace=0.5):
+def sample_predicate(
+    string_stats,
+    column_stats,
+    t,
+    col_name,
+    int_neq_predicate_threshold,
+    randstate,
+    complex_predicate=False,
+    p_like=0.5,
+    p_is_not_null=0.1,
+    p_in=0.5,
+    p_between=0.3,
+    p_not_like=0.5,
+    p_mid_string_whitespace=0.5,
+):
     col_stats = vars(vars(column_stats)[t]).get(col_name)
     str_stats = None
     if string_stats is not None:
         str_stats = vars(vars(string_stats)[t]).get(col_name)
 
     if complex_predicate:
-
         # LIKE / NOT LIKE
-        if col_stats is None or col_stats.datatype == str(Datatype.MISC) or \
-                (str_stats is not None and randstate.uniform() < p_like):
+        if (
+            col_stats is None
+            or col_stats.datatype == str(Datatype.MISC)
+            or (str_stats is not None and randstate.uniform() < p_like)
+        ):
             freq_words = [w for w in str_stats.freq_str_words if len(w) > 1]
             if len(freq_words) == 0:
                 return None
@@ -646,9 +944,9 @@ def sample_predicate(string_stats, column_stats, t, col_name, int_neq_predicate_
             # additional whitespace in the middle
             if randstate.uniform() < p_mid_string_whitespace:
                 split_pos = randstate.randint(1, len(literal))
-                literal = literal[:split_pos] + '%' + literal[split_pos:]
+                literal = literal[:split_pos] + "%" + literal[split_pos:]
 
-            if type(literal) == str and "\'" in literal:
+            if type(literal) == str and "'" in literal:
                 literal = f"''%{literal}%''"
             else:
                 literal = f"'%{literal}%'"
@@ -667,7 +965,10 @@ def sample_predicate(string_stats, column_stats, t, col_name, int_neq_predicate_
             return ColumnPredicate(t, col_name, Operator.IS_NULL, None)
 
         # IN
-        if col_stats.datatype == str(Datatype.CATEGORICAL) and randstate.uniform() < p_in:
+        if (
+            col_stats.datatype == str(Datatype.CATEGORICAL)
+            and randstate.uniform() < p_in
+        ):
             # rand_choice(randstate, l, no_elements=None, replace=False)
             literals = col_stats.unique_vals
             first_cap = min(len(literals), 10)
@@ -677,20 +978,36 @@ def sample_predicate(string_stats, column_stats, t, col_name, int_neq_predicate_
                 return None
 
             no_in_literals = randstate.randint(1, len(literals))
-            literals = rand_choice(randstate, literals, no_elements=no_in_literals, replace=False)
-            literals = ', '.join([f"''{l}''" if (type(l) == str and "\'" in l) else f"'{l}'" for l in literals])
-            literals = f'({literals})'
+            literals = rand_choice(
+                randstate, literals, no_elements=no_in_literals, replace=False
+            )
+            literals = ", ".join(
+                [
+                    f"''{l}''" if (type(l) == str and "'" in l) else f"'{l}'"
+                    for l in literals
+                ]
+            )
+            literals = f"({literals})"
 
             return ColumnPredicate(t, col_name, Operator.IN, literals)
 
-        if col_stats.datatype in {str(Datatype.INT), str(Datatype.FLOAT)} and randstate.uniform() < p_between:
-            l1 = sample_literal_from_percentiles(col_stats.percentiles, randstate,
-                                                 round=col_stats.datatype == str(Datatype.INT))
-            l2 = sample_literal_from_percentiles(col_stats.percentiles, randstate,
-                                                 round=col_stats.datatype == str(Datatype.INT))
+        if (
+            col_stats.datatype in {str(Datatype.INT), str(Datatype.FLOAT)}
+            and randstate.uniform() < p_between
+        ):
+            l1 = sample_literal_from_percentiles(
+                col_stats.percentiles,
+                randstate,
+                round=col_stats.datatype == str(Datatype.INT),
+            )
+            l2 = sample_literal_from_percentiles(
+                col_stats.percentiles,
+                randstate,
+                round=col_stats.datatype == str(Datatype.INT),
+            )
             if l1 == l2:
                 l2 += 1
-            literal = f'{min(l1, l2)} AND {max(l1, l2)}'
+            literal = f"{min(l1, l2)} AND {max(l1, l2)}"
             return ColumnPredicate(t, col_name, Operator.BETWEEN, literal)
 
     # simple predicates
@@ -700,23 +1017,30 @@ def sample_predicate(string_stats, column_stats, t, col_name, int_neq_predicate_
             reasonable_ops.append(Operator.EQ)
             reasonable_ops.append(Operator.NEQ)
 
-        literal = sample_literal_from_percentiles(col_stats.percentiles, randstate, round=True)
+        literal = sample_literal_from_percentiles(
+            col_stats.percentiles, randstate, round=True
+        )
 
     elif col_stats.datatype == str(Datatype.FLOAT):
         reasonable_ops = [Operator.LEQ, Operator.GEQ]
-        literal = sample_literal_from_percentiles(col_stats.percentiles, randstate, round=False)
+        literal = sample_literal_from_percentiles(
+            col_stats.percentiles, randstate, round=False
+        )
         # nan comparisons only produce errors
         # happens when column is all nan
         if np.isnan(literal):
             return None
     elif col_stats.datatype == str(Datatype.CATEGORICAL):
         reasonable_ops = [Operator.EQ, Operator.NEQ]
-        possible_literals = [v for v in col_stats.unique_vals if v is not None and
-                             not (isinstance(v, float) and np.isnan(v))]
+        possible_literals = [
+            v
+            for v in col_stats.unique_vals
+            if v is not None and not (isinstance(v, float) and np.isnan(v))
+        ]
         if len(possible_literals) == 0:
             return None
         literal = rand_choice(randstate, possible_literals)
-        if type(literal) == str and "\'" in literal:
+        if type(literal) == str and "'" in literal:
             literal = f"''%{literal}%''"
         else:
             literal = f"'%{literal}%'"
@@ -726,8 +1050,14 @@ def sample_predicate(string_stats, column_stats, t, col_name, int_neq_predicate_
     return ColumnPredicate(t, col_name, operator, literal)
 
 
-def sample_predicates(column_stats, int_neq_predicate_threshold, no_predicates, possible_columns, table_predicates,
-                      randstate):
+def sample_predicates(
+    column_stats,
+    int_neq_predicate_threshold,
+    no_predicates,
+    possible_columns,
+    table_predicates,
+    randstate,
+):
     # sample random predicates
     # weight the prob of being sampled by number of columns in table
     # make sure we do not just have conditions on one table with many columns
@@ -735,19 +1065,30 @@ def sample_predicates(column_stats, int_neq_predicate_threshold, no_predicates, 
     weights /= np.sum(weights)
     # we cannot sample more predicates than available columns
     no_predicates = min(no_predicates, len(possible_columns))
-    predicate_col_idx = randstate.choice(range(len(possible_columns)), no_predicates, p=weights, replace=False)
+    predicate_col_idx = randstate.choice(
+        range(len(possible_columns)), no_predicates, p=weights, replace=False
+    )
     predicate_columns = [possible_columns[i] for i in predicate_col_idx]
     predicates = []
     for [t, col_name] in predicate_columns:
-        p = sample_predicate(None, column_stats, t, col_name, int_neq_predicate_threshold, randstate,
-                             complex_predicate=False)
+        p = sample_predicate(
+            None,
+            column_stats,
+            t,
+            col_name,
+            int_neq_predicate_threshold,
+            randstate,
+            complex_predicate=False,
+        )
         if p is not None:
             predicates.append(p)
 
     return PredicateOperator(LogicalOperator.AND, predicates)
 
 
-def analyze_columns(column_stats, group_by_treshold, join_tables, string_stats, complex_predicates):
+def analyze_columns(
+    column_stats, group_by_treshold, join_tables, string_stats, complex_predicates
+):
     # find possible columns for predicates
     possible_columns = []
     possible_string_columns = []
@@ -758,7 +1099,9 @@ def analyze_columns(column_stats, group_by_treshold, join_tables, string_stats, 
     string_table_predicates = collections.defaultdict(int)
     for t in join_tables:
         for col_name, col_stats in vars(vars(column_stats)[t]).items():
-            if col_stats.datatype in {str(d) for d in [Datatype.INT, Datatype.FLOAT, Datatype.CATEGORICAL]}:
+            if col_stats.datatype in {
+                str(d) for d in [Datatype.INT, Datatype.FLOAT, Datatype.CATEGORICAL]
+            }:
                 possible_columns.append([t, col_name])
                 table_predicates[t] += 1
 
@@ -767,15 +1110,24 @@ def analyze_columns(column_stats, group_by_treshold, join_tables, string_stats, 
                 string_table_predicates[t] += 1
 
             # group by columns
-            if col_stats.datatype in {str(d) for d in [Datatype.INT, Datatype.CATEGORICAL]} \
-                    and col_stats.num_unique < group_by_treshold:
+            if (
+                col_stats.datatype
+                in {str(d) for d in [Datatype.INT, Datatype.CATEGORICAL]}
+                and col_stats.num_unique < group_by_treshold
+            ):
                 possible_group_by_columns.append([t, col_name, col_stats.num_unique])
 
             # numerical aggregation columns
             if col_stats.datatype in {str(d) for d in [Datatype.INT, Datatype.FLOAT]}:
                 numerical_aggregation_columns.append([t, col_name])
-    return numerical_aggregation_columns, possible_columns, possible_string_columns, \
-           possible_group_by_columns, table_predicates, string_table_predicates
+    return (
+        numerical_aggregation_columns,
+        possible_columns,
+        possible_string_columns,
+        possible_group_by_columns,
+        table_predicates,
+        string_table_predicates,
+    )
 
 
 def sample_literal_from_percentiles(percentiles, randstate, round=False):
@@ -797,7 +1149,9 @@ def rand_choice(randstate, l, no_elements=None, replace=False):
         return [l[i] for i in idxs]
 
 
-def sample_acyclic_join(no_joins, relationships_table, schema, randstate, left_outer_join_ratio):
+def sample_acyclic_join(
+    no_joins, relationships_table, schema, randstate, left_outer_join_ratio
+):
     # randomly sample join
     joins = list()
     start_t = rand_choice(randstate, schema.tables)

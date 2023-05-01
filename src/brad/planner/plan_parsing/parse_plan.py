@@ -6,10 +6,10 @@ import numpy as np
 from brad.planner.plan_parsing.plan_operator import PlanOperator
 from brad.planner.plan_parsing.postgres_utils import plan_statistics
 
-planning_time_regex = re.compile('planning time: (?P<planning_time>\d+.\d+) ms')
-ex_time_regex = re.compile('execution time: (?P<execution_time>\d+.\d+) ms')
+planning_time_regex = re.compile("planning time: (?P<planning_time>\d+.\d+) ms")
+ex_time_regex = re.compile("execution time: (?P<execution_time>\d+.\d+) ms")
 init_plan_regex = re.compile("InitPlan \d+ \(returns \$\d\)")
-join_columns_regex = re.compile('\w+\.\w+ ?= ?\w+\.\w+')
+join_columns_regex = re.compile("\w+\.\w+ ?= ?\w+\.\w+")
 
 
 def create_node(lines_plan_operator, operators_current_level):
@@ -21,7 +21,7 @@ def create_node(lines_plan_operator, operators_current_level):
 
 
 def count_left_whitespaces(a):
-    return len(a) - len(a.lstrip(' '))
+    return len(a) - len(a.lstrip(" "))
 
 
 def parse_recursively(parent, plan, offset, depth):
@@ -30,10 +30,11 @@ def parse_recursively(parent, plan, offset, depth):
     operators_current_level = []
     while i < len(plan):
         # new operator
-        if plan[i].strip().startswith('->'):
-
+        if plan[i].strip().startswith("->"):
             # create plan node for previous one
-            lines_plan_operator = create_node(lines_plan_operator, operators_current_level)
+            lines_plan_operator = create_node(
+                lines_plan_operator, operators_current_level
+            )
 
             # if plan operator is deeper
             new_depth = count_left_whitespaces(plan[i])
@@ -70,12 +71,14 @@ def parse_recursively(parent, plan, offset, depth):
 
 def parse_plan(analyze_plan_tuples, analyze=True, parse=True):
     plan_steps = analyze_plan_tuples
-    if isinstance(analyze_plan_tuples[0], tuple) or isinstance(analyze_plan_tuples[0], list):
+    if isinstance(analyze_plan_tuples[0], tuple) or isinstance(
+        analyze_plan_tuples[0], list
+    ):
         plan_steps = [t[0] for t in analyze_plan_tuples]
 
     # for some reason this is missing in postgres
     # in order to parse this, we add it
-    plan_steps[0] = '->  ' + plan_steps[0]
+    plan_steps[0] = "->  " + plan_steps[0]
 
     ex_time = 0
     planning_time = 0
@@ -102,10 +105,20 @@ def parse_plan(analyze_plan_tuples, analyze=True, parse=True):
     return root_operator, ex_time, planning_time
 
 
-def parse_plans(explain_rows, min_runtime=100, max_runtime=30000, parse_baseline=False, cap_queries=None,
-                parse_join_conds=False, include_zero_card=False, explain_only=False, zero_card_min_runtime=None,
-                db_name=None, timeout_ms=None, target_path=None):
-
+def parse_plans(
+    explain_rows,
+    min_runtime=100,
+    max_runtime=30000,
+    parse_baseline=False,
+    cap_queries=None,
+    parse_join_conds=False,
+    include_zero_card=False,
+    explain_only=False,
+    zero_card_min_runtime=None,
+    db_name=None,
+    timeout_ms=None,
+    target_path=None,
+):
     # keep track of column statistics
     if zero_card_min_runtime is None:
         zero_card_min_runtime = min_runtime
@@ -129,24 +142,31 @@ def parse_plans(explain_rows, min_runtime=100, max_runtime=30000, parse_baseline
 
     # only explain plan (not executed)
     verbose_plan, _, _ = parse_plan(explain_rows, analyze=False, parse=True)
-    verbose_plan.parse_lines_recursively(alias_dict=alias_dict, parse_baseline=parse_baseline,
-                                            parse_join_conds=parse_join_conds)
+    verbose_plan.parse_lines_recursively(
+        alias_dict=alias_dict,
+        parse_baseline=parse_baseline,
+        parse_join_conds=parse_join_conds,
+    )
 
     analyze_plan = verbose_plan
     tables, filter_columns, operators = plan_statistics(analyze_plan)
 
-    analyze_plan.parse_columns_bottom_up(column_id_mapping, partial_column_name_mapping, table_id_mapping,
-                                            alias_dict=alias_dict)
+    analyze_plan.parse_columns_bottom_up(
+        column_id_mapping,
+        partial_column_name_mapping,
+        table_id_mapping,
+        alias_dict=alias_dict,
+    )
     analyze_plan.tables = tables
     analyze_plan.num_tables = len(tables)
     analyze_plan.plan_runtime = avg_runtime
 
     def augment_no_workers(p, top_no_workers=0):
-        no_workers = p.plan_parameters.get('workers_planned')
+        no_workers = p.plan_parameters.get("workers_planned")
         if no_workers is None:
             no_workers = top_no_workers
 
-        p.plan_parameters['workers_planned'] = top_no_workers
+        p.plan_parameters["workers_planned"] = top_no_workers
 
         for c in p.children:
             augment_no_workers(c, top_no_workers=no_workers)
@@ -160,51 +180,53 @@ def parse_plans(explain_rows, min_runtime=100, max_runtime=30000, parse_baseline
         op_perc[op] += 1
     # log number of filters without counting AND, OR
     no_filters.append(len([fc for fc in filter_columns if fc[0] is not None]))
-    
+
     if "tables" in analyze_plan:
         analyze_plan["tables"] = list(analyze_plan["tables"])
     else:
         analyze_plan["tables"] = []
-    
+
     parsed_plans.append(analyze_plan)
 
     # statistics in seconds
-    print(f"Table statistics: "
-          f"\n\tmean: {np.mean(no_tables):.1f}"
-          f"\n\tmedian: {np.median(no_tables)}"
-          f"\n\tmax: {np.max(no_tables)}")
+    print(
+        f"Table statistics: "
+        f"\n\tmean: {np.mean(no_tables):.1f}"
+        f"\n\tmedian: {np.median(no_tables)}"
+        f"\n\tmax: {np.max(no_tables)}"
+    )
     print("Operators statistics (appear in x% of queries)")
     for op, op_count in op_perc.items():
         print(f"\t{str(op)}: {op_count / len(avg_runtimes) * 100:.0f}%")
-    print(f"Runtime statistics: "
-          f"\n\tmedian: {np.median(avg_runtimes) / 1000:.2f}s"
-          f"\n\tmax: {np.max(avg_runtimes) / 1000:.2f}s"
-          f"\n\tmean: {np.mean(avg_runtimes) / 1000:.2f}s")
+    print(
+        f"Runtime statistics: "
+        f"\n\tmedian: {np.median(avg_runtimes) / 1000:.2f}s"
+        f"\n\tmax: {np.max(avg_runtimes) / 1000:.2f}s"
+        f"\n\tmean: {np.mean(avg_runtimes) / 1000:.2f}s"
+    )
 
     parsed_runs = dict(parsed_plans=parsed_plans)
 
     stats = dict(
-        runtimes=str(avg_runtimes),
-        no_tables=str(no_tables),
-        no_filters=str(no_filters)
+        runtimes=str(avg_runtimes), no_tables=str(no_tables), no_filters=str(no_filters)
     )
 
     return parsed_runs, stats
 
 
 def normalize_join_condition(p_join_str):
-    join_conds = p_join_str.split('AND')
+    join_conds = p_join_str.split("AND")
     join_conds = [normalize_single_join_condition(jc.strip()) for jc in join_conds]
     join_conds = sorted(join_conds)
-    join_conds = ' AND '.join(join_conds)
+    join_conds = " AND ".join(join_conds)
     return join_conds
 
 
 def normalize_single_join_condition(p_join_str):
-    join_cond = p_join_str.split('=')
+    join_cond = p_join_str.split("=")
     assert len(join_cond) == 2
     for i in [0, 1]:
         join_cond[i] = join_cond[i].strip()
     join_cond = sorted(join_cond)
-    join_cond = f'{join_cond[0]} = {join_cond[1]}'
+    join_cond = f"{join_cond[0]} = {join_cond[1]}"
     return join_cond

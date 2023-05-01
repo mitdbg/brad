@@ -14,6 +14,7 @@
 
 import re
 
+
 def _CanonicalizeJoinCond(join_cond):
     """join_cond: 4-tuple"""
     t1, c1, t2, c2 = join_cond
@@ -42,7 +43,9 @@ def _GetJoinConds(sql):
         (\w+)  # 2nd table
         \.     # the dot "."
         (\w+)  # 2nd table column
-        """, re.VERBOSE)
+        """,
+        re.VERBOSE,
+    )
     join_conds = join_cond_pat.findall(sql)
     if len(join_conds) == 0:
         join_cond_pat = re.compile(
@@ -64,7 +67,9 @@ def _GetJoinConds(sql):
             \"
             (\w+)  # 2nd table column
             \"
-            """, re.VERBOSE)
+            """,
+            re.VERBOSE,
+        )
         join_conds = join_cond_pat.findall(sql)
         quotation = True
         return _DedupJoinConds(join_conds), quotation
@@ -74,6 +79,6 @@ def _GetJoinConds(sql):
 def _FormatJoinCond(tup, quotation=False):
     t1, c1, t2, c2 = tup
     if quotation:
-        return f"\"{t1}\".\"{c1}\" = \"{t2}\".\"{c2}\""
+        return f'"{t1}"."{c1}" = "{t2}"."{c2}"'
     else:
         return f"{t1}.{c1} = {t2}.{c2}"
