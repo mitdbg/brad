@@ -31,7 +31,7 @@ class ScalingScorer(Scorer):
     ) -> Score:
         return Score(
             1.0,
-            self._operational_cost_score(next_blueprint, next_workload),
+            self._operational_cost_score(next_blueprint, next_workload, engines),
             self._transition_score(current_blueprint, next_blueprint, current_workload),
         )
 
@@ -39,6 +39,7 @@ class ScalingScorer(Scorer):
         self,
         next_blueprint: Blueprint,
         _next_workload: Workload,
+        _engines: EngineConnections,
     ) -> float:
         # Operational monetary score:
         # - Provisioning costs for an hour
@@ -54,7 +55,12 @@ class ScalingScorer(Scorer):
         redshift_prov_cost = (
             _REDSHIFT_PRICING[redshift_prov.instance_type()] * redshift_prov.num_nodes()
         )
+
         # NOTE: Still need to include scan costs. This depends on the routing policy.
+        # - For each analytical query, send it through the router and see which
+        #   engine is selected.
+        # - Estimate the amount of data accessed, and use it to compute a scan cost.
+
         return aurora_prov_cost + redshift_prov_cost
 
     def _transition_score(

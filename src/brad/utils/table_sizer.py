@@ -32,6 +32,18 @@ class TableSizer:
                 "Unknown location {} for table {}".format(str(location), table_name)
             )
 
+    async def aurora_row_size_bytes(self, table_name: str) -> int:
+        """
+        A rough estimate for the size of a row in Aurora, in bytes.
+        """
+
+        query = f"SELECT pg_column_size(t.*) FROM {table_name} t LIMIT 1"
+        conn = self._engines.get_connection(Engine.Aurora)
+        cursor = await conn.cursor()
+        await cursor.execute(query)
+        row = await cursor.fetchone()
+        return int(row[0])
+
     async def _table_size_mb_athena(self, table_name: str) -> int:
         # Format: s3://bucket/path/to/files/
         parts = self._config.athena_s3_data_path.split("/")
