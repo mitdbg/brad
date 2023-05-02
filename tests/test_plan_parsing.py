@@ -1,5 +1,6 @@
 from brad.planner.plan_parsing import parse_explain_verbose
 
+
 def get_rows():
     explain_verbose = """
     Finalize GroupAggregate  (cost=176426.88..176427.66 rows=3 width=40)
@@ -38,8 +39,10 @@ def traverse_plan(plan, visitor):
 def test_parse_explain():
     plan = parse_explain_verbose(get_rows())
     num_ops = 0
+
     def visitor(_op):
         nonlocal num_ops
         num_ops += 1
+
     traverse_plan(plan, visitor)
     assert num_ops == 5
