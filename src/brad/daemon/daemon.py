@@ -49,6 +49,8 @@ class BradDaemon:
             # N.B. This is a placeholder
             current_workload=Workload.empty(),
             monitor=self._monitor,
+            config=self._config,
+            schema_name=self._schema_name,
         )
 
     async def run_forever(self) -> None:

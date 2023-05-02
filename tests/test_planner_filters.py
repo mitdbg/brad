@@ -9,14 +9,14 @@ from brad.planner.filters.aurora_transactions import AuroraTransactions
 from brad.planner.filters.no_data_loss import NoDataLoss
 from brad.planner.filters.single_engine_execution import SingleEngineExecution
 from brad.planner.filters.table_on_engine import TableOnEngine
-from brad.query_rep import QueryRep
+from brad.planner.workload.query import Query
 
 
 def workload_from_queries(query_list: List[str]) -> Workload:
     analytical = []
     transactional = []
     for q in query_list:
-        qr = QueryRep(q)
+        qr = Query(q)
         if qr.is_data_modification_query():
             transactional.append(qr)
         else:

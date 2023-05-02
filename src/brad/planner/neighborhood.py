@@ -3,6 +3,7 @@ import logging
 from typing import List
 
 from brad.blueprint import Blueprint
+from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner import BlueprintPlanner
@@ -14,6 +15,7 @@ from brad.planner.filters.single_engine_execution import SingleEngineExecution
 from brad.planner.filters.table_on_engine import TableOnEngine
 from brad.planner.scoring.scaling_scorer import ScalingScorer
 from brad.planner.workload import Workload
+from brad.server.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,8 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         current_workload: Workload,
         planner_config: PlannerConfig,
         monitor: Monitor,
+        config: ConfigFile,
+        schema_name: str,
     ) -> None:
         super().__init__()
         self._current_blueprint = current_blueprint
@@ -40,6 +44,8 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             TableOnEngine(),
         ]
         self._planner_config = planner_config
+        self._config = config
+        self._schema_name = schema_name
         self._scorer = ScalingScorer(self._monitor, self._planner_config)
 
     async def run_forever(self) -> None:
@@ -65,58 +71,72 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         # blueprints are being considered.
         candidate_set = []
 
-        for bp in NeighborhoodBlueprintEnumerator.enumerate(
-            self._current_blueprint,
-            self._planner_config.max_num_table_moves(),
-            self._planner_config.max_provisioning_multiplier(),
-        ):
-            # Workload-independent filters.
-            # Drop this candidate if any are invalid.
-            if any(
-                map(
-                    # pylint: disable-next=cell-var-from-loop
-                    lambda filt: not filt.is_valid(bp),
-                    self._workload_independent_filters,
-                )
+        # Establish connections to the underlying engines (needed for scoring
+        # purposes).
+        engines = await EngineConnections.connect(
+            self._config, self._schema_name, autocommit=False
+        )
+
+        try:
+            for bp in NeighborhoodBlueprintEnumerator.enumerate(
+                self._current_blueprint,
+                self._planner_config.max_num_table_moves(),
+                self._planner_config.max_provisioning_multiplier(),
             ):
-                continue
+                # Workload-independent filters.
+                # Drop this candidate if any are invalid.
+                if any(
+                    map(
+                        # pylint: disable-next=cell-var-from-loop
+                        lambda filt: not filt.is_valid(bp),
+                        self._workload_independent_filters,
+                    )
+                ):
+                    continue
 
-            # Workload-specific filters.
-            # Drop this candidate if any are invalid.
-            # pylint: disable-next=cell-var-from-loop
-            if any(map(lambda filt: not filt.is_valid(bp), workload_filters)):
-                continue
+                # Workload-specific filters.
+                # Drop this candidate if any are invalid.
+                # pylint: disable-next=cell-var-from-loop
+                if any(map(lambda filt: not filt.is_valid(bp), workload_filters)):
+                    continue
 
-            # Score the blueprint.
-            score = self._scorer.score(
-                self._current_blueprint, bp, self._current_workload, next_workload
-            )
+                # Score the blueprint.
+                score = self._scorer.score(
+                    self._current_blueprint,
+                    bp,
+                    self._current_workload,
+                    next_workload,
+                    engines,
+                )
 
-            # Store the blueprint (for debugging purposes).
-            candidate_set.append((score, bp.to_blueprint()))
+                # Store the blueprint (for debugging purposes).
+                candidate_set.append((score, bp.to_blueprint()))
 
-        # Sort by score - lower is better.
-        candidate_set.sort(key=lambda parts: parts[0].single_value())
+            # Sort by score - lower is better.
+            candidate_set.sort(key=lambda parts: parts[0].single_value())
 
-        # Log the candidates.
-        for score, candidate in candidate_set:
-            logger.debug("Score: %s", score)
-            logger.debug("%s", candidate)
-            logger.debug("----------")
+            # Log the candidates.
+            for score, candidate in candidate_set:
+                logger.debug("Score: %s", score)
+                logger.debug("%s", candidate)
+                logger.debug("----------")
 
-        if len(candidate_set) == 0:
-            logger.error("Planner did not find any valid candidate blueprints.")
-            logger.error("Next workload: %s", next_workload)
-            raise RuntimeError("No valid candidates!")
+            if len(candidate_set) == 0:
+                logger.error("Planner did not find any valid candidate blueprints.")
+                logger.error("Next workload: %s", next_workload)
+                raise RuntimeError("No valid candidates!")
 
-        best_score, best_blueprint = candidate_set[1]
-        logger.info("Selecting a new blueprint with score %s", best_score)
-        logger.info("%s", best_blueprint)
-        self._current_blueprint = best_blueprint
-        self._current_workload = next_workload
+            best_score, best_blueprint = candidate_set[1]
+            logger.info("Selecting a new blueprint with score %s", best_score)
+            logger.info("%s", best_blueprint)
+            self._current_blueprint = best_blueprint
+            self._current_workload = next_workload
 
-        # Emit the next blueprint.
-        await self._notify_new_blueprint(best_blueprint)
+            # Emit the next blueprint.
+            await self._notify_new_blueprint(best_blueprint)
+
+        finally:
+            await engines.close()
 
     def _check_if_metrics_warrant_replanning(self) -> bool:
         # See if the metrics indicate that we should trigger the planning
