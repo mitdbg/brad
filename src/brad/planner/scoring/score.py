@@ -2,6 +2,7 @@ import math
 
 from brad.blueprint import Blueprint
 from brad.planner.workload import Workload
+from brad.server.engine_connections import EngineConnections
 
 
 class Score:
@@ -44,5 +45,6 @@ class Scorer:
         next_blueprint: Blueprint,
         current_workload: Workload,
         next_workload: Workload,
+        engines: EngineConnections,
     ) -> Score:
         raise NotImplementedError

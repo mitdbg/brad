@@ -3,8 +3,8 @@ from itertools import chain
 from pathlib import Path
 
 from brad.blueprint import Blueprint
-from brad.query_rep import QueryRep
 from brad.config.engine import Engine
+from brad.planner.workload.query import Query
 from brad.utils.table_sizer import TableSizer
 
 
@@ -37,43 +37,43 @@ class Workload:
         txn_queries = []
         analytical_queries = []
 
-        with open(path / "oltp.sql") as txns:
+        with open(path / "oltp.sql", encoding="UTF-8") as txns:
             for txn in txns:
                 if txn.startswith("COMMIT"):
                     continue
-                txn_queries.append(QueryRep(txn))
+                txn_queries.append(Query(txn))
 
-        with open(path / "olap.sql") as analytics:
+        with open(path / "olap.sql", encoding="UTF-8") as analytics:
             for q in analytics:
-                analytical_queries.append(QueryRep(q))
+                analytical_queries.append(Query(q))
 
-        with open(path / "sample_prob.txt") as sample_file:
+        with open(path / "sample_prob.txt", encoding="UTF-8") as sample_file:
             sampling_prob = float(sample_file.read().strip())
 
         return cls(analytical_queries, txn_queries, sampling_prob, 0)
 
     def __init__(
         self,
-        analytical_queries: List[QueryRep],
-        transactional_queries: List[QueryRep],
+        analytical_queries: List[Query],
+        transactional_queries: List[Query],
         transaction_sample_fraction: float,
         dataset_size_mb: int,
     ) -> None:
-        self._analytical_queries: List[QueryRep] = analytical_queries
-        self._transactional_queries: List[QueryRep] = transactional_queries
+        self._analytical_queries: List[Query] = analytical_queries
+        self._transactional_queries: List[Query] = transactional_queries
         self._transaction_sample_fraction = transaction_sample_fraction
         self._dataset_size_mb = dataset_size_mb
 
         # The size of a table on an engine.
         self._table_sizes_mb: Dict[Tuple[str, Engine], int] = {}
 
-    def analytical_queries(self) -> List[QueryRep]:
+    def analytical_queries(self) -> List[Query]:
         return self._analytical_queries
 
-    def transactional_queries(self) -> List[QueryRep]:
+    def transactional_queries(self) -> List[Query]:
         return self._transactional_queries
 
-    def all_queries(self) -> Iterable[QueryRep]:
+    def all_queries(self) -> Iterable[Query]:
         return chain(self._transactional_queries, self._analytical_queries)
 
     async def populate_table_sizes_using_blueprint(
@@ -101,14 +101,3 @@ class Workload:
             return self._table_sizes_mb[(table_name, location)]
         except KeyError:
             return None
-
-
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--log-dir", type=str)
-    args = parser.parse_args()
-
-    w = Workload.from_extracted_logs(args.log_dir)
-    print(len(w.analytical_queries()))
-    print(len(w.transactional_queries()))

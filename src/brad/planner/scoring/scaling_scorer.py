@@ -12,6 +12,7 @@ from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner.workload import Workload
+from brad.server.engine_connections import EngineConnections
 
 
 class ScalingScorer(Scorer):
@@ -26,6 +27,7 @@ class ScalingScorer(Scorer):
         next_blueprint: Blueprint,
         current_workload: Workload,
         next_workload: Workload,
+        engines: EngineConnections,
     ) -> Score:
         return Score(
             1.0,
