@@ -80,9 +80,13 @@ class PlanOperator(dict):
         # parse estimated plan costs
         match_est = estimated_regex.search(op_line)
         assert match_est is not None
-        self.plan_parameters.update(
-            {k: float(v) for k, v in match_est.groupdict().items()}
-        )
+        updated_params = {}
+        for k, v in match_est.groupdict().items():
+            if k == "est_card" or k == "est_width":
+                updated_params[k] = int(v)
+            else:
+                updated_params[k] = float(v)
+        self.plan_parameters.update(updated_params)
 
         # parse actual plan costs
         match_act = actual_regex.search(op_line)
@@ -320,7 +324,8 @@ class PlanOperator(dict):
             else:
                 # print(f"!!!!!!{self.plan_parameters['table']} not found")
                 # print(table_id_mapping)
-                del self.plan_parameters["table"]
+                # del self.plan_parameters["table"]
+                pass
 
         return node_tables
 
@@ -353,11 +358,14 @@ class PlanOperator(dict):
             potential_tables = partial_column_name_mapping[column].intersection(
                 node_tables
             )
-            assert len(potential_tables) == 1, (
-                f"Did not find unique table for column {column} "
-                f"(node_tables: {node_tables})"
-            )
-            table = list(potential_tables)[0]
+            if len(potential_tables) == 0:
+                table = "unknown"
+            else:
+                assert len(potential_tables) == 1, (
+                    f"Did not find unique table for column {column} "
+                    f"(node_tables: {node_tables})"
+                )
+                table = list(potential_tables)[0]
         else:
             raise NotImplementedError
 
