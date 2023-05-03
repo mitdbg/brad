@@ -52,7 +52,7 @@ class ScalingScorer(Scorer):
     ) -> Score:
         bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
         return Score(
-            1.0,
+            {},
             await self._operational_cost_score(
                 current_blueprint, next_blueprint, next_workload, engines
             ),
@@ -388,13 +388,13 @@ class ScalingScorer(Scorer):
         else:
             raise RuntimeError("Unsupported resource scaling engine {}".format(engine))
         return (
-            specs["vcpus"] * provisioning.num_nodes(),
-            specs["mem_mib"] * provisioning.num_nodes(),
+            specs.vcpus * provisioning.num_nodes(),
+            specs.mem_mib * provisioning.num_nodes(),
         )
 
 
 _Provisioning = namedtuple(
-    "Provisioning", ["instance_type", "usd_per_hour", "vcpus", "mem_mib"]
+    "_Provisioning", ["instance_type", "usd_per_hour", "vcpus", "mem_mib"]
 )
 
 

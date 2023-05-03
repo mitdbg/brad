@@ -1,4 +1,4 @@
-import math
+import numpy as np
 from typing import Dict
 
 from brad.blueprint import Blueprint
@@ -31,10 +31,21 @@ class Score:
         return "Score:\n  " + score_components
 
     def single_value(self) -> float:
+        # To stay consistent with the other score components, lower is better.
+        # We invert throughput values.
         # N.B. This is a placeholder.
-        return math.pow(
-            self._perf_score * self._monetary_cost_score * self._transition_score, 1 / 3
-        )
+        values = [self._monetary_cost_score, self._transition_score]
+        for metric, mvalue in self._perf_metrics.items():
+            if mvalue <= 0.0:
+                continue
+            if "IOPS" in metric:
+                values.append(1.0 / mvalue)
+            else:
+                values.append(mvalue)
+
+        npvalues = np.array(values)
+        gmean = np.exp(np.log(npvalues).mean())
+        return gmean.item()
 
 
 class Scorer:
