@@ -85,6 +85,9 @@ class Workload:
         except KeyError:
             return None
 
+    def table_sizes_empty(self) -> bool:
+        return not self._table_sizes_mb
+
     async def populate_table_sizes_using_blueprint(
         self, blueprint: Blueprint, table_sizer: TableSizer
     ) -> None:
