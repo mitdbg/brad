@@ -1,13 +1,15 @@
 import importlib.resources as pkg_resources
 import json
 import math
-from typing import Dict, List
+from collections import namedtuple
+from typing import Dict, List, Optional, Tuple
 
 from .score import Scorer, Score
 import brad.planner.scoring.data as score_data
 
 from brad.blueprint import Blueprint
 from brad.blueprint.diff.blueprint import BlueprintDiff
+from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
@@ -31,12 +33,13 @@ class ScalingScorer(Scorer):
         next_workload: Workload,
         engines: EngineConnections,
     ) -> Score:
+        bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
         return Score(
             1.0,
             await self._operational_cost_score(
                 current_blueprint, next_blueprint, next_workload, engines
             ),
-            self._transition_score(current_blueprint, next_blueprint, current_workload),
+            self._transition_score(current_blueprint, bp_diff, current_workload),
         )
 
     async def _operational_cost_score(
@@ -55,10 +58,12 @@ class ScalingScorer(Scorer):
         aurora_prov = next_blueprint.aurora_provisioning()
         redshift_prov = next_blueprint.redshift_provisioning()
         aurora_prov_cost = (
-            _AURORA_PRICING[aurora_prov.instance_type()] * aurora_prov.num_nodes()
+            _AURORA_SPECS[aurora_prov.instance_type()].usd_per_hour
+            * aurora_prov.num_nodes()
         )
         redshift_prov_cost = (
-            _REDSHIFT_PRICING[redshift_prov.instance_type()] * redshift_prov.num_nodes()
+            _REDSHIFT_SPECS[redshift_prov.instance_type()].usd_per_hour
+            * redshift_prov.num_nodes()
         )
 
         # NOTE: The routing policy should be included in the blueprint. We
@@ -110,7 +115,7 @@ class ScalingScorer(Scorer):
     def _transition_score(
         self,
         current_blueprint: Blueprint,
-        next_blueprint: Blueprint,
+        bp_diff: Optional[BlueprintDiff],
         current_workload: Workload,
     ) -> float:
         # Transition score:
@@ -118,7 +123,6 @@ class ScalingScorer(Scorer):
         # - Table movement monetary costs (Athena)
         # - Redshift scale up / down time
         # - Aurora scale up / down time
-        bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
         if bp_diff is None:
             transition_score = 1.0
         else:
@@ -231,13 +235,111 @@ class ScalingScorer(Scorer):
         else:
             return options[0][0]
 
+    def _performance_score(
+        self,
+        current_blueprint: Blueprint,
+        next_blueprint: Blueprint,
+        bp_diff: Optional[BlueprintDiff],
+        current_workload: Workload,
+        next_workload: Workload,
+    ):
+        dataset_scale = (
+            next_workload.dataset_size_mb() / current_workload.dataset_size_mb()
+        )
+        redshift_resource_scale = self._compute_resource_scale(
+            current_blueprint, next_blueprint, bp_diff, Engine.Redshift
+        )
+        aurora_resource_scale = self._compute_resource_scale(
+            current_blueprint, next_blueprint, bp_diff, Engine.Aurora
+        )
 
-def _load_instance_pricing(file_name: str) -> Dict[str, float]:
+    def _compute_resource_scale(
+        self,
+        current_blueprint: Blueprint,
+        next_blueprint: Blueprint,
+        bp_diff: Optional[BlueprintDiff],
+        engine: Engine,
+    ) -> float:
+        if bp_diff is None:
+            # No provisioning change.
+            return 1.0
+
+        if engine == Engine.Redshift:
+            diff = bp_diff.redshift_diff()
+            if diff is None:
+                # No Redshift provisioning change.
+                return 1.0
+            if (
+                current_blueprint.redshift_provisioning().num_nodes() == 0
+                or next_blueprint.redshift_provisioning().num_nodes() == 0
+            ):
+                # This engine is/will be disabled.
+                return 0.0
+            curr_specs = self._retrieve_provisioning_specs(
+                engine, current_blueprint.redshift_provisioning()
+            )
+            next_specs = self._retrieve_provisioning_specs(
+                engine, next_blueprint.redshift_provisioning()
+            )
+
+        elif engine == Engine.Aurora:
+            diff = bp_diff.aurora_diff()
+            if diff is None:
+                # No Aurora provisioning change.
+                return 1.0
+            if (
+                current_blueprint.aurora_provisioning().num_nodes() == 0
+                or next_blueprint.aurora_provisioning().num_nodes() == 0
+            ):
+                # This engine is/will be disabled.
+                return 0.0
+            curr_specs = self._retrieve_provisioning_specs(
+                engine, current_blueprint.aurora_provisioning()
+            )
+            next_specs = self._retrieve_provisioning_specs(
+                engine, next_blueprint.aurora_provisioning()
+            )
+
+        else:
+            raise RuntimeError("Unsupported resource scaling engine {}".format(engine))
+
+        cpu_scale = next_specs[0] / curr_specs[0]
+        mem_scale = next_specs[1] / curr_specs[1]
+
+        # TODO: Take instance counts into account too.
+        return math.sqrt(cpu_scale * mem_scale)
+
+    def _retrieve_provisioning_specs(
+        self, engine: Engine, provisioning: Provisioning
+    ) -> Tuple[int, int]:
+        if engine == Engine.Redshift:
+            specs = _REDSHIFT_SPECS[provisioning.instance_type()]
+        elif engine == Engine.Aurora:
+            specs = _AURORA_SPECS[provisioning.instance_type()]
+        else:
+            raise RuntimeError("Unsupported resource scaling engine {}".format(engine))
+        return (specs["vcpus"], specs["mem_mib"])
+
+
+_Provisioning = namedtuple(
+    "Provisioning", ["instance_type", "usd_per_hour", "vcpus", "mem_mib"]
+)
+
+
+def _load_instance_specs(file_name: str) -> Dict[str, _Provisioning]:
     with pkg_resources.open_text(score_data, file_name) as data:
         raw_json = json.load(data)
 
-    return {config["instance_type"]: config["usd_per_hour"] for config in raw_json}
+    return {
+        config["instance_type"]: _Provisioning(
+            config["instance_type"],
+            config["usd_per_hour"],
+            config["vcpus"],
+            config["mem_mib"],
+        )
+        for config in raw_json
+    }
 
 
-_AURORA_PRICING = _load_instance_pricing("aurora_postgresql_instances.json")
-_REDSHIFT_PRICING = _load_instance_pricing("redshift_instances.json")
+_AURORA_SPECS = _load_instance_specs("aurora_postgresql_instances.json")
+_REDSHIFT_SPECS = _load_instance_specs("redshift_instances.json")

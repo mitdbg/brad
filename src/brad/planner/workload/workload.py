@@ -88,6 +88,9 @@ class Workload:
     def table_sizes_empty(self) -> bool:
         return not self._table_sizes_mb
 
+    def dataset_size_mb(self) -> int:
+        return self._dataset_size_mb
+
     async def populate_table_sizes_using_blueprint(
         self, blueprint: Blueprint, table_sizer: TableSizer
     ) -> None:
