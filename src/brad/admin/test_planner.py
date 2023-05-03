@@ -8,7 +8,6 @@ from brad.daemon.monitor import Monitor
 from brad.planner.neighborhood import NeighborhoodSearchPlanner
 from brad.planner.workload import Workload
 from brad.server.blueprint_manager import BlueprintManager
-from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +53,6 @@ def test_planner(args):
     This admin action is used to manually test the blueprint planner
     independently of the rest of BRAD.
     """
-    set_up_logging(debug_mode=args.debug)
-
     # 1. Load the config.
     config = ConfigFile(args.config_file)
 
