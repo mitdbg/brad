@@ -131,8 +131,8 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             # Sort by score - lower is better.
             candidate_set.sort(key=lambda parts: parts[0].single_value())
 
-            # Log the candidates.
-            for score, candidate in candidate_set:
+            # Log the top 50 candidate plans.
+            for score, candidate in candidate_set[:50]:
                 logger.debug("Score: %s", score)
                 logger.debug("%s", candidate)
                 logger.debug("----------")

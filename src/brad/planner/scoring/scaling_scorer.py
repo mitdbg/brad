@@ -120,7 +120,7 @@ class ScalingScorer(Scorer):
         # - Aurora scale up / down time
         bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
         if bp_diff is None:
-            transition_score = 0.0
+            transition_score = 1.0
         else:
             # Provisioning changes.
             redshift_prov_time_s = (
@@ -200,7 +200,9 @@ class ScalingScorer(Scorer):
                 redshift_prov_time_s + aurora_prov_time_s + movement_time_s
             )
             transition_cost = movement_cost
-            transition_score = math.sqrt(transition_time_s * transition_cost)
+            transition_score = math.sqrt(
+                (1.0 + transition_time_s) * (1.0 + transition_cost)
+            )
 
         return transition_score
 
