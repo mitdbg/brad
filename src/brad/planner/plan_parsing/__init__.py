@@ -7,7 +7,7 @@ ParsedPlan = Dict[str, Any]
 BaseCardinality = namedtuple("BaseCardinality", ["table_name", "cardinality", "width"])
 
 
-def parse_explain_verbose(lines: List[str] | List[Tuple[str]]) -> ParsedPlan:
+def parse_explain_verbose(lines: List[str] | List[Tuple[Any, ...]]) -> ParsedPlan:
     """
     Returns a parsed representation of PostgreSQL's EXPLAIN VERBOSE. This method
     also works for Redshift plans (EXPLAIN only) but does not include as much

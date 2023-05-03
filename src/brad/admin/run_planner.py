@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def register_admin_action(subparser) -> None:
     parser = subparser.add_parser(
-        "test_planner", help="Run the BRAD blueprint planner for testing purposes."
+        "run_planner", help="Run the BRAD blueprint planner for testing purposes."
     )
     parser.add_argument(
         "--config-file",
@@ -45,10 +45,10 @@ def register_admin_action(subparser) -> None:
         action="store_true",
         help="Set to enable debug logging.",
     )
-    parser.set_defaults(admin_action=test_planner)
+    parser.set_defaults(admin_action=run_planner)
 
 
-def test_planner(args):
+def run_planner(args):
     """
     This admin action is used to manually test the blueprint planner
     independently of the rest of BRAD.
