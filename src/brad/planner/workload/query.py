@@ -55,16 +55,14 @@ class Query(QueryRep):
             query = "EXPLAIN VERBOSE {}".format(self.raw_query)
             aurora = connections.get_connection(Engine.Aurora)
             cursor = await aurora.cursor()
-            logger.debug("Running on Aurora: %s", query)
         else:
             assert source_engine == Engine.Redshift
             query = "EXPLAIN {}".format(self.raw_query)
             redshift = connections.get_connection(Engine.Redshift)
             cursor = await redshift.cursor()
-            logger.debug("Running on Redshift: %s", query)
 
         await cursor.execute(query)
-        plan_rows = [row async for row in cursor]
+        plan_rows = [tuple(row) async for row in cursor]
         plan = parse_explain_verbose(plan_rows)
         base_cardinalities = extract_base_cardinalities(plan)
 
