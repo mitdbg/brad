@@ -17,7 +17,7 @@ class TableSizer:
     def __init__(self, engines: EngineConnections, config: ConfigFile) -> None:
         self._engines = engines
         self._config = config
-        self._s3_client = boto3.client(
+        self._s3 = boto3.resource(
             "s3",
             aws_access_key_id=config.aws_access_key,
             aws_secret_access_key=config.aws_access_key_secret,
@@ -57,7 +57,7 @@ class TableSizer:
         # NOTE: This may be problematic when there are many objects in a prefix.
         def run_inner():
             total_size_bytes = 0
-            bucket = self._s3_client.Bucket(bucket_name)
+            bucket = self._s3.Bucket(bucket_name)
             for obj in bucket.objects.filter(Prefix=table_prefix):
                 total_size_bytes += obj.size
             # `total_size` is in bytes.
@@ -79,7 +79,9 @@ class TableSizer:
         return int(int(result[0]) / 1000 / 1000)
 
     async def _table_size_mb_redshift(self, table_name: str) -> int:
-        query = "SELECT size FROM svv_table_info WHERE \"table\" = '{}';".format(table_name)
+        query = "SELECT size FROM svv_table_info WHERE \"table\" = '{}';".format(
+            table_name
+        )
         redshift = self._engines.get_connection(Engine.Redshift)
         logger.debug("Running on Redshift: %s", query)
         cursor = await redshift.cursor()

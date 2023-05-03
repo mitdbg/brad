@@ -65,6 +65,8 @@ def test_planner(args):
     # 3. Load the blueprint.
     blueprint_mgr = BlueprintManager(config, args.schema_name)
     blueprint_mgr.load_sync()
+    logger.info("Current blueprint:")
+    logger.info("%s", blueprint_mgr.get_blueprint())
 
     # 4. Load the workload.
     workload = Workload.from_extracted_logs(args.workload_dir)
