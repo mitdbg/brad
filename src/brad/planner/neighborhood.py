@@ -16,6 +16,7 @@ from brad.planner.filters.table_on_engine import TableOnEngine
 from brad.planner.scoring.scaling_scorer import ScalingScorer
 from brad.planner.workload import Workload
 from brad.server.engine_connections import EngineConnections
+from brad.utils.table_sizer import TableSizer
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +77,23 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         engines = await EngineConnections.connect(
             self._config, self._schema_name, autocommit=False
         )
+        table_sizer = TableSizer(engines, self._config)
 
         try:
+            # Update the dataset size. We must use the current blueprint because it
+            # contains information about where the tables are now.
+            if self._current_workload.table_sizes_empty():
+                await self._current_workload.populate_table_sizes_using_blueprint(
+                    self._current_blueprint, table_sizer
+                )
+                self._current_workload.set_dataset_size_from_table_sizes()
+
+            if next_workload.table_sizes_empty():
+                await next_workload.populate_table_sizes_using_blueprint(
+                    self._current_blueprint, table_sizer
+                )
+                next_workload.set_dataset_size_from_table_sizes()
+
             for bp in NeighborhoodBlueprintEnumerator.enumerate(
                 self._current_blueprint,
                 self._planner_config.max_num_table_moves(),
@@ -101,7 +117,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                     continue
 
                 # Score the blueprint.
-                score = self._scorer.score(
+                score = await self._scorer.score(
                     self._current_blueprint,
                     bp,
                     self._current_workload,

@@ -66,6 +66,7 @@ class Workload:
 
         # The size of a table on an engine.
         self._table_sizes_mb: Dict[Tuple[str, Engine], int] = {}
+        self._aurora_row_size_bytes: Dict[str, int] = {}
 
     def analytical_queries(self) -> List[Query]:
         return self._analytical_queries
@@ -76,6 +77,17 @@ class Workload:
     def all_queries(self) -> Iterable[Query]:
         return chain(self._transactional_queries, self._analytical_queries)
 
+    # TODO: Table size information should be put in a catalog class.
+
+    def aurora_row_size_bytes(self, table_name: str) -> Optional[int]:
+        try:
+            return self._aurora_row_size_bytes[table_name]
+        except KeyError:
+            return None
+
+    def table_sizes_empty(self) -> bool:
+        return not self._table_sizes_mb
+
     async def populate_table_sizes_using_blueprint(
         self, blueprint: Blueprint, table_sizer: TableSizer
     ) -> None:
@@ -85,6 +97,12 @@ class Workload:
                 self._table_sizes_mb[
                     (table.name, loc)
                 ] = await table_sizer.table_size_mb(table.name, loc)
+
+            # Fetch the row size as well, if applicable.
+            if Engine.Aurora in locations:
+                self._aurora_row_size_bytes[
+                    table.name
+                ] = await table_sizer.aurora_row_size_bytes(table.name)
 
     def set_dataset_size_from_table_sizes(self) -> None:
         largest_table_mb: Dict[str, int] = {}

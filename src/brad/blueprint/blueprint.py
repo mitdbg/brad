@@ -108,3 +108,15 @@ class Blueprint:
             visit_table(table)
 
         return base_tables
+
+    def __repr__(self) -> str:
+        # Useful for debugging purposes.
+        aurora = "Aurora: " + str(self.aurora_provisioning())
+        redshift = "Redshift: " + str(self.redshift_provisioning())
+        tables = "\n  ".join(
+            map(
+                lambda name_loc: "".join([name_loc[0], ": ", str(name_loc[1])]),
+                self.table_locations().items(),
+            )
+        )
+        return "\n  ".join(["Blueprint:", tables, aurora, redshift])

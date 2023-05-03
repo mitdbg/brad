@@ -1,5 +1,6 @@
 from typing import Set, List, Optional
 
+from brad.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.server.blueprint_manager import BlueprintManager
 from brad.daemon.monitor import Monitor
@@ -10,11 +11,14 @@ from brad.query_rep import QueryRep
 class RuleBased(Router):
     def __init__(
         self,
-        blueprint_mgr: BlueprintManager,
+        # One of `blueprint_mgr` and `blueprint` must not be `None`.
+        blueprint_mgr: Optional[BlueprintManager] = None,
+        blueprint: Optional[Blueprint] = None,
         monitor: Optional[Monitor] = None,
         deterministic: bool = True,
     ):
         self._blueprint_mgr = blueprint_mgr
+        self._blueprint = blueprint
         self._monitor = monitor
         # deterministic routing guarantees the same decision for the same query and should be used online
         # non-determinism will be used for offline training data exploration (not implemented)
@@ -24,7 +28,11 @@ class RuleBased(Router):
         if query.is_data_modification_query():
             return Engine.Aurora
 
-        blueprint = self._blueprint_mgr.get_blueprint()
+        if self._blueprint is not None:
+            blueprint = self._blueprint
+        else:
+            assert self._blueprint_mgr is not None
+            blueprint = self._blueprint_mgr.get_blueprint()
 
         location_sets: List[Set[Engine]] = []
         for table_name_str in query.tables():
