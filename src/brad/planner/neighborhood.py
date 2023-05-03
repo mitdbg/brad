@@ -123,7 +123,6 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                     self._current_workload,
                     next_workload,
                     engines,
-                    table_sizer,
                 )
 
                 # Store the blueprint (for debugging purposes).

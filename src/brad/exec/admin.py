@@ -5,6 +5,7 @@ from brad.utils import set_up_logging
 import brad.admin.bootstrap_schema as bootstrap_schema
 import brad.admin.drop_schema as drop_schema
 import brad.admin.bulk_load as bulk_load
+import brad.admin.test_planner as test_planner
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ def register_command(subparsers) -> None:
     bootstrap_schema.register_admin_action(admin_subparsers)
     drop_schema.register_admin_action(admin_subparsers)
     bulk_load.register_admin_action(admin_subparsers)
+    test_planner.register_admin_action(admin_subparsers)
     parser.set_defaults(func=main)
 
 
