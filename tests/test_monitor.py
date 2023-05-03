@@ -140,6 +140,8 @@ async def f6():
 
     df = m.read_k_most_recent(3)
     t = m._values.tail(3)
+    task.cancel()
+
     assert df.shape[0] == 3
     assert df.shape[1] == len(m._metric_ids)
     assert_frame_equal(df, t)

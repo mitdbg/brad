@@ -32,6 +32,7 @@ class Monitor:
         self._config = config
         self._enable_cost_monitoring = enable_cost_monitoring
         self._setup()
+        self._values = pd.DataFrame(columns=self._metric_ids)
 
         self._client = boto3.client("cloudwatch")
         if self._enable_cost_monitoring:
@@ -227,15 +228,15 @@ class Monitor:
                 services_short = [
                     self.SERVICE_DICT[s] for s in self._cost_query_fields["services"]
                 ]
-            except:
-                ValueError("Invalid service specified in `monitored_costs.json")
+            except KeyError as exc:
+                raise ValueError(
+                    "Invalid service specified in `monitored_costs.json"
+                ) from exc
 
             for s in services_short:
                 for m in self._cost_query_fields["metrics"]:
                     metric_id = f"{s}_{m}"
                     self._metric_ids.append(metric_id)
-
-        self._values = pd.DataFrame(columns=self._metric_ids)
 
     def _add_metrics(self):
         # Retrieve datapoints
@@ -304,8 +305,8 @@ class Monitor:
 
                 for group in result["Groups"]:
                     for metric in group["Metrics"]:
-                        id = f"{self.SERVICE_DICT[group['Keys'][0]]}_{metric}"
-                        cost_dict[id] = float(group["Metrics"][metric]["Amount"])
+                        item_id = f"{self.SERVICE_DICT[group['Keys'][0]]}_{metric}"
+                        cost_dict[item_id] = float(group["Metrics"][metric]["Amount"])
 
                 # Convert the dictionary to a dataframe and add it to the dictionary
                 df_dict[start] = pd.DataFrame(cost_dict, index=[start])
