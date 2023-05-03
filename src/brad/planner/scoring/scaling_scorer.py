@@ -18,6 +18,23 @@ from brad.planner.workload.query import Query
 from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
 
+_REDSHIFT_METRICS = [
+    "redshift_CPUUtilization_Average",
+    "redshift_ReadIOPS_Average",
+]
+
+_AURORA_METRICS = [
+    "aurora_WRITER_CPUUtilization_Average",
+    "aurora_WRITER_ReadIOPS_Average",
+    "aurora_WRITER_WriteIOPS_Average",
+]
+
+_ATHENA_METRICS = [
+    "athena_TotalExecutionTime_Sum",
+]
+
+_ALL_METRICS = _REDSHIFT_METRICS + _AURORA_METRICS + _ATHENA_METRICS
+
 
 class ScalingScorer(Scorer):
     def __init__(self, monitor: Monitor, planner_config: PlannerConfig) -> None:
@@ -242,18 +259,71 @@ class ScalingScorer(Scorer):
         bp_diff: Optional[BlueprintDiff],
         current_workload: Workload,
         next_workload: Workload,
-    ):
-        dataset_scale = (
+    ) -> Dict[str, float]:
+        # > 1.0 means the dataset size has increased
+        dataset_scaling = (
             next_workload.dataset_size_mb() / current_workload.dataset_size_mb()
         )
-        redshift_resource_scale = self._compute_resource_scale(
+        # > 1.0 means there are more resources
+        redshift_resource_scaling = self._compute_resource_scaling(
             current_blueprint, next_blueprint, bp_diff, Engine.Redshift
         )
-        aurora_resource_scale = self._compute_resource_scale(
+        # > 1.0 means there are more resources
+        aurora_resource_scaling = self._compute_resource_scaling(
             current_blueprint, next_blueprint, bp_diff, Engine.Aurora
         )
 
-    def _compute_resource_scale(
+        inv_redshift_resource_scaling = 1.0 / redshift_resource_scaling
+        inv_aurora_resource_scaling = 1.0 / aurora_resource_scaling
+
+        metrics_df = self._monitor.read_k_most_recent(metric_ids=_ALL_METRICS)
+
+        dataset_modifiers = self._planner_config.dataset_scaling_modifiers()
+        redshift_resource_modifiers = (
+            self._planner_config.redshift_resource_scaling_modifiers()
+        )
+        aurora_resource_modifiers = (
+            self._planner_config.aurora_resource_scaling_modifiers()
+        )
+
+        # TODO: Apply modifiers based on a changed table placement.
+
+        predicted_metrics: Dict[str, float] = {}
+
+        # Redshift predictions.
+        for metric_name in _REDSHIFT_METRICS:
+            curr_value = metrics_df[metric_name].iloc[0]
+            pred_value = curr_value
+            pred_value *= dataset_scaling * dataset_modifiers[metric_name]
+            pred_value *= (
+                inv_redshift_resource_scaling * redshift_resource_modifiers[metric_name]
+            )
+            predicted_metrics[metric_name] = pred_value
+
+        # Aurora predictions.
+        # TODO: Model the difference between Aurora writer instances and read
+        # replicas.
+        # TODO: Model the interaction between transactions and analytics on
+        # Aurora's metrics.
+        for metric_name in _AURORA_METRICS:
+            curr_value = metrics_df[metric_name].iloc[0]
+            pred_value = curr_value
+            pred_value *= dataset_scaling * dataset_modifiers[metric_name]
+            pred_value *= (
+                inv_aurora_resource_scaling * aurora_resource_modifiers[metric_name]
+            )
+            predicted_metrics[metric_name] = pred_value
+
+        # Athena predictions.
+        for metric_name in _ATHENA_METRICS:
+            curr_value = metrics_df[metric_name].iloc[0]
+            pred_value = curr_value
+            pred_value *= dataset_scaling * dataset_modifiers[metric_name]
+            predicted_metrics[metric_name] = pred_value
+
+        return predicted_metrics
+
+    def _compute_resource_scaling(
         self,
         current_blueprint: Blueprint,
         next_blueprint: Blueprint,
@@ -306,7 +376,6 @@ class ScalingScorer(Scorer):
         cpu_scale = next_specs[0] / curr_specs[0]
         mem_scale = next_specs[1] / curr_specs[1]
 
-        # TODO: Take instance counts into account too.
         return math.sqrt(cpu_scale * mem_scale)
 
     def _retrieve_provisioning_specs(
@@ -318,7 +387,10 @@ class ScalingScorer(Scorer):
             specs = _AURORA_SPECS[provisioning.instance_type()]
         else:
             raise RuntimeError("Unsupported resource scaling engine {}".format(engine))
-        return (specs["vcpus"], specs["mem_mib"])
+        return (
+            specs["vcpus"] * provisioning.num_nodes(),
+            specs["mem_mib"] * provisioning.num_nodes(),
+        )
 
 
 _Provisioning = namedtuple(

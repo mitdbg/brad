@@ -1,4 +1,5 @@
 import yaml
+from typing import Dict
 
 
 class PlannerConfig:
@@ -46,3 +47,12 @@ class PlannerConfig:
 
     def athena_load_rate_mb_per_s(self) -> float:
         return float(self._raw["athena_load_rate_mb_per_s"])
+
+    def dataset_scaling_modifiers(self) -> Dict[str, float]:
+        return self._raw["dataset_scaling"]
+
+    def redshift_resource_scaling_modifiers(self) -> Dict[str, float]:
+        return self._raw["redshift_resource_scaling"]
+
+    def aurora_resource_scaling_modifiers(self) -> Dict[str, float]:
+        return self._raw["aurora_resource_scaling"]
