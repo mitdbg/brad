@@ -38,6 +38,9 @@ class Monitor:
                 self._values, self._epoch_length, forecasting_window_size
             )
 
+    def force_read_metrics(self) -> None:
+        self._add_metrics()
+
     async def run_forever(self) -> None:
         # Flesh out the monitor - maintain running averages of the underlying
         # engines' metrics.

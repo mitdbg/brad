@@ -79,6 +79,7 @@ def test_planner(args):
         config=config,
         schema_name=args.schema_name,
     )
+    monitor.force_read_metrics()
 
     async def on_new_blueprint(blueprint: Blueprint):
         logger.info("Selected new blueprint")
