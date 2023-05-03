@@ -1,9 +1,12 @@
 import asyncio
 import boto3
+import logging
 
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.server.engine_connections import EngineConnections
+
+logger = logging.getLogger(__name__)
 
 
 class TableSizer:
@@ -69,14 +72,16 @@ class TableSizer:
         query = "SELECT pg_table_size('{}')".format(table_name)
         aurora = self._engines.get_connection(Engine.Aurora)
         cursor = await aurora.cursor()
+        logger.debug("Running on Aurora: %s", query)
         await cursor.execute(query)
         result = await cursor.fetchone()
         # The result is in bytes.
         return int(int(result[0]) / 1000 / 1000)
 
     async def _table_size_mb_redshift(self, table_name: str) -> int:
-        query = "SELECT size FROM svv_table_info WHERE table = '{}';".format(table_name)
+        query = "SELECT size FROM svv_table_info WHERE \"table\" = '{}';".format(table_name)
         redshift = self._engines.get_connection(Engine.Redshift)
+        logger.debug("Running on Redshift: %s", query)
         cursor = await redshift.cursor()
         await cursor.execute(query)
         result = await cursor.fetchone()

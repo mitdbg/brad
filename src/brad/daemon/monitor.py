@@ -183,9 +183,9 @@ class Monitor:
             for role in roles:
                 for metric_name, stats_list in f["metrics"].items():
                     for stat in stats_list:
-                        metric_id = f"{engine}_{metric_name}_{stat}"
+                        metric_id = f"{engine.value}_{metric_name}_{stat}"
                         if role != "":
-                            metric_id = f"{engine}_{role}_{metric_name}_{stat}"
+                            metric_id = f"{engine.value}_{role}_{metric_name}_{stat}"
                             dimensions[1] = {"Name": "Role", "Value": role}
                         self._metric_ids.append(metric_id)
                         metric_data_query = {
