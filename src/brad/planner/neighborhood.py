@@ -101,7 +101,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                     continue
 
                 # Score the blueprint.
-                score = self._scorer.score(
+                score = await self._scorer.score(
                     self._current_blueprint,
                     bp,
                     self._current_workload,

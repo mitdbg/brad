@@ -39,7 +39,7 @@ class Score:
 
 
 class Scorer:
-    def score(
+    async def score(
         self,
         current_blueprint: Blueprint,
         next_blueprint: Blueprint,

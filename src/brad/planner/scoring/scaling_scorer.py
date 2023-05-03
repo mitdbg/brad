@@ -1,7 +1,7 @@
 import importlib.resources as pkg_resources
 import json
 import math
-from typing import Dict
+from typing import Dict, List
 
 from .score import Scorer, Score
 import brad.planner.scoring.data as score_data
@@ -12,6 +12,8 @@ from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner.workload import Workload
+from brad.planner.workload.query import Query
+from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
 
 
@@ -21,7 +23,7 @@ class ScalingScorer(Scorer):
         self._monitor = monitor
         self._planner_config = planner_config
 
-    def score(
+    async def score(
         self,
         current_blueprint: Blueprint,
         next_blueprint: Blueprint,
@@ -31,15 +33,18 @@ class ScalingScorer(Scorer):
     ) -> Score:
         return Score(
             1.0,
-            self._operational_cost_score(next_blueprint, next_workload, engines),
+            await self._operational_cost_score(
+                current_blueprint, next_blueprint, next_workload, engines
+            ),
             self._transition_score(current_blueprint, next_blueprint, current_workload),
         )
 
-    def _operational_cost_score(
+    async def _operational_cost_score(
         self,
+        current_blueprint: Blueprint,
         next_blueprint: Blueprint,
-        _next_workload: Workload,
-        _engines: EngineConnections,
+        next_workload: Workload,
+        engines: EngineConnections,
     ) -> float:
         # Operational monetary score:
         # - Provisioning costs for an hour
@@ -56,12 +61,51 @@ class ScalingScorer(Scorer):
             _REDSHIFT_PRICING[redshift_prov.instance_type()] * redshift_prov.num_nodes()
         )
 
-        # NOTE: Still need to include scan costs. This depends on the routing policy.
-        # - For each analytical query, send it through the router and see which
-        #   engine is selected.
-        # - Estimate the amount of data accessed, and use it to compute a scan cost.
+        # NOTE: The routing policy should be included in the blueprint. We
+        # currently hardcode it here for engineering convenience.
+        router = RuleBased(blueprint=next_blueprint)
 
-        return aurora_prov_cost + redshift_prov_cost
+        dests: Dict[Engine, List[Query]] = {}
+        dests[Engine.Aurora] = []
+        dests[Engine.Athena] = []
+        dests[Engine.Redshift] = []
+
+        # See where each analytical query gets routed.
+        for q in next_workload.analytical_queries():
+            dests[router.engine_for(q)].append(q)
+
+        aurora_access_mb = 0
+        for q in dests[Engine.Aurora]:
+            # Data accessed must always be populated using the current blueprint
+            # (since the tables would not have been moved yet).
+            await q.populate_data_accessed_mb(
+                for_engine=Engine.Aurora,
+                connections=engines,
+                blueprint=current_blueprint,
+            )
+            aurora_access_mb += q.data_accessed_mb(Engine.Aurora)
+
+        athena_access_mb = 0
+        for q in dests[Engine.Athena]:
+            # Data accessed must always be populated using the current blueprint
+            # (since the tables would not have been moved yet).
+            await q.populate_data_accessed_mb(
+                for_engine=Engine.Athena,
+                connections=engines,
+                blueprint=current_blueprint,
+            )
+            athena_access_mb += q.data_accessed_mb(Engine.Athena)
+
+        aurora_scan_cost = (
+            aurora_access_mb * self._planner_config.aurora_usd_per_mb_scanned()
+        )
+        athena_scan_cost = (
+            athena_access_mb * self._planner_config.athena_usd_per_mb_scanned()
+        )
+
+        return (
+            aurora_prov_cost + redshift_prov_cost + aurora_scan_cost + athena_scan_cost
+        )
 
     def _transition_score(
         self,

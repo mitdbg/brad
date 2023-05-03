@@ -62,7 +62,9 @@ class BradServer(BradInterface):
             self._router = AlwaysOneRouter(Engine.Redshift)
         elif routing_policy == RoutingPolicy.RuleBased:
             self._monitor = Monitor(self._config)
-            self._router = RuleBased(self._blueprint_mgr, self._monitor)
+            self._router = RuleBased(
+                blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
+            )
         else:
             raise RuntimeError(
                 "Unsupported routing policy: {}".format(str(routing_policy))
