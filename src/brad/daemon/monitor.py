@@ -4,7 +4,7 @@ from typing import List
 import json
 from brad.config.engine import Engine
 import brad.daemon as daemon
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import boto3
 import pandas as pd
 import asyncio
@@ -16,16 +16,27 @@ from brad.forecasting import Forecaster
 
 
 class Monitor:
+    SERVICE_DICT = {
+        "Amazon Redshift": "redshift",
+        "Amazon Relational Database Service": "aurora",
+        "Amazon Simple Storage Service": "s3",
+    }
+
     def __init__(
         self,
         config: ConfigFile,
         forecasting_method: str = "constant",
         forecasting_window_size: int = 5,  # (Up to) how many past samples to base the forecast on
+        enable_cost_monitoring: bool = False,
     ) -> None:
         self._config = config
-        self._client = boto3.client("cloudwatch")
+        self._enable_cost_monitoring = enable_cost_monitoring
         self._setup()
-        self._values = pd.DataFrame(columns=self._metric_ids)
+
+        self._client = boto3.client("cloudwatch")
+        if self._enable_cost_monitoring:
+            self._cost_client = boto3.client("ce")
+
         self._forecaster: Forecaster
         if forecasting_method == "constant":
             self._forecaster = ConstantForecaster(self._values, self._epoch_length)
@@ -46,7 +57,7 @@ class Monitor:
         # engines' metrics.
         while True:
             self._add_metrics()
-            await asyncio.sleep(60)  # Read every minute
+            await asyncio.sleep(self._epoch_length.total_seconds())  # Read every epoch
 
     ############
     # The following functions, prefixed by `read_`, provide different ways to query the monitor for
@@ -140,7 +151,7 @@ class Monitor:
     ############
 
     def _setup(self):
-        # Load data.
+        # Load data for monitored metrics.
         with pkg_resources.open_text(daemon, "monitored_metrics.json") as data:
             file_contents = json.load(data)
 
@@ -150,6 +161,10 @@ class Monitor:
             hours=file_contents["epoch_length"]["hours"],
             minutes=file_contents["epoch_length"]["minutes"],
         )
+        if self._enable_cost_monitoring and self._epoch_length < timedelta(days=1):
+            raise ValueError(
+                "When cost monitoring is enabled, the epoch length must be no less than the cost monitoring period: 1 day"
+            )
 
         # Create the cloudwatch queries and list the metric ids used
         self._queries = []
@@ -203,6 +218,25 @@ class Monitor:
                         }
                         self._queries.append(metric_data_query)
 
+        # Load data for monitored costs.
+        if self._enable_cost_monitoring:
+            with pkg_resources.open_text(daemon, "monitored_costs.json") as data:
+                self._cost_query_fields = json.load(data)
+
+            try:
+                services_short = [
+                    self.SERVICE_DICT[s] for s in self._cost_query_fields["services"]
+                ]
+            except:
+                ValueError("Invalid service specified in `monitored_costs.json")
+
+            for s in services_short:
+                for m in self._cost_query_fields["metrics"]:
+                    metric_id = f"{s}_{m}"
+                    self._metric_ids.append(metric_id)
+
+        self._values = pd.DataFrame(columns=self._metric_ids)
+
     def _add_metrics(self):
         # Retrieve datapoints
         now = datetime.now()
@@ -216,29 +250,73 @@ class Monitor:
         if not self._values.empty:
             start_time = self._values.index[-1]
 
-        response = self._client.get_metric_data(
+        response_cloudwatch = self._client.get_metric_data(
             MetricDataQueries=self._queries,
             StartTime=start_time,
             EndTime=end_time,
             ScanBy="TimestampAscending",
         )
+        if self._enable_cost_monitoring:
+            response_cost = self._cost_client.get_cost_and_usage(
+                TimePeriod={
+                    "Start": datetime.strftime(start_time, "%Y-%m-%d"),
+                    "End": datetime.strftime(end_time, "%Y-%m-%d"),
+                },
+                Granularity=self._cost_query_fields["granularity"],
+                Metrics=self._cost_query_fields["metrics"],
+                Filter={
+                    "Dimensions": {
+                        "Key": "SERVICE",
+                        "Values": self._cost_query_fields["services"],
+                    }
+                },
+                GroupBy=[
+                    {"Type": "DIMENSION", "Key": "SERVICE"},
+                ],
+            )
 
-        # Parse metrics from json response
+        # Parse metrics from json responses
         resp_dict = {}
-        for metric_data in response["MetricDataResults"]:
+        for metric_data in response_cloudwatch["MetricDataResults"]:
             metric_id = metric_data["Id"]
             metric_timestamps = metric_data["Timestamps"]
             metric_values = metric_data["Values"]
             resp_dict[metric_id] = pd.Series(
                 metric_values, index=metric_timestamps, dtype=np.float64
             )
-        for metric_id in self._metric_ids:
-            if metric_id not in resp_dict:
-                resp_dict[metric_id] = pd.Series(dtype=np.float64)
 
         df = pd.DataFrame(resp_dict).fillna(0)
         df = df.sort_index()
         df.index = pd.to_datetime(df.index)
+
+        if self._enable_cost_monitoring:
+            # Create a dictionary to store the dataframes
+            df_dict = {}
+
+            # Loop over the results for each day
+            for result in response_cost["ResultsByTime"]:
+                start = datetime.strptime(
+                    result["TimePeriod"]["Start"], "%Y-%m-%d"
+                ).replace(tzinfo=timezone.utc)
+
+                # Create a dictionary to store the costs for each service
+                cost_dict = {}
+
+                for group in result["Groups"]:
+                    for metric in group["Metrics"]:
+                        id = f"{self.SERVICE_DICT[group['Keys'][0]]}_{metric}"
+                        cost_dict[id] = float(group["Metrics"][metric]["Amount"])
+
+                # Convert the dictionary to a dataframe and add it to the dictionary
+                df_dict[start] = pd.DataFrame(cost_dict, index=[start])
+
+            # Concatenate the dataframes into a single dataframe
+            df_temp = pd.concat(df_dict.values(), axis=0).fillna(0)
+            df = pd.concat([df, df_temp], axis=1)
+
+        for metric_id in self._metric_ids:
+            if metric_id not in df.columns:
+                df[metric_id] = pd.Series(dtype=np.float64)
 
         # Append only the new rows to the internal representation
         self._values = (

@@ -125,3 +125,21 @@ async def f5():
             df.head(i + 3).tail(1).reset_index(drop=True),
             t.tail(1).reset_index(drop=True),
         )
+
+
+def test_reading_cost_metrics():
+    asyncio.run(f6())
+
+
+async def f6():
+    m = Monitor(ConfigFile("./config/config.yml"), enable_cost_monitoring=True)
+    task = asyncio.create_task(m.run_forever())
+
+    while m._values.empty:
+        await asyncio.sleep(1)
+
+    df = m.read_k_most_recent(3)
+    t = m._values.tail(3)
+    assert df.shape[0] == 3
+    assert df.shape[1] == len(m._metric_ids)
+    assert_frame_equal(df, t)

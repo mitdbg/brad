@@ -1,0 +1,9 @@
+{
+    "granularity": "DAILY",
+    "metrics": ["BlendedCost"],
+    "services": [
+        "Amazon Redshift",
+        "Amazon Relational Database Service",
+        "Amazon Simple Storage Service"
+    ]
+}
