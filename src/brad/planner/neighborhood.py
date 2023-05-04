@@ -1,7 +1,9 @@
 import asyncio
+import csv
 import logging
 import heapq
 from typing import List
+from pathlib import Path
 
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
@@ -14,7 +16,7 @@ from brad.planner.filters.aurora_transactions import AuroraTransactions
 from brad.planner.filters.no_data_loss import NoDataLoss
 from brad.planner.filters.single_engine_execution import SingleEngineExecution
 from brad.planner.filters.table_on_engine import TableOnEngine
-from brad.planner.scoring.scaling_scorer import ScalingScorer
+from brad.planner.scoring.scaling_scorer import ScalingScorer, ALL_METRICS
 from brad.planner.scoring.score import Score
 from brad.planner.workload import Workload
 from brad.server.engine_connections import EngineConnections
@@ -51,18 +53,34 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         self._schema_name = schema_name
         self._scorer = ScalingScorer(self._monitor, self._planner_config)
 
+        self._metrics_out = open(
+            Path(self._config.planner_log_path) / "actual_metrics.csv",
+            "a",
+            encoding="UTF-8",
+        )
+        self._scoring_out = open(
+            Path(self._config.planner_log_path) / "scoring_out.csv",
+            "a",
+            encoding="UTF-8",
+        )
+
     async def run_forever(self) -> None:
-        while True:
-            await asyncio.sleep(3)
-            logger.debug("Planner is checking if a replan is needed...")
-            if self._check_if_metrics_warrant_replanning():
-                await self._replan()
+        try:
+            while True:
+                await asyncio.sleep(3)
+                logger.debug("Planner is checking if a replan is needed...")
+                if self._check_if_metrics_warrant_replanning():
+                    await self._replan()
+        finally:
+            self._metrics_out.close()
+            self._scoring_out.close()
 
     async def _replan(self) -> None:
         # This will be long-running and will block the event loop. For our
         # current needs, this is fine since the planner is the main component in
         # the daemon process.
         logger.info("Running a replan.")
+        self._log_current_metrics()
         next_workload = self._expected_workload()
         workload_filters = [
             AuroraTransactions(next_workload),
@@ -160,6 +178,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 logger.error("Next workload: %s", next_workload)
                 raise RuntimeError("No valid candidates!")
 
+            self._log_scoring_debug(candidate_set[0])
             best_blueprint = candidate_set[0].blueprint
             best_score = candidate_set[0].score
             logger.info("Selecting a new blueprint with score %s", best_score)
@@ -180,6 +199,39 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
 
     def _expected_workload(self) -> Workload:
         return self._current_workload
+
+    def _log_current_metrics(self) -> None:
+        redshift_prov = self._current_blueprint.redshift_provisioning()
+        aurora_prov = self._current_blueprint.aurora_provisioning()
+        metrics = self._monitor.read_k_most_recent(metric_ids=ALL_METRICS)
+        # Prepend provisioning information.
+        metrics.insert(0, "redshift_instance_type", redshift_prov.instance_type())
+        metrics.insert(1, "redshift_num_nodes", redshift_prov.num_nodes())
+        metrics.insert(2, "aurora_instance_type", aurora_prov.instance_type())
+        metrics.insert(3, "aurora_num_nodes", aurora_prov.num_nodes())
+        metrics.to_csv(self._metrics_out)
+
+    def _log_scoring_debug(self, candidate: "_BlueprintCandidate") -> None:
+        writer = csv.writer(self._scoring_out)
+        cols = [
+            "redshift_instance_type",
+            "redshift_num_nodes",
+            "aurora_instance_type",
+            "aurora_num_nodes",
+            *candidate.score.perf_debugging().keys(),
+        ]
+        redshift_prov = candidate.blueprint.redshift_provisioning()
+        aurora_prov = candidate.blueprint.aurora_provisioning()
+        values = [
+            redshift_prov.instance_type(),
+            redshift_prov.num_nodes(),
+            aurora_prov.instance_type(),
+            aurora_prov.num_nodes(),
+        ]
+        for col in cols[4:]:
+            values.append(candidate.score.perf_debugging()[col])
+        writer.writerow(cols)
+        writer.writerow(values)
 
 
 class _BlueprintCandidate:
