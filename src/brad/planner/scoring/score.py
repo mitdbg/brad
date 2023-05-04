@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from typing import Dict
 
 from brad.blueprint import Blueprint
@@ -61,5 +62,6 @@ class Scorer:
         current_workload: Workload,
         next_workload: Workload,
         engines: EngineConnections,
+        metrics: pd.DataFrame,
     ) -> Score:
         raise NotImplementedError

@@ -51,7 +51,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         self._planner_config = planner_config
         self._config = config
         self._schema_name = schema_name
-        self._scorer = ScalingScorer(self._monitor, self._planner_config)
+        self._scorer = ScalingScorer(self._planner_config)
 
         self._metrics_out = open(
             Path(self._config.planner_log_path) / "actual_metrics.csv",
@@ -102,6 +102,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         table_sizer = TableSizer(engines, self._config)
 
         try:
+            # Load metrics.
+            metrics = self._monitor.read_k_most_recent(metric_ids=ALL_METRICS)
+
             # Update the dataset size. We must use the current blueprint because it
             # contains information about where the tables are now.
             if self._current_workload.table_sizes_empty():
@@ -150,6 +153,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                     self._current_workload,
                     next_workload,
                     engines,
+                    metrics,
                 )
 
                 # Store the blueprint (for debugging purposes).

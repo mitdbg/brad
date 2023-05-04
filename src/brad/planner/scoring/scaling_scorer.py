@@ -2,6 +2,7 @@ import importlib.resources as pkg_resources
 import json
 import logging
 import math
+import pandas as pd
 from collections import namedtuple
 from typing import Dict, List, Optional, Tuple
 
@@ -13,7 +14,6 @@ from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
-from brad.daemon.monitor import Monitor
 from brad.planner.workload import Workload
 from brad.planner.workload.query import Query
 from brad.routing.rule_based import RuleBased
@@ -40,9 +40,7 @@ ALL_METRICS = _REDSHIFT_METRICS + _AURORA_METRICS + _ATHENA_METRICS
 
 
 class ScalingScorer(Scorer):
-    def __init__(self, monitor: Monitor, planner_config: PlannerConfig) -> None:
-        # For access to metrics.
-        self._monitor = monitor
+    def __init__(self, planner_config: PlannerConfig) -> None:
         self._planner_config = planner_config
 
     def score(
@@ -52,6 +50,7 @@ class ScalingScorer(Scorer):
         current_workload: Workload,
         next_workload: Workload,
         engines: EngineConnections,
+        metrics: pd.DataFrame,
     ) -> Score:
         bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
         transition_score = self._transition_score(
@@ -67,6 +66,7 @@ class ScalingScorer(Scorer):
             current_workload,
             next_workload,
             engines,
+            metrics,
         )
         return Score(perf_score, op_cost_score, transition_score, perf_debugging)
 
@@ -271,6 +271,7 @@ class ScalingScorer(Scorer):
         current_workload: Workload,
         next_workload: Workload,
         engines: EngineConnections,
+        metrics_df: pd.DataFrame,
     ) -> Tuple[Dict[str, float], Dict[str, float]]:
         # > 1.0 means the dataset size has increased
         dataset_scaling = (
@@ -287,8 +288,6 @@ class ScalingScorer(Scorer):
 
         inv_redshift_resource_scaling = 1.0 / redshift_resource_scaling
         inv_aurora_resource_scaling = 1.0 / aurora_resource_scaling
-
-        metrics_df = self._monitor.read_k_most_recent(metric_ids=ALL_METRICS)
 
         dataset_modifiers = self._planner_config.dataset_scaling_modifiers()
         redshift_resource_modifiers = (
