@@ -67,9 +67,7 @@ class RuleBased(Router):
                 ideal_location_rank = [Engine.Redshift, Engine.Athena, Engine.Aurora]
             else:
                 ideal_location_rank = [Engine.Aurora, Engine.Redshift, Engine.Athena]
-            # ideal_location_rank = [
-            #     loc for loc in ideal_location_rank if loc in locations
-            # ]
+
             if self._monitor is None:
                 for loc in ideal_location_rank:
                     if loc in locations:
