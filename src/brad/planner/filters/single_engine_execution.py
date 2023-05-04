@@ -1,6 +1,7 @@
 from typing import Tuple, Set
 
 from brad.blueprint import Blueprint
+from brad.config.engine import Engine
 from brad.planner.workload import Workload
 from .filter import Filter
 
@@ -21,12 +22,12 @@ class SingleEngineExecution(Filter):
         self._table_constraints = list(constraint_set)
 
     def is_valid(self, candidate: Blueprint) -> bool:
-        table_locations = candidate.table_locations()
+        table_locations = candidate.table_locations_bitmap()
 
         for constraint in self._table_constraints:
-            sets = map(lambda tbl: set(table_locations[tbl]), constraint)
-            intersection = set.intersection(*sets)
-            if len(intersection) < 1:
-                return False
-
+            locations = Engine.bitmap_all()
+            for tbl in constraint:
+                locations &= table_locations[tbl]
+                if locations == 0:
+                    return False
         return True

@@ -29,6 +29,10 @@ class Blueprint:
         self._tables_by_name = {tbl.name: tbl for tbl in self._table_schemas}
         self._base_table_names = self._compute_base_tables()
 
+        self._table_locations_bitmap: Dict[str, int] = {
+            tbl: Engine.to_bitmap(locs) for tbl, locs in self._table_locations.items()
+        }
+
     def schema_name(self) -> str:
         return self._schema_name
 
@@ -37,6 +41,9 @@ class Blueprint:
 
     def table_locations(self) -> Dict[str, List[Engine]]:
         return self._table_locations
+
+    def table_locations_bitmap(self) -> Dict[str, int]:
+        return self._table_locations_bitmap
 
     def tables_with_locations(self) -> List[Tuple[Table, List[Engine]]]:
         result = []
