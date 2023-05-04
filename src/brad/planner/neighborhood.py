@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import heapq
 from typing import List
 
 from brad.blueprint import Blueprint
@@ -14,6 +15,7 @@ from brad.planner.filters.no_data_loss import NoDataLoss
 from brad.planner.filters.single_engine_execution import SingleEngineExecution
 from brad.planner.filters.table_on_engine import TableOnEngine
 from brad.planner.scoring.scaling_scorer import ScalingScorer
+from brad.planner.scoring.score import Score
 from brad.planner.workload import Workload
 from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
@@ -70,7 +72,8 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         # No need to keep around all candidates if we are selecting the best
         # blueprint. But for debugging purposes it is useful to see what
         # blueprints are being considered.
-        candidate_set = []
+        candidate_set: List[_BlueprintCandidate] = []
+        num_top = 50
 
         # Establish connections to the underlying engines (needed for scoring
         # purposes). We use synchronous connections since there appears to be a
@@ -127,13 +130,22 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 )
 
                 # Store the blueprint (for debugging purposes).
-                candidate_set.append((score, bp.to_blueprint()))
+                if len(candidate_set) < num_top:
+                    candidate_set.append(_BlueprintCandidate(bp.to_blueprint(), score))
+                    if len(candidate_set) == num_top:
+                        heapq.heapify(candidate_set)
+                elif candidate_set[0].score_value > score.single_value():
+                    # Replace the "worst" blueprint so far with this one (lower
+                    # score is better).
+                    heapq.heappushpop(
+                        candidate_set, _BlueprintCandidate(bp.to_blueprint(), score)
+                    )
 
             # Sort by score - lower is better.
-            candidate_set.sort(key=lambda parts: parts[0].single_value())
+            candidate_set.sort(key=lambda bpc: bpc.score_value)
 
             # Log the top 50 candidate plans.
-            for score, candidate in candidate_set[:50]:
+            for score, candidate in candidate_set:
                 logger.debug("%s", score)
                 logger.debug("%s", candidate)
                 logger.debug("----------")
@@ -162,3 +174,17 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
 
     def _expected_workload(self) -> Workload:
         return self._current_workload
+
+
+class _BlueprintCandidate:
+    def __init__(self, blueprint: Blueprint, score: Score) -> None:
+        self.blueprint = blueprint
+        self.score = score
+        self.score_value = score.single_value()
+
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, _BlueprintCandidate):
+            return False
+        # N.B. We invert this __lt__ definition since we want to use it with
+        # `heapq` to create a max-heap (highest score at index 0).
+        return self.score_value > other.score_value
