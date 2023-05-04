@@ -1,5 +1,6 @@
 import importlib.resources as pkg_resources
 import json
+import logging
 import math
 from collections import namedtuple
 from typing import Dict, List, Optional, Tuple
@@ -17,6 +18,8 @@ from brad.planner.workload import Workload
 from brad.planner.workload.query import Query
 from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
+
+logger = logging.getLogger(__name__)
 
 _REDSHIFT_METRICS = [
     "redshift_CPUUtilization_Average",
@@ -42,7 +45,7 @@ class ScalingScorer(Scorer):
         self._monitor = monitor
         self._planner_config = planner_config
 
-    async def score(
+    def score(
         self,
         current_blueprint: Blueprint,
         next_blueprint: Blueprint,
@@ -51,22 +54,23 @@ class ScalingScorer(Scorer):
         engines: EngineConnections,
     ) -> Score:
         bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
-        return Score(
-            await self._performance_score(
-                current_blueprint,
-                next_blueprint,
-                bp_diff,
-                current_workload,
-                next_workload,
-                engines,
-            ),
-            await self._operational_cost_score(
-                current_blueprint, next_blueprint, next_workload, engines
-            ),
-            self._transition_score(current_blueprint, bp_diff, current_workload),
+        transition_score = self._transition_score(
+            current_blueprint, bp_diff, current_workload
         )
+        op_cost_score = self._operational_cost_score(
+            current_blueprint, next_blueprint, next_workload, engines
+        )
+        perf_score = self._performance_score(
+            current_blueprint,
+            next_blueprint,
+            bp_diff,
+            current_workload,
+            next_workload,
+            engines,
+        )
+        return Score(perf_score, op_cost_score, transition_score)
 
-    async def _operational_cost_score(
+    def _operational_cost_score(
         self,
         current_blueprint: Blueprint,
         next_blueprint: Blueprint,
@@ -107,7 +111,7 @@ class ScalingScorer(Scorer):
         for q in dests[Engine.Aurora]:
             # Data accessed must always be populated using the current blueprint
             # (since the tables would not have been moved yet).
-            await q.populate_data_accessed_mb(
+            q.populate_data_accessed_mb(
                 for_engine=Engine.Aurora,
                 connections=engines,
                 blueprint=current_blueprint,
@@ -118,7 +122,7 @@ class ScalingScorer(Scorer):
         for q in dests[Engine.Athena]:
             # Data accessed must always be populated using the current blueprint
             # (since the tables would not have been moved yet).
-            await q.populate_data_accessed_mb(
+            q.populate_data_accessed_mb(
                 for_engine=Engine.Athena,
                 connections=engines,
                 blueprint=current_blueprint,
@@ -259,7 +263,7 @@ class ScalingScorer(Scorer):
         else:
             return options[0][0]
 
-    async def _performance_score(
+    def _performance_score(
         self,
         current_blueprint: Blueprint,
         next_blueprint: Blueprint,
@@ -294,7 +298,6 @@ class ScalingScorer(Scorer):
             self._planner_config.aurora_resource_scaling_modifiers()
         )
 
-        # TODO: Apply modifiers based on a changed table placement.
         current_router = RuleBased(blueprint=current_blueprint)
         next_router = RuleBased(blueprint=next_blueprint)
 
@@ -312,9 +315,7 @@ class ScalingScorer(Scorer):
         # current workload (used to weigh the workload assigned to each engine).
         for q in current_workload.analytical_queries():
             current_engine = current_router.engine_for(q)
-            await q.populate_data_accessed_mb(
-                current_engine, engines, current_blueprint
-            )
+            q.populate_data_accessed_mb(current_engine, engines, current_blueprint)
             total_accessed_mb[current_engine] += q.data_accessed_mb(current_engine)
 
         for q in next_workload.analytical_queries():
@@ -323,7 +324,7 @@ class ScalingScorer(Scorer):
             # not yet be present on the engines in the next blueprint. This also
             # assumes the queries in the new workload do not access any new
             # tables.
-            await q.populate_data_accessed_mb(next_engine, engines, current_blueprint)
+            q.populate_data_accessed_mb(next_engine, engines, current_blueprint)
             dest_queries[next_engine].append(q)
 
         # Compute the table placement modifiers for each engine.
@@ -463,7 +464,7 @@ def _load_instance_specs(file_name: str) -> Dict[str, _Provisioning]:
             config["instance_type"],
             config["usd_per_hour"],
             config["vcpus"],
-            config["mem_mib"],
+            config["memory_mib"],
         )
         for config in raw_json
     }

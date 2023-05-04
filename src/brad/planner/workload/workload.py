@@ -91,21 +91,21 @@ class Workload:
     def dataset_size_mb(self) -> int:
         return self._dataset_size_mb
 
-    async def populate_table_sizes_using_blueprint(
+    def populate_table_sizes_using_blueprint(
         self, blueprint: Blueprint, table_sizer: TableSizer
     ) -> None:
         self._table_sizes_mb.clear()
         for table, locations in blueprint.tables_with_locations():
             for loc in locations:
-                self._table_sizes_mb[
-                    (table.name, loc)
-                ] = await table_sizer.table_size_mb(table.name, loc)
+                self._table_sizes_mb[(table.name, loc)] = table_sizer.table_size_mb(
+                    table.name, loc
+                )
 
             # Fetch the row size as well, if applicable.
             if Engine.Aurora in locations:
                 self._aurora_row_size_bytes[
                     table.name
-                ] = await table_sizer.aurora_row_size_bytes(table.name)
+                ] = table_sizer.aurora_row_size_bytes(table.name)
 
     def set_dataset_size_from_table_sizes(self) -> None:
         largest_table_mb: Dict[str, int] = {}

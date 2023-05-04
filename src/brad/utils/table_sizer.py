@@ -1,4 +1,3 @@
-import asyncio
 import boto3
 import logging
 
@@ -23,31 +22,31 @@ class TableSizer:
             aws_secret_access_key=config.aws_access_key_secret,
         )
 
-    async def table_size_mb(self, table_name: str, location: Engine) -> int:
+    def table_size_mb(self, table_name: str, location: Engine) -> int:
         if location == Engine.Aurora:
-            return await self._table_size_mb_aurora(table_name)
+            return self._table_size_mb_aurora(table_name)
         elif location == Engine.Athena:
-            return await self._table_size_mb_athena(table_name)
+            return self._table_size_mb_athena(table_name)
         elif location == Engine.Redshift:
-            return await self._table_size_mb_redshift(table_name)
+            return self._table_size_mb_redshift(table_name)
         else:
             raise RuntimeError(
                 "Unknown location {} for table {}".format(str(location), table_name)
             )
 
-    async def aurora_row_size_bytes(self, table_name: str) -> int:
+    def aurora_row_size_bytes(self, table_name: str) -> int:
         """
         A rough estimate for the size of a row in Aurora, in bytes.
         """
 
         query = f"SELECT pg_column_size(t.*) FROM {table_name} t LIMIT 1"
         conn = self._engines.get_connection(Engine.Aurora)
-        cursor = await conn.cursor()
-        await cursor.execute(query)
-        row = await cursor.fetchone()
+        cursor = conn.cursor()
+        cursor.execute(query)
+        row = cursor.fetchone()
         return int(row[0])
 
-    async def _table_size_mb_athena(self, table_name: str) -> int:
+    def _table_size_mb_athena(self, table_name: str) -> int:
         # Format: s3://bucket/path/to/files/
         parts = self._config.athena_s3_data_path.split("/")
         bucket_name = parts[2]
@@ -63,29 +62,27 @@ class TableSizer:
             # `total_size` is in bytes.
             return total_size_bytes
 
-        loop = asyncio.get_running_loop()
-        total_size_bytes = await loop.run_in_executor(None, run_inner)
-
+        total_size_bytes = run_inner()
         return int(total_size_bytes / 1000 / 1000)
 
-    async def _table_size_mb_aurora(self, table_name: str) -> int:
+    def _table_size_mb_aurora(self, table_name: str) -> int:
         query = "SELECT pg_table_size('{}')".format(table_name)
         aurora = self._engines.get_connection(Engine.Aurora)
-        cursor = await aurora.cursor()
+        cursor = aurora.cursor()
         logger.debug("Running on Aurora: %s", query)
-        await cursor.execute(query)
-        result = await cursor.fetchone()
+        cursor.execute(query)
+        result = cursor.fetchone()
         # The result is in bytes.
         return int(int(result[0]) / 1000 / 1000)
 
-    async def _table_size_mb_redshift(self, table_name: str) -> int:
+    def _table_size_mb_redshift(self, table_name: str) -> int:
         query = "SELECT size FROM svv_table_info WHERE \"table\" = '{}';".format(
             table_name
         )
         redshift = self._engines.get_connection(Engine.Redshift)
         logger.debug("Running on Redshift: %s", query)
-        cursor = await redshift.cursor()
-        await cursor.execute(query)
-        result = await cursor.fetchone()
+        cursor = redshift.cursor()
+        cursor.execute(query)
+        result = cursor.fetchone()
         table_size_mb = int(result[0])
         return table_size_mb
