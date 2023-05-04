@@ -1,13 +1,16 @@
 import importlib.resources as pkg_resources
 import json
+import logging
 import math
-from typing import Dict, List
+from collections import namedtuple
+from typing import Dict, List, Optional, Tuple
 
 from .score import Scorer, Score
 import brad.planner.scoring.data as score_data
 
 from brad.blueprint import Blueprint
 from brad.blueprint.diff.blueprint import BlueprintDiff
+from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
@@ -16,6 +19,25 @@ from brad.planner.workload.query import Query
 from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
 
+logger = logging.getLogger(__name__)
+
+_REDSHIFT_METRICS = [
+    "redshift_CPUUtilization_Average",
+    "redshift_ReadIOPS_Average",
+]
+
+_AURORA_METRICS = [
+    "aurora_WRITER_CPUUtilization_Average",
+    "aurora_WRITER_ReadIOPS_Average",
+    "aurora_WRITER_WriteIOPS_Average",
+]
+
+_ATHENA_METRICS = [
+    "athena_TotalExecutionTime_Sum",
+]
+
+_ALL_METRICS = _REDSHIFT_METRICS + _AURORA_METRICS + _ATHENA_METRICS
+
 
 class ScalingScorer(Scorer):
     def __init__(self, monitor: Monitor, planner_config: PlannerConfig) -> None:
@@ -23,7 +45,7 @@ class ScalingScorer(Scorer):
         self._monitor = monitor
         self._planner_config = planner_config
 
-    async def score(
+    def score(
         self,
         current_blueprint: Blueprint,
         next_blueprint: Blueprint,
@@ -31,15 +53,24 @@ class ScalingScorer(Scorer):
         next_workload: Workload,
         engines: EngineConnections,
     ) -> Score:
-        return Score(
-            1.0,
-            await self._operational_cost_score(
-                current_blueprint, next_blueprint, next_workload, engines
-            ),
-            self._transition_score(current_blueprint, next_blueprint, current_workload),
+        bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
+        transition_score = self._transition_score(
+            current_blueprint, bp_diff, current_workload
         )
+        op_cost_score = self._operational_cost_score(
+            current_blueprint, next_blueprint, next_workload, engines
+        )
+        perf_score = self._performance_score(
+            current_blueprint,
+            next_blueprint,
+            bp_diff,
+            current_workload,
+            next_workload,
+            engines,
+        )
+        return Score(perf_score, op_cost_score, transition_score)
 
-    async def _operational_cost_score(
+    def _operational_cost_score(
         self,
         current_blueprint: Blueprint,
         next_blueprint: Blueprint,
@@ -55,10 +86,12 @@ class ScalingScorer(Scorer):
         aurora_prov = next_blueprint.aurora_provisioning()
         redshift_prov = next_blueprint.redshift_provisioning()
         aurora_prov_cost = (
-            _AURORA_PRICING[aurora_prov.instance_type()] * aurora_prov.num_nodes()
+            _AURORA_SPECS[aurora_prov.instance_type()].usd_per_hour
+            * aurora_prov.num_nodes()
         )
         redshift_prov_cost = (
-            _REDSHIFT_PRICING[redshift_prov.instance_type()] * redshift_prov.num_nodes()
+            _REDSHIFT_SPECS[redshift_prov.instance_type()].usd_per_hour
+            * redshift_prov.num_nodes()
         )
 
         # NOTE: The routing policy should be included in the blueprint. We
@@ -78,7 +111,7 @@ class ScalingScorer(Scorer):
         for q in dests[Engine.Aurora]:
             # Data accessed must always be populated using the current blueprint
             # (since the tables would not have been moved yet).
-            await q.populate_data_accessed_mb(
+            q.populate_data_accessed_mb(
                 for_engine=Engine.Aurora,
                 connections=engines,
                 blueprint=current_blueprint,
@@ -89,7 +122,7 @@ class ScalingScorer(Scorer):
         for q in dests[Engine.Athena]:
             # Data accessed must always be populated using the current blueprint
             # (since the tables would not have been moved yet).
-            await q.populate_data_accessed_mb(
+            q.populate_data_accessed_mb(
                 for_engine=Engine.Athena,
                 connections=engines,
                 blueprint=current_blueprint,
@@ -110,7 +143,7 @@ class ScalingScorer(Scorer):
     def _transition_score(
         self,
         current_blueprint: Blueprint,
-        next_blueprint: Blueprint,
+        bp_diff: Optional[BlueprintDiff],
         current_workload: Workload,
     ) -> float:
         # Transition score:
@@ -118,9 +151,8 @@ class ScalingScorer(Scorer):
         # - Table movement monetary costs (Athena)
         # - Redshift scale up / down time
         # - Aurora scale up / down time
-        bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
         if bp_diff is None:
-            transition_score = 0.0
+            transition_score = 1.0
         else:
             # Provisioning changes.
             redshift_prov_time_s = (
@@ -200,7 +232,9 @@ class ScalingScorer(Scorer):
                 redshift_prov_time_s + aurora_prov_time_s + movement_time_s
             )
             transition_cost = movement_cost
-            transition_score = math.sqrt(transition_time_s * transition_cost)
+            transition_score = math.sqrt(
+                (1.0 + transition_time_s) * (1.0 + transition_cost)
+            )
 
         return transition_score
 
@@ -229,13 +263,212 @@ class ScalingScorer(Scorer):
         else:
             return options[0][0]
 
+    def _performance_score(
+        self,
+        current_blueprint: Blueprint,
+        next_blueprint: Blueprint,
+        bp_diff: Optional[BlueprintDiff],
+        current_workload: Workload,
+        next_workload: Workload,
+        engines: EngineConnections,
+    ) -> Dict[str, float]:
+        # > 1.0 means the dataset size has increased
+        dataset_scaling = (
+            next_workload.dataset_size_mb() / current_workload.dataset_size_mb()
+        )
+        # > 1.0 means there are more resources
+        redshift_resource_scaling = self._compute_resource_scaling(
+            current_blueprint, next_blueprint, bp_diff, Engine.Redshift
+        )
+        # > 1.0 means there are more resources
+        aurora_resource_scaling = self._compute_resource_scaling(
+            current_blueprint, next_blueprint, bp_diff, Engine.Aurora
+        )
 
-def _load_instance_pricing(file_name: str) -> Dict[str, float]:
+        inv_redshift_resource_scaling = 1.0 / redshift_resource_scaling
+        inv_aurora_resource_scaling = 1.0 / aurora_resource_scaling
+
+        metrics_df = self._monitor.read_k_most_recent(metric_ids=_ALL_METRICS)
+
+        dataset_modifiers = self._planner_config.dataset_scaling_modifiers()
+        redshift_resource_modifiers = (
+            self._planner_config.redshift_resource_scaling_modifiers()
+        )
+        aurora_resource_modifiers = (
+            self._planner_config.aurora_resource_scaling_modifiers()
+        )
+
+        current_router = RuleBased(blueprint=current_blueprint)
+        next_router = RuleBased(blueprint=next_blueprint)
+
+        total_accessed_mb: Dict[Engine, int] = {}
+        total_accessed_mb[Engine.Aurora] = 0
+        total_accessed_mb[Engine.Redshift] = 0
+        total_accessed_mb[Engine.Athena] = 0
+
+        dest_queries: Dict[Engine, List[Query]] = {}
+        dest_queries[Engine.Aurora] = []
+        dest_queries[Engine.Redshift] = []
+        dest_queries[Engine.Athena] = []
+
+        # Compute the total amount of data accessed on each engine in the
+        # current workload (used to weigh the workload assigned to each engine).
+        for q in current_workload.analytical_queries():
+            current_engine = current_router.engine_for(q)
+            q.populate_data_accessed_mb(current_engine, engines, current_blueprint)
+            total_accessed_mb[current_engine] += q.data_accessed_mb(current_engine)
+
+        for q in next_workload.analytical_queries():
+            next_engine = next_router.engine_for(q)
+            # N.B. Need to use the current blueprint here because the tables may
+            # not yet be present on the engines in the next blueprint. This also
+            # assumes the queries in the new workload do not access any new
+            # tables.
+            q.populate_data_accessed_mb(next_engine, engines, current_blueprint)
+            dest_queries[next_engine].append(q)
+
+        # Compute the table placement modifiers for each engine.
+        def compute_table_modifier(engine):
+            if total_accessed_mb[engine] == 0:
+                modifier = 1.0
+            else:
+                accessed_mb = 0
+                for q in dest_queries[engine]:
+                    accessed_mb += q.data_accessed_mb(engine)
+                modifier = accessed_mb / total_accessed_mb[engine]
+            return modifier
+
+        aurora_tp_modifier = compute_table_modifier(Engine.Aurora)
+        redshift_tp_modifier = compute_table_modifier(Engine.Redshift)
+        athena_tp_modifier = compute_table_modifier(Engine.Athena)
+
+        predicted_metrics: Dict[str, float] = {}
+
+        # Redshift predictions.
+        for metric_name in _REDSHIFT_METRICS:
+            curr_value = metrics_df[metric_name].iloc[0]
+            pred_value = curr_value
+            pred_value *= dataset_scaling * dataset_modifiers[metric_name]
+            pred_value *= (
+                inv_redshift_resource_scaling * redshift_resource_modifiers[metric_name]
+            )
+            pred_value *= redshift_tp_modifier
+            predicted_metrics[metric_name] = pred_value
+
+        # Aurora predictions.
+        # TODO: Model the difference between Aurora writer instances and read
+        # replicas.
+        # TODO: Model the interaction between transactions and analytics on
+        # Aurora's metrics.
+        for metric_name in _AURORA_METRICS:
+            curr_value = metrics_df[metric_name].iloc[0]
+            pred_value = curr_value
+            pred_value *= dataset_scaling * dataset_modifiers[metric_name]
+            pred_value *= (
+                inv_aurora_resource_scaling * aurora_resource_modifiers[metric_name]
+            )
+            pred_value *= aurora_tp_modifier
+            predicted_metrics[metric_name] = pred_value
+
+        # Athena predictions.
+        for metric_name in _ATHENA_METRICS:
+            curr_value = metrics_df[metric_name].iloc[0]
+            pred_value = curr_value
+            pred_value *= dataset_scaling * dataset_modifiers[metric_name]
+            pred_value *= athena_tp_modifier
+            predicted_metrics[metric_name] = pred_value
+
+        return predicted_metrics
+
+    def _compute_resource_scaling(
+        self,
+        current_blueprint: Blueprint,
+        next_blueprint: Blueprint,
+        bp_diff: Optional[BlueprintDiff],
+        engine: Engine,
+    ) -> float:
+        if bp_diff is None:
+            # No provisioning change.
+            return 1.0
+
+        if engine == Engine.Redshift:
+            diff = bp_diff.redshift_diff()
+            if diff is None:
+                # No Redshift provisioning change.
+                return 1.0
+            if (
+                current_blueprint.redshift_provisioning().num_nodes() == 0
+                or next_blueprint.redshift_provisioning().num_nodes() == 0
+            ):
+                # This engine is/will be disabled.
+                return 0.0
+            curr_specs = self._retrieve_provisioning_specs(
+                engine, current_blueprint.redshift_provisioning()
+            )
+            next_specs = self._retrieve_provisioning_specs(
+                engine, next_blueprint.redshift_provisioning()
+            )
+
+        elif engine == Engine.Aurora:
+            diff = bp_diff.aurora_diff()
+            if diff is None:
+                # No Aurora provisioning change.
+                return 1.0
+            if (
+                current_blueprint.aurora_provisioning().num_nodes() == 0
+                or next_blueprint.aurora_provisioning().num_nodes() == 0
+            ):
+                # This engine is/will be disabled.
+                return 0.0
+            curr_specs = self._retrieve_provisioning_specs(
+                engine, current_blueprint.aurora_provisioning()
+            )
+            next_specs = self._retrieve_provisioning_specs(
+                engine, next_blueprint.aurora_provisioning()
+            )
+
+        else:
+            raise RuntimeError("Unsupported resource scaling engine {}".format(engine))
+
+        cpu_scale = next_specs[0] / curr_specs[0]
+        mem_scale = next_specs[1] / curr_specs[1]
+
+        return math.sqrt(cpu_scale * mem_scale)
+
+    def _retrieve_provisioning_specs(
+        self, engine: Engine, provisioning: Provisioning
+    ) -> Tuple[int, int]:
+        if engine == Engine.Redshift:
+            specs = _REDSHIFT_SPECS[provisioning.instance_type()]
+        elif engine == Engine.Aurora:
+            specs = _AURORA_SPECS[provisioning.instance_type()]
+        else:
+            raise RuntimeError("Unsupported resource scaling engine {}".format(engine))
+        return (
+            specs.vcpus * provisioning.num_nodes(),
+            specs.mem_mib * provisioning.num_nodes(),
+        )
+
+
+_Provisioning = namedtuple(
+    "_Provisioning", ["instance_type", "usd_per_hour", "vcpus", "mem_mib"]
+)
+
+
+def _load_instance_specs(file_name: str) -> Dict[str, _Provisioning]:
     with pkg_resources.open_text(score_data, file_name) as data:
         raw_json = json.load(data)
 
-    return {config["instance_type"]: config["usd_per_hour"] for config in raw_json}
+    return {
+        config["instance_type"]: _Provisioning(
+            config["instance_type"],
+            config["usd_per_hour"],
+            config["vcpus"],
+            config["memory_mib"],
+        )
+        for config in raw_json
+    }
 
 
-_AURORA_PRICING = _load_instance_pricing("aurora_postgresql_instances.json")
-_REDSHIFT_PRICING = _load_instance_pricing("redshift_instances.json")
+_AURORA_SPECS = _load_instance_specs("aurora_postgresql_instances.json")
+_REDSHIFT_SPECS = _load_instance_specs("redshift_instances.json")

@@ -24,7 +24,7 @@ class Query(QueryRep):
     def data_accessed_mb(self, engine: Engine) -> int:
         return self._data_accessed_mb[engine]
 
-    async def populate_data_accessed_mb(
+    def populate_data_accessed_mb(
         self, for_engine: Engine, connections: EngineConnections, blueprint: Blueprint
     ) -> None:
         if for_engine in self._data_accessed_mb:
@@ -54,15 +54,15 @@ class Query(QueryRep):
         if source_engine == Engine.Aurora:
             query = "EXPLAIN VERBOSE {}".format(self.raw_query)
             aurora = connections.get_connection(Engine.Aurora)
-            cursor = await aurora.cursor()
+            cursor = aurora.cursor()
         else:
             assert source_engine == Engine.Redshift
             query = "EXPLAIN {}".format(self.raw_query)
             redshift = connections.get_connection(Engine.Redshift)
-            cursor = await redshift.cursor()
+            cursor = redshift.cursor()
 
-        await cursor.execute(query)
-        plan_rows = [tuple(row) async for row in cursor]
+        cursor.execute(query)
+        plan_rows = [tuple(row) for row in cursor]
         plan = parse_explain_verbose(plan_rows)
         base_cardinalities = extract_base_cardinalities(plan)
 

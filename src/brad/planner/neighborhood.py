@@ -73,8 +73,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         candidate_set = []
 
         # Establish connections to the underlying engines (needed for scoring
-        # purposes).
-        engines = await EngineConnections.connect(
+        # purposes). We use synchronous connections since there appears to be a
+        # bug in aioodbc that causes an indefinite await on a query result.
+        engines = EngineConnections.connect_sync(
             self._config, self._schema_name, autocommit=False
         )
         table_sizer = TableSizer(engines, self._config)
@@ -83,13 +84,13 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             # Update the dataset size. We must use the current blueprint because it
             # contains information about where the tables are now.
             if self._current_workload.table_sizes_empty():
-                await self._current_workload.populate_table_sizes_using_blueprint(
+                self._current_workload.populate_table_sizes_using_blueprint(
                     self._current_blueprint, table_sizer
                 )
                 self._current_workload.set_dataset_size_from_table_sizes()
 
             if next_workload.table_sizes_empty():
-                await next_workload.populate_table_sizes_using_blueprint(
+                next_workload.populate_table_sizes_using_blueprint(
                     self._current_blueprint, table_sizer
                 )
                 next_workload.set_dataset_size_from_table_sizes()
@@ -117,7 +118,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                     continue
 
                 # Score the blueprint.
-                score = await self._scorer.score(
+                score = self._scorer.score(
                     self._current_blueprint,
                     bp,
                     self._current_workload,
@@ -131,9 +132,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             # Sort by score - lower is better.
             candidate_set.sort(key=lambda parts: parts[0].single_value())
 
-            # Log the candidates.
-            for score, candidate in candidate_set:
-                logger.debug("Score: %s", score)
+            # Log the top 50 candidate plans.
+            for score, candidate in candidate_set[:50]:
+                logger.debug("%s", score)
                 logger.debug("%s", candidate)
                 logger.debug("----------")
 
@@ -152,7 +153,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             await self._notify_new_blueprint(best_blueprint)
 
         finally:
-            await engines.close()
+            engines.close_sync()
 
     def _check_if_metrics_warrant_replanning(self) -> bool:
         # See if the metrics indicate that we should trigger the planning
