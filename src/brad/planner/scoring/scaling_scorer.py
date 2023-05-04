@@ -52,7 +52,14 @@ class ScalingScorer(Scorer):
     ) -> Score:
         bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
         return Score(
-            {},
+            await self._performance_score(
+                current_blueprint,
+                next_blueprint,
+                bp_diff,
+                current_workload,
+                next_workload,
+                engines,
+            ),
             await self._operational_cost_score(
                 current_blueprint, next_blueprint, next_workload, engines
             ),
@@ -252,13 +259,14 @@ class ScalingScorer(Scorer):
         else:
             return options[0][0]
 
-    def _performance_score(
+    async def _performance_score(
         self,
         current_blueprint: Blueprint,
         next_blueprint: Blueprint,
         bp_diff: Optional[BlueprintDiff],
         current_workload: Workload,
         next_workload: Workload,
+        engines: EngineConnections,
     ) -> Dict[str, float]:
         # > 1.0 means the dataset size has increased
         dataset_scaling = (
@@ -287,6 +295,70 @@ class ScalingScorer(Scorer):
         )
 
         # TODO: Apply modifiers based on a changed table placement.
+        current_router = RuleBased(blueprint=current_blueprint)
+        next_router = RuleBased(blueprint=next_blueprint)
+
+        total_accessed_mb: Dict[Engine, int] = {}
+        total_accessed_mb[Engine.Aurora] = 0
+        total_accessed_mb[Engine.Redshift] = 0
+        total_accessed_mb[Engine.Athena] = 0
+
+        unmoved_queries: Dict[Engine, List[Query]] = {}
+        unmoved_queries[Engine.Aurora] = []
+        unmoved_queries[Engine.Redshift] = []
+        unmoved_queries[Engine.Athena] = []
+
+        added_queries: Dict[Engine, List[Query]] = {}
+        added_queries[Engine.Aurora] = []
+        added_queries[Engine.Redshift] = []
+        added_queries[Engine.Athena] = []
+
+        # We can only realistically use the current workload for these estimates
+        # because the future workload may not be supported by the current
+        # blueprint.
+        for q in current_workload.analytical_queries():
+            current_engine = current_router.engine_for(q)
+            await q.populate_data_accessed_mb(
+                current_engine, engines, current_blueprint
+            )
+            total_accessed_mb[current_engine] += q.data_accessed_mb(current_engine)
+
+            next_engine = next_router.engine_for(q)
+            if current_engine == next_engine:
+                unmoved_queries[current_engine].append(q)
+            else:
+                added_queries[next_engine].append(q)
+
+        # Compute the table placement modifiers for each engine.
+        if total_accessed_mb[Engine.Aurora] == 0:
+            aurora_tp_modifier = 1.0
+        else:
+            accessed_mb = 0
+            for q in unmoved_queries[Engine.Aurora]:
+                accessed_mb += q.data_accessed_mb(Engine.Aurora)
+            for q in added_queries[Engine.Aurora]:
+                accessed_mb += q.data_accessed_mb(Engine.Aurora)
+            aurora_tp_modifier = accessed_mb / total_accessed_mb[Engine.Aurora]
+
+        if total_accessed_mb[Engine.Redshift] == 0:
+            redshift_tp_modifier = 1.0
+        else:
+            accessed_mb = 0
+            for q in unmoved_queries[Engine.Redshift]:
+                accessed_mb += q.data_accessed_mb(Engine.Redshift)
+            for q in added_queries[Engine.Redshift]:
+                accessed_mb += q.data_accessed_mb(Engine.Redshift)
+            redshift_tp_modifier = accessed_mb / total_accessed_mb[Engine.Redshift]
+
+        if total_accessed_mb[Engine.Athena] == 0:
+            athena_tp_modifier = 1.0
+        else:
+            accessed_mb = 0
+            for q in unmoved_queries[Engine.Athena]:
+                accessed_mb += q.data_accessed_mb(Engine.Athena)
+            for q in added_queries[Engine.Athena]:
+                accessed_mb += q.data_accessed_mb(Engine.Athena)
+            athena_tp_modifier = accessed_mb / total_accessed_mb[Engine.Athena]
 
         predicted_metrics: Dict[str, float] = {}
 
@@ -298,6 +370,7 @@ class ScalingScorer(Scorer):
             pred_value *= (
                 inv_redshift_resource_scaling * redshift_resource_modifiers[metric_name]
             )
+            pred_value *= redshift_tp_modifier
             predicted_metrics[metric_name] = pred_value
 
         # Aurora predictions.
@@ -312,6 +385,7 @@ class ScalingScorer(Scorer):
             pred_value *= (
                 inv_aurora_resource_scaling * aurora_resource_modifiers[metric_name]
             )
+            pred_value *= aurora_tp_modifier
             predicted_metrics[metric_name] = pred_value
 
         # Athena predictions.
@@ -319,6 +393,7 @@ class ScalingScorer(Scorer):
             curr_value = metrics_df[metric_name].iloc[0]
             pred_value = curr_value
             pred_value *= dataset_scaling * dataset_modifiers[metric_name]
+            pred_value *= athena_tp_modifier
             predicted_metrics[metric_name] = pred_value
 
         return predicted_metrics
