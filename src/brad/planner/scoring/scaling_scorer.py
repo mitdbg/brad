@@ -303,19 +303,13 @@ class ScalingScorer(Scorer):
         total_accessed_mb[Engine.Redshift] = 0
         total_accessed_mb[Engine.Athena] = 0
 
-        unmoved_queries: Dict[Engine, List[Query]] = {}
-        unmoved_queries[Engine.Aurora] = []
-        unmoved_queries[Engine.Redshift] = []
-        unmoved_queries[Engine.Athena] = []
+        dest_queries: Dict[Engine, List[Query]] = {}
+        dest_queries[Engine.Aurora] = []
+        dest_queries[Engine.Redshift] = []
+        dest_queries[Engine.Athena] = []
 
-        added_queries: Dict[Engine, List[Query]] = {}
-        added_queries[Engine.Aurora] = []
-        added_queries[Engine.Redshift] = []
-        added_queries[Engine.Athena] = []
-
-        # We can only realistically use the current workload for these estimates
-        # because the future workload may not be supported by the current
-        # blueprint.
+        # Compute the total amount of data accessed on each engine in the
+        # current workload (used to weigh the workload assigned to each engine).
         for q in current_workload.analytical_queries():
             current_engine = current_router.engine_for(q)
             await q.populate_data_accessed_mb(
@@ -323,42 +317,29 @@ class ScalingScorer(Scorer):
             )
             total_accessed_mb[current_engine] += q.data_accessed_mb(current_engine)
 
+        for q in next_workload.analytical_queries():
             next_engine = next_router.engine_for(q)
-            if current_engine == next_engine:
-                unmoved_queries[current_engine].append(q)
-            else:
-                added_queries[next_engine].append(q)
+            # N.B. Need to use the current blueprint here because the tables may
+            # not yet be present on the engines in the next blueprint. This also
+            # assumes the queries in the new workload do not access any new
+            # tables.
+            await q.populate_data_accessed_mb(next_engine, engines, current_blueprint)
+            dest_queries[next_engine].append(q)
 
         # Compute the table placement modifiers for each engine.
-        if total_accessed_mb[Engine.Aurora] == 0:
-            aurora_tp_modifier = 1.0
-        else:
-            accessed_mb = 0
-            for q in unmoved_queries[Engine.Aurora]:
-                accessed_mb += q.data_accessed_mb(Engine.Aurora)
-            for q in added_queries[Engine.Aurora]:
-                accessed_mb += q.data_accessed_mb(Engine.Aurora)
-            aurora_tp_modifier = accessed_mb / total_accessed_mb[Engine.Aurora]
+        def compute_table_modifier(engine):
+            if total_accessed_mb[engine] == 0:
+                modifier = 1.0
+            else:
+                accessed_mb = 0
+                for q in dest_queries[engine]:
+                    accessed_mb += q.data_accessed_mb(engine)
+                modifier = accessed_mb / total_accessed_mb[engine]
+            return modifier
 
-        if total_accessed_mb[Engine.Redshift] == 0:
-            redshift_tp_modifier = 1.0
-        else:
-            accessed_mb = 0
-            for q in unmoved_queries[Engine.Redshift]:
-                accessed_mb += q.data_accessed_mb(Engine.Redshift)
-            for q in added_queries[Engine.Redshift]:
-                accessed_mb += q.data_accessed_mb(Engine.Redshift)
-            redshift_tp_modifier = accessed_mb / total_accessed_mb[Engine.Redshift]
-
-        if total_accessed_mb[Engine.Athena] == 0:
-            athena_tp_modifier = 1.0
-        else:
-            accessed_mb = 0
-            for q in unmoved_queries[Engine.Athena]:
-                accessed_mb += q.data_accessed_mb(Engine.Athena)
-            for q in added_queries[Engine.Athena]:
-                accessed_mb += q.data_accessed_mb(Engine.Athena)
-            athena_tp_modifier = accessed_mb / total_accessed_mb[Engine.Athena]
+        aurora_tp_modifier = compute_table_modifier(Engine.Aurora)
+        redshift_tp_modifier = compute_table_modifier(Engine.Redshift)
+        athena_tp_modifier = compute_table_modifier(Engine.Athena)
 
         predicted_metrics: Dict[str, float] = {}
 
