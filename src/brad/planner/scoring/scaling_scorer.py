@@ -36,7 +36,7 @@ _ATHENA_METRICS = [
     "athena_TotalExecutionTime_Sum",
 ]
 
-_ALL_METRICS = _REDSHIFT_METRICS + _AURORA_METRICS + _ATHENA_METRICS
+ALL_METRICS = _REDSHIFT_METRICS + _AURORA_METRICS + _ATHENA_METRICS
 
 
 class ScalingScorer(Scorer):
@@ -60,7 +60,7 @@ class ScalingScorer(Scorer):
         op_cost_score = self._operational_cost_score(
             current_blueprint, next_blueprint, next_workload, engines
         )
-        perf_score = self._performance_score(
+        perf_score, perf_debugging = self._performance_score(
             current_blueprint,
             next_blueprint,
             bp_diff,
@@ -68,7 +68,7 @@ class ScalingScorer(Scorer):
             next_workload,
             engines,
         )
-        return Score(perf_score, op_cost_score, transition_score)
+        return Score(perf_score, op_cost_score, transition_score, perf_debugging)
 
     def _operational_cost_score(
         self,
@@ -271,7 +271,7 @@ class ScalingScorer(Scorer):
         current_workload: Workload,
         next_workload: Workload,
         engines: EngineConnections,
-    ) -> Dict[str, float]:
+    ) -> Tuple[Dict[str, float], Dict[str, float]]:
         # > 1.0 means the dataset size has increased
         dataset_scaling = (
             next_workload.dataset_size_mb() / current_workload.dataset_size_mb()
@@ -288,7 +288,7 @@ class ScalingScorer(Scorer):
         inv_redshift_resource_scaling = 1.0 / redshift_resource_scaling
         inv_aurora_resource_scaling = 1.0 / aurora_resource_scaling
 
-        metrics_df = self._monitor.read_k_most_recent(metric_ids=_ALL_METRICS)
+        metrics_df = self._monitor.read_k_most_recent(metric_ids=ALL_METRICS)
 
         dataset_modifiers = self._planner_config.dataset_scaling_modifiers()
         redshift_resource_modifiers = (
@@ -378,7 +378,16 @@ class ScalingScorer(Scorer):
             pred_value *= athena_tp_modifier
             predicted_metrics[metric_name] = pred_value
 
-        return predicted_metrics
+        prediction_debugging = {
+            "aurora_tp_modifier": aurora_tp_modifier,
+            "athena_tp_modifier": athena_tp_modifier,
+            "redshift_tp_modifier": redshift_tp_modifier,
+            "dataset_scaling": dataset_scaling,
+            "redshift_resource_scaling": redshift_resource_scaling,
+            "aurora_resource_scaling": aurora_resource_scaling,
+        }
+
+        return predicted_metrics, prediction_debugging
 
     def _compute_resource_scaling(
         self,

@@ -20,6 +20,10 @@ class ConfigFile:
         return self._raw["daemon_log_file"] if "daemon_log_file" in self._raw else None
 
     @property
+    def planner_log_path(self) -> str:
+        return self._raw["planner_log_path"] if "planner_log_path" in self._raw else "."
+
+    @property
     def server_interface(self) -> str:
         return self._raw["server_interface"]
 
