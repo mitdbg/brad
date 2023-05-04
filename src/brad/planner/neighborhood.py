@@ -98,11 +98,16 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 )
                 next_workload.set_dataset_size_from_table_sizes()
 
-            for bp in NeighborhoodBlueprintEnumerator.enumerate(
-                self._current_blueprint,
-                self._planner_config.max_num_table_moves(),
-                self._planner_config.max_provisioning_multiplier(),
+            for idx, bp in enumerate(
+                NeighborhoodBlueprintEnumerator.enumerate(
+                    self._current_blueprint,
+                    self._planner_config.max_num_table_moves(),
+                    self._planner_config.max_provisioning_multiplier(),
+                )
             ):
+                if idx % 10000 == 0:
+                    logger.debug("Processing %d", idx)
+
                 # Workload-independent filters.
                 # Drop this candidate if any are invalid.
                 if any(
@@ -145,9 +150,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             candidate_set.sort(key=lambda bpc: bpc.score_value)
 
             # Log the top 50 candidate plans.
-            for score, candidate in candidate_set:
-                logger.debug("%s", score)
-                logger.debug("%s", candidate)
+            for candidate in candidate_set:
+                logger.debug("%s", candidate.score)
+                logger.debug("%s", candidate.blueprint)
                 logger.debug("----------")
 
             if len(candidate_set) == 0:
@@ -155,7 +160,8 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 logger.error("Next workload: %s", next_workload)
                 raise RuntimeError("No valid candidates!")
 
-            best_score, best_blueprint = candidate_set[1]
+            best_blueprint = candidate_set[0].blueprint
+            best_score = candidate_set[0].score
             logger.info("Selecting a new blueprint with score %s", best_score)
             logger.info("%s", best_blueprint)
             self._current_blueprint = best_blueprint
