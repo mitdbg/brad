@@ -1,4 +1,4 @@
-from typing import Set, List, Optional
+from typing import List, Optional
 
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
@@ -34,21 +34,18 @@ class RuleBased(Router):
             assert self._blueprint_mgr is not None
             blueprint = self._blueprint_mgr.get_blueprint()
 
-        location_sets: List[Set[Engine]] = []
+        locations_bitmaps = blueprint.table_locations_bitmap()
+        valid_locations = Engine.bitmap_all()
         for table_name_str in query.tables():
             try:
-                table_locations = blueprint.get_table_locations(table_name_str)
-                location_sets.append(set(table_locations))
-            except ValueError:
+                valid_locations &= locations_bitmaps[table_name_str]
+            except KeyError:
                 # The query is referencing a non-existent table (could be a CTE
                 # - the parser does not differentiate between CTE tables and
                 # "actual" tables).
                 pass
-        locations: List[Engine] = (
-            list(set.intersection(*location_sets)) if len(location_sets) > 0 else []
-        )
 
-        if len(locations) == 0:
+        if valid_locations == 0:
             # This happens when a query references a set of tables that do not
             # all have a presence in the same location.
             raise RuntimeError(
@@ -56,7 +53,9 @@ class RuleBased(Router):
                     ", ".join(query.tables())
                 )
             )
-        elif len(locations) == 1:
+
+        locations = Engine.from_bitmap(valid_locations)
+        if len(locations) == 1:
             return locations[0]
         else:
             ideal_location_rank: List[Engine] = []
@@ -68,12 +67,14 @@ class RuleBased(Router):
                 ideal_location_rank = [Engine.Redshift, Engine.Athena, Engine.Aurora]
             else:
                 ideal_location_rank = [Engine.Aurora, Engine.Redshift, Engine.Athena]
-            ideal_location_rank = [
-                loc for loc in ideal_location_rank if loc in locations
-            ]
+
             if self._monitor is None:
-                return ideal_location_rank[0]
+                for loc in ideal_location_rank:
+                    if loc in locations:
+                        return loc
+                # This should be unreachable since len(locations) > 0.
+                assert False
             else:
                 # sys_metric = self._monitor.read_k_most_recent(k=1)
                 # Todo: understand sys_metric format and design rules to filter ideal_location_rank
-                return ideal_location_rank[0]
+                raise NotImplementedError
