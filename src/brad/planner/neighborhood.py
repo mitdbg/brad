@@ -160,9 +160,8 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 elif candidate_set[0].score_value > score.single_value():
                     # Replace the "worst" blueprint so far with this one (lower
                     # score is better).
-                    heapq.heappushpop(
-                        candidate_set, _BlueprintCandidate(bp.to_blueprint(), score)
-                    )
+                    latest = _BlueprintCandidate(bp.to_blueprint(), score)
+                    heapq.heappushpop(candidate_set, latest)
 
             # Sort by score - lower is better.
             candidate_set.sort(key=lambda bpc: bpc.score_value)
@@ -209,7 +208,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         metrics.insert(1, "redshift_num_nodes", redshift_prov.num_nodes())
         metrics.insert(2, "aurora_instance_type", aurora_prov.instance_type())
         metrics.insert(3, "aurora_num_nodes", aurora_prov.num_nodes())
-        metrics.to_csv(self._metrics_out)
+        string_csv = metrics.to_csv(index=False)
+        self._metrics_out.write(string_csv)
+        self._metrics_out.flush()
 
     def _log_scoring_debug(self, candidate: "_BlueprintCandidate") -> None:
         writer = csv.writer(self._scoring_out)
