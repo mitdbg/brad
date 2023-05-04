@@ -2,11 +2,10 @@ import importlib.resources as pkg_resources
 import json
 import logging
 import math
-import pandas as pd
 from collections import namedtuple
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
-from .score import Scorer, Score
+from .score import Scorer, Score, ScoringContext
 import brad.planner.scoring.data as score_data
 
 from brad.blueprint import Blueprint
@@ -14,10 +13,7 @@ from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
-from brad.planner.workload import Workload
-from brad.planner.workload.query import Query
 from brad.routing.rule_based import RuleBased
-from brad.server.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
@@ -43,48 +39,33 @@ class ScalingScorer(Scorer):
     def __init__(self, planner_config: PlannerConfig) -> None:
         self._planner_config = planner_config
 
-    def score(
-        self,
-        current_blueprint: Blueprint,
-        next_blueprint: Blueprint,
-        current_workload: Workload,
-        next_workload: Workload,
-        engines: EngineConnections,
-        metrics: pd.DataFrame,
-    ) -> Score:
-        bp_diff = BlueprintDiff.of(current_blueprint, next_blueprint)
-        transition_score = self._transition_score(
-            current_blueprint, bp_diff, current_workload
-        )
-        op_cost_score = self._operational_cost_score(
-            current_blueprint, next_blueprint, next_workload, engines
-        )
-        perf_score, perf_debugging = self._performance_score(
-            current_blueprint,
-            next_blueprint,
-            bp_diff,
-            current_workload,
-            next_workload,
-            engines,
-            metrics,
-        )
+    def score(self, ctx: ScoringContext) -> Score:
+        self._simulate_next_workload(ctx)
+        transition_score = self._transition_score(ctx)
+        op_cost_score = self._operational_cost_score(ctx)
+        perf_score, perf_debugging = self._performance_score(ctx)
         return Score(perf_score, op_cost_score, transition_score, perf_debugging)
 
-    def _operational_cost_score(
-        self,
-        current_blueprint: Blueprint,
-        next_blueprint: Blueprint,
-        next_workload: Workload,
-        engines: EngineConnections,
-    ) -> float:
+    def _simulate_next_workload(self, ctx: ScoringContext) -> None:
+        # NOTE: The routing policy should be included in the blueprint. We
+        # currently hardcode it here for engineering convenience.
+        router = RuleBased(blueprint=ctx.next_blueprint)
+
+        # See where each analytical query gets routed.
+        for q in ctx.next_workload.analytical_queries():
+            next_engine = router.engine_for(q)
+            ctx.next_dest[next_engine].append(q)
+            q.populate_data_accessed_mb(next_engine, ctx.engines, ctx.current_blueprint)
+
+    def _operational_cost_score(self, ctx: ScoringContext) -> float:
         # Operational monetary score:
         # - Provisioning costs for an hour
         # - Aurora scans cost
         # - Athena scans cost
 
         # Provisioning costs.
-        aurora_prov = next_blueprint.aurora_provisioning()
-        redshift_prov = next_blueprint.redshift_provisioning()
+        aurora_prov = ctx.next_blueprint.aurora_provisioning()
+        redshift_prov = ctx.next_blueprint.redshift_provisioning()
         aurora_prov_cost = (
             _AURORA_SPECS[aurora_prov.instance_type()].usd_per_hour
             * aurora_prov.num_nodes()
@@ -94,38 +75,25 @@ class ScalingScorer(Scorer):
             * redshift_prov.num_nodes()
         )
 
-        # NOTE: The routing policy should be included in the blueprint. We
-        # currently hardcode it here for engineering convenience.
-        router = RuleBased(blueprint=next_blueprint)
-
-        dests: Dict[Engine, List[Query]] = {}
-        dests[Engine.Aurora] = []
-        dests[Engine.Athena] = []
-        dests[Engine.Redshift] = []
-
-        # See where each analytical query gets routed.
-        for q in next_workload.analytical_queries():
-            dests[router.engine_for(q)].append(q)
-
         aurora_access_mb = 0
-        for q in dests[Engine.Aurora]:
+        for q in ctx.next_dest[Engine.Aurora]:
             # Data accessed must always be populated using the current blueprint
             # (since the tables would not have been moved yet).
             q.populate_data_accessed_mb(
                 for_engine=Engine.Aurora,
-                connections=engines,
-                blueprint=current_blueprint,
+                connections=ctx.engines,
+                blueprint=ctx.current_blueprint,
             )
             aurora_access_mb += q.data_accessed_mb(Engine.Aurora)
 
         athena_access_mb = 0
-        for q in dests[Engine.Athena]:
+        for q in ctx.next_dest[Engine.Athena]:
             # Data accessed must always be populated using the current blueprint
             # (since the tables would not have been moved yet).
             q.populate_data_accessed_mb(
                 for_engine=Engine.Athena,
-                connections=engines,
-                blueprint=current_blueprint,
+                connections=ctx.engines,
+                blueprint=ctx.current_blueprint,
             )
             athena_access_mb += q.data_accessed_mb(Engine.Athena)
 
@@ -140,40 +108,35 @@ class ScalingScorer(Scorer):
             aurora_prov_cost + redshift_prov_cost + aurora_scan_cost + athena_scan_cost
         )
 
-    def _transition_score(
-        self,
-        current_blueprint: Blueprint,
-        bp_diff: Optional[BlueprintDiff],
-        current_workload: Workload,
-    ) -> float:
+    def _transition_score(self, ctx: ScoringContext) -> float:
         # Transition score:
         # - Table movement (size * transmission rate)
         # - Table movement monetary costs (Athena)
         # - Redshift scale up / down time
         # - Aurora scale up / down time
-        if bp_diff is None:
+        if ctx.bp_diff is None:
             transition_score = 1.0
         else:
             # Provisioning changes.
             redshift_prov_time_s = (
                 self._planner_config.redshift_provisioning_change_time_s()
-                if bp_diff.redshift_diff() is not None
+                if ctx.bp_diff.redshift_diff() is not None
                 else 0
             )
             aurora_prov_time_s = (
                 self._planner_config.aurora_provisioning_change_time_s()
-                if bp_diff.aurora_diff() is not None
+                if ctx.bp_diff.aurora_diff() is not None
                 else 0
             )
 
             # Table movement.
             movement_cost = 0.0
             movement_time_s = 0.0
-            for tbl_diff in bp_diff.table_diffs():
+            for tbl_diff in ctx.bp_diff.table_diffs():
                 table_name = tbl_diff.table_name()
                 move_to = tbl_diff.added_locations()
-                move_from = self._best_extract_engine(current_blueprint, table_name)
-                source_table_size_mb = current_workload.table_size_on_engine(
+                move_from = self._best_extract_engine(ctx.current_blueprint, table_name)
+                source_table_size_mb = ctx.current_workload.table_size_on_engine(
                     table_name, move_from
                 )
                 assert source_table_size_mb is not None
@@ -264,26 +227,19 @@ class ScalingScorer(Scorer):
             return options[0][0]
 
     def _performance_score(
-        self,
-        current_blueprint: Blueprint,
-        next_blueprint: Blueprint,
-        bp_diff: Optional[BlueprintDiff],
-        current_workload: Workload,
-        next_workload: Workload,
-        engines: EngineConnections,
-        metrics_df: pd.DataFrame,
+        self, ctx: ScoringContext
     ) -> Tuple[Dict[str, float], Dict[str, float]]:
         # > 1.0 means the dataset size has increased
         dataset_scaling = (
-            next_workload.dataset_size_mb() / current_workload.dataset_size_mb()
+            ctx.next_workload.dataset_size_mb() / ctx.current_workload.dataset_size_mb()
         )
         # > 1.0 means there are more resources
         redshift_resource_scaling = self._compute_resource_scaling(
-            current_blueprint, next_blueprint, bp_diff, Engine.Redshift
+            ctx.current_blueprint, ctx.next_blueprint, ctx.bp_diff, Engine.Redshift
         )
         # > 1.0 means there are more resources
         aurora_resource_scaling = self._compute_resource_scaling(
-            current_blueprint, next_blueprint, bp_diff, Engine.Aurora
+            ctx.current_blueprint, ctx.next_blueprint, ctx.bp_diff, Engine.Aurora
         )
 
         inv_redshift_resource_scaling = 1.0 / redshift_resource_scaling
@@ -297,44 +253,15 @@ class ScalingScorer(Scorer):
             self._planner_config.aurora_resource_scaling_modifiers()
         )
 
-        current_router = RuleBased(blueprint=current_blueprint)
-        next_router = RuleBased(blueprint=next_blueprint)
-
-        total_accessed_mb: Dict[Engine, int] = {}
-        total_accessed_mb[Engine.Aurora] = 0
-        total_accessed_mb[Engine.Redshift] = 0
-        total_accessed_mb[Engine.Athena] = 0
-
-        dest_queries: Dict[Engine, List[Query]] = {}
-        dest_queries[Engine.Aurora] = []
-        dest_queries[Engine.Redshift] = []
-        dest_queries[Engine.Athena] = []
-
-        # Compute the total amount of data accessed on each engine in the
-        # current workload (used to weigh the workload assigned to each engine).
-        for q in current_workload.analytical_queries():
-            current_engine = current_router.engine_for(q)
-            q.populate_data_accessed_mb(current_engine, engines, current_blueprint)
-            total_accessed_mb[current_engine] += q.data_accessed_mb(current_engine)
-
-        for q in next_workload.analytical_queries():
-            next_engine = next_router.engine_for(q)
-            # N.B. Need to use the current blueprint here because the tables may
-            # not yet be present on the engines in the next blueprint. This also
-            # assumes the queries in the new workload do not access any new
-            # tables.
-            q.populate_data_accessed_mb(next_engine, engines, current_blueprint)
-            dest_queries[next_engine].append(q)
-
         # Compute the table placement modifiers for each engine.
         def compute_table_modifier(engine):
-            if total_accessed_mb[engine] == 0:
+            if ctx.current_total_accessed_mb[engine] == 0:
                 modifier = 1.0
             else:
                 accessed_mb = 0
-                for q in dest_queries[engine]:
+                for q in ctx.next_dest[engine]:
                     accessed_mb += q.data_accessed_mb(engine)
-                modifier = accessed_mb / total_accessed_mb[engine]
+                modifier = accessed_mb / ctx.current_total_accessed_mb[engine]
             return modifier
 
         aurora_tp_modifier = compute_table_modifier(Engine.Aurora)
@@ -345,7 +272,7 @@ class ScalingScorer(Scorer):
 
         # Redshift predictions.
         for metric_name in _REDSHIFT_METRICS:
-            curr_value = metrics_df[metric_name].iloc[0]
+            curr_value = ctx.metrics[metric_name].iloc[0]
             pred_value = curr_value
             pred_value *= dataset_scaling * dataset_modifiers[metric_name]
             pred_value *= (
@@ -360,7 +287,7 @@ class ScalingScorer(Scorer):
         # TODO: Model the interaction between transactions and analytics on
         # Aurora's metrics.
         for metric_name in _AURORA_METRICS:
-            curr_value = metrics_df[metric_name].iloc[0]
+            curr_value = ctx.metrics[metric_name].iloc[0]
             pred_value = curr_value
             pred_value *= dataset_scaling * dataset_modifiers[metric_name]
             pred_value *= (
@@ -371,7 +298,7 @@ class ScalingScorer(Scorer):
 
         # Athena predictions.
         for metric_name in _ATHENA_METRICS:
-            curr_value = metrics_df[metric_name].iloc[0]
+            curr_value = ctx.metrics[metric_name].iloc[0]
             pred_value = curr_value
             pred_value *= dataset_scaling * dataset_modifiers[metric_name]
             pred_value *= athena_tp_modifier

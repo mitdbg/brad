@@ -2,10 +2,11 @@ import asyncio
 import csv
 import logging
 import heapq
-from typing import List
+from typing import Dict, List
 from pathlib import Path
 
 from brad.blueprint import Blueprint
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
@@ -17,8 +18,9 @@ from brad.planner.filters.no_data_loss import NoDataLoss
 from brad.planner.filters.single_engine_execution import SingleEngineExecution
 from brad.planner.filters.table_on_engine import TableOnEngine
 from brad.planner.scoring.scaling_scorer import ScalingScorer, ALL_METRICS
-from brad.planner.scoring.score import Score
+from brad.planner.scoring.score import Score, ScoringContext
 from brad.planner.workload import Workload
+from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 
@@ -119,6 +121,19 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 )
                 next_workload.set_dataset_size_from_table_sizes()
 
+            # Determine the amount of data accessed by the existing workload.
+            data_accessed_mb = self._estimate_current_data_accessed(engines)
+
+            # Used for all scoring.
+            scoring_ctx = ScoringContext(
+                self._current_blueprint,
+                self._current_workload,
+                next_workload,
+                engines,
+                metrics,
+                data_accessed_mb,
+            )
+
             for idx, bp in enumerate(
                 NeighborhoodBlueprintEnumerator.enumerate(
                     self._current_blueprint,
@@ -147,14 +162,8 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                     continue
 
                 # Score the blueprint.
-                score = self._scorer.score(
-                    self._current_blueprint,
-                    bp,
-                    self._current_workload,
-                    next_workload,
-                    engines,
-                    metrics,
-                )
+                scoring_ctx.reset(bp)
+                score = self._scorer.score(scoring_ctx)
 
                 # Store the blueprint (for debugging purposes).
                 if len(candidate_set) < num_top:
@@ -202,6 +211,27 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
 
     def _expected_workload(self) -> Workload:
         return self._current_workload
+
+    def _estimate_current_data_accessed(
+        self, engines: EngineConnections
+    ) -> Dict[Engine, int]:
+        current_router = RuleBased(blueprint=self._current_blueprint)
+
+        total_accessed_mb: Dict[Engine, int] = {}
+        total_accessed_mb[Engine.Aurora] = 0
+        total_accessed_mb[Engine.Redshift] = 0
+        total_accessed_mb[Engine.Athena] = 0
+
+        # Compute the total amount of data accessed on each engine in the
+        # current workload (used to weigh the workload assigned to each engine).
+        for q in self._current_workload.analytical_queries():
+            current_engine = current_router.engine_for(q)
+            q.populate_data_accessed_mb(
+                current_engine, engines, self._current_blueprint
+            )
+            total_accessed_mb[current_engine] += q.data_accessed_mb(current_engine)
+
+        return total_accessed_mb
 
     def _log_current_metrics(self) -> None:
         redshift_prov = self._current_blueprint.redshift_provisioning()
