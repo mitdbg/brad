@@ -48,10 +48,12 @@ class BradServer(BradInterface):
         self._debug_mode = debug_mode
         self._blueprint_mgr = BlueprintManager(self._config, self._schema_name)
         self._path_to_planner_config = path_to_planner_config
+        self._monitor: Optional[Monitor] = None
 
         # We have different routing policies for performance evaluation and
         # testing purposes.
         routing_policy = self._config.routing_policy
+        self.routing_policy = routing_policy
         if routing_policy == RoutingPolicy.Default:
             self._router: Router = LocationAwareRoundRobin(self._blueprint_mgr)
         elif routing_policy == RoutingPolicy.AlwaysAthena:
@@ -93,9 +95,15 @@ class BradServer(BradInterface):
             logger.info("The BRAD server has successfully started.")
             logger.info("Listening on port %d.", self._config.server_port)
 
-            # Todo: uncomment the following line to support Rule_based router
-            # await asyncio.gather(self._monitor.run_forever(), grpc_server.wait_for_termination())
-            await grpc_server.wait_for_termination()
+            if self.routing_policy == RoutingPolicy.RuleBased:
+                assert (
+                    self._monitor is not None
+                ), "require monitor running for rule-based router"
+                await asyncio.gather(
+                    self._monitor.run_forever(), grpc_server.wait_for_termination()
+                )
+            else:
+                await grpc_server.wait_for_termination()
         finally:
             # Not ideal, but we need to manually call this method to ensure
             # gRPC's internal shutdown process completes before we return from
