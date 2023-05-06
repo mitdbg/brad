@@ -1,5 +1,6 @@
 import yaml
 from typing import Optional
+from datetime import timedelta
 
 from brad.config.engine import Engine
 from brad.routing.policy import RoutingPolicy
@@ -86,6 +87,20 @@ class ConfigFile:
     @property
     def redshift_cluster_id(self) -> str:
         return self._raw[Engine.Redshift]["host"].split(".")[0]
+
+    @property
+    def aurora_cluster_id(self) -> str:
+        return self._raw[Engine.Aurora]["host"].split(".")[0]
+
+    @property
+    def forecasting_epoch(self) -> timedelta:
+        epoch = self._raw["forecasting_epoch_length"]
+        return timedelta(
+            weeks=epoch["weeks"],
+            days=epoch["days"],
+            hours=epoch["hours"],
+            minutes=epoch["minutes"],
+        )
 
     def get_odbc_connection_string(self, db: Engine, schema_name: Optional[str]) -> str:
         if db not in self._raw:

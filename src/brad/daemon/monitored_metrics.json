@@ -1,10 +1,4 @@
 {
-    "epoch_length": {
-        "weeks": 0,
-        "days": 1,
-        "hours": 0,
-        "minutes": 0
-    },
     "monitored_metrics": [
         {
             "engine": "redshift",
