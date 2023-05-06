@@ -156,12 +156,7 @@ class Monitor:
         with pkg_resources.open_text(daemon, "monitored_metrics.json") as data:
             file_contents = json.load(data)
 
-        self._epoch_length = timedelta(
-            weeks=file_contents["epoch_length"]["weeks"],
-            days=file_contents["epoch_length"]["days"],
-            hours=file_contents["epoch_length"]["hours"],
-            minutes=file_contents["epoch_length"]["minutes"],
-        )
+        self._epoch_length = self._config.forecasting_epoch
         if self._enable_cost_monitoring and self._epoch_length < timedelta(days=1):
             raise ValueError(
                 "When cost monitoring is enabled, the epoch length must be no less than the cost monitoring period: 1 day"
@@ -181,7 +176,10 @@ class Monitor:
             if engine == Engine.Aurora:
                 namespace = "AWS/RDS"
                 dimensions = [
-                    {"Name": "DBClusterIdentifier", "Value": "brad-aurora"},
+                    {
+                        "Name": "DBClusterIdentifier",
+                        "Value": self._config.aurora_cluster_id,
+                    },
                     {},
                 ]
             elif engine == Engine.Redshift:

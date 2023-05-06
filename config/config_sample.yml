@@ -34,10 +34,17 @@ s3_extract_region: us-east-1
 # automatic syncing is disabled.
 data_sync_period_seconds: 0
 
-# Set to always_{aurora, athena, redshift} to force IOHTAP to route all queries
+# Set to always_{aurora, athena, redshift} to force BRAD to route all queries
 # to the specified engine. The `default` routing policy uses a predictor to
 # select the most suitable engine.
 routing_policy: default
+
+# Epoch length for metrics and forecasting.
+forecasting_epoch_length:
+  weeks: 0
+  days: 0
+  hours: 0
+  minutes: 1
 
 athena:
   odbc_driver: Athena

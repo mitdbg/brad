@@ -59,6 +59,7 @@ class BradDaemon:
         """
         logger.info("The BRAD daemon is running.")
         self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
+        self._monitor.force_read_metrics()
         await asyncio.gather(
             self._read_server_messages(),
             self._planner.run_forever(),
