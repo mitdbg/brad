@@ -48,8 +48,10 @@ class BradDaemon:
             current_blueprint=self._current_blueprint,
             planner_config=planner_config,
             # N.B. This is a placeholder
-            current_workload=Workload(templates=[]),
+            current_workload=Workload.empty(),
             monitor=self._monitor,
+            config=self._config,
+            schema_name=self._schema_name,
         )
 
     async def run_forever(self) -> None:
@@ -58,6 +60,7 @@ class BradDaemon:
         """
         logger.info("The BRAD daemon is running.")
         self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
+        self._monitor.force_read_metrics()
         await asyncio.gather(
             self._read_server_messages(),
             self._planner.run_forever(),

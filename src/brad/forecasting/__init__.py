@@ -1,14 +1,14 @@
 from typing import List
 from datetime import datetime
+import pandas as pd
 
 
 class Forecaster:
-    def at_epochs(
-        self, metric_id: str, start_epoch: int, end_epoch: int
-    ) -> List[float]:
+    def update_df_pointer(self, df: pd.DataFrame) -> None:
         raise NotImplementedError
 
-    def at_timestamps(
-        self, metric_id: str, start_ts: datetime, end_ts: datetime
-    ) -> List[float]:
+    def num_points(self, metric_id: str, num_points: int) -> List[float]:
+        raise NotImplementedError
+
+    def until(self, metric_id: str, end_ts: datetime) -> List[float]:
         raise NotImplementedError

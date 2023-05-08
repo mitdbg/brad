@@ -1,26 +1,32 @@
+from typing import List
+
 from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.table import Table
 from brad.config.engine import Engine
 from brad.planner.workload import Workload
-from brad.planner.workload.query_template import QueryTemplate
 from brad.planner.filters.aurora_transactions import AuroraTransactions
 from brad.planner.filters.no_data_loss import NoDataLoss
 from brad.planner.filters.single_engine_execution import SingleEngineExecution
 from brad.planner.filters.table_on_engine import TableOnEngine
+from brad.planner.workload.query import Query
+
+
+def workload_from_queries(query_list: List[str]) -> Workload:
+    analytical = []
+    transactional = []
+    for q in query_list:
+        qr = Query(q)
+        if qr.is_data_modification_query():
+            transactional.append(qr)
+        else:
+            analytical.append(qr)
+    return Workload(analytical, transactional, 0.01, 1000)
 
 
 def test_aurora_transactions():
-    workload1 = Workload(
-        [QueryTemplate(tables=["test", "test2"], is_transactional=True)]
-    )
-    workload2 = Workload(
-        [
-            QueryTemplate(tables=["test"], is_transactional=False),
-            QueryTemplate(tables=["test2"], is_transactional=False),
-        ]
-    )
-
+    workload1 = workload_from_queries(["INSERT INTO test SELECT * FROM test2"])
+    workload2 = workload_from_queries(["SELECT * FROM test", "SELECT * FROM test2"])
     bp1 = Blueprint(
         "schema",
         table_schemas=[
@@ -60,18 +66,11 @@ def test_aurora_transactions():
 
 
 def test_single_engine_execution():
-    workload1 = Workload(
-        [
-            QueryTemplate(tables=["test", "test2"], is_transactional=False),
-            QueryTemplate(tables=["test2", "test3"], is_transactional=False),
-        ]
+    workload1 = workload_from_queries(
+        ["SELECT * FROM test, test2", "SELECT * FROM test2, test3"]
     )
-    workload2 = Workload(
-        [
-            QueryTemplate(tables=["test"], is_transactional=False),
-            QueryTemplate(tables=["test2"], is_transactional=False),
-            QueryTemplate(tables=["test3"], is_transactional=False),
-        ]
+    workload2 = workload_from_queries(
+        ["SELECT * FROM test", "SELECT * FROM test2", "SELECT * FROM test3"]
     )
 
     bp1 = Blueprint(

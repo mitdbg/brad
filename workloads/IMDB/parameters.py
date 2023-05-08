@@ -230,6 +230,9 @@ class WorkloadParams(object):
         p.Define("redshift_timeout", False, "include timeout queries on Redshift?")
 
         p.Define("force", False, "remove the existing query folder if exist")
+
+        # Parameters for executing the workload
+        p.Define("test_run", False, "do a quick test run?")
         return p
 
 
@@ -300,7 +303,7 @@ class Default(WorkloadParams):
         }
         p.txn_generation_ids_offset_file = "workloads/IMDB/OLTP_queries/log.json"
         p.reporting_query_rt_interval = {1: 5, 10: 5, 50: 5, 200: 5}
-        p.reporting_time_window = (0, 6)
+        p.reporting_time_window = ("00:00:00", "06:00:00")
         p.total_num_analytic_users = 10
         p.num_analytic_queries_per_user = 100
         p.num_analytic_queries_dist = [
@@ -334,4 +337,7 @@ class Default(WorkloadParams):
         p.aurora_timeout = False
         p.redshift_timeout = False
         p.force = False
+
+        # Workload execution parameters
+        p.test_run = True
         return p

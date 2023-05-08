@@ -1,10 +1,4 @@
 {
-    "epoch_length": {
-        "weeks": 0,
-        "days": 1,
-        "hours": 0,
-        "minutes": 0
-    },
     "monitored_metrics": [
         {
             "engine": "redshift",
@@ -62,6 +56,7 @@
         },
         {
             "engine": "aurora",
+            "roles": ["WRITER", "READER"],
             "metrics": {
                 "CPUUtilization": [
                     "SampleCount",
@@ -106,6 +101,25 @@
                     "Maximum"
                 ],
                 "WriteThroughput": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ]
+            }
+        },
+        {
+            "engine": "athena",
+            "metrics": {
+                "ProcessedBytes": [
+                    "SampleCount",
+                    "Average",
+                    "Sum",
+                    "Minimum",
+                    "Maximum"
+                ],
+                "TotalExecutionTime": [
                     "SampleCount",
                     "Average",
                     "Sum",

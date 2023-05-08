@@ -6,6 +6,7 @@ class RoutingPolicy(str, enum.Enum):
     AlwaysAthena = "always_athena"
     AlwaysAurora = "always_aurora"
     AlwaysRedshift = "always_redshift"
+    RuleBased = "rule_based"
 
     @staticmethod
     def from_str(candidate: str) -> "RoutingPolicy":
@@ -17,5 +18,7 @@ class RoutingPolicy(str, enum.Enum):
             return RoutingPolicy.AlwaysAurora
         elif candidate == RoutingPolicy.AlwaysRedshift.value:
             return RoutingPolicy.AlwaysRedshift
+        elif candidate == RoutingPolicy.RuleBased.value:
+            return RoutingPolicy.RuleBased
         else:
             raise ValueError("Unrecognized DB type {}".format(candidate))

@@ -15,10 +15,12 @@ from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
+from brad.daemon.monitor import Monitor
 from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel, ReceivedQuery
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
+from brad.routing.rule_based import RuleBased
 from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
 from brad.routing.policy import RoutingPolicy
 from brad.server.brad_interface import BradInterface
@@ -46,10 +48,12 @@ class BradServer(BradInterface):
         self._debug_mode = debug_mode
         self._blueprint_mgr = BlueprintManager(self._config, self._schema_name)
         self._path_to_planner_config = path_to_planner_config
+        self._monitor: Optional[Monitor] = None
 
         # We have different routing policies for performance evaluation and
         # testing purposes.
         routing_policy = self._config.routing_policy
+        self.routing_policy = routing_policy
         if routing_policy == RoutingPolicy.Default:
             self._router: Router = LocationAwareRoundRobin(self._blueprint_mgr)
         elif routing_policy == RoutingPolicy.AlwaysAthena:
@@ -58,6 +62,11 @@ class BradServer(BradInterface):
             self._router = AlwaysOneRouter(Engine.Aurora)
         elif routing_policy == RoutingPolicy.AlwaysRedshift:
             self._router = AlwaysOneRouter(Engine.Redshift)
+        elif routing_policy == RoutingPolicy.RuleBased:
+            self._monitor = Monitor(self._config)
+            self._router = RuleBased(
+                blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
+            )
         else:
             raise RuntimeError(
                 "Unsupported routing policy: {}".format(str(routing_policy))
@@ -85,7 +94,16 @@ class BradServer(BradInterface):
             await grpc_server.start()
             logger.info("The BRAD server has successfully started.")
             logger.info("Listening on port %d.", self._config.server_port)
-            await grpc_server.wait_for_termination()
+
+            if self.routing_policy == RoutingPolicy.RuleBased:
+                assert (
+                    self._monitor is not None
+                ), "require monitor running for rule-based router"
+                await asyncio.gather(
+                    self._monitor.run_forever(), grpc_server.wait_for_termination()
+                )
+            else:
+                await grpc_server.wait_for_termination()
         finally:
             # Not ideal, but we need to manually call this method to ensure
             # gRPC's internal shutdown process completes before we return from

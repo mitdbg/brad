@@ -5,7 +5,8 @@
     "memory_mib": 15360,
     "io_gb_s": 0.60,
     "min_nodes": 1,
-    "max_nodes": 32
+    "max_nodes": 32,
+    "usd_per_hour": 0.25
   },
   {
     "instance_type": "dc2.8xlarge",
@@ -13,7 +14,8 @@
     "memory_mib": 249856,
     "io_gb_s": 7.5,
     "min_nodes": 2,
-    "max_nodes": 128
+    "max_nodes": 128,
+    "usd_per_hour": 4.80
   },
   {
     "instance_type": "ra3.xlplus",
@@ -21,7 +23,8 @@
     "memory_mib": 32768,
     "io_gb_s": 0.65,
     "min_nodes": 1,
-    "max_nodes": 16
+    "max_nodes": 16,
+    "usd_per_hour": 1.086
   },
   {
     "instance_type": "ra3.4xlarge",
@@ -29,7 +32,8 @@
     "memory_mib": 98304,
     "io_gb_s": 2,
     "min_nodes": 2,
-    "max_nodes": 32
+    "max_nodes": 32,
+    "usd_per_hour": 3.26
   },
   {
     "instance_type": "ra3.16xlarge",
@@ -37,6 +41,7 @@
     "memory_mib": 393216,
     "io_gb_s": 8,
     "min_nodes": 2,
-    "max_nodes": 128
+    "max_nodes": 128,
+    "usd_per_hour": 13.04
   }
 ]
