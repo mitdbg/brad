@@ -1,7 +1,7 @@
 import logging
 import aioodbc
 import pyodbc
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
@@ -20,6 +20,8 @@ class EngineConnections:
         config: ConfigFile,
         schema_name: Optional[str] = None,
         autocommit: bool = True,
+        read_only: bool = False,
+        conn_info: Dict[str, Any] = {},
     ) -> "EngineConnections":
         """
         Establishes connections to the underlying engines. The connections made
@@ -32,17 +34,17 @@ class EngineConnections:
         )
         logger.debug("Connecting to Athena...")
         athena = await aioodbc.connect(
-            dsn=config.get_odbc_connection_string(Engine.Athena, schema_name),
+            dsn=config.get_odbc_connection_string(Engine.Athena, schema_name, conn_info.get(Engine.Athena)),
             autocommit=autocommit,
         )
         logger.debug("Connecting to Aurora...")
         aurora = await aioodbc.connect(
-            dsn=config.get_odbc_connection_string(Engine.Aurora, schema_name),
+            dsn=config.get_odbc_connection_string(Engine.Aurora, schema_name, (read_only, conn_info.get(Engine.Aurora))),
             autocommit=autocommit,
         )
         logger.debug("Connecting to Redshift...")
         redshift = await aioodbc.connect(
-            dsn=config.get_odbc_connection_string(Engine.Redshift, schema_name),
+            dsn=config.get_odbc_connection_string(Engine.Redshift, schema_name, conn_info.get(Engine.Redshift)),
             autocommit=autocommit,
         )
         await redshift.execute("SET enable_result_cache_for_session = off")

@@ -3,7 +3,7 @@ import io
 import logging
 import queue
 import multiprocessing as mp
-from typing import AsyncIterable, Optional
+from typing import AsyncIterable, Optional, Any, Dict
 
 import grpc
 import pyodbc
@@ -29,6 +29,7 @@ from brad.server.errors import QueryError
 from brad.server.grpc import BradGrpc
 from brad.server.session import SessionManager, SessionId
 from brad.query_rep import QueryRep
+from brad.provisioning.physical import PhysicalProvisioning
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,7 @@ class BradServer(BradInterface):
         elif routing_policy == RoutingPolicy.RuleBased:
             # TODO(Amadou): Use real constructor.
             self._monitor = Monitor.from_schema_name(schema_name)
+            self._physical = PhysicalProvisioning(self._monitor, self._blueprint_mgr.get_blueprint())
             self._router = RuleBased(
                 blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
             )
@@ -72,8 +74,10 @@ class BradServer(BradInterface):
             raise RuntimeError(
                 "Unsupported routing policy: {}".format(str(routing_policy))
             )
-
-        self._sessions = SessionManager(self._config, self._schema_name)
+        conn_info = dict()
+        if self._physical is not None:
+            conn_info = self._physical.connection_info()
+        self._sessions = SessionManager(self._config, self._schema_name, conn_info=conn_info)
         self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
         self._timed_sync_task = None
         self._daemon_messages_task = None
@@ -160,8 +164,8 @@ class BradServer(BradInterface):
 
         await self._data_sync_executor.shutdown()
 
-    async def start_session(self) -> SessionId:
-        session_id, _ = await self._sessions.create_new_session()
+    async def start_session(self, read_only: bool = False) -> SessionId:
+        session_id, _ = await self._sessions.create_new_session(read_only)
         return session_id
 
     async def end_session(self, session_id: SessionId) -> None:
