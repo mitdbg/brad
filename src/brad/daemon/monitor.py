@@ -1,6 +1,6 @@
 from brad.config.file import ConfigFile
-import importlib.resources as pkg_resources
-from typing import List
+from importlib.resources import files, as_file
+from typing import List, Dict
 import json
 from brad.config.engine import Engine
 import brad.daemon as daemon
@@ -15,6 +15,15 @@ from brad.forecasting.linear_forecaster import LinearForecaster
 from brad.forecasting import Forecaster
 
 
+# Return the id of a metric in the dataframe.
+def get_metric_id(engine: str, metric_name: str, stat: str, role: str = ""):
+    metric_id = f"{engine}_{metric_name}_{stat}"
+    if role != "":
+        metric_id = f"{engine}_{role}_{metric_name}_{stat}"
+    return metric_id
+
+
+# Monitor
 class Monitor:
     SERVICE_DICT = {
         "Amazon Redshift": "redshift",
@@ -24,12 +33,14 @@ class Monitor:
 
     def __init__(
         self,
-        config: ConfigFile,
+        cluster_ids: Dict[str, str],
         forecasting_method: str = "constant",
         forecasting_window_size: int = 5,  # (Up to) how many past samples to base the forecast on
+        forecasting_epoch: timedelta = timedelta(hours=1),
         enable_cost_monitoring: bool = False,
     ) -> None:
-        self._config = config
+        self._cluster_ids = cluster_ids
+        self._epoch_length = forecasting_epoch
         self._enable_cost_monitoring = enable_cost_monitoring
         self._setup()
         self._values = pd.DataFrame(columns=self._metric_ids)
@@ -50,8 +61,24 @@ class Monitor:
                 self._values, self._epoch_length, forecasting_window_size
             )
 
+    # Forcibly read metrics. Use to avoid `run_forever()`.
     def force_read_metrics(self) -> None:
         self._add_metrics()
+
+    # Create from config file.
+    @classmethod
+    def from_config_file(cls, config: ConfigFile):
+        raise NotImplementedError
+
+    # Create from schema name.
+    @classmethod
+    def from_schema_name(cls, schema_name: str):
+        cluster_ids = {
+            Engine.Redshift.lower(): f"brad-{schema_name}",
+            Engine.Aurora.lower(): f"brad-{schema_name}",
+            Engine.Athena.lower(): f"brad-{schema_name}",
+        }
+        return cls(cluster_ids)
 
     async def run_forever(self) -> None:
         # Flesh out the monitor - maintain running averages of the underlying
@@ -153,10 +180,11 @@ class Monitor:
 
     def _setup(self):
         # Load data for monitored metrics.
-        with pkg_resources.open_text(daemon, "monitored_metrics.json") as data:
-            file_contents = json.load(data)
+        metrics_file = files(daemon).joinpath("test_monitored_metrics.json")
+        with as_file(metrics_file) as file:
+            with open(file, "r", encoding="utf8") as data:
+                file_contents = json.load(data)
 
-        self._epoch_length = self._config.forecasting_epoch
         if self._enable_cost_monitoring and self._epoch_length < timedelta(days=1):
             raise ValueError(
                 "When cost monitoring is enabled, the epoch length must be no less than the cost monitoring period: 1 day"
@@ -178,20 +206,26 @@ class Monitor:
                 dimensions = [
                     {
                         "Name": "DBClusterIdentifier",
-                        "Value": self._config.aurora_cluster_id,
+                        "Value": self._cluster_ids[Engine.Aurora],
                     },
-                    {},
+                    {},  # Gets set in the loop.
                 ]
             elif engine == Engine.Redshift:
                 namespace = "AWS/Redshift"
                 dimensions = [
                     {
                         "Name": "ClusterIdentifier",
-                        "Value": self._config.redshift_cluster_id,
+                        "Value": self._cluster_ids[Engine.Redshift],
                     },
                 ]
             elif engine == Engine.Athena:
                 namespace = "AWS/Athena"
+                dimensions = [
+                    {
+                        "Name": "WorkGroup",
+                        "Value": self._cluster_ids[Engine.Athena],
+                    }
+                ]
 
             roles = f.get("roles", [""])
             for role in roles:
@@ -219,8 +253,10 @@ class Monitor:
 
         # Load data for monitored costs.
         if self._enable_cost_monitoring:
-            with pkg_resources.open_text(daemon, "monitored_costs.json") as data:
-                self._cost_query_fields = json.load(data)
+            cost_file = files(daemon).joinpath("monitored_costs.json")
+            with as_file(cost_file) as file:
+                with open(file, "r", encoding="utf8") as data:
+                    self._cost_query_fields = json.load(data)
 
             try:
                 services_short = [
