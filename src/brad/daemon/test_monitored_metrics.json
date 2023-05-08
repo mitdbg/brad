@@ -62,6 +62,7 @@
         },
         {
             "engine": "aurora",
+            "roles": ["WRITER", "READER"],
             "metrics": {
                 "CPUUtilization": [
                     "SampleCount",

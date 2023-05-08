@@ -189,7 +189,6 @@ class Monitor:
             with open(file, "r", encoding="utf8") as data:
                 file_contents = json.load(data)
 
-        self._epoch_length = self._config.forecasting_epoch
         if self._enable_cost_monitoring and self._epoch_length < timedelta(days=1):
             raise ValueError(
                 "When cost monitoring is enabled, the epoch length must be no less than the cost monitoring period: 1 day"
@@ -211,8 +210,9 @@ class Monitor:
                 dimensions = [
                     {
                         "Name": "DBClusterIdentifier",
-                        "Value": self._config.aurora_cluster_id,
+                        "Value": self._cluster_ids[Engine.Aurora],
                     },
+                    {}, # Gets set in the loop.
                 ]
             elif engine == Engine.Redshift:
                 namespace = "AWS/Redshift"

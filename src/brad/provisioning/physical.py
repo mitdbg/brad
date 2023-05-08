@@ -57,20 +57,25 @@ class PhysicalProvisioning:
     # Can override certain metrics by providing Dict[metric_id -> value]
     def should_trigger_replan(self, overrides=None) -> bool:
         df = self._monitor.read_k_most_recent(1)
+        print("TRIGGER REPLAN")
+        print(df)
         if df is None:
             return False
         for engine, triggers in self._trigger_ranges.items():
-            for metric_name, lohi in triggers.items():
-                lo, hi = lohi[0], lohi[1]
-                metric_id = get_metric_id(engine, metric_name, "Average")
-                if metric_id not in df.columns:
-                    continue
-                metric_value = df[metric_id][-1]
-                print(f"Metric {metric_id}: {metric_value}")
-                if overrides is not None and metric_id in overrides:
-                    metric_value = overrides[metric_id]
-                if metric_value < lo or metric_value > hi:
-                    return True
+            roles = triggers.get("roles", [""])
+            metrics = triggers["metrics"]
+            for role in roles:
+                for metric_name, lohi in metrics.items():
+                    lo, hi = lohi[0], lohi[1]
+                    metric_id = get_metric_id(engine, metric_name, "Average", role=role)
+                    if metric_id not in df.columns:
+                        continue
+                    metric_value = df[metric_id][-1]
+                    print(f"Metric {metric_id}: {metric_value}")
+                    if overrides is not None and metric_id in overrides:
+                        metric_value = overrides[metric_id]
+                    if metric_value < lo or metric_value > hi:
+                        return True
 
         return False
 

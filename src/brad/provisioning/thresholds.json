@@ -1,8 +1,13 @@
 {
     "redshift": {
-        "CPUUtilization": [25, 90]
+        "metrics": {
+            "CPUUtilization": [25, 90]
+        }
     },
     "aurora": {
-        "CPUUtilization": [25, 90]
+        "roles": ["WRITER"],
+        "metrics": {
+            "CPUUtilization": [25, 90]
+        }
     }
 }
