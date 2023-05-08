@@ -63,7 +63,8 @@ class BradServer(BradInterface):
         elif routing_policy == RoutingPolicy.AlwaysRedshift:
             self._router = AlwaysOneRouter(Engine.Redshift)
         elif routing_policy == RoutingPolicy.RuleBased:
-            self._monitor = Monitor(self._config)
+            # TODO(Amadou): Use real constructor.
+            self._monitor = Monitor.from_schema_name(schema_name)
             self._router = RuleBased(
                 blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
             )

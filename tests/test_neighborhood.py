@@ -5,7 +5,7 @@ from brad.daemon.monitor import Monitor, get_metric_id
 import pytest
 
 
-# @pytest.mark.skip(reason="No way of running in CI. It needs to start actual clusters.")
+@pytest.mark.skip(reason="No way of running in CI. It needs to start actual clusters.")
 def test_neighborhood_change():
     table_config = """
       schema_name: test

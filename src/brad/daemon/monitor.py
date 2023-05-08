@@ -16,7 +16,7 @@ from brad.forecasting import Forecaster
 
 
 # Return the id of a metric in the dataframe.
-def get_metric_id(engine: str, metric_name: str, stat: str, role: str =""):
+def get_metric_id(engine: str, metric_name: str, stat: str, role: str = ""):
     metric_id = f"{engine}_{metric_name}_{stat}"
     if role != "":
         metric_id = f"{engine}_{role}_{metric_name}_{stat}"
@@ -79,10 +79,6 @@ class Monitor:
             Engine.Athena.lower(): f"brad-{schema_name}",
         }
         return cls(cluster_ids)
-
-    # Forcibly fetch metrics. To avoid running long running tests.
-    def force_read_metrics(self) -> None:
-        self._add_metrics()
 
     async def run_forever(self) -> None:
         # Flesh out the monitor - maintain running averages of the underlying
@@ -212,7 +208,7 @@ class Monitor:
                         "Name": "DBClusterIdentifier",
                         "Value": self._cluster_ids[Engine.Aurora],
                     },
-                    {}, # Gets set in the loop.
+                    {},  # Gets set in the loop.
                 ]
             elif engine == Engine.Redshift:
                 namespace = "AWS/Redshift"
