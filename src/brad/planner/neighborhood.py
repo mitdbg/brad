@@ -1,7 +1,10 @@
 import asyncio
 import csv
-import logging
+import datetime
 import heapq
+import logging
+import io
+import os
 from typing import Dict, List
 from pathlib import Path
 
@@ -25,6 +28,8 @@ from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 
 logger = logging.getLogger(__name__)
+
+LOG_REPLAN_VAR = "BRAD_LOG_PLANNING"
 
 
 class NeighborhoodSearchPlanner(BlueprintPlanner):
@@ -134,6 +139,17 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 data_accessed_mb,
             )
 
+            if LOG_REPLAN_VAR in os.environ:
+                logger.debug("Logging all blueprint planning results.")
+                curr_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                out_file_name = f"brad_planning_{curr_time}.csv"
+                out_file = open(out_file_name, "w", encoding="UTF-8")
+                first_log = True
+            else:
+                logger.debug("Not logging the blueprint planning results.")
+                out_file = None
+                first_log = False
+
             for idx, bp in enumerate(
                 NeighborhoodBlueprintEnumerator.enumerate(
                     self._current_blueprint,
@@ -164,6 +180,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 # Score the blueprint.
                 scoring_ctx.reset(bp)
                 score = self._scorer.score(scoring_ctx)
+                if out_file is not None:
+                    self._log_blueprint_and_score(bp, score, out_file, first_log)
+                    first_log = False
 
                 # Store the blueprint (for debugging purposes).
                 if len(candidate_set) < num_top:
@@ -190,13 +209,16 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 logger.error("Next workload: %s", next_workload)
                 raise RuntimeError("No valid candidates!")
 
-            self._log_scoring_debug(candidate_set[0])
             best_blueprint = candidate_set[0].blueprint
             best_score = candidate_set[0].score
             logger.info("Selecting a new blueprint with score %s", best_score)
             logger.info("%s", best_blueprint)
             self._current_blueprint = best_blueprint
             self._current_workload = next_workload
+
+            if out_file is not None:
+                out_file.close()
+                out_file = None
 
             # Emit the next blueprint.
             await self._notify_new_blueprint(best_blueprint)
@@ -246,26 +268,22 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         self._metrics_out.write(string_csv)
         self._metrics_out.flush()
 
-    def _log_scoring_debug(self, candidate: "_BlueprintCandidate") -> None:
-        writer = csv.writer(self._scoring_out)
-        cols = [
-            "redshift_instance_type",
-            "redshift_num_nodes",
-            "aurora_instance_type",
-            "aurora_num_nodes",
-            *candidate.score.debug_components().keys(),
-        ]
-        redshift_prov = candidate.blueprint.redshift_provisioning()
-        aurora_prov = candidate.blueprint.aurora_provisioning()
-        values = [
-            redshift_prov.instance_type(),
-            redshift_prov.num_nodes(),
-            aurora_prov.instance_type(),
-            aurora_prov.num_nodes(),
-        ]
-        for col in cols[4:]:
-            values.append(candidate.score.debug_components()[col])
-        writer.writerow(cols)
+    def _log_blueprint_and_score(
+        self, bp: Blueprint, score: Score, out_file: io.TextIOWrapper, first_log: bool
+    ) -> None:
+        writer = csv.writer(out_file)
+        bp_dict = bp.as_dict()
+        score_dict = score.debug_components()
+        bp_keys = bp_dict.keys()
+        score_keys = score_dict.keys()
+        if first_log:
+            all_keys = list(bp_dict.keys()) + list(score_dict.keys())
+            writer.writerow(all_keys)
+        values = []
+        for k in bp_keys:
+            values.append(bp_dict[k])
+        for k in score_keys:
+            values.append(score_dict[k])
         writer.writerow(values)
 
 

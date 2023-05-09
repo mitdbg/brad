@@ -24,6 +24,7 @@ class Score:
         self._monetary_cost_score = monetary_cost_score
         self._transition_score = transition_score
         self._debug_components = debug_components
+        self._debug_components["single_value"] = self.single_value()
 
     def __repr__(self) -> str:
         score_components = "\n  ".join(
