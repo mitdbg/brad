@@ -16,14 +16,14 @@ class Score:
         perf_metrics: Dict[str, float],
         monetary_cost_score: float,
         transition_score: float,
-        perf_debugging: Dict[str, float],
+        debug_components: Dict[str, int | float],
     ) -> None:
         # NOTE: For better performance debugging we should expand these
         # components out into more pieces.
         self._perf_metrics = perf_metrics
         self._monetary_cost_score = monetary_cost_score
         self._transition_score = transition_score
-        self._perf_debugging = perf_debugging
+        self._debug_components = debug_components
 
     def __repr__(self) -> str:
         score_components = "\n  ".join(
@@ -53,8 +53,11 @@ class Score:
         gmean = np.exp(np.log(npvalues).mean())
         return gmean.item()
 
-    def perf_debugging(self) -> Dict[str, float]:
-        return self._perf_debugging
+    def perf_metrics(self) -> Dict[str, float]:
+        return self._perf_metrics
+
+    def debug_components(self) -> Dict[str, int | float]:
+        return self._debug_components
 
 
 class ScoringContext:

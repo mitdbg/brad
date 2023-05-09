@@ -253,7 +253,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             "redshift_num_nodes",
             "aurora_instance_type",
             "aurora_num_nodes",
-            *candidate.score.perf_debugging().keys(),
+            *candidate.score.debug_components().keys(),
         ]
         redshift_prov = candidate.blueprint.redshift_provisioning()
         aurora_prov = candidate.blueprint.aurora_provisioning()
@@ -264,7 +264,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             aurora_prov.num_nodes(),
         ]
         for col in cols[4:]:
-            values.append(candidate.score.perf_debugging()[col])
+            values.append(candidate.score.debug_components()[col])
         writer.writerow(cols)
         writer.writerow(values)
 
