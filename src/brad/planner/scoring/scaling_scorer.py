@@ -155,6 +155,11 @@ class ScalingScorer(Scorer):
             for tbl_diff in ctx.bp_diff.table_diffs():
                 table_name = tbl_diff.table_name()
                 move_to = tbl_diff.added_locations()
+                if len(move_to) == 0:
+                    # This means that we are only removing this table from
+                    # engines. "Dropping" a table is "free".
+                    continue
+
                 move_from = self._best_extract_engine(ctx.current_blueprint, table_name)
                 source_table_size_mb = ctx.current_workload.table_size_on_engine(
                     table_name, move_from
