@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning
@@ -26,11 +26,13 @@ class EnumeratedBlueprint(Blueprint):
         self._current_locations = base_blueprint.table_locations()
         self._current_aurora_provisioning = base_blueprint.aurora_provisioning()
         self._current_redshift_provisioning = base_blueprint.redshift_provisioning()
+        self._current_table_locations_bitmap: Optional[Dict[str, int]] = None
 
     def set_table_locations(
         self, locations: Dict[str, List[Engine]]
     ) -> "EnumeratedBlueprint":
         self._current_locations = locations
+        self._current_table_locations_bitmap = None
         return self
 
     def set_aurora_provisioning(self, prov: Provisioning) -> "EnumeratedBlueprint":
@@ -62,6 +64,13 @@ class EnumeratedBlueprint(Blueprint):
 
     def table_locations(self) -> Dict[str, List[Engine]]:
         return self._current_locations
+
+    def table_locations_bitmap(self) -> Dict[str, int]:
+        if self._current_table_locations_bitmap is None:
+            self._current_table_locations_bitmap = {
+                tbl: Engine.to_bitmap(locs) for tbl, locs in self._current_locations.items()
+            }
+        return self._current_table_locations_bitmap
 
     def aurora_provisioning(self) -> Provisioning:
         return self._current_aurora_provisioning
