@@ -41,8 +41,17 @@ class Score:
         # To stay consistent with the other score components, lower is better.
         # We invert throughput values.
         # N.B. This is a placeholder.
-        values = [self._monetary_cost_score, self._transition_score]
+        num_components = 2
+        zero = 1e-5
+        values = []
+
+        if self._monetary_cost_score > zero:
+            values.append(self._monetary_cost_score)
+        if self._transition_score > zero:
+            values.append(self._transition_score)
+
         for metric, mvalue in self._perf_metrics.items():
+            num_components += 1
             if mvalue <= 0.0:
                 continue
             if "IOPS" in metric:
@@ -51,7 +60,7 @@ class Score:
                 values.append(mvalue)
 
         npvalues = np.array(values)
-        gmean = np.exp(np.log(npvalues).mean())
+        gmean = np.exp(np.log(npvalues) / num_components)
         return gmean.item()
 
     def perf_metrics(self) -> Dict[str, float]:
