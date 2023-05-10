@@ -1,4 +1,3 @@
-import math
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional
@@ -37,7 +36,7 @@ class Score:
     def single_value(self) -> float:
         # To stay consistent with the other score components, lower is better.
         # N.B. This is a placeholder.
-        num_components = 3
+        num_components = 2
         zero = 1e-9
         values = []
 
@@ -46,14 +45,10 @@ class Score:
             values.append(perf_value)
         if self._monetary_cost > zero:
             values.append(self._monetary_cost)
-        if self._transition_time_s > zero:
-            # We want to decrease the weight of the transition time since we
-            # assume transitions occur during maintenance windows and that they
-            # can complete during the maintenance window. But we still want to
-            # capture the fact that there is a time cost to a transition (some
-            # blueprints are more expensive to transition to).
-            # N.B. This weight was arbitrarily chosen.
-            values.append(math.pow(self._transition_time_s, 0.25))
+
+        # We exclude the transition time for now. This is because we assume the
+        # transition occurs during the maintenance window and that all
+        # transitions can complete within the maintenance window.
 
         npvalues = np.array(values)
         gmean = np.exp(np.log(npvalues).sum() / num_components)
