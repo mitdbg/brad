@@ -265,6 +265,8 @@ class ScalingScorer(Scorer):
             debug_components["aurora_prov_time_s"] = aurora_prov_time_s
             debug_components["redshift_prov_time_s"] = redshift_prov_time_s
 
+        debug_components["transition_time_s"] = transition_time_s
+        debug_components["transition_cost"] = transition_cost
         return transition_time_s, transition_cost
 
     def _best_extract_engine(self, blueprint: Blueprint, table_name: str) -> Engine:

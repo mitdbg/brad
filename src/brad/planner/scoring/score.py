@@ -23,6 +23,8 @@ class Score:
         self._monetary_cost = monetary_cost
         self._transition_time_s = transition_time_s
         self._debug_components = debug_components
+        self._debug_components["perf_summary_value"] = self.perf_summary_value()
+        self._debug_components["monetary_cost"] = self.monetary_cost()
         self._debug_components["single_value"] = self.single_value()
 
     def __repr__(self) -> str:
