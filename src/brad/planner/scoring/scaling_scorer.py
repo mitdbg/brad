@@ -41,10 +41,11 @@ class ScalingScorer(Scorer):
 
     def score(self, ctx: ScoringContext) -> Score:
         self._simulate_next_workload(ctx)
-        transition_score = self._transition_score(ctx)
-        op_cost_score = self._operational_cost_score(ctx)
-        perf_score, perf_debugging = self._performance_score(ctx)
-        return Score(perf_score, op_cost_score, transition_score, perf_debugging)
+        debug_components: Dict[str, int | float] = {}
+        transition_score = self._transition_score(ctx, debug_components)
+        op_cost_score = self._operational_cost_score(ctx, debug_components)
+        perf_score = self._performance_score(ctx, debug_components)
+        return Score(perf_score, op_cost_score, transition_score, debug_components)
 
     def _simulate_next_workload(self, ctx: ScoringContext) -> None:
         # NOTE: The routing policy should be included in the blueprint. We
@@ -57,7 +58,9 @@ class ScalingScorer(Scorer):
             ctx.next_dest[next_engine].append(q)
             q.populate_data_accessed_mb(next_engine, ctx.engines, ctx.current_blueprint)
 
-    def _operational_cost_score(self, ctx: ScoringContext) -> float:
+    def _operational_cost_score(
+        self, ctx: ScoringContext, debug_components: Dict[str, int | float]
+    ) -> float:
         # Operational monetary score:
         # - Provisioning costs for an hour
         # - Aurora scans cost
@@ -104,11 +107,23 @@ class ScalingScorer(Scorer):
             athena_access_mb * self._planner_config.athena_usd_per_mb_scanned()
         )
 
-        return (
+        debug_components["aurora_prov_cost"] = aurora_prov_cost
+        debug_components["redshift_prov_cost"] = redshift_prov_cost
+        debug_components["aurora_access_mb"] = aurora_access_mb
+        debug_components["athena_access_mb"] = athena_access_mb
+        debug_components["aurora_scan_cost"] = aurora_scan_cost
+        debug_components["athena_scan_cost"] = athena_scan_cost
+
+        operational_score = (
             aurora_prov_cost + redshift_prov_cost + aurora_scan_cost + athena_scan_cost
         )
+        debug_components["operational_score"] = operational_score
 
-    def _transition_score(self, ctx: ScoringContext) -> float:
+        return operational_score
+
+    def _transition_score(
+        self, ctx: ScoringContext, debug_components: Dict[str, int | float]
+    ) -> float:
         # Transition score:
         # - Table movement (size * transmission rate)
         # - Table movement monetary costs (Athena)
@@ -116,6 +131,11 @@ class ScalingScorer(Scorer):
         # - Aurora scale up / down time
         if ctx.bp_diff is None:
             transition_score = 1.0
+
+            debug_components["movement_time_s"] = 0.0
+            debug_components["movement_cost"] = 0.0
+            debug_components["aurora_prov_time_s"] = 0.0
+            debug_components["redshift_prov_time_s"] = 0.0
         else:
             # Provisioning changes.
             redshift_prov_time_s = (
@@ -135,6 +155,11 @@ class ScalingScorer(Scorer):
             for tbl_diff in ctx.bp_diff.table_diffs():
                 table_name = tbl_diff.table_name()
                 move_to = tbl_diff.added_locations()
+                if len(move_to) == 0:
+                    # This means that we are only removing this table from
+                    # engines. "Dropping" a table is "free".
+                    continue
+
                 move_from = self._best_extract_engine(ctx.current_blueprint, table_name)
                 source_table_size_mb = ctx.current_workload.table_size_on_engine(
                     table_name, move_from
@@ -195,10 +220,19 @@ class ScalingScorer(Scorer):
                 redshift_prov_time_s + aurora_prov_time_s + movement_time_s
             )
             transition_cost = movement_cost
-            transition_score = math.sqrt(
-                (1.0 + transition_time_s) * (1.0 + transition_cost)
-            )
+            if transition_time_s <= 0.0:
+                transition_score = math.sqrt(transition_cost)
+            elif transition_cost <= 0.0:
+                transition_score = math.sqrt(transition_time_s)
+            else:
+                transition_score = math.sqrt(transition_time_s * transition_cost)
 
+            debug_components["movement_time_s"] = movement_time_s
+            debug_components["movement_cost"] = movement_cost
+            debug_components["aurora_prov_time_s"] = aurora_prov_time_s
+            debug_components["redshift_prov_time_s"] = redshift_prov_time_s
+
+        debug_components["transition_score"] = transition_score
         return transition_score
 
     def _best_extract_engine(self, blueprint: Blueprint, table_name: str) -> Engine:
@@ -227,8 +261,8 @@ class ScalingScorer(Scorer):
             return options[0][0]
 
     def _performance_score(
-        self, ctx: ScoringContext
-    ) -> Tuple[Dict[str, float], Dict[str, float]]:
+        self, ctx: ScoringContext, debug_components: Dict[str, int | float]
+    ) -> Dict[str, float]:
         # > 1.0 means the dataset size has increased
         dataset_scaling = (
             ctx.next_workload.dataset_size_mb() / ctx.current_workload.dataset_size_mb()
@@ -304,16 +338,14 @@ class ScalingScorer(Scorer):
             pred_value *= athena_tp_modifier
             predicted_metrics[metric_name] = pred_value
 
-        prediction_debugging = {
-            "aurora_tp_modifier": aurora_tp_modifier,
-            "athena_tp_modifier": athena_tp_modifier,
-            "redshift_tp_modifier": redshift_tp_modifier,
-            "dataset_scaling": dataset_scaling,
-            "redshift_resource_scaling": redshift_resource_scaling,
-            "aurora_resource_scaling": aurora_resource_scaling,
-        }
+        debug_components["aurora_tp_modifier"] = aurora_tp_modifier
+        debug_components["athena_tp_modifier"] = athena_tp_modifier
+        debug_components["redshift_tp_modifier"] = redshift_tp_modifier
+        debug_components["dataset_scaling"] = dataset_scaling
+        debug_components["redshift_resource_scaling"] = redshift_resource_scaling
+        debug_components["aurora_resource_scaling"] = aurora_resource_scaling
 
-        return predicted_metrics, prediction_debugging
+        return predicted_metrics
 
     def _compute_resource_scaling(
         self,

@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List, Set, Optional, Tuple
+from typing import Callable, Dict, List, Set, Optional, Tuple, Any
 
 from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.table import Table
@@ -127,3 +127,16 @@ class Blueprint:
             )
         )
         return "\n  ".join(["Blueprint:", tables, aurora, redshift])
+
+    def as_dict(self) -> Dict[str, Any]:
+        """
+        Useful for logging and debugging purposes.
+        """
+        provisioning = {
+            "aurora_instance_type": self.aurora_provisioning().instance_type(),
+            "aurora_num_nodes": self.aurora_provisioning().num_nodes(),
+            "redshift_instance_type": self.redshift_provisioning().instance_type(),
+            "redshift_num_nodes": self.redshift_provisioning().num_nodes(),
+        }
+        table_locations = self.table_locations_bitmap()
+        return {**provisioning, **table_locations}

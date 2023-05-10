@@ -16,14 +16,15 @@ class Score:
         perf_metrics: Dict[str, float],
         monetary_cost_score: float,
         transition_score: float,
-        perf_debugging: Dict[str, float],
+        debug_components: Dict[str, int | float],
     ) -> None:
         # NOTE: For better performance debugging we should expand these
         # components out into more pieces.
         self._perf_metrics = perf_metrics
         self._monetary_cost_score = monetary_cost_score
         self._transition_score = transition_score
-        self._perf_debugging = perf_debugging
+        self._debug_components = debug_components
+        self._debug_components["single_value"] = self.single_value()
 
     def __repr__(self) -> str:
         score_components = "\n  ".join(
@@ -40,8 +41,17 @@ class Score:
         # To stay consistent with the other score components, lower is better.
         # We invert throughput values.
         # N.B. This is a placeholder.
-        values = [self._monetary_cost_score, self._transition_score]
+        num_components = 2
+        zero = 1e-5
+        values = []
+
+        if self._monetary_cost_score > zero:
+            values.append(self._monetary_cost_score)
+        if self._transition_score > zero:
+            values.append(self._transition_score)
+
         for metric, mvalue in self._perf_metrics.items():
+            num_components += 1
             if mvalue <= 0.0:
                 continue
             if "IOPS" in metric:
@@ -50,11 +60,14 @@ class Score:
                 values.append(mvalue)
 
         npvalues = np.array(values)
-        gmean = np.exp(np.log(npvalues).mean())
+        gmean = np.exp(np.log(npvalues).sum() / num_components)
         return gmean.item()
 
-    def perf_debugging(self) -> Dict[str, float]:
-        return self._perf_debugging
+    def perf_metrics(self) -> Dict[str, float]:
+        return self._perf_metrics
+
+    def debug_components(self) -> Dict[str, int | float]:
+        return self._debug_components
 
 
 class ScoringContext:
