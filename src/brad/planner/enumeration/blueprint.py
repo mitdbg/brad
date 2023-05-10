@@ -68,7 +68,8 @@ class EnumeratedBlueprint(Blueprint):
     def table_locations_bitmap(self) -> Dict[str, int]:
         if self._current_table_locations_bitmap is None:
             self._current_table_locations_bitmap = {
-                tbl: Engine.to_bitmap(locs) for tbl, locs in self._current_locations.items()
+                tbl: Engine.to_bitmap(locs)
+                for tbl, locs in self._current_locations.items()
             }
         return self._current_table_locations_bitmap
 

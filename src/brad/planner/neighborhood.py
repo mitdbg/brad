@@ -229,7 +229,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
     def _check_if_metrics_warrant_replanning(self) -> bool:
         # See if the metrics indicate that we should trigger the planning
         # process.
-        return True
+        return False
 
     def _expected_workload(self) -> Workload:
         return self._current_workload
@@ -272,19 +272,31 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         self, bp: Blueprint, score: Score, out_file: io.TextIOWrapper, first_log: bool
     ) -> None:
         writer = csv.writer(out_file)
+
         bp_dict = bp.as_dict()
+        perf_dict = score.perf_metrics()
         score_dict = score.debug_components()
+
         bp_keys = bp_dict.keys()
+        perf_keys = perf_dict.keys()
         score_keys = score_dict.keys()
+
         if first_log:
-            all_keys = list(bp_dict.keys()) + list(score_dict.keys())
+            all_keys = (
+                list(bp_dict.keys()) + list(perf_dict.keys()) + list(score_dict.keys())
+            )
             writer.writerow(all_keys)
+
         values = []
         for k in bp_keys:
             values.append(bp_dict[k])
+        for k in perf_keys:
+            values.append(perf_dict[k])
         for k in score_keys:
             values.append(score_dict[k])
+
         writer.writerow(values)
+        out_file.flush()
 
 
 class _BlueprintCandidate:
