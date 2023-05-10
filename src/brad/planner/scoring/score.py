@@ -60,7 +60,7 @@ class Score:
                 values.append(mvalue)
 
         npvalues = np.array(values)
-        gmean = np.exp(np.log(npvalues) / num_components)
+        gmean = np.exp(np.log(npvalues).sum() / num_components)
         return gmean.item()
 
     def perf_metrics(self) -> Dict[str, float]:
