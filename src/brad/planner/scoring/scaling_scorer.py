@@ -42,10 +42,17 @@ class ScalingScorer(Scorer):
     def score(self, ctx: ScoringContext) -> Score:
         self._simulate_next_workload(ctx)
         debug_components: Dict[str, int | float] = {}
-        transition_score = self._transition_score(ctx, debug_components)
-        op_cost_score = self._operational_cost_score(ctx, debug_components)
-        perf_score = self._performance_score(ctx, debug_components)
-        return Score(perf_score, op_cost_score, transition_score, debug_components)
+        transition_time_s, transition_cost = self._transition_score(
+            ctx, debug_components
+        )
+        operational_cost = self._operational_cost_score(ctx, debug_components)
+        perf_metrics = self._performance_score(ctx, debug_components)
+        return Score(
+            perf_metrics,
+            operational_cost + transition_cost,
+            transition_time_s,
+            debug_components,
+        )
 
     def _simulate_next_workload(self, ctx: ScoringContext) -> None:
         # NOTE: The routing policy should be included in the blueprint. We
@@ -78,6 +85,7 @@ class ScalingScorer(Scorer):
             * redshift_prov.num_nodes()
         )
 
+        # Data access (scan) costs.
         aurora_access_mb = 0
         for q in ctx.next_dest[Engine.Aurora]:
             # Data accessed must always be populated using the current blueprint
@@ -107,30 +115,61 @@ class ScalingScorer(Scorer):
             athena_access_mb * self._planner_config.athena_usd_per_mb_scanned()
         )
 
+        # Athena table placement costs.
+        # We need to add a cost to having tables on Athena to discourage placing
+        # tables on Athena if they provide no performance benefit.
+        athena_table_storage_cost = 0.0
+        for tbl, locations in ctx.next_blueprint.table_locations().items():
+            if Engine.Athena not in locations:
+                continue
+            sources = [Engine.Athena, Engine.Aurora, Engine.Redshift]
+            for src in sources:
+                size_mb = ctx.next_workload.table_size_on_engine(tbl, src)
+                if size_mb is not None:
+                    break
+            # Table is present on at least one engine.
+            assert size_mb is not None
+            athena_table_storage_cost += (
+                size_mb * self._planner_config.s3_usd_per_mb_per_month()
+            )
+
+        # Rescale the cost to be USD per MB per hour. The provisioning cost is
+        # based on an hour.
+        # We use 30 days to represent a month.
+        # TODO: Make the time period configurable (we may want a cost for a day,
+        # for example).
+        athena_table_storage_cost /= 30 * 24
+
         debug_components["aurora_prov_cost"] = aurora_prov_cost
         debug_components["redshift_prov_cost"] = redshift_prov_cost
         debug_components["aurora_access_mb"] = aurora_access_mb
         debug_components["athena_access_mb"] = athena_access_mb
         debug_components["aurora_scan_cost"] = aurora_scan_cost
         debug_components["athena_scan_cost"] = athena_scan_cost
+        debug_components["athena_table_storage_cost"] = athena_table_storage_cost
 
-        operational_score = (
-            aurora_prov_cost + redshift_prov_cost + aurora_scan_cost + athena_scan_cost
+        operational_cost = (
+            aurora_prov_cost
+            + redshift_prov_cost
+            + aurora_scan_cost
+            + athena_scan_cost
+            + athena_table_storage_cost
         )
-        debug_components["operational_score"] = operational_score
+        debug_components["operational_cost"] = operational_cost
 
-        return operational_score
+        return operational_cost
 
     def _transition_score(
         self, ctx: ScoringContext, debug_components: Dict[str, int | float]
-    ) -> float:
+    ) -> Tuple[float, float]:
         # Transition score:
         # - Table movement (size * transmission rate)
         # - Table movement monetary costs (Athena)
         # - Redshift scale up / down time
         # - Aurora scale up / down time
         if ctx.bp_diff is None:
-            transition_score = 1.0
+            transition_time_s = 0.0
+            transition_cost = 0.0
 
             debug_components["movement_time_s"] = 0.0
             debug_components["movement_cost"] = 0.0
@@ -220,20 +259,15 @@ class ScalingScorer(Scorer):
                 redshift_prov_time_s + aurora_prov_time_s + movement_time_s
             )
             transition_cost = movement_cost
-            if transition_time_s <= 0.0:
-                transition_score = math.sqrt(transition_cost)
-            elif transition_cost <= 0.0:
-                transition_score = math.sqrt(transition_time_s)
-            else:
-                transition_score = math.sqrt(transition_time_s * transition_cost)
 
             debug_components["movement_time_s"] = movement_time_s
             debug_components["movement_cost"] = movement_cost
             debug_components["aurora_prov_time_s"] = aurora_prov_time_s
             debug_components["redshift_prov_time_s"] = redshift_prov_time_s
 
-        debug_components["transition_score"] = transition_score
-        return transition_score
+        debug_components["transition_time_s"] = transition_time_s
+        debug_components["transition_cost"] = transition_cost
+        return transition_time_s, transition_cost
 
     def _best_extract_engine(self, blueprint: Blueprint, table_name: str) -> Engine:
         """

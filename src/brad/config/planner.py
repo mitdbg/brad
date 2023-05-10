@@ -56,3 +56,6 @@ class PlannerConfig:
 
     def aurora_resource_scaling_modifiers(self) -> Dict[str, float]:
         return self._raw["aurora_resource_scaling"]
+
+    def s3_usd_per_mb_per_month(self) -> float:
+        return float(self._raw["s3_usd_per_mb_per_month"])

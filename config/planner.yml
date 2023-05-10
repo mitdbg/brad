@@ -1,7 +1,7 @@
 strategy: neighborhood
 
-max_num_table_moves: 5
-max_provisioning_multiplier: 3
+max_num_table_moves: 3
+max_provisioning_multiplier: 2
 
 # $5.00 per TB of data scanned.
 # Technically, there is a minimum charge of 10 MB.
@@ -27,6 +27,8 @@ aurora_load_rate_mb_per_s: 10.0
 # Extracting / loading in Athena corresponds to a conversion to/from Iceberg.
 athena_extract_rate_mb_per_s: 10.0
 athena_load_rate_mb_per_s: 10.0
+
+s3_usd_per_mb_per_month: 0.000023
 
 # Performance metrics scaling modifiers.
 dataset_scaling:
