@@ -8,7 +8,7 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.messages import ShutdownDaemon, NewBlueprint, ReceivedQuery
 from brad.daemon.monitor import Monitor
-from brad.planner.neighborhood import NeighborhoodSearchPlanner
+from brad.planner.full_neighborhood import FullNeighborhoodSearchPlanner
 from brad.planner.workload import Workload
 from brad.utils import set_up_logging
 
@@ -44,7 +44,7 @@ class BradDaemon:
         self._current_blueprint = current_blueprint
         # TODO(Amadou): Determine how to pass in specific clusters.
         self._monitor = Monitor.from_schema_name(current_blueprint.schema_name())
-        self._planner = NeighborhoodSearchPlanner(
+        self._planner = FullNeighborhoodSearchPlanner(
             current_blueprint=self._current_blueprint,
             planner_config=planner_config,
             # N.B. This is a placeholder
