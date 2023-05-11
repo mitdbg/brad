@@ -55,7 +55,7 @@ class BradServer(BradInterface):
         self._qlogger.setLevel(logging.INFO)
         qhandler = logging.FileHandler(self._config.query_log_path)
         qhandler.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+        formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
         qhandler.setFormatter(formatter)
         self._qlogger.addHandler(qhandler)
 
