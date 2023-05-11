@@ -6,7 +6,9 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner.full_neighborhood import FullNeighborhoodSearchPlanner
+from brad.planner.sampled_neighborhood import SampledNeighborhoodSearchPlanner
 from brad.planner.workload import Workload
+from brad.planner.strategy import PlanningStrategy
 from brad.server.blueprint_manager import BlueprintManager
 
 logger = logging.getLogger(__name__)
@@ -70,14 +72,27 @@ def run_planner(args):
 
     # 5. Start the planner.
     monitor = Monitor(config)
-    planner = FullNeighborhoodSearchPlanner(
-        current_blueprint=blueprint_mgr.get_blueprint(),
-        current_workload=workload,
-        planner_config=planner_config,
-        monitor=monitor,
-        config=config,
-        schema_name=args.schema_name,
-    )
+    strategy = planner_config.strategy()
+    if strategy == PlanningStrategy.FullNeighborhood:
+        planner = FullNeighborhoodSearchPlanner(
+            current_blueprint=blueprint_mgr.get_blueprint(),
+            current_workload=workload,
+            planner_config=planner_config,
+            monitor=monitor,
+            config=config,
+            schema_name=args.schema_name,
+        )
+    elif strategy == PlanningStrategy.SampledNeighborhood:
+        planner = SampledNeighborhoodSearchPlanner(
+            current_blueprint=blueprint_mgr.get_blueprint(),
+            current_workload=workload,
+            planner_config=planner_config,
+            monitor=monitor,
+            config=config,
+            schema_name=args.schema_name,
+        )
+    else:
+        assert False
     monitor.force_read_metrics()
 
     async def on_new_blueprint(blueprint: Blueprint):
