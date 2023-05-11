@@ -1,9 +1,15 @@
 from brad.daemon.monitor import Monitor
-from brad.config.file import ConfigFile
+from brad.config.engine import Engine
 import asyncio
 from pandas.testing import assert_frame_equal
 
 # pylint: disable=protected-access
+
+cluster_ids = {
+    Engine.Aurora: "brad-aurora",
+    Engine.Redshift: "brad-redshift",
+    Engine.Athena: "primary",
+}
 
 
 def test_read_k_most_recent():
@@ -11,7 +17,7 @@ def test_read_k_most_recent():
 
 
 async def f1():
-    m = Monitor(ConfigFile("./config/config.yml"))
+    m = Monitor(cluster_ids=cluster_ids)
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
@@ -31,7 +37,7 @@ def test_read_k_upcoming():
 
 
 async def f2():
-    m = Monitor(ConfigFile("./config/config.yml"))
+    m = Monitor(cluster_ids=cluster_ids)
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
@@ -54,7 +60,7 @@ def test_read_upcoming_until():
 
 
 async def f3():
-    m = Monitor(ConfigFile("./config/config.yml"))
+    m = Monitor(cluster_ids=cluster_ids)
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
@@ -79,7 +85,7 @@ def test_read_between_times():
 
 
 async def f4():
-    m = Monitor(ConfigFile("./config/config.yml"))
+    m = Monitor(cluster_ids=cluster_ids)
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
@@ -107,7 +113,7 @@ def test_read_between_epochs():
 
 
 async def f5():
-    m = Monitor(ConfigFile("./config/config.yml"))
+    m = Monitor(cluster_ids=cluster_ids)
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
@@ -132,7 +138,7 @@ def test_reading_cost_metrics():
 
 
 async def f6():
-    m = Monitor(ConfigFile("./config/config.yml"), enable_cost_monitoring=True)
+    m = Monitor(cluster_ids=cluster_ids)
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
