@@ -14,7 +14,7 @@ class ReservoirSampler(Generic[T]):
 
     def __init__(self, sample_size: int, seed: int = 42) -> None:
         self._prng = random.Random(seed)
-        self._reservoir = []
+        self._reservoir: List[T] = []
         self._sample_size = sample_size
 
     def offer(self, item: T) -> None:
