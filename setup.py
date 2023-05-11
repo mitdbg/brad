@@ -34,6 +34,7 @@ INSTALL_REQUIRES = [
     "sqlglot",
     "pandas",
     "scikit-learn",
+    "types-pytz",
 ]
 
 DEV_REQUIRES = [

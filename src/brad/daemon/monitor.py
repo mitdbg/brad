@@ -9,6 +9,7 @@ import boto3
 import pandas as pd
 import asyncio
 import numpy as np
+import pytz
 from brad.forecasting.constant_forecaster import ConstantForecaster
 from brad.forecasting.moving_average_forecaster import MovingAverageForecaster
 from brad.forecasting.linear_forecaster import LinearForecaster
@@ -274,8 +275,10 @@ class Monitor:
 
     def _add_metrics(self):
         # Retrieve datapoints
-        now = datetime.now()
-        end_time = now - (now - datetime.min) % self._epoch_length
+        now = datetime.now(tz=timezone.utc)
+        end_time = (
+            now - (now - datetime.min.replace(tzinfo=pytz.UTC)) % self._epoch_length
+        )
 
         # Retrieve more than 1 epoch, for robustness; If we retrieve once per
         # minute and things are logged every minute, small delays might cause
@@ -330,9 +333,7 @@ class Monitor:
 
             # Loop over the results for each day
             for result in response_cost["ResultsByTime"]:
-                start = datetime.strptime(
-                    result["TimePeriod"]["Start"], "%Y-%m-%d"
-                ).replace(tzinfo=timezone.utc)
+                start = datetime.strptime(result["TimePeriod"]["Start"], "%Y-%m-%d")
 
                 # Create a dictionary to store the costs for each service
                 cost_dict = {}
