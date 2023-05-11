@@ -1,5 +1,5 @@
 import random
-from typing import TypeVar, Generic, List
+from typing import Callable, TypeVar, Generic, List
 
 T = TypeVar("T")
 
@@ -13,17 +13,22 @@ class ReservoirSampler(Generic[T]):
     """
 
     def __init__(self, sample_size: int, seed: int = 42) -> None:
-        self._prng = random.Random(seed)
+        self._seed = seed
+        self._prng = random.Random(self._seed)
         self._reservoir: List[T] = []
         self._sample_size = sample_size
 
-    def offer(self, item: T) -> None:
+    def offer(self, item_provider: Callable[[], T]) -> None:
         if len(self._reservoir) < self._sample_size:
-            self._reservoir.append(item)
+            self._reservoir.append(item_provider())
         else:
             j = self._prng.randint(0, len(self._reservoir) - 1)
             if j < self._sample_size:
-                self._reservoir[j] = item
+                self._reservoir[j] = item_provider()
 
     def get(self) -> List[T]:
         return self._reservoir
+
+    def reset(self) -> None:
+        self._prng = random.Random(self._seed)
+        self._reservoir.clear()

@@ -8,7 +8,10 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.messages import ShutdownDaemon, NewBlueprint, ReceivedQuery
 from brad.daemon.monitor import Monitor
+from brad.planner.abstract import BlueprintPlanner
 from brad.planner.full_neighborhood import FullNeighborhoodSearchPlanner
+from brad.planner.sampled_neighborhood import SampledNeighborhoodSearchPlanner
+from brad.planner.strategy import PlanningStrategy
 from brad.planner.workload import Workload
 from brad.utils import set_up_logging
 
@@ -44,15 +47,28 @@ class BradDaemon:
         self._current_blueprint = current_blueprint
         # TODO(Amadou): Determine how to pass in specific clusters.
         self._monitor = Monitor.from_schema_name(current_blueprint.schema_name())
-        self._planner = FullNeighborhoodSearchPlanner(
-            current_blueprint=self._current_blueprint,
-            planner_config=planner_config,
-            # N.B. This is a placeholder
-            current_workload=Workload.empty(),
-            monitor=self._monitor,
-            config=self._config,
-            schema_name=self._schema_name,
-        )
+
+        planning_strategy = self._planner_config.strategy()
+        if planning_strategy == PlanningStrategy.FullNeighborhood:
+            self._planner: BlueprintPlanner = FullNeighborhoodSearchPlanner(
+                current_blueprint=self._current_blueprint,
+                planner_config=planner_config,
+                # N.B. This is a placeholder
+                current_workload=Workload.empty(),
+                monitor=self._monitor,
+                config=self._config,
+                schema_name=self._schema_name,
+            )
+        elif planning_strategy == PlanningStrategy.SampledNeighborhood:
+            self._planner = SampledNeighborhoodSearchPlanner(
+                current_blueprint=self._current_blueprint,
+                planner_config=planner_config,
+                # N.B. This is a placeholder
+                current_workload=Workload.empty(),
+                monitor=self._monitor,
+                config=self._config,
+                schema_name=self._schema_name,
+            )
 
     async def run_forever(self) -> None:
         """
