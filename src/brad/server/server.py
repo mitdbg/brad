@@ -50,6 +50,15 @@ class BradServer(BradInterface):
         self._path_to_planner_config = path_to_planner_config
         self._monitor: Optional[Monitor] = None
 
+        # Set up query logger
+        self._qlogger = logging.getLogger("queries")
+        self._qlogger.setLevel(logging.INFO)
+        qhandler = logging.FileHandler(self._config.query_log_path)
+        qhandler.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+        qhandler.setFormatter(formatter)
+        self._qlogger.addHandler(qhandler)
+
         # We have different routing policies for performance evaluation and
         # testing purposes.
         routing_policy = self._config.routing_policy
@@ -178,6 +187,7 @@ class BradServer(BradInterface):
         try:
             # Remove any trailing or leading whitespace.
             query = query.strip()
+            self._qlogger.info(query)
 
             # Handle internal commands separately.
             if query.startswith("BRAD_"):
