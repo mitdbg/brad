@@ -1,4 +1,7 @@
-strategy: neighborhood
+strategy: full_neighborhood
+
+# Used by the "sampled_neighborhood" strategy
+sample_set_size: 100000
 
 max_num_table_moves: 3
 max_provisioning_multiplier: 2

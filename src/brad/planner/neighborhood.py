@@ -1,10 +1,5 @@
 import asyncio
-import csv
-import datetime
-import heapq
 import logging
-import io
-import os
 from typing import Dict, List
 from pathlib import Path
 
@@ -13,15 +8,15 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
-from brad.planner import BlueprintPlanner
 from brad.planner.enumeration.neighborhood import NeighborhoodBlueprintEnumerator
+from brad.planner.enumeration.blueprint import EnumeratedBlueprint
 from brad.planner.filters import Filter
 from brad.planner.filters.aurora_transactions import AuroraTransactions
 from brad.planner.filters.no_data_loss import NoDataLoss
 from brad.planner.filters.single_engine_execution import SingleEngineExecution
 from brad.planner.filters.table_on_engine import TableOnEngine
-from brad.planner.scoring.scaling_scorer import ScalingScorer, ALL_METRICS
-from brad.planner.scoring.score import Score, ScoringContext
+from brad.planner.scoring.scaling_scorer import ALL_METRICS
+from brad.planner.scoring.score import ScoringContext
 from brad.planner.workload import Workload
 from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
@@ -32,7 +27,20 @@ logger = logging.getLogger(__name__)
 LOG_REPLAN_VAR = "BRAD_LOG_PLANNING"
 
 
-class NeighborhoodSearchPlanner(BlueprintPlanner):
+class NeighborhoodImpl:
+    def on_start_enumeration(self) -> None:
+        raise NotImplementedError
+
+    def on_enumerated_blueprint(
+        self, bp: EnumeratedBlueprint, ctx: ScoringContext
+    ) -> None:
+        raise NotImplementedError
+
+    async def on_enumeration_complete(self, ctx: ScoringContext) -> Blueprint:
+        raise NotImplementedError
+
+
+class NeighborhoodSearchPlanner:
     def __init__(
         self,
         current_blueprint: Blueprint,
@@ -41,6 +49,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         monitor: Monitor,
         config: ConfigFile,
         schema_name: str,
+        impl: NeighborhoodImpl,
     ) -> None:
         super().__init__()
         self._current_blueprint = current_blueprint
@@ -58,18 +67,14 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         self._planner_config = planner_config
         self._config = config
         self._schema_name = schema_name
-        self._scorer = ScalingScorer(self._planner_config)
 
         self._metrics_out = open(
             Path(self._config.planner_log_path) / "actual_metrics.csv",
             "a",
             encoding="UTF-8",
         )
-        self._scoring_out = open(
-            Path(self._config.planner_log_path) / "scoring_out.csv",
-            "a",
-            encoding="UTF-8",
-        )
+
+        self._impl = impl
 
     async def run_forever(self) -> None:
         try:
@@ -77,12 +82,11 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 await asyncio.sleep(3)
                 logger.debug("Planner is checking if a replan is needed...")
                 if self._check_if_metrics_warrant_replanning():
-                    await self._replan()
+                    await self.run_replan()
         finally:
             self._metrics_out.close()
-            self._scoring_out.close()
 
-    async def _replan(self) -> None:
+    async def run_replan(self) -> None:
         # This will be long-running and will block the event loop. For our
         # current needs, this is fine since the planner is the main component in
         # the daemon process.
@@ -93,12 +97,6 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             AuroraTransactions(next_workload),
             SingleEngineExecution(next_workload),
         ]
-
-        # No need to keep around all candidates if we are selecting the best
-        # blueprint. But for debugging purposes it is useful to see what
-        # blueprints are being considered.
-        candidate_set: List[_BlueprintCandidate] = []
-        num_top = 50
 
         # Establish connections to the underlying engines (needed for scoring
         # purposes). We use synchronous connections since there appears to be a
@@ -139,16 +137,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 data_accessed_mb,
             )
 
-            if LOG_REPLAN_VAR in os.environ:
-                logger.debug("Logging all blueprint planning results.")
-                curr_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                out_file_name = f"brad_planning_{curr_time}.csv"
-                out_file = open(out_file_name, "w", encoding="UTF-8")
-                first_log = True
-            else:
-                logger.debug("Not logging the blueprint planning results.")
-                out_file = None
-                first_log = False
+            self._impl.on_start_enumeration()
 
             for idx, bp in enumerate(
                 NeighborhoodBlueprintEnumerator.enumerate(
@@ -177,51 +166,11 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 if any(map(lambda filt: not filt.is_valid(bp), workload_filters)):
                     continue
 
-                # Score the blueprint.
-                scoring_ctx.reset(bp)
-                score = self._scorer.score(scoring_ctx)
-                if out_file is not None:
-                    self._log_blueprint_and_score(bp, score, out_file, first_log)
-                    first_log = False
+                self._impl.on_enumerated_blueprint(bp, scoring_ctx)
 
-                # Store the blueprint (for debugging purposes).
-                if len(candidate_set) < num_top:
-                    candidate_set.append(_BlueprintCandidate(bp.to_blueprint(), score))
-                    if len(candidate_set) == num_top:
-                        heapq.heapify(candidate_set)
-                elif candidate_set[0].score_value > score.single_value():
-                    # Replace the "worst" blueprint so far with this one (lower
-                    # score is better).
-                    latest = _BlueprintCandidate(bp.to_blueprint(), score)
-                    heapq.heappushpop(candidate_set, latest)
-
-            # Sort by score - lower is better.
-            candidate_set.sort(key=lambda bpc: bpc.score_value)
-
-            # Log the top 50 candidate plans.
-            for candidate in candidate_set:
-                logger.debug("%s", candidate.score)
-                logger.debug("%s", candidate.blueprint)
-                logger.debug("----------")
-
-            if len(candidate_set) == 0:
-                logger.error("Planner did not find any valid candidate blueprints.")
-                logger.error("Next workload: %s", next_workload)
-                raise RuntimeError("No valid candidates!")
-
-            best_blueprint = candidate_set[0].blueprint
-            best_score = candidate_set[0].score
-            logger.info("Selecting a new blueprint with score %s", best_score)
-            logger.info("%s", best_blueprint)
-            self._current_blueprint = best_blueprint
+            selected_blueprint = await self._impl.on_enumeration_complete(scoring_ctx)
+            self._current_blueprint = selected_blueprint
             self._current_workload = next_workload
-
-            if out_file is not None:
-                out_file.close()
-                out_file = None
-
-            # Emit the next blueprint.
-            await self._notify_new_blueprint(best_blueprint)
 
         finally:
             engines.close_sync()
@@ -267,47 +216,3 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         string_csv = metrics.to_csv(index=False)
         self._metrics_out.write(string_csv)
         self._metrics_out.flush()
-
-    def _log_blueprint_and_score(
-        self, bp: Blueprint, score: Score, out_file: io.TextIOWrapper, first_log: bool
-    ) -> None:
-        writer = csv.writer(out_file)
-
-        bp_dict = bp.as_dict()
-        perf_dict = score.perf_metrics()
-        score_dict = score.debug_components()
-
-        bp_keys = bp_dict.keys()
-        perf_keys = perf_dict.keys()
-        score_keys = score_dict.keys()
-
-        if first_log:
-            all_keys = (
-                list(bp_dict.keys()) + list(perf_dict.keys()) + list(score_dict.keys())
-            )
-            writer.writerow(all_keys)
-
-        values = []
-        for k in bp_keys:
-            values.append(bp_dict[k])
-        for k in perf_keys:
-            values.append(perf_dict[k])
-        for k in score_keys:
-            values.append(score_dict[k])
-
-        writer.writerow(values)
-        out_file.flush()
-
-
-class _BlueprintCandidate:
-    def __init__(self, blueprint: Blueprint, score: Score) -> None:
-        self.blueprint = blueprint
-        self.score = score
-        self.score_value = score.single_value()
-
-    def __lt__(self, other: object) -> bool:
-        if not isinstance(other, _BlueprintCandidate):
-            return False
-        # N.B. We invert this __lt__ definition since we want to use it with
-        # `heapq` to create a max-heap (highest score at index 0).
-        return self.score_value > other.score_value
