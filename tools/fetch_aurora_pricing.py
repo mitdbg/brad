@@ -50,7 +50,7 @@ def main():
     parser.add_argument(
         "--in-out-file",
         type=str,
-        default="../src/brad/planner/scoring/data/aurora_postgresql_instances.json",
+        default="../src/brad/planner/scoring/data/aurora_postgresql_instances_full.json",
     )
     args = parser.parse_args()
 
