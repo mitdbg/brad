@@ -56,7 +56,7 @@ class UserProvidedBlueprint:
         else:
             # These are our defaults.
             aurora_provisioning = Provisioning(
-                instance_type="db.r6g.large", num_nodes=1
+                instance_type="db.r6i.large", num_nodes=1
             )
             redshift_provisioning = Provisioning(instance_type="dc2.large", num_nodes=1)
 
