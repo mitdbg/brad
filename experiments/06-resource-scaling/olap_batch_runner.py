@@ -24,6 +24,11 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
     conn = pyodbc.connect(args.cstr)
     cursor = conn.cursor()
 
+    # Hacky way to disable the query cache when applicable.
+    if "Redshift" in args.cstr or "redshift" in args.cstr:
+        print("Disabling Redshift result cache (client {})".format(idx))
+        cursor.execute("SET enable_result_cache_for_session = OFF;")
+
     queries = load_queries(args.query_file)
     prng = random.Random(args.seed)
 
@@ -66,6 +71,30 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                 pass
 
 
+def run_warmup(args):
+    conn = pyodbc.connect(args.cstr)
+    conn.timeout = 60
+    cursor = conn.cursor()
+
+    # Hacky way to disable the query cache when applicable.
+    if "Redshift" in args.cstr or "redshift" in args.cstr:
+        print("Disabling Redshift result cache")
+        cursor.execute("SET enable_result_cache_for_session = OFF;")
+
+    queries = load_queries(args.query_file)
+    with open("olap_batch_warmup.csv", "w") as file:
+        print("query_idx,run_time_s", file=file)
+        for idx, q in enumerate(queries):
+            start = time.time()
+            cursor.execute(q)
+            end = time.time()
+            run_time_s = end - start
+            print("Warmed up {} of {}. Run time (s): {}".format(idx + 1, len(queries), run_time_s))
+            if run_time_s >= 59:
+                print("Warning: Query index {} takes longer than a minute".format(idx))
+            print("{},{}".format(idx, run_time_s), file=file)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -77,11 +106,16 @@ def main():
     parser.add_argument("--query-file", type=str, default="queries.sql")
     parser.add_argument("--specific-query-idx", type=int)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--run-warmup", action="store_true")
     # Controls how the clients submit queries to the underlying engine.
     parser.add_argument("--num-clients", type=int, default=1)
     parser.add_argument("--avg-gap-s", type=float, default=1.0)
     parser.add_argument("--std-gap-s", type=float, default=0.5)
     args = parser.parse_args()
+
+    if args.run_warmup:
+        run_warmup(args)
+        return
 
     mgr = mp.Manager()
     start_queue = mgr.Queue()
@@ -111,3 +145,11 @@ def main():
         p.join()
 
     print("Done!")
+
+
+if __name__ == "__main__":
+    # On Unix platforms, the default way to start a process is by forking, which
+    # is not ideal (we do not want to duplicate this process' file
+    # descriptors!).
+    mp.set_start_method("spawn")
+    main()
