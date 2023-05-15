@@ -1,6 +1,6 @@
 import os.path
 import json
-from typing import List, Optional, Mapping, Any
+from typing import List, Optional, Mapping, MutableMapping, Any
 from importlib.resources import files, as_file
 
 from brad.blueprint import Blueprint
@@ -58,7 +58,7 @@ class RuleBased(Router):
         blueprint_mgr: Optional[BlueprintManager] = None,
         blueprint: Optional[Blueprint] = None,
         monitor: Optional[Monitor] = None,
-        catalog: Optional[Mapping[str, Mapping[str, Any]]] = None,
+        catalog: Optional[MutableMapping[str, MutableMapping[str, Any]]] = None,
         decision_tree: bool = False,
         deterministic: bool = True,
     ):
@@ -71,7 +71,7 @@ class RuleBased(Router):
             _catalog_file = files(brad.routing).joinpath("imdb_catalog.json")
             with as_file(_catalog_file) as file:
                 if os.path.exists(file):
-                    with open(file, "r") as f:
+                    with open(file, "r", encoding="utf8") as f:
                         self._catalog = json.load(f)
         # use decision tree instead of rules
         self._decision_tree = decision_tree
@@ -86,6 +86,7 @@ class RuleBased(Router):
             self._catalog = dict()
         session_id, _ = await sessions.create_new_session()
         session = sessions.get_session(session_id)
+        assert session is not None, "need to provide a valid aurora session to recollect_catalog"
         # Since only Aurora handles txn, we only need connection to Aurora
         connection = session.engines.get_connection(Engine.Aurora)
         cursor = await connection.cursor()
@@ -102,7 +103,7 @@ class RuleBased(Router):
         )
         await cursor.execute(indexes_sql)
         all_indexes_raw = await cursor.fetchall()
-        all_indexes = dict()
+        all_indexes: MutableMapping[str, List[str]] = dict()
         for index in all_indexes_raw:
             brad_table_name = index[0]
             if brad_table_name not in all_indexes:
