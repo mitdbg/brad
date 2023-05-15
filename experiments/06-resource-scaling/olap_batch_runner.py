@@ -73,7 +73,7 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
 
 def run_warmup(args):
     conn = pyodbc.connect(args.cstr)
-    conn.timeout = 60
+    conn.timeout = 30
     cursor = conn.cursor()
 
     # Hacky way to disable the query cache when applicable.
@@ -90,9 +90,9 @@ def run_warmup(args):
             end = time.time()
             run_time_s = end - start
             print("Warmed up {} of {}. Run time (s): {}".format(idx + 1, len(queries), run_time_s))
-            if run_time_s >= 59:
-                print("Warning: Query index {} takes longer than a minute".format(idx))
-            print("{},{}".format(idx, run_time_s), file=file)
+            if run_time_s >= 29:
+                print("Warning: Query index {} takes longer than 30 s".format(idx))
+            print("{},{}".format(idx, run_time_s), file=file, flush=True)
 
 
 def main():
@@ -103,7 +103,7 @@ def main():
     parser.add_argument(
         "--run-for-s", type=int, default=60, help="How long to run the experiment for."
     )
-    parser.add_argument("--query-file", type=str, default="queries.sql")
+    parser.add_argument("--query-file", type=str, default="queries_30.sql")
     parser.add_argument("--specific-query-idx", type=int)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--run-warmup", action="store_true")
