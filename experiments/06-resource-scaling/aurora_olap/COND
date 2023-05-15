@@ -23,6 +23,7 @@ run_experiment_group(
         "avg_gap_s": AVG_GAP_S,
         "std_gap_s": STD_GAP_S,
         "cstr_var": CSTR_VAR,
+        "query_file": QUERY_FILE,
         "num_clients": clients,
       },
     )
@@ -43,6 +44,7 @@ for query_idx in INDIVIDUAL_QUERIES:
           "std_gap_s": STD_GAP_S,
           "num_clients": clients,
           "cstr_var": CSTR_VAR,
+          "query_file": QUERY_FILE,
           "specific_query_idx": query_idx,
         },
       )

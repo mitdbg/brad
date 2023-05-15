@@ -4,3 +4,4 @@ INDIVIDUAL_QUERIES = [1, 8, 28]
 RUN_FOR_S = 120
 AVG_GAP_S = 1.0
 STD_GAP_S = 0.5
+QUERY_FILE = "../queries_30.sql"

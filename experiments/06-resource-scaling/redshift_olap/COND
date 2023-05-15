@@ -19,7 +19,7 @@ combine(
 for nodes in NUM_NODES:
   # Run all experiments on the current instance/node configuration.
   combine(
-    name="dc2_large-{}",
+    name="dc2_large-{}".format(nodes),
     deps=[
       ":multi-dc2_large-{}".format(nodes)
     ] + [
@@ -39,6 +39,7 @@ for nodes in NUM_NODES:
           "avg_gap_s": AVG_GAP_S,
           "std_gap_s": STD_GAP_S,
           "cstr_var": CSTR_VAR,
+          "query_file": QUERY_FILE,
           "num_clients": clients,
         },
       )
@@ -59,6 +60,7 @@ for nodes in NUM_NODES:
             "std_gap_s": STD_GAP_S,
             "num_clients": clients,
             "cstr_var": CSTR_VAR,
+            "query_file": QUERY_FILE,
             "specific_query_idx": query_idx,
           },
         )
