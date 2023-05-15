@@ -21,16 +21,17 @@ def load_queries(file_path: str) -> List[str]:
 
 
 def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
-    conn = pyodbc.connect(args.cstr)
+    cstr = os.environ[args.cstr_var]
+    conn = pyodbc.connect(cstr)
     cursor = conn.cursor()
 
     # Hacky way to disable the query cache when applicable.
-    if "Redshift" in args.cstr or "redshift" in args.cstr:
+    if "Redshift" in cstr or "redshift" in cstr:
         print("Disabling Redshift result cache (client {})".format(idx))
         cursor.execute("SET enable_result_cache_for_session = OFF;")
 
     queries = load_queries(args.query_file)
-    prng = random.Random(args.seed)
+    prng = random.Random(args.seed ^ idx)
 
     # For printing out results.
     if "COND_OUT" in os.environ:
@@ -72,12 +73,13 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
 
 
 def run_warmup(args):
-    conn = pyodbc.connect(args.cstr)
+    cstr = os.environ[args.cstr_var]
+    conn = pyodbc.connect(cstr)
     conn.timeout = 30
     cursor = conn.cursor()
 
     # Hacky way to disable the query cache when applicable.
-    if "Redshift" in args.cstr or "redshift" in args.cstr:
+    if "Redshift" in cstr or "redshift" in cstr:
         print("Disabling Redshift result cache")
         cursor.execute("SET enable_result_cache_for_session = OFF;")
 
@@ -89,7 +91,11 @@ def run_warmup(args):
             cursor.execute(q)
             end = time.time()
             run_time_s = end - start
-            print("Warmed up {} of {}. Run time (s): {}".format(idx + 1, len(queries), run_time_s))
+            print(
+                "Warmed up {} of {}. Run time (s): {}".format(
+                    idx + 1, len(queries), run_time_s
+                )
+            )
             if run_time_s >= 29:
                 print("Warning: Query index {} takes longer than 30 s".format(idx))
             print("{},{}".format(idx, run_time_s), file=file, flush=True)
@@ -98,19 +104,19 @@ def run_warmup(args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--cstr", type=str, required=True, help="The ODBC connection string"
+        "--cstr_var", type=str, required=True, help="The ODBC connection string"
     )
     parser.add_argument(
-        "--run-for-s", type=int, default=60, help="How long to run the experiment for."
+        "--run_for_s", type=int, default=60, help="How long to run the experiment for."
     )
-    parser.add_argument("--query-file", type=str, default="queries_30.sql")
-    parser.add_argument("--specific-query-idx", type=int)
+    parser.add_argument("--query_file", type=str, default="queries_30.sql")
+    parser.add_argument("--specific_query_idx", type=int)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--run-warmup", action="store_true")
+    parser.add_argument("--run_warmup", action="store_true")
     # Controls how the clients submit queries to the underlying engine.
-    parser.add_argument("--num-clients", type=int, default=1)
-    parser.add_argument("--avg-gap-s", type=float, default=1.0)
-    parser.add_argument("--std-gap-s", type=float, default=0.5)
+    parser.add_argument("--num_clients", type=int, default=1)
+    parser.add_argument("--avg_gap_s", type=float, default=1.0)
+    parser.add_argument("--std_gap_s", type=float, default=0.5)
     args = parser.parse_args()
 
     if args.run_warmup:

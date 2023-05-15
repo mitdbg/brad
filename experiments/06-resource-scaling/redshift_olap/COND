@@ -1,0 +1,67 @@
+from itertools import product
+
+include("../olap.cond")
+
+CSTR_VAR = "REDSHIFT_CSTR"
+
+# Used for collecting all dc2.large experiments.
+combine(
+  name="dc2_large",
+  deps=[
+    ":multi-dc2_large-{}".format(nodes)
+    for nodes in NUM_NODES
+  ] + [
+    ":q{}-dc2_large-{}".format(query_idx, nodes)
+    for query_idx, nodes in product(INDIVIDUAL_QUERIES, NUM_NODES)
+  ],
+)
+
+for nodes in NUM_NODES:
+  # Run all experiments on the current instance/node configuration.
+  combine(
+    name="dc2_large-{}",
+    deps=[
+      ":multi-dc2_large-{}".format(nodes)
+    ] + [
+      ":q{}-dc2_large-{}".format(query_idx, nodes)
+      for query_idx in INDIVIDUAL_QUERIES
+    ],
+  )
+
+  run_experiment_group(
+    name="multi-dc2_large-{}".format(nodes),
+    run="python3 ../olap_batch_runner.py",
+    experiments=[
+      ExperimentInstance(
+        name="multi-dc2_large-{}-{}".format(nodes, clients),
+        options={
+          "run_for_s": RUN_FOR_S,
+          "avg_gap_s": AVG_GAP_S,
+          "std_gap_s": STD_GAP_S,
+          "cstr_var": CSTR_VAR,
+          "num_clients": clients,
+        },
+      )
+      for clients in NUM_CLIENTS
+    ],
+  )
+
+  for query_idx in INDIVIDUAL_QUERIES:
+    run_experiment_group(
+      name="q{}-dc2_large-{}".format(query_idx, nodes),
+      run="python3 ../olap_batch_runner.py",
+      experiments=[
+        ExperimentInstance(
+          name="q{}-dc2_large-{}-{}".format(query_idx, nodes, clients),
+          options={
+            "run_for_s": RUN_FOR_S,
+            "avg_gap_s": AVG_GAP_S,
+            "std_gap_s": STD_GAP_S,
+            "num_clients": clients,
+            "cstr_var": CSTR_VAR,
+            "specific_query_idx": query_idx,
+          },
+        )
+        for clients in NUM_CLIENTS
+      ],
+    )
