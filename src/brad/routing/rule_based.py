@@ -86,7 +86,9 @@ class RuleBased(Router):
             self._catalog = dict()
         session_id, _ = await sessions.create_new_session()
         session = sessions.get_session(session_id)
-        assert session is not None, "need to provide a valid aurora session to recollect_catalog"
+        assert (
+            session is not None
+        ), "need to provide a valid aurora session to recollect_catalog"
         # Since only Aurora handles txn, we only need connection to Aurora
         connection = session.engines.get_connection(Engine.Aurora)
         cursor = await connection.cursor()
