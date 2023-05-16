@@ -3,7 +3,7 @@ import io
 import logging
 import queue
 import multiprocessing as mp
-from typing import AsyncIterable, Optional, Any, Dict
+from typing import AsyncIterable, Optional
 
 import grpc
 import pyodbc
@@ -75,7 +75,11 @@ class BradServer(BradInterface):
         elif routing_policy == RoutingPolicy.RuleBased:
             # TODO(Amadou): Use real constructor.
             self._monitor = Monitor.from_config_file(config)
-            self._physical = PhysicalProvisioning(self._monitor, self._blueprint_mgr.get_blueprint(), cluster_ids=config.get_cluster_ids())
+            self._physical = PhysicalProvisioning(
+                self._monitor,
+                self._blueprint_mgr.get_blueprint(),
+                cluster_ids=config.get_cluster_ids(),
+            )
             self._router = RuleBased(
                 blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
             )
@@ -86,7 +90,9 @@ class BradServer(BradInterface):
         conn_info = dict()
         if self._physical is not None:
             conn_info = self._physical.connection_info()
-        self._sessions = SessionManager(self._config, self._schema_name, conn_info=conn_info)
+        self._sessions = SessionManager(
+            self._config, self._schema_name, conn_info=conn_info
+        )
         self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
         self._timed_sync_task = None
         self._daemon_messages_task = None

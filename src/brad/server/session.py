@@ -34,7 +34,9 @@ class Session:
 
 
 class SessionManager:
-    def __init__(self, config: ConfigFile, schema_name: str, conn_info: Dict[Engine, Any]):
+    def __init__(
+        self, config: ConfigFile, schema_name: str, conn_info: Dict[Engine, Any]
+    ):
         self._config = config
         self._next_id_value = 0
         self._sessions: Dict[SessionId, Session] = {}
@@ -46,11 +48,18 @@ class SessionManager:
         # and that it is provided up front when starting BRAD.
         self._schema_name = schema_name
 
-    async def create_new_session(self, read_only: bool) -> Tuple[SessionId, Session]:
+    async def create_new_session(
+        self, read_only: bool = False
+    ) -> Tuple[SessionId, Session]:
         logger.debug("Creating a new session...")
         session_id = SessionId(self._next_id_value)
         self._next_id_value += 1
-        connections = await EngineConnections.connect(self._config, self._schema_name, read_only=read_only, conn_info=self._conn_info)
+        connections = await EngineConnections.connect(
+            self._config,
+            self._schema_name,
+            read_only=read_only,
+            conn_info=self._conn_info,
+        )
         session = Session(session_id, connections)
         self._sessions[session_id] = session
         logger.debug("Established a new session: %s", session_id)

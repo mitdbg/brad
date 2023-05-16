@@ -16,7 +16,7 @@ class ConfigFile:
         return {
             Engine.Aurora: self.aurora_cluster_id,
             Engine.Redshift: self.redshift_cluster_id,
-            Engine.Athena: "brad-db0", # TODO(Amadou): I don't want to break existing configs. Coordinate with Geoff on this. 
+            Engine.Athena: "brad-db0",  # TODO(Amadou): I don't want to break existing configs. Coordinate with Geoff on this.
         }
 
     @property
@@ -117,7 +117,9 @@ class ConfigFile:
             minutes=epoch["minutes"],
         )
 
-    def get_odbc_connection_string(self, db: Engine, schema_name: Optional[str], conn_info: Any) -> str:
+    def get_odbc_connection_string(
+        self, db: Engine, schema_name: Optional[str], conn_info: Any = None
+    ) -> str:
         if db not in self._raw:
             raise AssertionError("Unhandled database type: " + str(db))
 

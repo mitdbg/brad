@@ -10,6 +10,7 @@ import json
 from importlib.resources import files, as_file
 from typing import Dict, Any
 
+
 # Manages physical provisioning using the logical blueprint.
 class PhysicalProvisioning:
     # Initialize physical provisioning.
