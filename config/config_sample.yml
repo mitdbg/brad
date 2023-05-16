@@ -12,6 +12,9 @@ daemon_log_file: /tmp/brad_daemon.log
 # Where BRAD's blueprint planner will write debug logs.
 planner_log_path: .
 
+# Where BRAD's frontend will write queries.
+query_log_path: ./queries.log
+
 # BRAD uses these credentials when interacting with the AWS APIs.
 # These credentials should have access to
 # - Athena

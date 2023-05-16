@@ -23,6 +23,12 @@ class BlueprintPlanner:
         """
         raise NotImplementedError
 
+    async def run_replan(self) -> None:
+        """
+        Triggers a "forced" replan. Used for debugging.
+        """
+        raise NotImplementedError
+
     # NOTE: In the future we will implement an abstraction that will allow for a
     # generic planner to subscribe to a stream of events, used to detect when to
     # trigger re-planning.

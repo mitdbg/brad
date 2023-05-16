@@ -14,35 +14,55 @@ class Score:
     def __init__(
         self,
         perf_metrics: Dict[str, float],
-        monetary_cost_score: float,
-        transition_score: float,
-        perf_debugging: Dict[str, float],
+        monetary_cost: float,
+        transition_time_s: float,
+        debug_components: Dict[str, int | float],
     ) -> None:
-        # NOTE: For better performance debugging we should expand these
-        # components out into more pieces.
         self._perf_metrics = perf_metrics
-        self._monetary_cost_score = monetary_cost_score
-        self._transition_score = transition_score
-        self._perf_debugging = perf_debugging
+        self._monetary_cost = monetary_cost
+        self._transition_time_s = transition_time_s
+        self._debug_components = debug_components
+        self._debug_components["perf_summary_value"] = self.perf_summary_value()
+        self._debug_components["monetary_cost"] = self.monetary_cost()
+        self._debug_components["single_value"] = self.single_value()
 
     def __repr__(self) -> str:
         score_components = "\n  ".join(
-            [
-                "single_value: {}".format(self.single_value()),
-                "monetary_cost_score: {}".format(self._monetary_cost_score),
-                "transition_score: {}".format(self._transition_score),
-            ]
+            [f"{name}: {value}" for name, value in self._debug_components.items()]
             + [f"{name}: {value}" for name, value in self._perf_metrics.items()]
         )
         return "Score:\n  " + score_components
 
     def single_value(self) -> float:
         # To stay consistent with the other score components, lower is better.
-        # We invert throughput values.
         # N.B. This is a placeholder.
-        values = [self._monetary_cost_score, self._transition_score]
+        num_components = 2
+        zero = 1e-9
+        values = []
+
+        perf_value = self.perf_summary_value()
+        if perf_value > zero:
+            values.append(perf_value)
+        if self._monetary_cost > zero:
+            values.append(self._monetary_cost)
+
+        # We exclude the transition time for now. This is because we assume the
+        # transition occurs during the maintenance window and that all
+        # transitions can complete within the maintenance window.
+
+        npvalues = np.array(values)
+        gmean = np.exp(np.log(npvalues).sum() / num_components)
+        return gmean.item()
+
+    def perf_summary_value(self) -> float:
+        # To stay consistent with the cost and transition time component, lower is better.
+        # We invert throughput values.
+        num_components = 0
+        zero = 1e-9
+        values = []
         for metric, mvalue in self._perf_metrics.items():
-            if mvalue <= 0.0:
+            num_components += 1
+            if mvalue <= zero:
                 continue
             if "IOPS" in metric:
                 values.append(1.0 / mvalue)
@@ -50,11 +70,20 @@ class Score:
                 values.append(mvalue)
 
         npvalues = np.array(values)
-        gmean = np.exp(np.log(npvalues).mean())
+        gmean = np.exp(np.log(npvalues).sum() / num_components)
         return gmean.item()
 
-    def perf_debugging(self) -> Dict[str, float]:
-        return self._perf_debugging
+    def monetary_cost(self) -> float:
+        return self._monetary_cost
+
+    def transition_time_s(self) -> float:
+        return self._transition_time_s
+
+    def perf_metrics(self) -> Dict[str, float]:
+        return self._perf_metrics
+
+    def debug_components(self) -> Dict[str, int | float]:
+        return self._debug_components
 
 
 class ScoringContext:

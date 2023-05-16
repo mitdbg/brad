@@ -1,5 +1,6 @@
 import yaml
 from typing import Dict
+from brad.planner.strategy import PlanningStrategy
 
 
 class PlannerConfig:
@@ -11,6 +12,9 @@ class PlannerConfig:
         self._raw_path = path
         with open(path, "r", encoding="UTF-8") as file:
             self._raw = yaml.load(file, Loader=yaml.Loader)
+
+    def strategy(self) -> PlanningStrategy:
+        return PlanningStrategy.from_str(self._raw["strategy"])
 
     def max_num_table_moves(self) -> int:
         return int(self._raw["max_num_table_moves"])
@@ -56,3 +60,9 @@ class PlannerConfig:
 
     def aurora_resource_scaling_modifiers(self) -> Dict[str, float]:
         return self._raw["aurora_resource_scaling"]
+
+    def s3_usd_per_mb_per_month(self) -> float:
+        return float(self._raw["s3_usd_per_mb_per_month"])
+
+    def sample_set_size(self) -> int:
+        return int(self._raw["sample_set_size"])

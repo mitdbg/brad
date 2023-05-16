@@ -8,7 +8,7 @@ from brad.planner.enumeration.neighborhood import NeighborhoodBlueprintEnumerato
 
 def test_provisioning_enumerate_aurora():
     aurora = ProvisioningEnumerator(Engine.Aurora)
-    base_aurora = Provisioning("db.r6g.large", 1)
+    base_aurora = Provisioning("db.r6i.large", 1)
 
     aurora_nearby = [
         p.clone()
@@ -62,7 +62,7 @@ def test_blueprint_enumerate():
         "test",
         [],
         {"table1": [Engine.Aurora], "table2": [Engine.Redshift]},
-        aurora_provisioning=Provisioning("db.r6g.large", 1),
+        aurora_provisioning=Provisioning("db.r6i.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
         router_provider=None,
     )
