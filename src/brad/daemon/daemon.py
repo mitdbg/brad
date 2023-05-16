@@ -46,18 +46,7 @@ class BradDaemon:
 
         self._current_blueprint = current_blueprint
         # TODO(Amadou): Determine how to pass in specific clusters.
-        self._monitor = Monitor.from_schema_name(current_blueprint.schema_name())
-<<<<<<< HEAD
-        self._planner = NeighborhoodSearchPlanner(
-            current_blueprint=self._current_blueprint,
-            planner_config=planner_config,
-            # N.B. This is a placeholder
-            current_workload=Workload.empty(),
-            monitor=self._monitor,
-            config=self._config,
-            schema_name=self._schema_name,
-        )
-=======
+        self._monitor = Monitor.from_config_file(config)
 
         planning_strategy = self._planner_config.strategy()
         if planning_strategy == PlanningStrategy.FullNeighborhood:
@@ -80,7 +69,6 @@ class BradDaemon:
                 config=self._config,
                 schema_name=self._schema_name,
             )
->>>>>>> origin/main
 
     async def run_forever(self) -> None:
         """
