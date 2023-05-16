@@ -1,5 +1,5 @@
 import yaml
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 from datetime import timedelta
 
 from brad.config.engine import Engine
@@ -11,6 +11,13 @@ class ConfigFile:
         self._raw_path = path
         with open(path, "r", encoding="UTF-8") as file:
             self._raw = yaml.load(file, Loader=yaml.Loader)
+
+    def get_cluster_ids(self) -> Dict[Engine, str]:
+        return {
+            Engine.Aurora: self.aurora_cluster_id,
+            Engine.Redshift: self.redshift_cluster_id,
+            Engine.Athena: "brad-db0", # TODO(Amadou): I don't want to break existing configs. Coordinate with Geoff on this. 
+        }
 
     @property
     def raw_path(self) -> str:

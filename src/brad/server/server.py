@@ -65,8 +65,8 @@ class BradServer(BradInterface):
             self._router = AlwaysOneRouter(Engine.Redshift)
         elif routing_policy == RoutingPolicy.RuleBased:
             # TODO(Amadou): Use real constructor.
-            self._monitor = Monitor.from_schema_name(schema_name)
-            self._physical = PhysicalProvisioning(self._monitor, self._blueprint_mgr.get_blueprint())
+            self._monitor = Monitor.from_config_file(config)
+            self._physical = PhysicalProvisioning(self._monitor, self._blueprint_mgr.get_blueprint(), cluster_ids=config.get_cluster_ids())
             self._router = RuleBased(
                 blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
             )

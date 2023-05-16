@@ -68,7 +68,8 @@ class Monitor:
     # Create from config file.
     @classmethod
     def from_config_file(cls, config: ConfigFile):
-        raise NotImplementedError
+        cluster_ids = config.get_cluster_ids()
+        return cls(cluster_ids)
 
     # Create from schema name.
     @classmethod
