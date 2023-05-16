@@ -2,7 +2,9 @@ include("../olap.cond")
 
 CSTR_VAR = "AURORA_CSTR"
 
-for nodes in NUM_NODES:
+NUM_NODES_AURORA = [1, 2]
+
+for nodes in NUM_NODES_AURORA:
   combine(
     name="r6i_large-{}".format(nodes),
     deps=[
