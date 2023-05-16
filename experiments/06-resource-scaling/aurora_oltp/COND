@@ -1,0 +1,23 @@
+RUN_FOR_S = 120
+NUM_CLIENTS = [1, 2, 4, 8, 16]
+ISOLATION_LEVEL = "SERIALIZABLE"
+TRANSACTION_PATH = "../../../workloads/IMDB/OLTP_queries/"
+CSTR_VAR = "AURORA_CSTR"
+
+run_experiment_group(
+  name="r6i_large",
+  run="python3 ../oltp_runner.py",
+  experiments=[
+    ExperimentInstance(
+      name="r6i_large-{}".format(clients),
+      options={
+        "run_for_s": RUN_FOR_S,
+        "cstr_var": CSTR_VAR,
+        "isolation_level": ISOLATION_LEVEL,
+        "transaction_path": TRANSACTION_PATH,
+        "num_clients": clients,
+      },
+    )
+    for clients in NUM_CLIENTS
+  ],
+)

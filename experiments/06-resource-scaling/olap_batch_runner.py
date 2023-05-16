@@ -75,7 +75,10 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
 def run_warmup(args):
     cstr = os.environ[args.cstr_var]
     conn = pyodbc.connect(cstr)
-    conn.timeout = 30
+    try:
+        conn.timeout = 30
+    except pyodbc.Error:
+        pass
     cursor = conn.cursor()
 
     # Hacky way to disable the query cache when applicable.

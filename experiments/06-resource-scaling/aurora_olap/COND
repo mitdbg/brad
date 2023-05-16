@@ -2,52 +2,55 @@ include("../olap.cond")
 
 CSTR_VAR = "AURORA_CSTR"
 
-combine(
-  name="r6i_large-1",
-  deps=[
-    ":multi-r6i_large-1"
-  ] + [
-    ":q{}-r6i_large-1".format(query_idx)
-    for query_idx in INDIVIDUAL_QUERIES
-  ],
-)
+NUM_NODES_AURORA = [1, 2]
 
-run_experiment_group(
-  name="multi-r6i_large-1",
-  run="python3 ../olap_batch_runner.py",
-  experiments=[
-    ExperimentInstance(
-      name="multi-r6i_large-1-{}".format(clients),
-      options={
-        "run_for_s": RUN_FOR_S,
-        "avg_gap_s": AVG_GAP_S,
-        "std_gap_s": STD_GAP_S,
-        "cstr_var": CSTR_VAR,
-        "query_file": QUERY_FILE,
-        "num_clients": clients,
-      },
-    )
-    for clients in NUM_CLIENTS
-  ],
-)
+for nodes in NUM_NODES_AURORA:
+  combine(
+    name="r6i_large-{}".format(nodes),
+    deps=[
+      ":multi-r6i_large-{}".format(nodes)
+    ] + [
+      ":q{}-r6i_large-{}".format(query_idx, nodes)
+      for query_idx in INDIVIDUAL_QUERIES
+    ],
+  )
 
-for query_idx in INDIVIDUAL_QUERIES:
   run_experiment_group(
-    name="q{}-r6i_large-1".format(query_idx),
+    name="multi-r6i_large-{}".format(nodes),
     run="python3 ../olap_batch_runner.py",
     experiments=[
       ExperimentInstance(
-        name="q{}-r6i_large-1-{}".format(query_idx, clients),
+        name="multi-r6i_large-{}-{}".format(nodes, clients),
         options={
           "run_for_s": RUN_FOR_S,
           "avg_gap_s": AVG_GAP_S,
           "std_gap_s": STD_GAP_S,
-          "num_clients": clients,
           "cstr_var": CSTR_VAR,
           "query_file": QUERY_FILE,
-          "specific_query_idx": query_idx,
+          "num_clients": clients,
         },
       )
       for clients in NUM_CLIENTS
     ],
   )
+
+  for query_idx in INDIVIDUAL_QUERIES:
+    run_experiment_group(
+      name="q{}-r6i_large-{}".format(query_idx, nodes),
+      run="python3 ../olap_batch_runner.py",
+      experiments=[
+        ExperimentInstance(
+          name="q{}-r6i_large-{}-{}".format(query_idx, nodes, clients),
+          options={
+            "run_for_s": RUN_FOR_S,
+            "avg_gap_s": AVG_GAP_S,
+            "std_gap_s": STD_GAP_S,
+            "num_clients": clients,
+            "cstr_var": CSTR_VAR,
+            "query_file": QUERY_FILE,
+            "specific_query_idx": query_idx,
+          },
+        )
+        for clients in NUM_CLIENTS
+      ],
+    )
