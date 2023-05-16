@@ -8,7 +8,7 @@ import os
 import pathlib
 import json
 
-from typing import List
+from typing import List, Tuple
 
 TABLE_MAX_IDS = {
     "aka_name": 901343,
@@ -41,8 +41,8 @@ def load_txns(txns_file_path: str, idx: int) -> List[str]:
 
     path = pathlib.Path(txns_file_path)
 
-    with open(path / "transaction_user_{}.json".format(idx), "r") as file:
-        parsed = json.loads(file)
+    with open(path / "transaction_user_{}.json".format(idx + 1), "r") as file:
+        parsed = json.load(file)
         for query_seq in parsed.values():
             # The last "query" is a "COMMIT".
             transactions.append(query_seq.split("\n")[:-1])
@@ -54,6 +54,11 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
     cstr = os.environ[args.cstr_var]
     conn = pyodbc.connect(cstr)
     cursor = conn.cursor()
+    cursor.execute(
+        "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {}".format(
+            args.isolation_level
+        )
+    )
 
     txn_list = load_txns(args.transaction_path, idx)
     next_txn_idx = 0
@@ -65,17 +70,28 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
     _ = stop_queue.get()
 
     # Returns the transaction latency.
-    def run_txn(txn_idx: int) -> float:
+    def run_txn(txn_idx: int) -> Tuple[float, int]:
         txn = txn_list[txn_idx]
-        start = time.time()
-        for q in txn:
-            cursor.execute(q)
-        cursor.commit()
-        end = time.time()
-        return end - start
+        num_aborts = 0
+
+        while True:
+            try:
+                start = time.time()
+                for q in txn:
+                    cursor.execute(q)
+                cursor.commit()
+                end = time.time()
+                break
+            except pyodbc.Error:
+                # Serialization error.
+                cursor.rollback()
+                num_aborts += 1
+
+        return end - start, num_aborts
 
     latencies = []
     num_txns_executed = 0
+    total_aborts = 0
 
     overall_start = time.time()
     while True:
@@ -85,7 +101,9 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                 wait_for_s = 0.0
             time.sleep(wait_for_s)
 
-        latencies.append(run_txn(next_txn_idx))
+        lat, aborts = run_txn(next_txn_idx)
+        latencies.append(lat)
+        total_aborts += aborts
         next_txn_idx += 1
         next_txn_idx %= len(txn_list)
         num_txns_executed += 1
@@ -108,12 +126,13 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
     with open(out_dir / "oltp_latency_{}.csv".format(idx), "w") as file:
         print("txn_idx,run_time_s", file=file)
         for tidx, lat in enumerate(latencies):
-            print("{},{}".format(tidx, lat))
+            print("{},{}".format(tidx, lat), file=file)
 
     with open(out_dir / "oltp_stats_{}.csv".format(idx), "w") as file:
-        print("stat,value")
-        print("num_txns,{}".format(num_txns_executed))
-        print("overall_run_time_s,{}".format(overall_end - overall_start))
+        print("stat,value", file=file)
+        print("num_txns,{}".format(num_txns_executed), file=file)
+        print("overall_run_time_s,{}".format(overall_end - overall_start), file=file)
+        print("num_aborts,{}".format(total_aborts), file=file)
 
 
 def trim_tables(args):
@@ -122,7 +141,7 @@ def trim_tables(args):
     conn = pyodbc.connect(cstr)
     cursor = conn.cursor()
 
-    for table, max_orig_id in TABLE_MAX_IDS:
+    for table, max_orig_id in TABLE_MAX_IDS.items():
         print("Trimming {}...".format(table))
         cursor.execute("DELETE FROM {} WHERE id > {}".format(table, max_orig_id))
 
@@ -139,6 +158,8 @@ def main():
     )
     parser.add_argument("--transaction_path", type=str, required=True)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--trim_only", action="store_true")
+    parser.add_argument("--isolation_level", type=str, default="SERIALIZABLE")
     # Controls how the clients submit queries to the underlying engine.
     parser.add_argument("--num_clients", type=int, default=1)
     parser.add_argument("--add_wait", action="store_true")
@@ -147,6 +168,8 @@ def main():
     args = parser.parse_args()
 
     trim_tables(args)
+    if args.trim_only:
+        return
 
     mgr = mp.Manager()
     start_queue = mgr.Queue()
