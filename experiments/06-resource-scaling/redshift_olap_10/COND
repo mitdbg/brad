@@ -4,6 +4,7 @@ include("../olap.cond")
 
 CSTR_VAR = "REDSHIFT_CSTR"
 RUN_FOR_S_SHORT = 60
+NUM_CLIENTS = 1
 
 # Used for collecting all dc2.large experiments.
 combine(
@@ -15,31 +16,22 @@ combine(
 )
 
 for nodes in NUM_NODES:
-  combine(
-    name="dc2_large-{}".format(nodes),
-    deps=[
-      ":q{}-dc2_large-{}".format(query_idx, nodes)
-      for query_idx in INDIVIDUAL_QUERIES_10
-    ],
-  )
-
-for nodes, query_idx in product(NUM_NODES, INDIVIDUAL_QUERIES_10):
   run_experiment_group(
-    name="q{}-dc2_large-{}".format(query_idx, nodes),
+    name="dc2_large-{}".format(nodes),
     run="python3 ../olap_batch_runner.py",
     experiments=[
       ExperimentInstance(
-        name="q{}-dc2_large-{}-{}".format(query_idx, nodes, clients),
+        name="q{}-dc2_large-{}".format(query_idx, nodes),
         options={
           "run_for_s": RUN_FOR_S_SHORT,
           "avg_gap_s": AVG_GAP_S,
           "std_gap_s": STD_GAP_S,
-          "num_clients": clients,
+          "num_clients": NUM_CLIENTS,
           "cstr_var": CSTR_VAR,
           "query_file": QUERY_FILE,
           "specific_query_idx": query_idx,
         },
       )
-      for clients in NUM_CLIENTS
+      for query_idx in INDIVIDUAL_QUERIES_10
     ],
   )
