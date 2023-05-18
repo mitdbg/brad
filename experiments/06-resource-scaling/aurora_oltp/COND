@@ -1,23 +1,33 @@
-RUN_FOR_S = 120
+RUN_FOR_S = 60
 NUM_CLIENTS = [1, 2, 4, 8, 16]
-ISOLATION_LEVEL = "SERIALIZABLE"
+# Might want to consider changing the transactions in the workload so that we
+# can reasonably run under SERIALIZABLE.
+ISOLATION_LEVEL = "REPEATABLE READ"
 TRANSACTION_PATH = "../../../workloads/IMDB/OLTP_queries/"
 CSTR_VAR = "AURORA_CSTR"
 
-run_experiment_group(
-  name="r6i_large",
-  run="python3 ../oltp_runner.py",
-  experiments=[
-    ExperimentInstance(
-      name="r6i_large-{}".format(clients),
-      options={
-        "run_for_s": RUN_FOR_S,
-        "cstr_var": CSTR_VAR,
-        "isolation_level": ISOLATION_LEVEL,
-        "transaction_path": TRANSACTION_PATH,
-        "num_clients": clients,
-      },
-    )
-    for clients in NUM_CLIENTS
-  ],
-)
+INSTANCE_TYPES = [
+  "r6i_large",
+  "r6i_xlarge",
+  "r6i_2xlarge",
+  "r6i_4xlarge",
+]
+
+for instance in INSTANCE_TYPES:
+  run_experiment_group(
+    name=instance,
+    run="python3 ../oltp_runner.py",
+    experiments=[
+      ExperimentInstance(
+        name="{}-{}".format(instance, clients),
+        options={
+          "run_for_s": RUN_FOR_S,
+          "cstr_var": CSTR_VAR,
+          "isolation_level": ISOLATION_LEVEL,
+          "transaction_path": TRANSACTION_PATH,
+          "num_clients": clients,
+        },
+      )
+      for clients in NUM_CLIENTS
+    ],
+  )
