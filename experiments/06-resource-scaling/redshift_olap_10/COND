@@ -14,6 +14,15 @@ combine(
   ],
 )
 
+for nodes in NUM_NODES:
+  combine(
+    name="dc2_large-{}".format(nodes),
+    deps=[
+      ":q{}-dc2_large-{}".format(query_idx, nodes)
+      for query_idx in INDIVIDUAL_QUERIES_10
+    ],
+  )
+
 for nodes, query_idx in product(NUM_NODES, INDIVIDUAL_QUERIES_10):
   run_experiment_group(
     name="q{}-dc2_large-{}".format(query_idx, nodes),
