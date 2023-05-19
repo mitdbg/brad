@@ -1,5 +1,3 @@
-import pytest
-
 from brad.planner.workload import Workload
 from brad.config.file import ConfigFile
 
