@@ -2,8 +2,10 @@ import asyncio
 import io
 import logging
 import queue
+from datetime import datetime, timezone
 import multiprocessing as mp
 from typing import AsyncIterable, Optional
+import random
 
 import grpc
 import pyodbc
@@ -29,6 +31,7 @@ from brad.server.errors import QueryError
 from brad.server.grpc import BradGrpc
 from brad.server.session import SessionManager, SessionId
 from brad.query_rep import QueryRep
+from brad.server.epoch_file_handler import EpochFileHandler
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +56,15 @@ class BradServer(BradInterface):
         # Set up query logger
         self._qlogger = logging.getLogger("queries")
         self._qlogger.setLevel(logging.INFO)
-        qhandler = logging.FileHandler(self._config.query_log_path)
+        qhandler = EpochFileHandler(
+            self._config.local_logs_path,
+            self._config.epoch_length,
+            self._config.s3_logs_bucket,
+            self._config.s3_logs_path,
+            self._config.txn_log_prob,
+        )
         qhandler.setLevel(logging.INFO)
-        formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+        formatter = logging.Formatter("%(message)s")
         qhandler.setFormatter(formatter)
         self._qlogger.addHandler(qhandler)
 
@@ -145,6 +154,7 @@ class BradServer(BradInterface):
                 self._daemon_output_queue,
             ),
         )
+
         self._daemon_process.start()
         logger.info("The BRAD daemon process has been started.")
 
@@ -187,7 +197,6 @@ class BradServer(BradInterface):
         try:
             # Remove any trailing or leading whitespace.
             query = query.strip()
-            self._qlogger.info(query)
 
             # Handle internal commands separately.
             if query.startswith("BRAD_"):
@@ -200,14 +209,24 @@ class BradServer(BradInterface):
             engine_to_use = self._router.engine_for(query_rep)
             logger.debug("Routing '%s' to %s", query, engine_to_use)
 
-            # 3. Actually execute the query
+            # 3. Actually execute the query.
             connection = session.engines.get_connection(engine_to_use)
             cursor = await connection.cursor()
             try:
+                start = datetime.now(tz=timezone.utc)
                 await cursor.execute(query_rep.raw_query)
+                end = datetime.now(tz=timezone.utc)
             except (pyodbc.ProgrammingError, pyodbc.Error) as ex:
                 # Error when executing the query.
                 raise QueryError.from_exception(ex)
+
+            # Decide whether to log the query.
+            if query_rep.is_analytical_query() or (
+                random.random() < self._config.txn_log_prob
+            ):
+                self._qlogger.info(
+                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {end-start}s IsTransaction: {query_rep.is_transactional_query()}"
+                )
 
             # Extract and return the results, if any.
             try:

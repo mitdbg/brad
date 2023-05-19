@@ -62,7 +62,7 @@ engines.
   path/to/manifest.yml` to execute the bulk load (this time may take some time,
   depending on how much data you are loading).
 - Start the BRAD server `brad server --config-file path/to/config.yml
-  --schema-name your_schema_name`.
+  --schema-name your_schema_name --planner-config-file path/to/planner.yml`.
 - Run queries through the CLI `brad cli`.
 
 To remove the tables, use `brad admin drop_schema` (e.g., `brad admin
