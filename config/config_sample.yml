@@ -12,8 +12,12 @@ daemon_log_file: /tmp/brad_daemon.log
 # Where BRAD's blueprint planner will write debug logs.
 planner_log_path: .
 
-# Where BRAD's frontend will write queries.
-query_log_path: ./queries.log
+# The epoch length for metrics monitoring.
+epoch_length:
+  weeks: 0
+  days: 0
+  hours: 0
+  minutes: 1
 
 # BRAD uses these credentials when interacting with the AWS APIs.
 # These credentials should have access to
@@ -33,6 +37,14 @@ s3_extract_bucket: your-bucket
 s3_extract_path: extract/path/
 s3_extract_region: us-east-1
 
+# BRAD stores query logs here 
+s3_logs_bucket: your-bucket
+s3_logs_path: s3/logs/path/
+local_logs_path: local/logs/path/
+
+# Probability that each transactional query wil be logged.
+txn_log_prob: 0.5
+
 # Set to a non-zero value enable automatic data syncing. When this is set to 0,
 # automatic syncing is disabled.
 data_sync_period_seconds: 0
@@ -41,13 +53,6 @@ data_sync_period_seconds: 0
 # to the specified engine. The `default` routing policy uses a predictor to
 # select the most suitable engine.
 routing_policy: default
-
-# Epoch length for metrics and forecasting.
-forecasting_epoch_length:
-  weeks: 0
-  days: 0
-  hours: 0
-  minutes: 1
 
 athena:
   odbc_driver: Athena
