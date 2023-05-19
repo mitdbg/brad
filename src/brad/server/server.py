@@ -2,6 +2,7 @@ import asyncio
 import io
 import logging
 import queue
+import time
 import multiprocessing as mp
 from typing import AsyncIterable, Optional
 
@@ -187,7 +188,6 @@ class BradServer(BradInterface):
         try:
             # Remove any trailing or leading whitespace.
             query = query.strip()
-            self._qlogger.info(query)
 
             # Handle internal commands separately.
             if query.startswith("BRAD_"):
@@ -204,10 +204,16 @@ class BradServer(BradInterface):
             connection = session.engines.get_connection(engine_to_use)
             cursor = await connection.cursor()
             try:
+                start = time.time()
                 await cursor.execute(query_rep.raw_query)
+                end = time.time()
             except (pyodbc.ProgrammingError, pyodbc.Error) as ex:
                 # Error when executing the query.
                 raise QueryError.from_exception(ex)
+
+            self._qlogger.info(
+                f"Query: {query} Engine: {engine_to_use} Duration: {end-start}s"
+            )
 
             # Extract and return the results, if any.
             try:
