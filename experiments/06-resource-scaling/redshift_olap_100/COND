@@ -1,0 +1,27 @@
+include("../olap.cond")
+
+CSTR_VAR = "REDSHIFT_CSTR"
+NUM_CLIENTS = 1
+QUERY_FILE_100 = "../queries_under_30s.sql"
+RUN_TIMES = 3
+
+# Used for collecting all ra3.xlplus experiments.
+combine(
+  name="ra3_xlplus",
+  deps=[
+    ":ra3_xlplus-{}".format(nodes)
+    for nodes in NUM_NODES
+  ],
+)
+
+for nodes in NUM_NODES:
+  run_experiment_group(
+    name="ra3_xlplus-{}".format(nodes),
+    run="python3 ../olap_batch_runner.py",
+    options={
+      "run_all_times": RUN_TIMES,
+      "num_clients": NUM_CLIENTS,
+      "cstr_var": CSTR_VAR,
+      "query_file": QUERY_FILE_100,
+    },
+  )

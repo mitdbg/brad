@@ -7,6 +7,14 @@ NUM_CLIENTS = [1, 2, 4, 8, 16]
 ISOLATION_LEVEL = "'REPEATABLE READ'"
 TRANSACTION_PATH = "../../../workloads/IMDB/OLTP_queries/"
 
+combine(
+  name="all",
+  deps=[
+    ":{}".format(instance)
+    for instance in AURORA_INSTANCE_TYPES
+  ],
+)
+
 for instance in AURORA_INSTANCE_TYPES:
   run_experiment_group(
     name=instance,

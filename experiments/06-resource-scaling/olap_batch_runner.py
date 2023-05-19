@@ -22,7 +22,7 @@ def load_queries(file_path: str) -> List[str]:
 
 def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
     cstr = os.environ[args.cstr_var]
-    conn = pyodbc.connect(cstr)
+    conn = pyodbc.connect(cstr, autocommit=True)
     cursor = conn.cursor()
 
     # Hacky way to disable the query cache when applicable.
@@ -48,28 +48,38 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
         start_queue.put_nowait("")
         _ = stop_queue.get()
 
-        while True:
-            wait_for_s = prng.gauss(args.avg_gap_s, args.std_gap_s)
-            if wait_for_s < 0.0:
-                wait_for_s = 0.0
-            time.sleep(wait_for_s)
+        if args.run_all_times is None:
+            while True:
+                wait_for_s = prng.gauss(args.avg_gap_s, args.std_gap_s)
+                if wait_for_s < 0.0:
+                    wait_for_s = 0.0
+                time.sleep(wait_for_s)
 
-            if args.specific_query_idx is None:
-                next_query_idx = prng.randrange(len(queries))
-            else:
-                next_query_idx = args.specific_query_idx
-            next_query = queries[next_query_idx]
+                if args.specific_query_idx is None:
+                    next_query_idx = prng.randrange(len(queries))
+                else:
+                    next_query_idx = args.specific_query_idx
+                next_query = queries[next_query_idx]
 
-            start = time.time()
-            cursor.execute(next_query)
-            end = time.time()
-            print("{},{}".format(next_query_idx, end - start), file=file)
+                start = time.time()
+                cursor.execute(next_query)
+                end = time.time()
+                print("{},{}".format(next_query_idx, end - start), file=file)
 
-            try:
-                _ = stop_queue.get_nowait()
-                break
-            except queue.Empty:
-                pass
+                try:
+                    _ = stop_queue.get_nowait()
+                    break
+                except queue.Empty:
+                    pass
+        else:
+            for idx, q in enumerate(queries):
+                if idx % 10 == 0:
+                    print("Running query index {} of {}".format(idx, len(queries)))
+                for _ in range(args.run_all_times):
+                    start = time.time()
+                    cursor.execute(q)
+                    end = time.time()
+                    print("{},{}".format(idx, end - start), file=file)
 
 
 def run_warmup(args):
@@ -112,7 +122,12 @@ def main():
     parser.add_argument(
         "--run_for_s", type=int, default=60, help="How long to run the experiment for."
     )
-    parser.add_argument("--query_file", type=str, default="queries_30.sql")
+    parser.add_argument(
+        "--run_all_times",
+        type=int,
+        help="If set, run all the queries in the file this many times.",
+    )
+    parser.add_argument("--query_file", type=str, default="queries_under_30s.sql")
     parser.add_argument("--specific_query_idx", type=int)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--run_warmup", action="store_true")
@@ -144,12 +159,15 @@ def main():
     for _ in range(args.num_clients):
         stop_queue.put("")
 
-    print("Letting the experiment run for {} seconds...".format(args.run_for_s))
-    time.sleep(args.run_for_s)
+    if args.run_all_times is None:
+        print("Letting the experiment run for {} seconds...".format(args.run_for_s))
+        time.sleep(args.run_for_s)
 
-    print("Stopping clients...")
-    for _ in range(args.num_clients):
-        stop_queue.put("")
+        print("Stopping clients...")
+        for _ in range(args.num_clients):
+            stop_queue.put("")
+
+    # Wait for the experiment to finish.
     for p in processes:
         p.join()
 
