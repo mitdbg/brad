@@ -5,6 +5,7 @@ import queue
 from datetime import datetime, timezone
 import multiprocessing as mp
 from typing import AsyncIterable, Optional
+import random
 
 import grpc
 import pyodbc
@@ -60,6 +61,7 @@ class BradServer(BradInterface):
             self._config.epoch_length,
             self._config.s3_logs_bucket,
             self._config.s3_logs_path,
+            self._config.txn_log_prob,
         )
         qhandler.setLevel(logging.INFO)
         formatter = logging.Formatter("%(message)s")
@@ -207,7 +209,7 @@ class BradServer(BradInterface):
             engine_to_use = self._router.engine_for(query_rep)
             logger.debug("Routing '%s' to %s", query, engine_to_use)
 
-            # 3. Actually execute the query
+            # 3. Actually execute the query.
             connection = session.engines.get_connection(engine_to_use)
             cursor = await connection.cursor()
             try:
@@ -218,9 +220,13 @@ class BradServer(BradInterface):
                 # Error when executing the query.
                 raise QueryError.from_exception(ex)
 
-            self._qlogger.info(
-                f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {end-start}s"
-            )
+            # Decide whether to log the query.
+            if query_rep.is_analytical_query() or (
+                random.random() < self._config.txn_log_prob
+            ):
+                self._qlogger.info(
+                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {end-start}s IsTransaction: {query_rep.is_transactional_query()}"
+                )
 
             # Extract and return the results, if any.
             try:

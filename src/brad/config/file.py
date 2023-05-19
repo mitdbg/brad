@@ -118,6 +118,10 @@ class ConfigFile:
             minutes=epoch["minutes"],
         )
 
+    @property
+    def txn_log_prob(self) -> float:
+        return float(self._raw["txn_log_prob"])
+
     def get_odbc_connection_string(self, db: Engine, schema_name: Optional[str]) -> str:
         if db not in self._raw:
             raise AssertionError("Unhandled database type: " + str(db))
