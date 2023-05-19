@@ -15,7 +15,7 @@ combine(
 )
 
 for nodes in NUM_NODES:
-  run_experiment_group(
+  run_experiment(
     name="ra3_xlplus-{}".format(nodes),
     run="python3 ../olap_batch_runner.py",
     options={
