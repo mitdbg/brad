@@ -25,14 +25,6 @@ class ConfigFile:
         return self._raw["planner_log_path"] if "planner_log_path" in self._raw else "."
 
     @property
-    def query_log_path(self) -> str:
-        return (
-            self._raw["query_log_path"]
-            if "query_log_path" in self._raw
-            else "./queries.log"
-        )
-
-    @property
     def server_interface(self) -> str:
         return self._raw["server_interface"]
 
@@ -80,6 +72,22 @@ class ConfigFile:
         return _ensure_slash_terminated(self._raw["s3_extract_path"])
 
     @property
+    def s3_logs_bucket(self) -> str:
+        return self._raw["s3_logs_bucket"]
+
+    @property
+    def s3_logs_path(self) -> str:
+        return _ensure_slash_terminated(self._raw["s3_logs_path"])
+
+    @property
+    def local_logs_path(self) -> str:
+        return (
+            self._raw["local_logs_path"]
+            if "local_logs_path" in self._raw
+            else "./query_logs"
+        )
+
+    @property
     def s3_extract_region(self) -> str:
         """Needed when exporting data from Aurora to S3."""
         return self._raw["s3_extract_region"]
@@ -101,8 +109,8 @@ class ConfigFile:
         return self._raw[Engine.Aurora]["host"].split(".")[0]
 
     @property
-    def forecasting_epoch(self) -> timedelta:
-        epoch = self._raw["forecasting_epoch_length"]
+    def epoch_length(self) -> timedelta:
+        epoch = self._raw["epoch_length"]
         return timedelta(
             weeks=epoch["weeks"],
             days=epoch["days"],
