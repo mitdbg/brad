@@ -1,23 +1,29 @@
 include("../olap.cond")
 
-CSTR_VAR = "REDSHIFT_CSTR"
+CSTR_VAR = "AURORA_CSTR"
 NUM_CLIENTS = 1
 QUERY_FILE_100 = "../queries_under_30s.sql"
 RUN_TIMES = 3
-REDSHIFT_NODES = [1, 2, 4, 8]
 
-# Used for collecting all ra3.xlplus experiments.
+INSTANCES = [
+  "r6i_large",
+  "r6i_xlarge",
+  "r6i_2xlarge",
+  "r6i_4xlarge",
+]
+
+# Used for collecting all experiments.
 combine(
-  name="ra3_xlplus",
+  name="all",
   deps=[
-    ":ra3_xlplus-{}".format(nodes)
-    for nodes in REDSHIFT_NODES
+    ":{}".format(instance)
+    for instance in INSTANCES
   ],
 )
 
-for nodes in REDSHIFT_NODES:
+for instance in INSTANCES:
   run_experiment(
-    name="ra3_xlplus-{}".format(nodes),
+    name=instance,
     run="python3 ../olap_batch_runner.py",
     options={
       "run_all_times": RUN_TIMES,

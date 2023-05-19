@@ -74,7 +74,10 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
         else:
             for idx, q in enumerate(queries):
                 if idx % 10 == 0:
-                    print("Running query index {} of {}".format(idx, len(queries)))
+                    print(
+                        "Running query index {} of {}".format(idx, len(queries)),
+                        flush=True,
+                    )
                 for _ in range(args.run_all_times):
                     start = time.time()
                     cursor.execute(q)
