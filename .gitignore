@@ -13,7 +13,7 @@ brad.egg-info
 config/config.yml
 config/config_local.yml
 config/manifests/manifest.yml
-queries/
+query_logs/
 
 cond-out*
 
