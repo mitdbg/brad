@@ -10,6 +10,7 @@ INSTANCES = [
   "r6i_xlarge",
   "r6i_2xlarge",
   "r6i_4xlarge",
+  "r6i_8xlarge",
 ]
 
 # Used for collecting all experiments.
