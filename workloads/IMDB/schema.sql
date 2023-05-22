@@ -190,3 +190,31 @@ CREATE TABLE person_info (
     info character varying NOT NULL,
     note character varying
 );
+
+DROP TABLE IF EXISTS "cinemas";
+CREATE TABLE cinema (
+    id SERIAL PRIMARY KEY,
+    x_coord integer NOT NULL,
+    y_coord integer NOT NULL
+);
+
+DROP TABLE IF EXISTS "hospitals";
+CREATE TABLE hospital (
+    id SERIAL PRIMARY KEY,
+    x_coord integer NOT NULL,
+    y_coord integer NOT NULL
+);
+
+DROP TABLE IF EXISTS "homes";
+CREATE TABLE home (
+    id SERIAL PRIMARY KEY,
+    x_coord integer NOT NULL,
+    y_coord integer NOT NULL
+);
+
+DROP TABLE IF EXISTS "area_desc";
+CREATE TABLE area_desc (
+    id SERIAL PRIMARY KEY,
+    description integer NOT NULL,
+    polygon_str character varying NOT NULL
+);
