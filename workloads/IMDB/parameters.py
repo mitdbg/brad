@@ -302,7 +302,7 @@ class Default(WorkloadParams):
             "role_type": 0,
         }
         p.txn_generation_ids_offset_file = "workloads/IMDB/OLTP_queries/log.json"
-        p.reporting_query_rt_interval = {1: 5, 10: 5, 50: 5, 200: 5}
+        p.reporting_query_rt_interval = {0.5: 0, 1: 50, 10: 100, 50: 20, 200: 10}
         p.reporting_time_window = ("00:00:00", "06:00:00")
         p.total_num_analytic_users = 10
         p.num_analytic_queries_per_user = 100
