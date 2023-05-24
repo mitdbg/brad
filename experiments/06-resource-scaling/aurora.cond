@@ -1,0 +1,8 @@
+CSTR_VAR = "AURORA_CSTR"
+
+AURORA_INSTANCE_TYPES = [
+  "r6i_large",
+  "r6i_xlarge",
+  "r6i_2xlarge",
+  "r6i_4xlarge",
+]
