@@ -179,13 +179,17 @@ class ConfigFile:
                 port = config["port"]
             else:
                 (host, port) = conn_info
-            cstr = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};Database=dev;".format(
+            cstr = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};".format(
                 config["odbc_driver"],
                 host,
                 port,
                 config["user"],
                 config["password"],
             )
+            if schema_name is not None:
+                cstr += "Database={};".format(schema_name)
+            else:
+                cstr += "Database=dev;"
         return cstr
 
 
