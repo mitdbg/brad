@@ -1,11 +1,14 @@
 from typing import Dict, List, Tuple, Optional, Iterable
 from itertools import chain
 from pathlib import Path
+import boto3
+import re
 
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.planner.workload.query import Query
 from brad.utils.table_sizer import TableSizer
+from brad.config.file import ConfigFile
 
 
 class Workload:
@@ -49,6 +52,47 @@ class Workload:
 
         with open(path / "sample_prob.txt", encoding="UTF-8") as sample_file:
             sampling_prob = float(sample_file.read().strip())
+
+        return cls(analytical_queries, txn_queries, sampling_prob, 0)
+
+    @classmethod
+    def from_s3_logs(cls, config: ConfigFile, epochs: int):
+        s3 = boto3.client("s3")
+
+        # List all objects in the directory
+        response = s3.list_objects_v2(
+            Bucket=config.s3_logs_bucket, Prefix=config.s3_logs_path
+        )
+
+        # Get the last `epochs` epochs by sorting the objects based on their key names
+        # TODO: think about scenarios where files haven't been uploaded yet etc. - are the last k on S3 the most recent k?
+        sorted_files = sorted(
+            response["Contents"], key=lambda obj: obj["Key"], reverse=True
+        )[: epochs * 2]
+
+        txn_queries = []
+        analytical_queries = []
+        sampling_prob = 1
+
+        # Retrieve the contents of each file
+        for file_obj in sorted_files:
+            file_key = file_obj["Key"]
+
+            response = s3.get_object(Bucket=config.s3_logs_bucket, Key=file_key)
+            content = response["Body"].read().decode("utf-8")
+
+            if "analytical" in file_key:
+                for line in content.strip().split("\n"):
+                    q = re.findall(r"Query: (.+?) Engine:", line)[0]
+                    analytical_queries.append(Query(q))
+            elif "transactional" in file_key:
+                prob = re.findall(r"_p(\d+)\.log$", file_key)[0]
+                if (float(prob) / 100.0) < sampling_prob:
+                    sampling_prob = prob
+                for line in content.strip().split("\n"):
+                    print(line)
+                    q = re.findall(r"Query: (.+) Engine:", line)[0]
+                    txn_queries.append(Query(q))
 
         return cls(analytical_queries, txn_queries, sampling_prob, 0)
 

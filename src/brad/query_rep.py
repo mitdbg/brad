@@ -34,10 +34,16 @@ class QueryRep:
     def raw_query(self) -> str:
         return self._raw_sql_query
 
+    def is_analytical_query(self) -> bool:
+        return not self.is_transactional_query()
+
+    def is_transactional_query(self) -> bool:
+        return self.is_data_modification_query()
+
     def is_data_modification_query(self) -> bool:
         if self._is_data_modification is None:
             self._is_data_modification = any(
-                map(self._raw_sql_query.startswith, _DATA_MODIFICATION_PREFIXES)
+                map(self._raw_sql_query.upper().startswith, _DATA_MODIFICATION_PREFIXES)
             )
         return self._is_data_modification
 

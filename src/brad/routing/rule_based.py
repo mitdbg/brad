@@ -16,7 +16,7 @@ from brad.server.session import SessionManager
 class RuleBasedParams(object):
     def __init__(self):
         # Ideal location threshold
-        ideal_location_upper_limit: Mapping[str, Optional[float]] = dict()
+        ideal_location_upper_limit: MutableMapping[str, Optional[float]] = dict()
         ideal_location_upper_limit["aurora_num_table"] = 6
         ideal_location_upper_limit["aurora_table_size_max"] = 5e7
         ideal_location_upper_limit["aurora_table_size_sum"] = 2e8
@@ -26,28 +26,28 @@ class RuleBasedParams(object):
         ideal_location_upper_limit["redshift_table_size_max"] = 5e9
         ideal_location_upper_limit["redshift_table_size_sum"] = 2e11
         self.ideal_location_upper_limit = ideal_location_upper_limit
-        ideal_location_lower_limit: Mapping[str, Optional[float]] = dict()
+        ideal_location_lower_limit: MutableMapping[str, Optional[float]] = dict()
         ideal_location_lower_limit["redshift_num_table"] = 3.0
         self.ideal_location_lower_limit = ideal_location_lower_limit
 
         # Aurora metric threshold
-        aurora_parameters_upper_limit: Mapping[str, Optional[float]] = dict()
+        aurora_parameters_upper_limit: MutableMapping[str, Optional[float]] = dict()
         aurora_parameters_upper_limit["aurora_WRITER_CPUUtilization_Average"] = 50.0
         aurora_parameters_upper_limit["aurora_WRITER_ReadIOPS_Average"] = None
         aurora_parameters_upper_limit["aurora_READER_CPUUtilization_Average"] = 50.0
         aurora_parameters_upper_limit["aurora_READER_ReadIOPS_Average"] = None
         aurora_parameters_upper_limit["aurora_READER_ReadLatency_Average"] = 1e-4
         self.aurora_parameters_upper_limit = aurora_parameters_upper_limit
-        aurora_parameters_lower_limit: Mapping[str, Optional[float]] = dict()
+        aurora_parameters_lower_limit: MutableMapping[str, Optional[float]] = dict()
         self.aurora_parameters_lower_limit = aurora_parameters_lower_limit
 
         # Redshift metric threshold
-        redshift_parameters_upper_limit: Mapping[str, Optional[float]] = dict()
+        redshift_parameters_upper_limit: MutableMapping[str, Optional[float]] = dict()
         redshift_parameters_upper_limit["redshift_CPUUtilization_Average"] = 50.0
         redshift_parameters_upper_limit["redshift_ReadIOPS_Average"] = None
         redshift_parameters_upper_limit["redshift_ReadLatency_Average"] = 1e-4
         self.redshift_parameters_upper_limit = redshift_parameters_upper_limit
-        redshift_parameters_lower_limit: Mapping[str, Optional[float]] = dict()
+        redshift_parameters_lower_limit: MutableMapping[str, Optional[float]] = dict()
         self.redshift_parameters_lower_limit = redshift_parameters_lower_limit
 
 

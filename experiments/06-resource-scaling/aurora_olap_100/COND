@@ -1,0 +1,35 @@
+include("../olap.cond")
+
+CSTR_VAR = "AURORA_CSTR"
+NUM_CLIENTS = 1
+QUERY_FILE_100 = "../queries_under_30s.sql"
+RUN_TIMES = 3
+
+INSTANCES = [
+  "r6i_large",
+  "r6i_xlarge",
+  "r6i_2xlarge",
+  "r6i_4xlarge",
+  "r6i_8xlarge",
+]
+
+# Used for collecting all experiments.
+combine(
+  name="all",
+  deps=[
+    ":{}".format(instance)
+    for instance in INSTANCES
+  ],
+)
+
+for instance in INSTANCES:
+  run_experiment(
+    name=instance,
+    run="python3 ../olap_batch_runner.py",
+    options={
+      "run_all_times": RUN_TIMES,
+      "num_clients": NUM_CLIENTS,
+      "cstr_var": CSTR_VAR,
+      "query_file": QUERY_FILE_100,
+    },
+  )
