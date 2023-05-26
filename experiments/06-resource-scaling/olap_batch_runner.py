@@ -6,6 +6,8 @@ import random
 import time
 import os
 import pathlib
+import signal
+import threading
 
 from typing import List
 
@@ -42,7 +44,7 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
         out_dir = pathlib.Path(".")
 
     with open(out_dir / "olap_batch_{}.csv".format(idx), "w") as file:
-        print("query_idx,run_time_s", file=file)
+        print("query_idx,run_time_s", file=file, flush=True)
 
         # Signal that we're ready to start and wait for the controller.
         start_queue.put_nowait("")
@@ -64,7 +66,9 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                 start = time.time()
                 cursor.execute(next_query)
                 end = time.time()
-                print("{},{}".format(next_query_idx, end - start), file=file)
+                print(
+                    "{},{}".format(next_query_idx, end - start), file=file, flush=True
+                )
 
                 try:
                     _ = stop_queue.get_nowait()
@@ -123,7 +127,9 @@ def main():
         "--cstr_var", type=str, required=True, help="The ODBC connection string"
     )
     parser.add_argument(
-        "--run_for_s", type=int, default=60, help="How long to run the experiment for."
+        "--run_for_s",
+        type=int,
+        help="How long to run the experiment for. If unset, the experiment will run until Ctrl-C.",
     )
     parser.add_argument(
         "--run_all_times",
@@ -158,13 +164,26 @@ def main():
     for _ in range(args.num_clients):
         start_queue.get()
 
-    print("Telling clients to start.")
+    print("Telling {} clients to start.".format(args.num_clients))
     for _ in range(args.num_clients):
         stop_queue.put("")
 
     if args.run_all_times is None:
-        print("Letting the experiment run for {} seconds...".format(args.run_for_s))
-        time.sleep(args.run_for_s)
+        if args.run_for_s is not None:
+            print("Letting the experiment run for {} seconds...".format(args.run_for_s))
+            time.sleep(args.run_for_s)
+
+        else:
+            print("Waiting until requested to stop... (hit Ctrl-C)")
+            should_shutdown = threading.Event()
+
+            def signal_handler(signal, frame):
+                should_shutdown.set()
+
+            signal.signal(signal.SIGINT, signal_handler)
+            signal.signal(signal.SIGTERM, signal_handler)
+
+            should_shutdown.wait()
 
         print("Stopping clients...")
         for _ in range(args.num_clients):
