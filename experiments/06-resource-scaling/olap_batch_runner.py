@@ -63,6 +63,7 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
 
                 start = time.time()
                 cursor.execute(next_query)
+                cursor.fetchall()
                 end = time.time()
                 print("{},{}".format(next_query_idx, end - start), file=file)
 
@@ -81,6 +82,7 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                 for _ in range(args.run_all_times):
                     start = time.time()
                     cursor.execute(q)
+                    cursor.fetchall()
                     end = time.time()
                     print("{},{}".format(idx, end - start), file=file)
 
@@ -105,6 +107,7 @@ def run_warmup(args):
         for idx, q in enumerate(queries):
             start = time.time()
             cursor.execute(q)
+            cursor.fetchall()
             end = time.time()
             run_time_s = end - start
             print(
