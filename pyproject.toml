@@ -1,9 +1,8 @@
 [tool.black]
 extend-exclude = "src/brad/proto_gen/*"
-extend-exclude = "src/brad/cost_model/*"
-extend-exclude = "workloads/cross_db_benchmark/*"
 
 [tool.pytest.ini_options]
+addopts = "--ignore=src/brad/cost_model/ --ignore=workloads/cross_db_benchmark/"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
