@@ -1,5 +1,7 @@
 [tool.black]
 extend-exclude = "src/brad/proto_gen/*"
+extend-exclude = "src/brad/cost_model/*"
+extend-exclude = "workloads/cross_db_benchmark/*"
 
 [tool.pytest.ini_options]
 log_cli = true
