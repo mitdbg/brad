@@ -59,7 +59,7 @@ class RuleBased(Router):
         blueprint: Optional[Blueprint] = None,
         monitor: Optional[Monitor] = None,
         catalog: Optional[MutableMapping[str, MutableMapping[str, Any]]] = None,
-        decision_tree: bool = False,
+        use_decision_tree: bool = False,
         deterministic: bool = True,
     ):
         self._blueprint_mgr = blueprint_mgr
@@ -74,7 +74,7 @@ class RuleBased(Router):
                     with open(file, "r", encoding="utf8") as f:
                         self._catalog = json.load(f)
         # use decision tree instead of rules
-        self._decision_tree = decision_tree
+        self._use_decision_tree = use_decision_tree
         # deterministic routing guarantees the same decision for the same query and should be used online
         # non-determinism will be used for offline training data exploration (not implemented)
         self._deterministic = deterministic
@@ -216,7 +216,6 @@ class RuleBased(Router):
             return locations[0]
         else:
             ideal_location_rank: List[Engine] = []
-            # Todo(ziniu): include index or simple selectivity
             touched_tables = query.tables()
             if (
                 len(touched_tables)
