@@ -57,7 +57,7 @@ class MAPE(Metric):
         mape = np.mean(np.abs((labels - preds) / labels))
         return mape
 
-    def evaluate_metric(self, labels=None, preds=None):
+    def evaluate_metric(self, labels=None, preds=None):  # type: ignore
         raise NotImplementedError
 
 
@@ -70,7 +70,7 @@ class RMSE(Metric):
         return val_mse
 
 
-class MAPE(Metric):
+class MAPE(Metric):  # type: ignore
     def __init__(self, **kwargs):
         super().__init__(metric_name="mape", maximize=False, **kwargs)
 

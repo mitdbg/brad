@@ -10,14 +10,14 @@ class SourceDataset:
 @dataclass()
 class Database:
     db_name: str
-    _source_dataset: str = None
-    _data_folder: str = None
+    _source_dataset: str = None  # type: ignore
+    _data_folder: str = None  # type: ignore
     max_no_joins: int = 4
     min_no_joins: int = 1
     max_no_predicates: int = 4
     min_no_predicates: int = 1
     scale: int = 1
-    duplicate_tables: list = None
+    duplicate_tables: list = None  # type: ignore
     duplicate_no: int = 1
     contain_unicode: bool = False
     full_outer_join: bool = False
