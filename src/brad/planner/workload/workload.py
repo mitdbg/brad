@@ -3,6 +3,7 @@ from itertools import chain
 from pathlib import Path
 import boto3
 import re
+import numpy.typing as npt
 
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
@@ -112,6 +113,11 @@ class Workload:
         self._table_sizes_mb: Dict[Tuple[str, Engine], int] = {}
         self._aurora_row_size_bytes: Dict[str, int] = {}
 
+        # The predicted latencies of the analytical queries.
+        # Shape: (N x 3) where `N` is the number of queries and 3 represents our
+        # three engines (Aurora, Redshift, Athena) in that order.
+        self._predicted_analytical_latencies: Optional[npt.NDArray] = None
+
     def analytical_queries(self) -> List[Query]:
         return self._analytical_queries
 
@@ -166,3 +172,8 @@ class Workload:
             return self._table_sizes_mb[(table_name, location)]
         except KeyError:
             return None
+
+    def set_predicted_analytical_latencies(
+        self, predicted_latency: npt.NDArray
+    ) -> None:
+        self._predicted_analytical_latencies = predicted_latency

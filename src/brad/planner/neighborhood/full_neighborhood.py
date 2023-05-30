@@ -4,47 +4,23 @@ import os
 from typing import List, Optional
 
 from brad.blueprint import Blueprint
-from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
-from brad.daemon.monitor import Monitor
-from brad.planner import BlueprintPlanner
 from brad.planner.enumeration.blueprint import EnumeratedBlueprint
 from brad.planner.neighborhood.logger import BlueprintPlanningLogger
 from brad.planner.neighborhood.blueprint_candidate import BlueprintCandidate
-from brad.planner.neighborhood.neighborhood import (
-    NeighborhoodSearchPlanner,
-    NeighborhoodImpl,
-)
+from brad.planner.neighborhood.impl import NeighborhoodImpl
 from brad.planner.neighborhood.scaling_scorer import ScalingScorer
 from brad.planner.neighborhood.score import ScoringContext
-from brad.planner.workload import Workload
 
 logger = logging.getLogger(__name__)
 
 LOG_REPLAN_VAR = "BRAD_LOG_PLANNING"
 
 
-class FullNeighborhoodSearchPlanner(BlueprintPlanner, NeighborhoodImpl):
-    def __init__(
-        self,
-        current_blueprint: Blueprint,
-        current_workload: Workload,
-        planner_config: PlannerConfig,
-        monitor: Monitor,
-        config: ConfigFile,
-        schema_name: str,
-    ) -> None:
+class FullNeighborhoodSearchPlanner(NeighborhoodImpl):
+    def __init__(self, planner_config: PlannerConfig) -> None:
         super().__init__()
         self._scorer = ScalingScorer(planner_config)
-        self._planner = NeighborhoodSearchPlanner(
-            current_blueprint,
-            current_workload,
-            planner_config,
-            monitor,
-            config,
-            schema_name,
-            self,
-        )
 
         # No need to keep around all candidates if we are selecting the best
         # blueprint. But for debugging purposes it is useful to see what
@@ -53,12 +29,6 @@ class FullNeighborhoodSearchPlanner(BlueprintPlanner, NeighborhoodImpl):
         self._num_top = 50
 
         self._bp_logger: Optional[BlueprintPlanningLogger] = None
-
-    async def run_forever(self) -> None:
-        await self._planner.run_forever()
-
-    async def run_replan(self) -> None:
-        await self._planner.run_replan()
 
     def on_start_enumeration(self) -> None:
         self._candidate_set.clear()
@@ -85,7 +55,7 @@ class FullNeighborhoodSearchPlanner(BlueprintPlanner, NeighborhoodImpl):
             latest = BlueprintCandidate(bp.to_blueprint(), score)
             heapq.heappushpop(self._candidate_set, latest)
 
-    async def on_enumeration_complete(self, _ctx: ScoringContext) -> Blueprint:
+    def on_enumeration_complete(self, _ctx: ScoringContext) -> Blueprint:
         # Close the logger.
         self._bp_logger = None
 
@@ -107,5 +77,4 @@ class FullNeighborhoodSearchPlanner(BlueprintPlanner, NeighborhoodImpl):
         logger.info("Selecting a new blueprint with score %s", best_score)
         logger.info("%s", best_blueprint)
 
-        await self._notify_new_blueprint(best_blueprint)
         return best_blueprint

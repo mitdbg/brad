@@ -8,12 +8,9 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.messages import ShutdownDaemon, NewBlueprint, ReceivedQuery
 from brad.daemon.monitor import Monitor
-from brad.planner.abstract import BlueprintPlanner
-from brad.planner.neighborhood.full_neighborhood import FullNeighborhoodSearchPlanner
-from brad.planner.neighborhood.sampled_neighborhood import (
-    SampledNeighborhoodSearchPlanner,
-)
-from brad.planner.strategy import PlanningStrategy
+from brad.planner.factory import BlueprintPlannerFactory
+from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
+from brad.planner.workload.provider import WorkloadProvider
 from brad.planner.workload import Workload
 from brad.utils import set_up_logging
 
@@ -50,27 +47,19 @@ class BradDaemon:
         # TODO(Amadou): Determine how to pass in specific clusters.
         self._monitor = Monitor.from_config_file(config)
 
-        planning_strategy = self._planner_config.strategy()
-        if planning_strategy == PlanningStrategy.FullNeighborhood:
-            self._planner: BlueprintPlanner = FullNeighborhoodSearchPlanner(
-                current_blueprint=self._current_blueprint,
-                planner_config=planner_config,
-                # N.B. This is a placeholder
-                current_workload=Workload.empty(),
-                monitor=self._monitor,
-                config=self._config,
-                schema_name=self._schema_name,
-            )
-        elif planning_strategy == PlanningStrategy.SampledNeighborhood:
-            self._planner = SampledNeighborhoodSearchPlanner(
-                current_blueprint=self._current_blueprint,
-                planner_config=planner_config,
-                # N.B. This is a placeholder
-                current_workload=Workload.empty(),
-                monitor=self._monitor,
-                config=self._config,
-                schema_name=self._schema_name,
-            )
+        self._planner = BlueprintPlannerFactory.create(
+            planner_config=planner_config,
+            current_blueprint=self._current_blueprint,
+            # N.B. This is a placeholder
+            current_workload=Workload.empty(),
+            monitor=self._monitor,
+            config=self._config,
+            schema_name=self._schema_name,
+            # TODO: Hook into the query logging infrastructure. This is a placeholder.
+            workload_provider=_EmptyWorkloadProvider(),
+            # TODO: Hook into the learned performance cost model. This is a placeholder.
+            analytics_latency_scorer=_NoopAnalyticsScorer(),
+        )
 
     async def run_forever(self) -> None:
         """
@@ -174,3 +163,13 @@ class BradDaemon:
 
 def _noop():
     pass
+
+
+class _EmptyWorkloadProvider(WorkloadProvider):
+    def next_workload(self) -> Workload:
+        return Workload.empty()
+
+
+class _NoopAnalyticsScorer(AnalyticsLatencyScorer):
+    def apply_predicted_latencies(self, _workload: Workload) -> None:
+        pass

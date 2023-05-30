@@ -3,21 +3,23 @@ import logging
 from typing import Dict, List
 from pathlib import Path
 
-from brad.blueprint import Blueprint
 from brad.config.engine import Engine
-from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
-from brad.daemon.monitor import Monitor
+from brad.planner import BlueprintPlanner
 from brad.planner.enumeration.neighborhood import NeighborhoodBlueprintEnumerator
-from brad.planner.enumeration.blueprint import EnumeratedBlueprint
 from brad.planner.filters import Filter
 from brad.planner.filters.aurora_transactions import AuroraTransactions
 from brad.planner.filters.no_data_loss import NoDataLoss
 from brad.planner.filters.single_engine_execution import SingleEngineExecution
 from brad.planner.filters.table_on_engine import TableOnEngine
+from brad.planner.neighborhood.impl import NeighborhoodImpl
 from brad.planner.neighborhood.scaling_scorer import ALL_METRICS
 from brad.planner.neighborhood.score import ScoringContext
-from brad.planner.workload import Workload
+from brad.planner.neighborhood.full_neighborhood import FullNeighborhoodSearchPlanner
+from brad.planner.neighborhood.sampled_neighborhood import (
+    SampledNeighborhoodSearchPlanner,
+)
+from brad.planner.strategy import PlanningStrategy
 from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
@@ -27,46 +29,19 @@ logger = logging.getLogger(__name__)
 LOG_REPLAN_VAR = "BRAD_LOG_PLANNING"
 
 
-class NeighborhoodImpl:
-    def on_start_enumeration(self) -> None:
-        raise NotImplementedError
-
-    def on_enumerated_blueprint(
-        self, bp: EnumeratedBlueprint, ctx: ScoringContext
-    ) -> None:
-        raise NotImplementedError
-
-    async def on_enumeration_complete(self, ctx: ScoringContext) -> Blueprint:
-        raise NotImplementedError
-
-
-class NeighborhoodSearchPlanner:
+class NeighborhoodSearchPlanner(BlueprintPlanner):
     def __init__(
         self,
-        current_blueprint: Blueprint,
-        current_workload: Workload,
-        planner_config: PlannerConfig,
-        monitor: Monitor,
-        config: ConfigFile,
-        schema_name: str,
-        impl: NeighborhoodImpl,
+        *args,
+        **kwargs,
     ) -> None:
-        super().__init__()
-        self._current_blueprint = current_blueprint
-        self._current_workload = current_workload
-        # The intention is to decouple the planner and monitor down the line
-        # when it is clear how we want to process the metrics provided by the
-        # monitor.
-        self._monitor = monitor
+        super().__init__(*args, **kwargs)
 
         # Workload independent semantic filters.
         self._workload_independent_filters: List[Filter] = [
             NoDataLoss(),
             TableOnEngine(),
         ]
-        self._planner_config = planner_config
-        self._config = config
-        self._schema_name = schema_name
 
         self._metrics_out = open(
             Path(self._config.planner_log_path) / "actual_metrics.csv",
@@ -74,7 +49,15 @@ class NeighborhoodSearchPlanner:
             encoding="UTF-8",
         )
 
-        self._impl = impl
+        planner_config: PlannerConfig = kwargs["planner_config"]
+        strategy = planner_config.strategy()
+
+        if strategy == PlanningStrategy.FullNeighborhood:
+            self._impl: NeighborhoodImpl = FullNeighborhoodSearchPlanner(planner_config)
+        elif strategy == PlanningStrategy.SampledNeighborhood:
+            self._impl = SampledNeighborhoodSearchPlanner(planner_config)
+        else:
+            assert False
 
     async def run_forever(self) -> None:
         try:
@@ -92,7 +75,7 @@ class NeighborhoodSearchPlanner:
         # the daemon process.
         logger.info("Running a replan.")
         self._log_current_metrics()
-        next_workload = self._expected_workload()
+        next_workload = self._workload_provider.next_workload()
         workload_filters = [
             AuroraTransactions(next_workload),
             SingleEngineExecution(next_workload),
@@ -168,9 +151,10 @@ class NeighborhoodSearchPlanner:
 
                 self._impl.on_enumerated_blueprint(bp, scoring_ctx)
 
-            selected_blueprint = await self._impl.on_enumeration_complete(scoring_ctx)
+            selected_blueprint = self._impl.on_enumeration_complete(scoring_ctx)
             self._current_blueprint = selected_blueprint
             self._current_workload = next_workload
+            await self._notify_new_blueprint(selected_blueprint)
 
         finally:
             engines.close_sync()
@@ -179,9 +163,6 @@ class NeighborhoodSearchPlanner:
         # See if the metrics indicate that we should trigger the planning
         # process.
         return False
-
-    def _expected_workload(self) -> Workload:
-        return self._current_workload
 
     def _estimate_current_data_accessed(
         self, engines: EngineConnections
