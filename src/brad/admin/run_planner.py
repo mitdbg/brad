@@ -5,12 +5,10 @@ from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
-from brad.planner.neighborhood.full_neighborhood import FullNeighborhoodSearchPlanner
-from brad.planner.neighborhood.sampled_neighborhood import (
-    SampledNeighborhoodSearchPlanner,
-)
+from brad.planner.factory import BlueprintPlannerFactory
+from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 from brad.planner.workload import Workload
-from brad.planner.strategy import PlanningStrategy
+from brad.planner.workload.provider import FixedWorkloadProvider
 from brad.server.blueprint_manager import BlueprintManager
 
 logger = logging.getLogger(__name__)
@@ -74,27 +72,18 @@ def run_planner(args):
 
     # 5. Start the planner.
     monitor = Monitor.from_config_file(config)
-    strategy = planner_config.strategy()
-    if strategy == PlanningStrategy.FullNeighborhood:
-        planner = FullNeighborhoodSearchPlanner(
-            current_blueprint=blueprint_mgr.get_blueprint(),
-            current_workload=workload,
-            planner_config=planner_config,
-            monitor=monitor,
-            config=config,
-            schema_name=args.schema_name,
-        )
-    elif strategy == PlanningStrategy.SampledNeighborhood:
-        planner = SampledNeighborhoodSearchPlanner(
-            current_blueprint=blueprint_mgr.get_blueprint(),
-            current_workload=workload,
-            planner_config=planner_config,
-            monitor=monitor,
-            config=config,
-            schema_name=args.schema_name,
-        )
-    else:
-        assert False
+    planner = BlueprintPlannerFactory.create(
+        current_blueprint=blueprint_mgr.get_blueprint(),
+        current_workload=workload,
+        planner_config=planner_config,
+        monitor=monitor,
+        config=config,
+        schema_name=args.schema_name,
+        # Next workload is the same as the current workload.
+        workload_provider=FixedWorkloadProvider(workload),
+        # This is a temporary placeholder.
+        analytics_latency_scorer=_NoopAnalyticsLatencyScorer(),
+    )
     monitor.force_read_metrics()
 
     async def on_new_blueprint(blueprint: Blueprint):
@@ -108,3 +97,8 @@ def run_planner(args):
     event_loop.set_debug(enabled=args.debug)
     asyncio.set_event_loop(event_loop)
     asyncio.run(planner.run_replan())
+
+
+class _NoopAnalyticsLatencyScorer(AnalyticsLatencyScorer):
+    def apply_predicted_latencies(self, workload: Workload) -> None:
+        pass

@@ -2,6 +2,12 @@ import asyncio
 from typing import Coroutine, Callable, List
 
 from brad.blueprint import Blueprint
+from brad.config.file import ConfigFile
+from brad.config.planner import PlannerConfig
+from brad.daemon.monitor import Monitor
+from brad.planner.workload import Workload
+from brad.planner.workload.provider import WorkloadProvider
+from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 
 NewBlueprintCallback = Callable[[Blueprint], Coroutine[None, None, None]]
 
@@ -13,7 +19,27 @@ class BlueprintPlanner:
     multiple Python threads from executing in parallel.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        planner_config: PlannerConfig,
+        current_blueprint: Blueprint,
+        current_workload: Workload,
+        monitor: Monitor,
+        config: ConfigFile,
+        schema_name: str,
+        workload_provider: WorkloadProvider,
+        analytics_latency_scorer: AnalyticsLatencyScorer,
+    ) -> None:
+        self._planner_config = planner_config
+        self._current_blueprint = current_blueprint
+        self._current_workload = current_workload
+        self._monitor = monitor
+        self._config = config
+        self._schema_name = schema_name
+
+        self._workload_provider = workload_provider
+        self._analytics_latency_scorer = analytics_latency_scorer
+
         self._callbacks: List[NewBlueprintCallback] = []
 
     async def run_forever(self) -> None:

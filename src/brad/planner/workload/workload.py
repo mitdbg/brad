@@ -3,7 +3,6 @@ from itertools import chain
 from pathlib import Path
 import boto3
 import re
-import numpy as np
 import numpy.typing as npt
 
 from brad.blueprint import Blueprint

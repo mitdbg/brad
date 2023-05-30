@@ -3,10 +3,7 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner import BlueprintPlanner
-from brad.planner.neighborhood.full_neighborhood import FullNeighborhoodSearchPlanner
-from brad.planner.neighborhood.sampled_neighborhood import (
-    SampledNeighborhoodSearchPlanner,
-)
+from brad.planner.neighborhood.neighborhood import NeighborhoodSearchPlanner
 from brad.planner.beam.query_based import QueryBasedBeamPlanner
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 from brad.planner.strategy import PlanningStrategy
@@ -27,36 +24,31 @@ class BlueprintPlannerFactory:
         analytics_latency_scorer: AnalyticsLatencyScorer,
     ) -> BlueprintPlanner:
         strategy = planner_config.strategy()
-        if strategy == PlanningStrategy.FullNeighborhood:
-            return FullNeighborhoodSearchPlanner(
-                current_blueprint,
-                current_workload,
-                planner_config,
-                monitor,
-                config,
-                schema_name,
-            )
-
-        elif strategy == PlanningStrategy.SampledNeighborhood:
-            return SampledNeighborhoodSearchPlanner(
-                current_blueprint,
-                current_workload,
-                planner_config,
-                monitor,
-                config,
-                schema_name,
+        if (
+            strategy == PlanningStrategy.FullNeighborhood
+            or strategy == PlanningStrategy.SampledNeighborhood
+        ):
+            return NeighborhoodSearchPlanner(
+                current_blueprint=current_blueprint,
+                current_workload=current_workload,
+                planner_config=planner_config,
+                monitor=monitor,
+                config=config,
+                schema_name=schema_name,
+                workload_provider=workload_provider,
+                analytics_latency_scorer=analytics_latency_scorer,
             )
 
         elif strategy == PlanningStrategy.QueryBasedBeam:
             return QueryBasedBeamPlanner(
-                current_blueprint,
-                current_workload,
-                planner_config,
-                monitor,
-                config,
-                schema_name,
-                workload_provider,
-                analytics_latency_scorer,
+                current_blueprint=current_blueprint,
+                current_workload=current_workload,
+                planner_config=planner_config,
+                monitor=monitor,
+                config=config,
+                schema_name=schema_name,
+                workload_provider=workload_provider,
+                analytics_latency_scorer=analytics_latency_scorer,
             )
 
         else:
