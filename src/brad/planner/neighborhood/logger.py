@@ -2,7 +2,7 @@ import csv
 import datetime
 
 from brad.blueprint import Blueprint
-from brad.planner.scoring.score import Score
+from brad.planner.neighborhood.score import Score
 
 
 class BlueprintPlanningLogger:

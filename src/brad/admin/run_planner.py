@@ -5,8 +5,10 @@ from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
-from brad.planner.full_neighborhood import FullNeighborhoodSearchPlanner
-from brad.planner.sampled_neighborhood import SampledNeighborhoodSearchPlanner
+from brad.planner.neighborhood.full_neighborhood import FullNeighborhoodSearchPlanner
+from brad.planner.neighborhood.sampled_neighborhood import (
+    SampledNeighborhoodSearchPlanner,
+)
 from brad.planner.workload import Workload
 from brad.planner.strategy import PlanningStrategy
 from brad.server.blueprint_manager import BlueprintManager
@@ -71,7 +73,7 @@ def run_planner(args):
     workload = Workload.from_extracted_logs(args.workload_dir)
 
     # 5. Start the planner.
-    monitor = Monitor(config)
+    monitor = Monitor.from_config_file(config)
     strategy = planner_config.strategy()
     if strategy == PlanningStrategy.FullNeighborhood:
         planner = FullNeighborhoodSearchPlanner(

@@ -20,7 +20,6 @@ from brad.daemon.daemon import BradDaemon
 from brad.daemon.monitor import Monitor
 from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel, ReceivedQuery
 from brad.data_sync.execution.executor import DataSyncExecutor
-from brad.provisioning.physical import PhysicalProvisioning
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.rule_based import RuleBased
@@ -82,13 +81,7 @@ class BradServer(BradInterface):
         elif routing_policy == RoutingPolicy.AlwaysRedshift:
             self._router = AlwaysOneRouter(Engine.Redshift)
         elif routing_policy == RoutingPolicy.RuleBased:
-            # TODO(Amadou): Use real constructor.
             self._monitor = Monitor.from_config_file(config)
-            self._physical = PhysicalProvisioning(
-                self._monitor,
-                self._blueprint_mgr.get_blueprint(),
-                cluster_ids=config.get_cluster_ids(),
-            )
             self._router = RuleBased(
                 blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
             )
@@ -96,12 +89,14 @@ class BradServer(BradInterface):
             raise RuntimeError(
                 "Unsupported routing policy: {}".format(str(routing_policy))
             )
-        conn_info = dict()
-        if self._physical is not None:
-            conn_info = self._physical.connection_info()
+
         self._sessions = SessionManager(
-            self._config, self._schema_name, conn_info=conn_info
+            self._config,
+            self._schema_name,
+            # TODO: Better handling of connections to the underlying provisioning.
+            conn_info=dict(),
         )
+
         self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
         self._timed_sync_task = None
         self._daemon_messages_task = None

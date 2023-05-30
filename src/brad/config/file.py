@@ -155,11 +155,11 @@ class ConfigFile:
             if schema_name is not None:
                 cstr += "Schema={};".format(schema_name)
         elif db is Engine.Aurora:
-            (read_only, conn_info) = conn_info
             if conn_info is None:
                 host = config["host"]
                 port = config["port"]
             else:
+                (read_only, conn_info) = conn_info
                 (writer_host, reader_host, port) = conn_info
                 if read_only:
                     host = reader_host
