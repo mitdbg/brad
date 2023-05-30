@@ -22,7 +22,6 @@ class NodeTypeEncoder(FcOutModel):
         one_hot_embeddings=True,
         **kwargs,
     ):
-
         for f in features:
             if f not in feature_statistics:
                 raise ValueError(f"Did not find {f} in feature statistics")

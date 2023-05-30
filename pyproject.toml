@@ -1,8 +1,6 @@
 [tool.black]
 extend-exclude = """
 src/brad/proto_gen/*
-src/brad/cost_model/*
-workloads/cross_db_benchmark/*
 """
 
 [tool.pytest.ini_options]

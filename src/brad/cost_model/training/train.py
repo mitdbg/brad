@@ -489,7 +489,9 @@ def train_default(
 
     train_kwargs = dict(
         optimizer_class_name="AdamW",
-        optimizer_kwargs=dict(lr=1e-3,),
+        optimizer_kwargs=dict(
+            lr=1e-3,
+        ),
         final_mlp_kwargs=final_mlp_kwargs,
         node_type_kwargs=node_type_kwargs,
         tree_layer_kwargs=tree_layer_kwargs,
@@ -588,7 +590,9 @@ def train_readout_hyperparams(
 
     train_kwargs = dict(
         optimizer_class_name="AdamW",
-        optimizer_kwargs=dict(lr=hyperparams.pop("lr"),),
+        optimizer_kwargs=dict(
+            lr=hyperparams.pop("lr"),
+        ),
         final_mlp_kwargs=final_mlp_kwargs,
         node_type_kwargs=node_type_kwargs,
         tree_layer_kwargs=tree_layer_kwargs,

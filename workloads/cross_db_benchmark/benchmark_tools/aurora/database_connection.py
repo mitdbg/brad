@@ -103,7 +103,7 @@ class AuroraDatabaseConnection(DatabaseConnection):
                         projection = f'"{c}" || \'R\' AS "{c}"'
                     elif type.startswith("int"):
                         offset = find_numeric_offset(c, column_stats, schema, t)
-                        offset *= 2 ** no_prev_replications
+                        offset *= 2**no_prev_replications
                         projection = f'"{c}"+{offset} AS "{c}"'
                     else:
                         raise NotImplementedError(type)

@@ -61,7 +61,6 @@ def scale_up_dataset(
             print(f" - scale: {scale}")
 
     for t in schema.tables:
-
         table_path = os.path.join(data_dir, f"{t}.csv")
         table_target_path = os.path.join(target_dir, f"{t}.csv")
         shutil.copyfile(table_path, table_target_path)
@@ -97,7 +96,6 @@ def scale_up_dataset(
         # a nullable integer type.
         conv_int_cols = set()
         for c in orig_df_table.columns:
-
             if orig_df_table[c].dtype == np.float64:
                 nna_mask = ~np.isnan(orig_df_table[c])
 
@@ -116,10 +114,8 @@ def scale_up_dataset(
 
         print(f"Scaling table {t}")
         for i in tqdm(range(scale - 1)):
-
             curr_df_table = orig_df_table.copy(deep=True)
             for c in scale_columns[t]:
-
                 if curr_df_table[c].dtype == np.int64 or c in conv_int_cols:
                     offset = find_numeric_offset(c, column_stats, schema, t)
                     curr_df_table[c] += (i + 1) * offset
@@ -176,7 +172,7 @@ def get_dataset_size(data_dir, schema):
     for t in schema.tables:
         table_path = os.path.join(data_dir, f"{t}.csv")
         filesize_b += os.path.getsize(table_path)
-    filesize_gb = filesize_b / (1024 ** 3)
+    filesize_gb = filesize_b / (1024**3)
     return filesize_gb
 
 

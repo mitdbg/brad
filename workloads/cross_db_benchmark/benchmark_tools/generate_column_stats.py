@@ -82,7 +82,6 @@ def generate_stats(data_dir, dataset, force=True):
     # read individual table csvs and derive statistics
     joint_column_stats = dict()
     for t in schema.tables:
-
         column_stats_table = dict()
         table_dir = os.path.join(data_dir, f"{t}.csv")
         assert os.path.exists(table_dir), f"Could not find table csv {table_dir}"

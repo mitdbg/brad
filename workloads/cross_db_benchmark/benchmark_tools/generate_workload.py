@@ -569,7 +569,6 @@ def sample_exists_subqueries(
     exists_subquery = randstate.rand() < exists_ratio
     eligible_exist = list(set(q.join_tables).intersection(relationships_table.keys()))
     if exists_subquery and len(eligible_exist) > 0:
-
         no_exists = randstate.randint(1, max_no_exists + 1)
 
         alias_dict = dict()
@@ -816,7 +815,6 @@ def sample_complex_predicates(
     predicate_columns = [possible_columns[i] for i in predicate_col_idx]
     predicates = []
     for [t, col_name] in predicate_columns:
-
         # sample which predicate chain
         predicate_options = [
             PredicateChain.SIMPLE,
@@ -933,7 +931,6 @@ def sample_predicate(
         str_stats = vars(vars(string_stats)[t]).get(col_name)
 
     if complex_predicate:
-
         # LIKE / NOT LIKE
         if (
             col_stats is None

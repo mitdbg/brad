@@ -34,7 +34,6 @@ def generate_string_stats(
     cols_with_freq_words = 0
     string_stats = dict()
     for table, cols in vars(column_stats).items():
-
         string_stats[table] = dict()
         table_dir = os.path.join(data_dir, f"{table}.csv")
         assert os.path.exists(data_dir), f"Could not find table csv {table_dir}"

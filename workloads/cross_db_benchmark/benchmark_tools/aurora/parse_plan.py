@@ -36,7 +36,6 @@ def parse_recursively(parent, plan, offset, depth):
     while i < len(plan):
         # new operator
         if plan[i].strip().startswith("->"):
-
             # create plan node for previous one
             lines_plan_operator = create_node(
                 lines_plan_operator, operators_current_level

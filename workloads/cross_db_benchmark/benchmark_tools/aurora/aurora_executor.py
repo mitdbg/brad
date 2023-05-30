@@ -27,7 +27,10 @@ REMOTE_DSN = "postgres://psycopg:psycopg@localhost/imdbload"
 #     such as EXPLAIN).
 #   server_ip: str, the private IP address of the Postgres server that
 #     generated this Result.
-Result = collections.namedtuple("Result", ["result", "has_timeout", "server_ip"],)
+Result = collections.namedtuple(
+    "Result",
+    ["result", "has_timeout", "server_ip"],
+)
 
 # ----------------------------------------
 #     Psycopg setup

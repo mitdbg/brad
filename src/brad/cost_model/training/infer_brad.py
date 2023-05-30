@@ -134,7 +134,9 @@ def load_models(
 
         train_kwargs = dict(
             optimizer_class_name="AdamW",
-            optimizer_kwargs=dict(lr=hyperparams.pop("lr"),),
+            optimizer_kwargs=dict(
+                lr=hyperparams.pop("lr"),
+            ),
             final_mlp_kwargs=final_mlp_kwargs,
             node_type_kwargs=node_type_kwargs,
             tree_layer_kwargs=tree_layer_kwargs,

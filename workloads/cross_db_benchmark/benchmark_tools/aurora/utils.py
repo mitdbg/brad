@@ -142,7 +142,7 @@ def getJoinConds(
     join_conds = dict()
     t1_alias = None
     t2_alias = None
-    for (t1, k1, t2, k2) in joins:
+    for t1, k1, t2, k2 in joins:
         clause = _FormatJoinCond((t1, k1, t2, k2))
         if alias_dict is not None:
             if t1 in alias_dict:

@@ -150,7 +150,6 @@ class PlanOperator(dict):
     def parse_output_columns(self, l):
         output_columns = []
         for col in l.split(", "):
-
             # argument in a function call not an actual column
             if col.strip(")").isnumeric() or col in {
                 "NULL::numeric",
@@ -262,7 +261,6 @@ class PlanOperator(dict):
         table_id_mapping,
         alias_dict,
     ):
-
         if alias_dict is None:
             alias_dict = dict()
 
