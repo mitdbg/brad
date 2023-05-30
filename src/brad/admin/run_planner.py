@@ -5,8 +5,10 @@ from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
-from brad.planner.full_neighborhood import FullNeighborhoodSearchPlanner
-from brad.planner.sampled_neighborhood import SampledNeighborhoodSearchPlanner
+from brad.planner.neighborhood.full_neighborhood import FullNeighborhoodSearchPlanner
+from brad.planner.neighborhood.sampled_neighborhood import (
+    SampledNeighborhoodSearchPlanner,
+)
 from brad.planner.workload import Workload
 from brad.planner.strategy import PlanningStrategy
 from brad.server.blueprint_manager import BlueprintManager

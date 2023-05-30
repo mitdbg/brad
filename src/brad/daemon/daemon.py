@@ -9,8 +9,10 @@ from brad.config.planner import PlannerConfig
 from brad.daemon.messages import ShutdownDaemon, NewBlueprint, ReceivedQuery
 from brad.daemon.monitor import Monitor
 from brad.planner.abstract import BlueprintPlanner
-from brad.planner.full_neighborhood import FullNeighborhoodSearchPlanner
-from brad.planner.sampled_neighborhood import SampledNeighborhoodSearchPlanner
+from brad.planner.neighborhood.full_neighborhood import FullNeighborhoodSearchPlanner
+from brad.planner.neighborhood.sampled_neighborhood import (
+    SampledNeighborhoodSearchPlanner,
+)
 from brad.planner.strategy import PlanningStrategy
 from brad.planner.workload import Workload
 from brad.utils import set_up_logging
