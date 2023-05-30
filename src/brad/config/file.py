@@ -138,10 +138,10 @@ class ConfigFile:
         config = self._raw[db]
         if db is Engine.Athena:
             if conn_info is None:
-                workgroup = None
+                _workgroup = None
                 s3_path = config["s3_output_path"]
             else:
-                (workgroup, s3_path) = conn_info
+                (_workgroup, s3_path) = conn_info
             cstr = "Driver={{{}}};AwsRegion={};S3OutputLocation={};AuthenticationType=IAM Credentials;UID={};PWD={};".format(
                 config["odbc_driver"],
                 config["aws_region"],
@@ -149,8 +149,9 @@ class ConfigFile:
                 config["access_key"],
                 config["access_key_secret"],
             )
-            if workgroup is not None:
-                cstr += f"Workgroup={workgroup};"
+            # TODO: Restrict connections to a workgroup.
+            # We do not do so right now because the bootstrap workflow does not
+            # set up an Athena workgroup.
             if schema_name is not None:
                 cstr += "Schema={};".format(schema_name)
         elif db is Engine.Aurora:

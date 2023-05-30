@@ -223,10 +223,13 @@ class Monitor:
             elif engine == Engine.Athena:
                 namespace = "AWS/Athena"
                 dimensions = [
-                    {
-                        "Name": "WorkGroup",
-                        "Value": self._cluster_ids[Engine.Athena],
-                    }
+                    # TODO: Restrict metrics to an Athena workgroup.
+                    # We do not do so right now because the bootstrap workflow does not
+                    # set up an Athena workgroup.
+                    # {
+                    #     "Name": "WorkGroup",
+                    #     "Value": self._cluster_ids[Engine.Athena],
+                    # }
                 ]
 
             roles = f.get("roles", [""])
