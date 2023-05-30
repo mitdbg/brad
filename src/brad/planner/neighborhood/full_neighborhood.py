@@ -8,15 +8,15 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner import BlueprintPlanner
-from brad.planner.logger import BlueprintPlanningLogger
-from brad.planner.blueprint_candidate import BlueprintCandidate
 from brad.planner.enumeration.blueprint import EnumeratedBlueprint
+from brad.planner.neighborhood.logger import BlueprintPlanningLogger
+from brad.planner.neighborhood.blueprint_candidate import BlueprintCandidate
 from brad.planner.neighborhood.neighborhood import (
     NeighborhoodSearchPlanner,
     NeighborhoodImpl,
 )
-from brad.planner.scoring.scaling_scorer import ScalingScorer
-from brad.planner.scoring.score import ScoringContext
+from brad.planner.neighborhood.scaling_scorer import ScalingScorer
+from brad.planner.neighborhood.score import ScoringContext
 from brad.planner.workload import Workload
 
 logger = logging.getLogger(__name__)

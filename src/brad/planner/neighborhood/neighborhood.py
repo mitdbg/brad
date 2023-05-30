@@ -15,8 +15,8 @@ from brad.planner.filters.aurora_transactions import AuroraTransactions
 from brad.planner.filters.no_data_loss import NoDataLoss
 from brad.planner.filters.single_engine_execution import SingleEngineExecution
 from brad.planner.filters.table_on_engine import TableOnEngine
-from brad.planner.scoring.scaling_scorer import ALL_METRICS
-from brad.planner.scoring.score import ScoringContext
+from brad.planner.neighborhood.scaling_scorer import ALL_METRICS
+from brad.planner.neighborhood.score import ScoringContext
 from brad.planner.workload import Workload
 from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
