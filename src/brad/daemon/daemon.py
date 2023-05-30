@@ -46,7 +46,7 @@ class BradDaemon:
 
         self._current_blueprint = current_blueprint
         # TODO(Amadou): Determine how to pass in specific clusters.
-        self._monitor = Monitor.from_schema_name(current_blueprint.schema_name())
+        self._monitor = Monitor.from_config_file(config)
 
         planning_strategy = self._planner_config.strategy()
         if planning_strategy == PlanningStrategy.FullNeighborhood:

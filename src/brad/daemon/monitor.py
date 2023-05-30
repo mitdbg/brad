@@ -34,7 +34,7 @@ class Monitor:
 
     def __init__(
         self,
-        cluster_ids: Dict[str, str],
+        cluster_ids: Dict[Engine, str],
         forecasting_method: str = "constant",
         forecasting_window_size: int = 5,  # (Up to) how many past samples to base the forecast on
         forecasting_epoch: timedelta = timedelta(hours=1),
@@ -69,15 +69,16 @@ class Monitor:
     # Create from config file.
     @classmethod
     def from_config_file(cls, config: ConfigFile):
-        raise NotImplementedError
+        cluster_ids = config.get_cluster_ids()
+        return cls(cluster_ids)
 
     # Create from schema name.
     @classmethod
     def from_schema_name(cls, schema_name: str):
         cluster_ids = {
-            Engine.Redshift.lower(): f"brad-{schema_name}",
-            Engine.Aurora.lower(): f"brad-{schema_name}",
-            Engine.Athena.lower(): f"brad-{schema_name}",
+            Engine.Redshift: f"brad-{schema_name}",
+            Engine.Aurora: f"brad-{schema_name}",
+            Engine.Athena: f"brad-{schema_name}",
         }
         return cls(cluster_ids)
 
@@ -222,10 +223,13 @@ class Monitor:
             elif engine == Engine.Athena:
                 namespace = "AWS/Athena"
                 dimensions = [
-                    {
-                        "Name": "WorkGroup",
-                        "Value": self._cluster_ids[Engine.Athena],
-                    }
+                    # TODO: Restrict metrics to an Athena workgroup.
+                    # We do not do so right now because the bootstrap workflow does not
+                    # set up an Athena workgroup.
+                    # {
+                    #     "Name": "WorkGroup",
+                    #     "Value": self._cluster_ids[Engine.Athena],
+                    # }
                 ]
 
             roles = f.get("roles", [""])

@@ -1,5 +1,5 @@
 import yaml
-from typing import Optional
+from typing import Optional, Any, Dict
 from datetime import timedelta
 
 from brad.config.engine import Engine
@@ -11,6 +11,13 @@ class ConfigFile:
         self._raw_path = path
         with open(path, "r", encoding="UTF-8") as file:
             self._raw = yaml.load(file, Loader=yaml.Loader)
+
+    def get_cluster_ids(self) -> Dict[Engine, str]:
+        return {
+            Engine.Aurora: self.aurora_cluster_id,
+            Engine.Redshift: self.redshift_cluster_id,
+            Engine.Athena: "brad-db0",  # TODO(Amadou): I don't want to break existing configs. Coordinate with Geoff on this.
+        }
 
     @property
     def raw_path(self) -> str:
@@ -122,39 +129,69 @@ class ConfigFile:
     def txn_log_prob(self) -> float:
         return float(self._raw["txn_log_prob"])
 
-    def get_odbc_connection_string(self, db: Engine, schema_name: Optional[str]) -> str:
+    def get_odbc_connection_string(
+        self, db: Engine, schema_name: Optional[str], conn_info: Any = None
+    ) -> str:
         if db not in self._raw:
             raise AssertionError("Unhandled database type: " + str(db))
 
         config = self._raw[db]
         if db is Engine.Athena:
+            if conn_info is None:
+                _workgroup = None
+                s3_path = config["s3_output_path"]
+            else:
+                (_workgroup, s3_path) = conn_info
             cstr = "Driver={{{}}};AwsRegion={};S3OutputLocation={};AuthenticationType=IAM Credentials;UID={};PWD={};".format(
                 config["odbc_driver"],
                 config["aws_region"],
-                config["s3_output_path"],
+                s3_path,
                 config["access_key"],
                 config["access_key_secret"],
             )
+            # TODO: Restrict connections to a workgroup.
+            # We do not do so right now because the bootstrap workflow does not
+            # set up an Athena workgroup.
             if schema_name is not None:
                 cstr += "Schema={};".format(schema_name)
-            return cstr
-
-        elif db is Engine.Aurora or db is Engine.Redshift:
+        elif db is Engine.Aurora:
+            (read_only, conn_info) = conn_info
+            if conn_info is None:
+                host = config["host"]
+                port = config["port"]
+            else:
+                (writer_host, reader_host, port) = conn_info
+                if read_only:
+                    host = reader_host
+                else:
+                    host = writer_host
             cstr = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};".format(
                 config["odbc_driver"],
-                config["host"],
-                config["port"],
+                host,
+                port,
                 config["user"],
                 config["password"],
             )
             if schema_name is not None:
                 cstr += "Database={};".format(schema_name)
-            elif db is Engine.Redshift:
-                # Redshift requires a database name to be specified. As far as
-                # we know, there is always a `dev` database. We connect without
-                # a database when we are bootstrapping a new database.
+        elif db is Engine.Redshift:
+            if conn_info is None:
+                host = config["host"]
+                port = config["port"]
+            else:
+                (host, port) = conn_info
+            cstr = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};".format(
+                config["odbc_driver"],
+                host,
+                port,
+                config["user"],
+                config["password"],
+            )
+            if schema_name is not None:
+                cstr += "Database={};".format(schema_name)
+            else:
                 cstr += "Database=dev;"
-            return cstr
+        return cstr
 
 
 def _ensure_slash_terminated(candidate: str) -> str:

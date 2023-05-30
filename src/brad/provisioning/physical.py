@@ -8,6 +8,7 @@ from brad.daemon.monitor import Monitor, get_metric_id
 import brad.provisioning as provisioning
 import json
 from importlib.resources import files, as_file
+from typing import Dict, Any
 
 
 # Manages physical provisioning using the logical blueprint.
@@ -110,6 +111,14 @@ class PhysicalProvisioning:
     # Return athena's workgroup for issuing queries.
     def get_athena_workgroup(self):
         self._athena_provisioning.get_workgroup()
+
+    # Return all connection infos.
+    def connection_info(self) -> Dict[Engine, Any]:
+        return {
+            Engine.Aurora: self.get_aurora_connection(),
+            Engine.Redshift: self.get_redshift_connection(),
+            Engine.Athena: self.get_athena_workgroup(),
+        }
 
     # Change specific trigger.
     def change_trigger(self, engine: Engine, metric: str, lo: float, hi: float):
