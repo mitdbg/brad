@@ -1,5 +1,6 @@
 import os.path
 import json
+import logging
 from typing import List, Optional, Mapping, MutableMapping, Any
 from importlib.resources import files, as_file
 
@@ -11,6 +12,8 @@ import brad.routing
 from brad.routing import Router
 from brad.query_rep import QueryRep
 from brad.server.session import SessionManager
+
+logger = logging.getLogger(__name__)
 
 
 class RuleBasedParams(object):
@@ -294,6 +297,12 @@ class RuleBased(Router):
             else:
                 # Todo(Ziniu): this can be stored in this class to reduce latency
                 raw_sys_metric = self._monitor.read_k_most_recent(k=1)
+                if raw_sys_metric.empty:
+                    logger.warning(
+                        "Routing without system metrics when we expect to have metrics."
+                    )
+                    return ideal_location_rank[0]
+
                 col_name = list(raw_sys_metric.columns)
                 col_value = list(raw_sys_metric.values)[0]
                 sys_metric = {col_name[i]: col_value[i] for i in range(len(col_value))}
