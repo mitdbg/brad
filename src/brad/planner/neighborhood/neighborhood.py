@@ -147,7 +147,7 @@ class NeighborhoodSearchPlanner:
                 )
             ):
                 if idx % 10000 == 0:
-                    logger.debug("Processing %d", idx)
+                    logger.info("Processing %d", idx)
 
                 # Workload-independent filters.
                 # Drop this candidate if any are invalid.

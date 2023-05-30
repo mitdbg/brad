@@ -182,7 +182,7 @@ class Monitor:
 
     def _setup(self):
         # Load data for monitored metrics.
-        metrics_file = files(daemon).joinpath("test_monitored_metrics.json")
+        metrics_file = files(daemon).joinpath("monitored_metrics.json")
         with as_file(metrics_file) as file:
             with open(file, "r", encoding="utf8") as data:
                 file_contents = json.load(data)

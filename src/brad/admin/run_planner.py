@@ -73,7 +73,7 @@ def run_planner(args):
     workload = Workload.from_extracted_logs(args.workload_dir)
 
     # 5. Start the planner.
-    monitor = Monitor(config)
+    monitor = Monitor.from_config_file(config)
     strategy = planner_config.strategy()
     if strategy == PlanningStrategy.FullNeighborhood:
         planner = FullNeighborhoodSearchPlanner(
