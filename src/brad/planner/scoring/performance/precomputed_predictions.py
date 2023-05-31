@@ -1,3 +1,4 @@
+import pathlib
 import numpy as np
 import numpy.typing as npt
 from typing import Dict
@@ -15,10 +16,10 @@ class PrecomputedPredictions(AnalyticsLatencyScorer):
     @classmethod
     def load(
         cls,
-        workload_file_path: str,
-        aurora_predictions_path: str,
-        redshift_predictions_path: str,
-        athena_predictions_path: str,
+        workload_file_path: str | pathlib.Path,
+        aurora_predictions_path: str | pathlib.Path,
+        redshift_predictions_path: str | pathlib.Path,
+        athena_predictions_path: str | pathlib.Path,
     ) -> "PrecomputedPredictions":
         with open(workload_file_path, "r", encoding="UTF-8") as query_file:
             raw_queries = [line.strip() for line in query_file]
