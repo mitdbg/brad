@@ -21,3 +21,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
     async def run_replan(self) -> None:
         logger.info("Running a replan...")
+
+        # 1. Fetch the next workload and make query execution predictions.
+        next_workload = self._workload_provider.next_workload()
+        self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
