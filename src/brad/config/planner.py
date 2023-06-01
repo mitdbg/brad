@@ -5,7 +5,8 @@ from brad.planner.strategy import PlanningStrategy
 
 class PlannerConfig:
     """
-    Constants used by the neighborhood-based blueprint planner.
+    Configuration constants used by the blueprint planners. Some constants are
+    shared across planning strategies, some are specific to a strategy.
     """
 
     def __init__(self, path: str):
@@ -15,6 +16,9 @@ class PlannerConfig:
 
     def strategy(self) -> PlanningStrategy:
         return PlanningStrategy.from_str(self._raw["strategy"])
+
+    def beam_size(self) -> int:
+        return int(self._raw["beam_size"])
 
     def max_num_table_moves(self) -> int:
         return int(self._raw["max_num_table_moves"])

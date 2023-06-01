@@ -27,14 +27,14 @@ class Engine(str, enum.Enum):
         return reduce(
             # Bitwise OR
             operator.or_,
-            map(lambda eng: _EngineBitmapValues[eng], engines),
+            map(lambda eng: EngineBitmapValues[eng], engines),
             0,
         )
 
     @staticmethod
     def from_bitmap(engines: int) -> List["Engine"]:
         results = []
-        for engine, v in _EngineBitmapValues.items():
+        for engine, v in EngineBitmapValues.items():
             if v & engines != 0:
                 results.append(engine)
         return results
@@ -44,7 +44,7 @@ class Engine(str, enum.Enum):
         return 0b111
 
 
-_EngineBitmapValues = {}
-_EngineBitmapValues[Engine.Athena] = 0b001
-_EngineBitmapValues[Engine.Aurora] = 0b010
-_EngineBitmapValues[Engine.Redshift] = 0b100
+EngineBitmapValues = {}
+EngineBitmapValues[Engine.Athena] = 0b001
+EngineBitmapValues[Engine.Aurora] = 0b010
+EngineBitmapValues[Engine.Redshift] = 0b100
