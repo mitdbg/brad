@@ -1,12 +1,15 @@
 import asyncio
 import logging
+import pathlib
 
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner.factory import BlueprintPlannerFactory
-from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
+from brad.planner.scoring.performance.precomputed_predictions import (
+    PrecomputedPredictions,
+)
 from brad.planner.workload import Workload
 from brad.planner.workload.provider import FixedWorkloadProvider
 from brad.server.blueprint_manager import BlueprintManager
@@ -35,6 +38,12 @@ def register_admin_action(subparser) -> None:
         type=str,
         required=True,
         help="Path to the workload to load for planning purposes.",
+    )
+    parser.add_argument(
+        "--predictions-dir",
+        type=str,
+        required=True,
+        help="Path to the workload's predicted execution times.",
     )
     parser.add_argument(
         "--schema-name",
@@ -70,7 +79,16 @@ def run_planner(args):
     # 4. Load the workload.
     workload = Workload.from_extracted_logs(args.workload_dir)
 
-    # 5. Start the planner.
+    # 5. Load the pre-computed predictions.
+    prediction_dir = pathlib.Path(args.predictions_dir)
+    prediction_provider = PrecomputedPredictions.load(
+        workload_file_path=prediction_dir / "all_queries.sql",
+        aurora_predictions_path=prediction_dir / "pred_aurora_runtime.npy",
+        redshift_predictions_path=prediction_dir / "pred_redshift_runtime.npy",
+        athena_predictions_path=prediction_dir / "pred_athena_runtime.npy",
+    )
+
+    # 6. Start the planner.
     monitor = Monitor.from_config_file(config)
     planner = BlueprintPlannerFactory.create(
         current_blueprint=blueprint_mgr.get_blueprint(),
@@ -81,8 +99,8 @@ def run_planner(args):
         schema_name=args.schema_name,
         # Next workload is the same as the current workload.
         workload_provider=FixedWorkloadProvider(workload),
-        # This is a temporary placeholder.
-        analytics_latency_scorer=_NoopAnalyticsLatencyScorer(),
+        # Used for debugging purposes.
+        analytics_latency_scorer=prediction_provider,
     )
     monitor.force_read_metrics()
 
@@ -92,13 +110,8 @@ def run_planner(args):
 
     planner.register_new_blueprint_callback(on_new_blueprint)
 
-    # 6. Trigger replanning.
+    # 7. Trigger replanning.
     event_loop = asyncio.new_event_loop()
     event_loop.set_debug(enabled=args.debug)
     asyncio.set_event_loop(event_loop)
     asyncio.run(planner.run_replan())
-
-
-class _NoopAnalyticsLatencyScorer(AnalyticsLatencyScorer):
-    def apply_predicted_latencies(self, workload: Workload) -> None:
-        pass

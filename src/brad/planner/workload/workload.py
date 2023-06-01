@@ -1,8 +1,10 @@
 from typing import Dict, List, Tuple, Optional, Iterable
 from itertools import chain
 from pathlib import Path
+from itertools import combinations
 import boto3
 import re
+import numpy as np
 import numpy.typing as npt
 
 from brad.blueprint import Blueprint
@@ -177,3 +179,20 @@ class Workload:
         self, predicted_latency: npt.NDArray
     ) -> None:
         self._predicted_analytical_latencies = predicted_latency
+
+    def compute_latency_gains(self) -> npt.NDArray:
+        """
+        We define "gain" as the largest ratio between predicted execution times
+        across engines. The intuition is that a high gain represents a query
+        where routing correctly will have a large impact on its latency.
+        """
+        preds = self._predicted_analytical_latencies
+        assert preds is not None
+        num_engines = preds.shape[1]
+        ratios = []
+        for i, j in combinations(range(num_engines), 2):
+            ratios.append(preds[:, i] / preds[:, j])
+            ratios.append(preds[:, j] / preds[:, i])
+        combined = np.stack(ratios, axis=1)
+        gains = np.amax(combined, axis=1)
+        return gains
