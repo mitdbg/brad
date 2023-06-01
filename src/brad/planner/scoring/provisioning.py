@@ -1,14 +1,19 @@
 import json
 import importlib.resources as pkg_resources
 from collections import namedtuple
-from typing import Dict
+from typing import Dict, Iterable
 
 import brad.planner.scoring.data as score_data
+
+from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.provisioning import Provisioning
+from brad.config.engine import Engine
+from brad.config.planner import PlannerConfig
+from brad.planner.workload.query import Query
 
 
 ProvisioningResources = namedtuple(
-    "_Provisioning", ["instance_type", "usd_per_hour", "vcpus", "mem_mib"]
+    "ProvisioningResources", ["instance_type", "usd_per_hour", "vcpus", "mem_mib"]
 )
 
 
@@ -31,15 +36,61 @@ AuroraSpecs = _load_instance_specs("aurora_postgresql_instances.json")
 RedshiftSpecs = _load_instance_specs("redshift_instances.json")
 
 
-def aurora_hourly_operational_cost(provisioning: Provisioning) -> float:
+def compute_aurora_hourly_operational_cost(provisioning: Provisioning) -> float:
     return (
         AuroraSpecs[provisioning.instance_type()].usd_per_hour
         * provisioning.num_nodes()
     )
 
 
-def redshift_hourly_operational_cost(provisioning: Provisioning) -> float:
+def compute_redshift_hourly_operational_cost(provisioning: Provisioning) -> float:
     return (
         RedshiftSpecs[provisioning.instance_type()].usd_per_hour
         * provisioning.num_nodes()
     )
+
+
+def compute_aurora_scan_cost(
+    aurora_queries: Iterable[Query],
+    planner_config: PlannerConfig,
+) -> float:
+    # Data access (scan) costs.
+    aurora_access_mb = 0
+    for q in aurora_queries:
+        aurora_access_mb += q.data_accessed_mb(Engine.Aurora)
+    return aurora_access_mb * planner_config.aurora_usd_per_mb_scanned()
+
+
+def compute_athena_scan_cost(
+    athena_queries: Iterable[Query],
+    planner_config: PlannerConfig,
+) -> float:
+    athena_access_mb = 0
+    for q in athena_queries:
+        athena_access_mb += q.data_accessed_mb(Engine.Athena)
+    return athena_access_mb * planner_config.athena_usd_per_mb_scanned()
+
+
+def compute_aurora_transition_time_s(
+    old: Provisioning, new: Provisioning, planner_config: PlannerConfig
+) -> float:
+    diff = ProvisioningDiff.of(old, new)
+    if diff is None:
+        return 0.0
+
+    # Some provisioning changes may take longer than others. To start, we use
+    # one fixed time.
+    return planner_config.aurora_provisioning_change_time_s()
+
+
+def compute_redshift_transition_time_s(
+    old: Provisioning, new: Provisioning, planner_config: PlannerConfig
+) -> float:
+    diff = ProvisioningDiff.of(old, new)
+    if diff is None:
+        return 0.0
+
+    # Some provisioning changes may take longer than others (classic vs. elastic
+    # resize and also the time it takes to transfer data). To start, we use one
+    # fixed time.
+    return planner_config.redshift_provisioning_change_time_s()

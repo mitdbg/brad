@@ -1,12 +1,12 @@
 from collections import namedtuple
-from typing import Dict, Tuple
+from typing import Dict
 
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.config.planner import PlannerConfig
 from brad.planner.workload import Workload
 
 
-def athena_table_placement_cost(
+def compute_athena_table_placement_cost(
     table_placements: Dict[str, int],
     workload: Workload,
     planner_config: PlannerConfig,
@@ -47,7 +47,7 @@ TableMovementScore = namedtuple(
 )
 
 
-def table_movement_time_and_cost(
+def compute_table_movement_time_and_cost(
     current_placement: Dict[str, int],
     next_placement: Dict[str, int],
     current_workload: Workload,
