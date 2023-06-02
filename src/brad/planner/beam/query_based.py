@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import List, Tuple, Dict
+from typing import List, Dict
 
 from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import MutableProvisioning
@@ -60,7 +60,6 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         # 3. Establish connections to the underlying engines (needed for scoring
         #    purposes). We use synchronous connections since there appears to be a
         #    bug in aioodbc that causes an indefinite await on a query result.
-        #
         engine_connections = EngineConnections.connect_sync(
             self._config, self._schema_name, autocommit=False
         )
@@ -73,7 +72,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     self._current_blueprint, table_sizer
                 )
                 next_workload.set_dataset_size_from_table_sizes()
-            ctx = _ScoringContext(self._current_blueprint, next_workload)
+            _ctx = _ScoringContext(self._current_blueprint, next_workload)
 
             # 5. Initialize the beam (top-k set) and other planning state.
             beam_size = (  # pylint: disable=unused-variable
@@ -94,9 +93,13 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     blueprint=self._current_blueprint,
                 )
                 candidate.add_query(
-                    first_query_idx, analytical_queries[first_query_idx], routing_engine
+                    first_query_idx,
+                    analytical_queries[first_query_idx],
+                    routing_engine,
+                    next_workload.get_predicted_analytical_latency(
+                        first_query_idx, routing_engine
+                    ),
                 )
-                self._update_score(candidate, ctx)
                 current_top_k.append(candidate)
 
             # 6. Run beam search.
@@ -106,15 +109,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         finally:
             engine_connections.close_sync()
 
-    def _update_score(
+    def _initialize_score(
         self, candidate: "_BlueprintCandidate", ctx: "_ScoringContext"
     ) -> None:
         # NOTE: This function recomputes the score components from scratch.
-        # Based on how we construct and modify the blueprint candidates, we can
-        # update the score incrementally as well. For implementation
-        # convenience, we'll stick with recomputation until we know we need
-        # incremental updates.
-
         analytical_queries = ctx.next_workload.analytical_queries()
 
         aurora_prov_cost = compute_aurora_hourly_operational_cost(
@@ -126,15 +124,15 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
         aurora_scan_cost = compute_aurora_scan_cost(
             map(
-                lambda ql: analytical_queries[ql[0]],
-                filter(lambda ql: ql[1] == Engine.Aurora, candidate.query_locations),
+                lambda qidx: analytical_queries[qidx],
+                candidate.query_locations[Engine.Aurora],
             ),
             self._planner_config,
         )
         athena_scan_cost = compute_athena_scan_cost(
             map(
-                lambda ql: analytical_queries[ql[0]],
-                filter(lambda ql: ql[1] == Engine.Athena, candidate.query_locations),
+                lambda qidx: analytical_queries[qidx],
+                candidate.query_locations[Engine.Athena],
             ),
             self._planner_config,
         )
@@ -160,18 +158,14 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             self._planner_config,
         )
 
-        candidate.operational_cost = (
-            aurora_prov_cost
-            + redshift_prov_cost
-            + athena_table_cost
-            + aurora_scan_cost
-            + athena_scan_cost
-        )
-        candidate.transition_cost = movement_score.movement_cost
-        candidate.transition_time_s = (
-            movement_score.movement_time_s
-            + aurora_transition_time_s
-            + redshift_transition_time_s
+        candidate.provisioning_cost = aurora_prov_cost + redshift_prov_cost
+        candidate.storage_cost = athena_table_cost
+        candidate.workload_scan_cost = aurora_scan_cost + athena_scan_cost
+        candidate.table_movement_trans_cost = movement_score.movement_cost
+
+        candidate.table_movement_trans_time_s = movement_score.movement_time_s
+        candidate.provisioning_trans_time_s = (
+            aurora_transition_time_s + redshift_transition_time_s
         )
 
 
@@ -201,34 +195,80 @@ class _BlueprintCandidate:
         redshift: MutableProvisioning,
         table_placements: Dict[str, int],
     ) -> None:
-        self.query_locations: List[Tuple[int, Engine]] = []
+        self.aurora_provisioning = aurora.mutable_clone()
+        self.redshift_provisioning = redshift.mutable_clone()
         # Table locations are represented using a bitmap. We initialize each
         # table to being present on no engines.
         self.table_placements = table_placements
-        self.aurora_provisioning = aurora.mutable_clone()
-        self.redshift_provisioning = redshift.mutable_clone()
+
+        self.query_locations: Dict[Engine, List[int]] = {}
+        self.query_locations[Engine.Aurora] = []
+        self.query_locations[Engine.Redshift] = []
+        self.query_locations[Engine.Athena] = []
+
+        self.query_latencies: Dict[Engine, List[float]] = {}
+        self.query_latencies[Engine.Aurora] = []
+        self.query_latencies[Engine.Redshift] = []
+        self.query_latencies[Engine.Athena] = []
 
         # Scoring components.
-        self.operational_cost = 0.0
-        self.transition_cost = 0.0
-        self.transition_time_s = 0.0
 
-    def add_query(self, query_idx: int, query: QueryRep, location: Engine) -> None:
-        self.query_locations.append((query_idx, location))
+        # Monetary costs.
+        self.provisioning_cost = 0.0
+        self.storage_cost = 0.0
+        self.workload_scan_cost = 0.0
+        self.table_movement_trans_cost = 0.0
+
+        # Transition times.
+        self.table_movement_trans_time_s = 0.0
+        self.provisioning_trans_time_s = 0.0
+
+        # Workload performance is handled externally.
+
+    def add_query(
+        self, query_idx: int, query: QueryRep, location: Engine, base_latency: float
+    ) -> None:
+        self.query_locations[location].append(query_idx)
+        self.query_latencies[location].append(base_latency)
         engine_bitvalue = EngineBitmapValues[location]
 
         # Ensure that the table is present on the engine on which we want to run
         # the query.
+        table_diffs = []
         for table_name in query.tables():
             try:
+                orig = self.table_placements[table_name]
                 self.table_placements[table_name] |= engine_bitvalue
+
+                if orig != self.table_placements[table_name]:
+                    table_diffs.append(
+                        (table_name, orig, self.table_placements[table_name])
+                    )
+
             except KeyError:
                 # Some of the tables returned are not tables but names of CTEs.
                 pass
 
+        # TODO: Incrementally update scoring.
+
     def clone(self) -> "_BlueprintCandidate":
-        return _BlueprintCandidate(
+        cloned = _BlueprintCandidate(
             self.aurora_provisioning.mutable_clone(),
             self.redshift_provisioning.mutable_clone(),
             self.table_placements.copy(),
         )
+
+        for engine, indices in self.query_locations.items():
+            cloned.query_locations[engine].extend(indices)
+        for engine, lats in self.query_latencies.items():
+            cloned.query_latencies[engine].extend(lats)
+
+        cloned.provisioning_cost = self.provisioning_cost
+        cloned.storage_cost = self.storage_cost
+        cloned.workload_scan_cost = self.workload_scan_cost
+        cloned.table_movement_trans_cost = self.table_movement_trans_cost
+
+        cloned.table_movement_trans_time_s = self.table_movement_trans_time_s
+        cloned.provisioning_trans_time_s = self.provisioning_trans_time_s
+
+        return cloned
