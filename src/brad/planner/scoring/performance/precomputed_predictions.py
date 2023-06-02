@@ -3,6 +3,7 @@ import numpy as np
 import numpy.typing as npt
 from typing import Dict
 
+from brad.config.engine import Engine
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 from brad.planner.workload import Workload
 
@@ -34,7 +35,12 @@ class PrecomputedPredictions(AnalyticsLatencyScorer):
         assert redshift.shape[0] == len(raw_queries)
         assert athena.shape[0] == len(raw_queries)
 
-        predictions = np.stack([aurora, redshift, athena], axis=-1)
+        preds = [np.array([]), np.array([]), np.array([])]
+        preds[Workload.EngineLatencyIndex[Engine.Aurora]] = aurora
+        preds[Workload.EngineLatencyIndex[Engine.Redshift]] = redshift
+        preds[Workload.EngineLatencyIndex[Engine.Athena]] = athena
+
+        predictions = np.stack(preds, axis=-1)
 
         return cls(queries_map, predictions)
 

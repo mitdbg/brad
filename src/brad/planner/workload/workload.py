@@ -28,6 +28,13 @@ class Workload:
     that these values can also be _forecasted_.
     """
 
+    # Used to extract predicted latency (dimension index).
+    EngineLatencyIndex = {
+        Engine.Aurora: 0,
+        Engine.Redshift: 1,
+        Engine.Athena: 2,
+    }
+
     @classmethod
     def empty(cls) -> "Workload":
         return cls([], [], 0.01, 0)
@@ -179,6 +186,12 @@ class Workload:
         self, predicted_latency: npt.NDArray
     ) -> None:
         self._predicted_analytical_latencies = predicted_latency
+
+    def get_predicted_analytical_latency(self, query_idx: int, engine: Engine) -> float:
+        assert self._predicted_analytical_latencies is not None
+        return self._predicted_analytical_latencies[
+            query_idx, self.EngineLatencyIndex[engine]
+        ].item()
 
     def compute_latency_gains(self) -> npt.NDArray:
         """
