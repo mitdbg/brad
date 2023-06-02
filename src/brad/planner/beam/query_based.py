@@ -76,7 +76,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             ctx = _ScoringContext(self._current_blueprint, next_workload)
 
             # 5. Initialize the beam (top-k set) and other planning state.
-            beam_size = self._planner_config.beam_size()  # pylint: disable=unused-variable
+            beam_size = (  # pylint: disable=unused-variable
+                self._planner_config.beam_size()
+            )
             engines = [Engine.Aurora, Engine.Redshift, Engine.Athena]
             first_query_idx = query_indices[0]
             current_top_k = []
