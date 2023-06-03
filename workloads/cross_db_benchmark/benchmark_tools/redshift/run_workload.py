@@ -18,53 +18,6 @@ def extract_columns(sql):
     return [m for m in column_regex.findall(sql)]
 
 
-def index_creation_deletion(existing_indexes, sql_part, db_conn, timeout_sec):
-    cols = extract_columns(sql_part)
-    index_cols = set(existing_indexes.keys())
-    no_idxs = len(index_cols.intersection(cols))
-
-    if len(cols) > 0:
-        # not a single index for sql available, create one
-        if no_idxs == 0:
-            t, c = random.choice(cols)
-            db_conn.set_statement_timeout(10 * timeout_sec, verbose=False)
-            print(f"Creating index on {t}.{c}")
-            index_creation_start = time.perf_counter()
-            try:
-                index_name = db_conn.create_index(t, c)
-                existing_indexes[(t, c)] = index_name
-                print(
-                    f"Creation time: {time.perf_counter() - index_creation_start:.2f}s"
-                )
-            except Exception as e:
-                print(f"Index creation failed {str(e)}")
-            db_conn.set_statement_timeout(timeout_sec, verbose=False)
-
-        # indexes for all columns, delete one
-        if len(cols) > 1 and no_idxs == len(cols):
-            t, c = random.choice(cols)
-            print(f"Dropping index on {t}.{c}")
-            try:
-                index_name = existing_indexes[(t, c)]
-                db_conn.drop_index(index_name)
-                del existing_indexes[(t, c)]
-            except Exception as e:
-                print(f"Index deletion failed {str(e)}")
-
-
-def modify_indexes(db_conn, sql_query, existing_indexes, timeout_sec):
-    try:
-        if "GROUP BY " in sql_query:
-            sql_query = sql_query.split("GROUP BY ")[0]
-        join_part = sql_query.split(" FROM ")[1].split(" WHERE ")[0]
-        where_part = sql_query.split(" FROM ")[1].split(" WHERE ")[1]
-
-        index_creation_deletion(existing_indexes, join_part, db_conn, timeout_sec)
-        index_creation_deletion(existing_indexes, where_part, db_conn, timeout_sec)
-    except Exception as e:
-        print(f"Could not create indexes for {sql_query} ({str(e)})")
-
-
 def run_redshift_workload(
     workload_path,
     database,
@@ -107,12 +60,11 @@ def run_redshift_workload(
 
     # set a timeout to make sure long running queries do not delay the entire process
     db_conn.set_statement_timeout(timeout_sec)
-
-    existing_indexes = dict()
+    db_conn.clear_query_result_cache()
 
     # extract query plans
     start_t = time.perf_counter()
-    valid_queries = 0
+
     for i, sql_query in enumerate(tqdm(sql_queries)):
         if cap_workload and i >= cap_workload:
             break

@@ -138,30 +138,6 @@ class RedshiftDatabaseConnection(DatabaseConnection):
         )
         return exists_res[0][0]
 
-    def remove_remaining_fk_indexes(self):
-        benchmark_idx_query = """ SELECT indexname FROM pg_indexes 
-            WHERE schemaname = 'public' AND indexname LIKE 'zero_shot_%'
-        """
-        index_rows = self.get_result(benchmark_idx_query)
-        for r in index_rows:
-            index_name = r[0]
-            print(f"Dropping previously created index {index_name}")
-            self.drop_index(index_name)
-
-    def drop_index(self, index_name):
-        self.submit_query(f'DROP INDEX "{index_name}";')
-
-    def create_index(self, table, column):
-        index_name = f"zero_shot_{table}_{column}"
-        self.submit_query(f'CREATE INDEX "{index_name}" ON "{table}" ("{column}");')
-        return index_name
-
-    def create_db(self):
-        exists_res = self.submit_query(
-            f"CREATE DATABASE {self.db_name};", db_created=False
-        )
-        return exists_res
-
     def test_join_conditions(self, dataset):
         schema = load_schema_json(dataset)
 
@@ -192,10 +168,20 @@ class RedshiftDatabaseConnection(DatabaseConnection):
         if verbose:
             print(f"Set timeout to {timeout_sec} secs for {self.db_name}.")
 
+    def clear_query_result_cache(self):
+        self.submit_query("SET enable_result_cache_for_session = OFF;", db_created=True)
+
     def run_query_collect_statistics(
-        self, sql, repetitions=1, prefix="", explain_only=False, timeout_sec=None
+        self,
+        sql,
+        repetitions=1,
+        prefix="",
+        explain_only=False,
+        timeout_sec=None,
+        clear_cache=True,
     ):
         results = None
+        runtimes = None
         analyze_plans = None
         timeout = False
 
@@ -205,11 +191,17 @@ class RedshiftDatabaseConnection(DatabaseConnection):
             )
 
             results = []
+            runtimes = []
             if not explain_only:
                 for i in range(repetitions):
                     statement = f"{prefix} {sql}"
-                    curr_result = self.get_result(statement, timeout_sec=timeout_sec)
+                    query_start_t = time.perf_counter()
+                    curr_result = self.get_result(
+                        statement, timeout_sec=timeout_sec, clear_cache=clear_cache
+                    )
+                    query_time = time.perf_counter() - query_start_t
                     results.append(curr_result)
+                    runtimes.append(query_time)
         # timeout
         except psycopg2.errors.QueryCanceled as e:
             timeout = True
@@ -217,11 +209,16 @@ class RedshiftDatabaseConnection(DatabaseConnection):
             # restart_t0 = time.perf_counter()
             # os.system('sudo service postgresql restart')
             # print(f'Restarted in {time.perf_counter() - restart_t0:.2f} secs')
-
         except:
-            print(f"Skipping query {sql} due to an error")
+            timeout = True
+            print(f"Skipping query {sql} due to an internal error")
 
-        return dict(results=results, analyze_plans=analyze_plans, timeout=timeout)
+        return dict(
+            results=results,
+            runtimes=runtimes,
+            analyze_plans=analyze_plans,
+            timeout=timeout,
+        )
 
     def collect_db_statistics(self):
         # column stats
@@ -245,11 +242,19 @@ class RedshiftDatabaseConnection(DatabaseConnection):
         return dict(column_stats=column_stats, table_stats=table_stats)
 
     def get_result(
-        self, sql, include_column_names=False, db_created=True, timeout_sec=None
+        self,
+        sql,
+        include_column_names=False,
+        db_created=True,
+        timeout_sec=None,
+        clear_cache=True,
     ):
         connection, cursor = self.get_cursor(db_created=db_created)
         if timeout_sec:
             cursor.execute(f"set statement_timeout = {int(timeout_sec * 1000)};")
+            connection.commit()
+        if clear_cache:
+            cursor.execute("SET enable_result_cache_for_session = OFF;")
             connection.commit()
         cursor.execute(sql)
         records = cursor.fetchall()
