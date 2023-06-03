@@ -1,7 +1,7 @@
 # We adapted the legacy from from https://github.com/DataManagementLab/zero-shot-cost-estimation
-from cost_model.dataset.plan_featurization import postgres_plan_featurizations
-from cost_model.dataset.query_featurization import postgres_query_featurizations
-from cost_model.encoder.zero_shot_model import ZeroShotModel
+from brad.cost_model.dataset.plan_featurization import postgres_plan_featurizations
+from brad.cost_model.dataset.query_featurization import postgres_query_featurizations
+from brad.cost_model.encoder.zero_shot_model import ZeroShotModel
 
 
 class PostgresZeroShotModelPlan(ZeroShotModel):

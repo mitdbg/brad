@@ -7,7 +7,7 @@ from torch import nn
 from torch.nn import init
 from torch.nn.parameter import Parameter
 
-from cost_model.encoder.utils import losses, activations
+from brad.cost_model.encoder.utils import losses, activations
 
 
 class DynamicLayer(nn.Module):

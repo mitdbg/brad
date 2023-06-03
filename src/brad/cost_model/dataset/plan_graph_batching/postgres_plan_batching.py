@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from sklearn.preprocessing import RobustScaler
 
-from cross_db_benchmark.benchmark_tools.generate_workload import Operator
+from workloads.cross_db_benchmark.benchmark_tools.generate_workload import Operator
 from cost_model.dataset.plan_featurization import postgres_plan_featurizations
 from cost_model.preprocessing.feature_statistics import FeatureType
 

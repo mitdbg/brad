@@ -2,7 +2,7 @@
 
 import dgl.function as fn
 
-from cost_model.encoder.message_aggregators.aggregator import MessageAggregator
+from brad.cost_model.encoder.message_aggregators.aggregator import MessageAggregator
 
 
 class MscnConv(MessageAggregator):

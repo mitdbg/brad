@@ -1,6 +1,4 @@
 # Legacy from from https://github.com/DataManagementLab/zero-shot-cost-estimation
-
-
 class PostgresTrueCardDetail:
     PLAN_FEATURES = [
         "act_card",

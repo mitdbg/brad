@@ -3,9 +3,9 @@ import numpy as np
 import torch
 from torch import nn
 
-from cost_model.preprocessing.feature_statistics import FeatureType
-from cost_model.encoder.utils.embeddings import EmbeddingInitializer
-from cost_model.encoder.utils.fc_out_model import FcOutModel
+from brad.cost_model.preprocessing.feature_statistics import FeatureType
+from brad.cost_model.encoder.utils.embeddings import EmbeddingInitializer
+from brad.cost_model.encoder.utils.fc_out_model import FcOutModel
 
 
 class NodeTypeEncoder(FcOutModel):

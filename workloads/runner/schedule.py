@@ -126,11 +126,7 @@ class Repeat(Schedule):
 
         # Second overload: `end_time`
         assert end_time is not None
-        return Repeat(
-            interval=interval,
-            start_time=start_time,
-            end_time=end_time,
-        )
+        return Repeat(interval=interval, start_time=start_time, end_time=end_time,)
 
     @staticmethod
     def starting_at(
@@ -160,11 +156,7 @@ class Repeat(Schedule):
 
         # Second overload: `end_time`
         assert end_time is not None
-        return Repeat(
-            interval=interval,
-            start_time=start_time,
-            end_time=end_time,
-        )
+        return Repeat(interval=interval, start_time=start_time, end_time=end_time,)
 
 
 class ScheduleGenerator(ImmutableGenerator[Schedule]):

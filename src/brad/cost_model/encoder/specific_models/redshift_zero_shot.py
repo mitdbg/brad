@@ -1,5 +1,5 @@
-from cost_model.dataset.query_featurization import redshift_query_featurization
-from cost_model.encoder.zero_shot_model import ZeroShotModel
+from brad.cost_model.dataset.query_featurization import redshift_query_featurization
+from brad.cost_model.encoder.zero_shot_model import ZeroShotModel
 
 
 class RedshiftZeroShotModel(ZeroShotModel):

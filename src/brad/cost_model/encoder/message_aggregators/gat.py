@@ -5,7 +5,7 @@ from dgl.nn import edge_softmax
 from dgl.utils import expand_as_pair
 from torch import nn
 
-from cost_model.encoder.message_aggregators.aggregator import MessageAggregator
+from brad.cost_model.encoder.message_aggregators.aggregator import MessageAggregator
 
 
 class GATConv(MessageAggregator):

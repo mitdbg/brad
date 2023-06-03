@@ -1,9 +1,9 @@
 import os
 import pickle
 
-from cost_model.training.test import test_one_model
 from workloads.cross_db_benchmark.benchmark_tools.utils import load_json
-from cost_model.training.utils import batch_to
+from brad.cost_model.training.test import test_one_model
+from brad.cost_model.training.utils import batch_to
 
 
 def auto_encode(

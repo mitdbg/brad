@@ -4,10 +4,10 @@ import collections
 import torch.optim as opt
 from tqdm import tqdm
 
-from cost_model.dataset.dataset_creation import create_dataloader_for_brad
-from cost_model.training.checkpoint import load_checkpoint
-from cost_model.training.utils import batch_to
-from cost_model.encoder.specific_models.model import zero_shot_models
+from brad.cost_model.dataset.dataset_creation import create_dataloader_for_brad
+from brad.cost_model.training.checkpoint import load_checkpoint
+from brad.cost_model.training.utils import batch_to
+from brad.cost_model.encoder.specific_models.model import zero_shot_models
 from workloads.cross_db_benchmark.benchmark_tools.utils import load_json
 from workloads.cross_db_benchmark.benchmark_tools.database import DatabaseSystem
 from workloads.cross_db_benchmark.benchmark_tools.load_database import create_db_conn

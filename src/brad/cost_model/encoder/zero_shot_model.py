@@ -4,9 +4,9 @@ import torch
 from torch import nn
 import numpy as np
 
-from cost_model.encoder.message_aggregators import message_aggregators
-from cost_model.encoder.utils.fc_out_model import FcOutModel
-from cost_model.encoder.utils.node_type_encoder import NodeTypeEncoder
+from brad.cost_model.encoder.message_aggregators import message_aggregators
+from brad.cost_model.encoder.utils.fc_out_model import FcOutModel
+from brad.cost_model.encoder.utils.node_type_encoder import NodeTypeEncoder
 
 
 class ZeroShotModel(nn.Module):

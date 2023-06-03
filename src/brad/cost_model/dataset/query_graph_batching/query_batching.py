@@ -6,11 +6,11 @@ from sklearn.preprocessing import RobustScaler
 
 from workloads.cross_db_benchmark.benchmark_tools.database import DatabaseSystem
 from workloads.cross_db_benchmark.benchmark_tools.generate_workload import Operator
-from cost_model.dataset.query_featurization import aurora_query_featurization
-from cost_model.dataset.query_featurization import postgres_query_featurizations
-from cost_model.dataset.query_featurization import redshift_query_featurization
-from cost_model.dataset.query_featurization import athena_query_featurization
-from cost_model.preprocessing.feature_statistics import FeatureType
+from brad.cost_model.dataset.query_featurization import aurora_query_featurization
+from brad.cost_model.dataset.query_featurization import postgres_query_featurizations
+from brad.cost_model.dataset.query_featurization import redshift_query_featurization
+from brad.cost_model.dataset.query_featurization import athena_query_featurization
+from brad.cost_model.preprocessing.feature_statistics import FeatureType
 
 
 def encode(column, plan_params, feature_statistics):

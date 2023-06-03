@@ -8,10 +8,10 @@ from sklearn.pipeline import Pipeline
 from torch.utils.data import DataLoader
 
 from workloads.cross_db_benchmark.benchmark_tools.utils import load_json
-from cost_model.dataset.plan_dataset import PlanDataset
-from cost_model.dataset.query_dataset import QueryDataset
-from cost_model.dataset.query_graph_batching.query_batching import query_collator
-from cost_model.dataset.plan_graph_batching.plan_batchers import plan_collator_dict
+from brad.cost_model.dataset.plan_dataset import PlanDataset
+from brad.cost_model.dataset.query_dataset import QueryDataset
+from brad.cost_model.dataset.query_graph_batching.query_batching import query_collator
+from brad.cost_model.dataset.plan_graph_batching.plan_batchers import plan_collator_dict
 
 
 def read_workload_runs(

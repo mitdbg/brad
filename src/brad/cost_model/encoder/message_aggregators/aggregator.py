@@ -1,7 +1,7 @@
 # Legacy from from https://github.com/DataManagementLab/zero-shot-cost-estimation
 import torch
 
-from cost_model.encoder.utils.fc_out_model import FcOutModel
+from brad.cost_model.encoder.utils.fc_out_model import FcOutModel
 
 
 class MessageAggregator(FcOutModel):
