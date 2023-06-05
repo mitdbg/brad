@@ -1,13 +1,15 @@
 import asyncio
 import logging
 import heapq
+import numpy as np
 import numpy.typing as npt
 from typing import List, Dict, Optional
 
 from brad.blueprint import Blueprint
-from brad.blueprint.provisioning import MutableProvisioning
+from brad.blueprint.provisioning import Provisioning, MutableProvisioning
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner import BlueprintPlanner
+from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.workload.query import Query
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.provisioning import (
@@ -17,6 +19,8 @@ from brad.planner.scoring.provisioning import (
     compute_athena_scan_cost,
     compute_aurora_transition_time_s,
     compute_redshift_transition_time_s,
+    aurora_resource_value,
+    redshift_resource_value,
 )
 from brad.planner.scoring.table_placement import (
     compute_single_athena_table_cost,
@@ -327,6 +331,38 @@ class _BlueprintCandidate:
             aurora_transition_time_s + redshift_transition_time_s
         )
 
+        self.scaled_query_latencies.clear()
+
+        if self.aurora_provisioning.num_nodes() > 0:
+            aurora_base = np.array(self.base_query_latencies[Engine.Aurora])
+            aurora_predicted = (
+                aurora_base
+                * ctx.planner_config.aurora_gamma()
+                * ctx.planner_config.aurora_alpha()
+                * _AURORA_BASE_RESOURCE_VALUE
+                / aurora_resource_value(self.aurora_provisioning)
+            ) + (aurora_base * (1.0 - ctx.planner_config.aurora_gamma()))
+            self.scaled_query_latencies[Engine.Aurora] = aurora_predicted
+        else:
+            self.scaled_query_latencies[Engine.Aurora] = np.full(
+                (len(self.base_query_latencies[Engine.Aurora]),), np.inf
+            )
+
+        if self.redshift_provisioning.num_nodes() > 0:
+            redshift_base = np.array(self.base_query_latencies[Engine.Redshift])
+            redshift_predicted = (
+                redshift_base
+                * ctx.planner_config.redshift_gamma()
+                * ctx.planner_config.redshift_alpha()
+                * _REDSHIFT_BASE_RESOURCE_VALUE
+                / redshift_resource_value(self.redshift_provisioning)
+            ) + (redshift_base * (1.0 - ctx.planner_config.redshift_gamma()))
+            self.scaled_query_latencies[Engine.Redshift] = redshift_predicted
+        else:
+            self.scaled_query_latencies[Engine.Redshift] = np.full(
+                (len(self.base_query_latencies[Engine.Redshift]),), np.inf
+            )
+
     def is_better_than(self, _other: "_BlueprintCandidate") -> bool:
         raise NotImplementedError
 
@@ -335,7 +371,7 @@ class _BlueprintCandidate:
         # implements a min-heap, but we want a max-heap.
         return not self.is_better_than(other)
 
-    def find_best_provisioning(self, _ctx: ScoringContext) -> None:
+    def find_best_provisioning(self, ctx: ScoringContext) -> None:
         # Tries all provisioinings in the neighborhood and finds the best
         # scoring one for the current table placement and routing.
 
@@ -343,8 +379,80 @@ class _BlueprintCandidate:
             # Already ran before.
             return
 
-    def is_provisioning_feasible(self) -> bool:
-        # Checks if the provisioning is acceptable for the workload
+        aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
+        aurora_it = aurora_enumerator.enumerate_nearby(
+            ctx.current_blueprint.aurora_provisioning(),
+            aurora_enumerator.scaling_to_distance(
+                ctx.current_blueprint.aurora_provisioning(),
+                ctx.planner_config.max_provisioning_multiplier(),
+            ),
+        )
+
+        redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
+        redshift_it = redshift_enumerator.enumerate_nearby(
+            ctx.current_blueprint.redshift_provisioning(),
+            aurora_enumerator.scaling_to_distance(
+                ctx.current_blueprint.redshift_provisioning(),
+                ctx.planner_config.max_provisioning_multiplier(),
+            ),
+        )
+
+        working_candidate = self.clone()
+        current_best = working_candidate.clone()
+        current_best.recompute_provisioning_dependent_scoring(ctx)
+
+        for aurora in aurora_it:
+            working_candidate.aurora_provisioning.set_instance_type(
+                aurora.instance_type()
+            )
+            working_candidate.aurora_provisioning.set_num_nodes(aurora.num_nodes())
+
+            for redshift in redshift_it:
+                working_candidate.redshift_provisioning.set_instance_type(
+                    redshift.instance_type()
+                )
+                working_candidate.redshift_provisioning.set_num_nodes(
+                    redshift.num_nodes()
+                )
+                working_candidate.is_feasible = None
+                working_candidate.compute_provisioning_feasibility()
+                if not working_candidate.is_feasible:
+                    continue
+                working_candidate.recompute_provisioning_dependent_scoring(ctx)
+
+                if working_candidate.is_better_than(current_best):
+                    current_best, working_candidate = working_candidate, current_best
+
+        self.aurora_provisioning.set_instance_type(
+            current_best.aurora_provisioning.instance_type()
+        )
+        self.aurora_provisioning.set_num_nodes(
+            current_best.aurora_provisioning.num_nodes()
+        )
+        self.redshift_provisioning.set_instance_type(
+            current_best.redshift_provisioning.instance_type()
+        )
+        self.redshift_provisioning.set_num_nodes(
+            current_best.redshift_provisioning.num_nodes()
+        )
+        self.provisioning_cost = current_best.provisioning_cost
+        self.provisioning_trans_time_s = current_best.provisioning_trans_time_s
+        self.explored_provisionings = True
+
+    def compute_provisioning_feasibility(self) -> None:
+        if (
+            len(self.base_query_latencies[Engine.Aurora]) > 0
+            and self.aurora_provisioning.num_nodes() == 0
+        ):
+            self.is_feasible = False
+            return
+
+        if (
+            len(self.base_query_latencies[Engine.Redshift]) > 0
+            and self.redshift_provisioning.num_nodes() == 0
+        ):
+            self.is_feasible = False
+            return
 
         # Make sure the provisioning supports the table placement.
         total_bitmap = 0
@@ -354,14 +462,16 @@ class _BlueprintCandidate:
         if (
             (EngineBitmapValues[Engine.Aurora] & total_bitmap) != 0
         ) and self.aurora_provisioning.num_nodes() == 0:
-            return False
+            self.is_feasible = False
+            return
 
         if (
             (EngineBitmapValues[Engine.Redshift] & total_bitmap) != 0
         ) and self.redshift_provisioning.num_nodes() == 0:
-            return False
+            self.is_feasible = False
+            return
 
-        return True
+        self.is_feasible = True
 
     def clone(self) -> "_BlueprintCandidate":
         cloned = _BlueprintCandidate(
@@ -384,3 +494,7 @@ class _BlueprintCandidate:
         cloned.provisioning_trans_time_s = self.provisioning_trans_time_s
 
         return cloned
+
+
+_AURORA_BASE_RESOURCE_VALUE = aurora_resource_value(Provisioning("db.r6i.large", 1))
+_REDSHIFT_BASE_RESOURCE_VALUE = redshift_resource_value(Provisioning("dc2.large", 1))
