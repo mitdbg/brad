@@ -1,6 +1,8 @@
 import asyncio
 import logging
-from typing import List, Dict
+import heapq
+import numpy.typing as npt
+from typing import List, Dict, Optional
 
 from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import MutableProvisioning
@@ -17,10 +19,8 @@ from brad.planner.scoring.provisioning import (
     compute_redshift_transition_time_s,
 )
 from brad.planner.scoring.table_placement import (
-    compute_athena_table_placement_cost,
     compute_single_athena_table_cost,
     compute_single_table_movement_time_and_cost,
-    compute_table_movement_time_and_cost,
 )
 from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
@@ -81,100 +81,110 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 self._planner_config,
             )
 
-            # 5. Initialize the beam (top-k set) and other planning state.
-            beam_size = (  # pylint: disable=unused-variable
-                self._planner_config.beam_size()
-            )
+            # 5. Initialize planning state.
+            beam_size = self._planner_config.beam_size()
             engines = [Engine.Aurora, Engine.Redshift, Engine.Athena]
             first_query_idx = query_indices[0]
-            current_top_k = []
+            current_top_k: List[_BlueprintCandidate] = []
 
+            # Not a fundamental limitation, but it simplifies the implementation
+            # below if this condition is true.
+            assert beam_size >= len(engines)
+
+            # 6. Initialize the top-k set (beam).
             for routing_engine in engines:
                 candidate = _BlueprintCandidate.based_on(self._current_blueprint)
-                query_rep = analytical_queries[first_query_idx]
+                query = analytical_queries[first_query_idx]
                 # N.B. We must use the current blueprint because the tables
                 # would not yet have been moved.
-                query_rep.populate_data_accessed_mb(
+                query.populate_data_accessed_mb(
                     for_engine=routing_engine,
                     connections=engine_connections,
                     blueprint=self._current_blueprint,
                 )
                 candidate.add_query(
                     first_query_idx,
-                    analytical_queries[first_query_idx],
+                    query,
                     routing_engine,
                     next_workload.get_predicted_analytical_latency(
                         first_query_idx, routing_engine
                     ),
                     ctx,
                 )
+                candidate.recompute_provisioning_dependent_scoring(ctx)
                 current_top_k.append(candidate)
 
-            # 6. Run beam search.
+            # 7. Run beam search to formulate the table placements.
+            for query_idx in query_indices[1:]:
+                next_top_k: List[_BlueprintCandidate] = []
+                query = analytical_queries[first_query_idx]
 
-            # 7. Return best blueprint.
+                # For each candidate in the current top k, expand it by one
+                # query in the workload.
+                for curr_candidate in current_top_k:
+                    for routing_engine in engines:
+                        # N.B. We must use the current blueprint because the tables
+                        # would not yet have been moved.
+                        query.populate_data_accessed_mb(
+                            for_engine=routing_engine,
+                            connections=engine_connections,
+                            blueprint=self._current_blueprint,
+                        )
+                        next_candidate = curr_candidate.clone()
+                        next_candidate.add_query(
+                            query_idx,
+                            query,
+                            routing_engine,
+                            next_workload.get_predicted_analytical_latency(
+                                query_idx, routing_engine
+                            ),
+                            ctx,
+                        )
+
+                        if len(next_top_k) < beam_size:
+                            next_top_k.append(next_candidate)
+                            if len(next_top_k) == beam_size:
+                                # Meant to be a max heap. A lower score is
+                                # better, so we need to keep around the highest
+                                # scoring candidate.
+                                heapq.heapify(next_top_k)
+                        else:
+                            # Need to eliminate a blueprint candidate.
+                            if not (next_candidate.is_better_than(next_top_k[0])):
+                                next_candidate.find_best_provisioning(ctx)
+
+                            if not (next_candidate.is_better_than(next_top_k[0])):
+                                # We eliminate `next_candidate`. Even after
+                                # looking for the best provisioning, it has a
+                                # worse score compared to `next_top_k[0]` (the
+                                # worst scoring blueprint candidate in the
+                                # top-k).
+                                continue
+
+                            while (
+                                next_candidate.is_better_than(next_top_k[0])
+                                and not next_top_k[0].explored_provisionings
+                            ):
+                                # Being in this loop means that the next
+                                # candidate is better than the worst candidate
+                                # in the current top k, but we have not tuned
+                                # the worst top k blueprint's provisioning.
+                                current_worst = heapq.heappop(next_top_k)
+                                current_worst.find_best_provisioning(ctx)
+                                heapq.heappush(next_top_k, current_worst)
+
+                            if next_candidate.is_better_than(next_top_k[0]):
+                                heapq.heappushpop(next_top_k, next_candidate)
+
+                current_top_k = next_top_k
+
+            # TODO: Touch up the candidate blueprints (e.g., add placements for
+            # any tables that do not appear in any queries).
+
+            # 8. Run a final greedy search over provisionings in the top-k set.
 
         finally:
             engine_connections.close_sync()
-
-    def _compute_score_from_scratch(
-        self, candidate: "_BlueprintCandidate", ctx: ScoringContext
-    ) -> None:
-        # NOTE: This function recomputes the score components from scratch.
-        analytical_queries = ctx.next_workload.analytical_queries()
-
-        aurora_prov_cost = compute_aurora_hourly_operational_cost(
-            candidate.aurora_provisioning
-        )
-        redshift_prov_cost = compute_redshift_hourly_operational_cost(
-            candidate.redshift_provisioning
-        )
-
-        aurora_scan_cost = compute_aurora_scan_cost(
-            map(
-                lambda qidx: analytical_queries[qidx],
-                candidate.query_locations[Engine.Aurora],
-            ),
-            self._planner_config,
-        )
-        athena_scan_cost = compute_athena_scan_cost(
-            map(
-                lambda qidx: analytical_queries[qidx],
-                candidate.query_locations[Engine.Athena],
-            ),
-            self._planner_config,
-        )
-
-        athena_table_cost = compute_athena_table_placement_cost(
-            candidate.table_placements, ctx.next_workload, self._planner_config
-        )
-        movement_score = compute_table_movement_time_and_cost(
-            self._current_blueprint.table_locations_bitmap(),
-            candidate.table_placements,
-            ctx.next_workload,
-            self._planner_config,
-        )
-
-        aurora_transition_time_s = compute_aurora_transition_time_s(
-            ctx.current_blueprint.aurora_provisioning(),
-            candidate.aurora_provisioning,
-            self._planner_config,
-        )
-        redshift_transition_time_s = compute_redshift_transition_time_s(
-            ctx.current_blueprint.redshift_provisioning(),
-            candidate.redshift_provisioning,
-            self._planner_config,
-        )
-
-        candidate.provisioning_cost = aurora_prov_cost + redshift_prov_cost
-        candidate.storage_cost = athena_table_cost
-        candidate.workload_scan_cost = aurora_scan_cost + athena_scan_cost
-        candidate.table_movement_trans_cost = movement_score.movement_cost
-
-        candidate.table_movement_trans_time_s = movement_score.movement_time_s
-        candidate.provisioning_trans_time_s = (
-            aurora_transition_time_s + redshift_transition_time_s
-        )
 
 
 class _BlueprintCandidate:
@@ -208,10 +218,10 @@ class _BlueprintCandidate:
         self.query_locations[Engine.Redshift] = []
         self.query_locations[Engine.Athena] = []
 
-        self.query_latencies: Dict[Engine, List[float]] = {}
-        self.query_latencies[Engine.Aurora] = []
-        self.query_latencies[Engine.Redshift] = []
-        self.query_latencies[Engine.Athena] = []
+        self.base_query_latencies: Dict[Engine, List[float]] = {}
+        self.base_query_latencies[Engine.Aurora] = []
+        self.base_query_latencies[Engine.Redshift] = []
+        self.base_query_latencies[Engine.Athena] = []
 
         # Scoring components.
 
@@ -225,7 +235,11 @@ class _BlueprintCandidate:
         self.table_movement_trans_time_s = 0.0
         self.provisioning_trans_time_s = 0.0
 
-        # Workload performance is handled externally.
+        # Used for scoring purposes.
+        self.explored_provisionings = False
+        # If none, it means that we have not checked for feasibility yet.
+        self.is_feasible: Optional[bool] = None
+        self.scaled_query_latencies: Dict[Engine, npt.NDArray] = {}
 
     def add_query(
         self,
@@ -236,7 +250,7 @@ class _BlueprintCandidate:
         ctx: ScoringContext,
     ) -> None:
         self.query_locations[location].append(query_idx)
-        self.query_latencies[location].append(base_latency)
+        self.base_query_latencies[location].append(base_latency)
         engine_bitvalue = EngineBitmapValues[location]
 
         # Ensure that the table is present on the engine on which we want to run
@@ -289,7 +303,7 @@ class _BlueprintCandidate:
                     name, ctx.next_workload, ctx.planner_config
                 )
 
-    def recompute_provisioning_score(self, ctx: ScoringContext) -> None:
+    def recompute_provisioning_dependent_scoring(self, ctx: ScoringContext) -> None:
         aurora_prov_cost = compute_aurora_hourly_operational_cost(
             self.aurora_provisioning
         )
@@ -313,6 +327,42 @@ class _BlueprintCandidate:
             aurora_transition_time_s + redshift_transition_time_s
         )
 
+    def is_better_than(self, _other: "_BlueprintCandidate") -> bool:
+        raise NotImplementedError
+
+    def __lt__(self, other: "_BlueprintCandidate") -> bool:
+        # This is implemented for use with Python's `heapq` module. It
+        # implements a min-heap, but we want a max-heap.
+        return not self.is_better_than(other)
+
+    def find_best_provisioning(self, _ctx: ScoringContext) -> None:
+        # Tries all provisioinings in the neighborhood and finds the best
+        # scoring one for the current table placement and routing.
+
+        if self.explored_provisionings:
+            # Already ran before.
+            return
+
+    def is_provisioning_feasible(self) -> bool:
+        # Checks if the provisioning is acceptable for the workload
+
+        # Make sure the provisioning supports the table placement.
+        total_bitmap = 0
+        for location_bitmap in self.table_placements.values():
+            total_bitmap |= location_bitmap
+
+        if (
+            (EngineBitmapValues[Engine.Aurora] & total_bitmap) != 0
+        ) and self.aurora_provisioning.num_nodes() == 0:
+            return False
+
+        if (
+            (EngineBitmapValues[Engine.Redshift] & total_bitmap) != 0
+        ) and self.redshift_provisioning.num_nodes() == 0:
+            return False
+
+        return True
+
     def clone(self) -> "_BlueprintCandidate":
         cloned = _BlueprintCandidate(
             self.aurora_provisioning.mutable_clone(),
@@ -322,8 +372,8 @@ class _BlueprintCandidate:
 
         for engine, indices in self.query_locations.items():
             cloned.query_locations[engine].extend(indices)
-        for engine, lats in self.query_latencies.items():
-            cloned.query_latencies[engine].extend(lats)
+        for engine, lats in self.base_query_latencies.items():
+            cloned.base_query_latencies[engine].extend(lats)
 
         cloned.provisioning_cost = self.provisioning_cost
         cloned.storage_cost = self.storage_cost

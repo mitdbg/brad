@@ -10,7 +10,9 @@ from brad.planner.enumeration.neighborhood import NeighborhoodBlueprintEnumerato
 from brad.planner.neighborhood.filters import Filter
 from brad.planner.neighborhood.filters.aurora_transactions import AuroraTransactions
 from brad.planner.neighborhood.filters.no_data_loss import NoDataLoss
-from brad.planner.neighborhood.filters.single_engine_execution import SingleEngineExecution
+from brad.planner.neighborhood.filters.single_engine_execution import (
+    SingleEngineExecution,
+)
 from brad.planner.neighborhood.filters.table_on_engine import TableOnEngine
 from brad.planner.neighborhood.impl import NeighborhoodImpl
 from brad.planner.neighborhood.scaling_scorer import ALL_METRICS
