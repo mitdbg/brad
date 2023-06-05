@@ -6,7 +6,8 @@ from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import MutableProvisioning
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner import BlueprintPlanner
-from brad.planner.workload.query import QueryRep
+from brad.planner.workload.query import Query
+from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.provisioning import (
     compute_aurora_hourly_operational_cost,
     compute_redshift_hourly_operational_cost,
@@ -17,9 +18,10 @@ from brad.planner.scoring.provisioning import (
 )
 from brad.planner.scoring.table_placement import (
     compute_athena_table_placement_cost,
+    compute_single_athena_table_cost,
+    compute_single_table_movement_time_and_cost,
     compute_table_movement_time_and_cost,
 )
-from brad.planner.workload import Workload
 from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 
@@ -72,7 +74,12 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     self._current_blueprint, table_sizer
                 )
                 next_workload.set_dataset_size_from_table_sizes()
-            _ctx = _ScoringContext(self._current_blueprint, next_workload)
+            ctx = ScoringContext(
+                self._current_blueprint,
+                self._current_workload,
+                next_workload,
+                self._planner_config,
+            )
 
             # 5. Initialize the beam (top-k set) and other planning state.
             beam_size = (  # pylint: disable=unused-variable
@@ -99,6 +106,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     next_workload.get_predicted_analytical_latency(
                         first_query_idx, routing_engine
                     ),
+                    ctx,
                 )
                 current_top_k.append(candidate)
 
@@ -109,8 +117,8 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         finally:
             engine_connections.close_sync()
 
-    def _initialize_score(
-        self, candidate: "_BlueprintCandidate", ctx: "_ScoringContext"
+    def _compute_score_from_scratch(
+        self, candidate: "_BlueprintCandidate", ctx: ScoringContext
     ) -> None:
         # NOTE: This function recomputes the score components from scratch.
         analytical_queries = ctx.next_workload.analytical_queries()
@@ -169,12 +177,6 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         )
 
 
-class _ScoringContext:
-    def __init__(self, current_blueprint: Blueprint, next_workload: Workload) -> None:
-        self.current_blueprint = current_blueprint
-        self.next_workload = next_workload
-
-
 class _BlueprintCandidate:
     """
     A "barebones" representation of a blueprint, used during the optimization
@@ -226,7 +228,12 @@ class _BlueprintCandidate:
         # Workload performance is handled externally.
 
     def add_query(
-        self, query_idx: int, query: QueryRep, location: Engine, base_latency: float
+        self,
+        query_idx: int,
+        query: Query,
+        location: Engine,
+        base_latency: float,
+        ctx: ScoringContext,
     ) -> None:
         self.query_locations[location].append(query_idx)
         self.query_latencies[location].append(base_latency)
@@ -249,7 +256,62 @@ class _BlueprintCandidate:
                 # Some of the tables returned are not tables but names of CTEs.
                 pass
 
-        # TODO: Incrementally update scoring.
+        # Scan monetary costs that this query imposes.
+        if location == Engine.Athena:
+            self.workload_scan_cost += compute_athena_scan_cost(
+                [query], ctx.planner_config
+            )
+        elif location == Engine.Aurora:
+            self.workload_scan_cost += compute_aurora_scan_cost(
+                [query], ctx.planner_config
+            )
+
+        # Table movement costs that this query imposes.
+        for name, current_placement, next_placement in table_diffs:
+            result = compute_single_table_movement_time_and_cost(
+                name,
+                current_placement,
+                next_placement,
+                ctx.current_workload,
+                ctx.planner_config,
+            )
+            self.table_movement_trans_cost += result.movement_cost
+            self.table_movement_trans_time_s += result.movement_time_s
+
+            # If we added a table on Athena, we need to take into account its
+            # storage costs.
+            if (
+                ((~current_placement) & next_placement)
+                & (EngineBitmapValues[Engine.Athena])
+            ) != 0:
+                # We added the table to Athena.
+                self.storage_cost += compute_single_athena_table_cost(
+                    name, ctx.next_workload, ctx.planner_config
+                )
+
+    def recompute_provisioning_score(self, ctx: ScoringContext) -> None:
+        aurora_prov_cost = compute_aurora_hourly_operational_cost(
+            self.aurora_provisioning
+        )
+        redshift_prov_cost = compute_redshift_hourly_operational_cost(
+            self.redshift_provisioning
+        )
+
+        aurora_transition_time_s = compute_aurora_transition_time_s(
+            ctx.current_blueprint.aurora_provisioning(),
+            self.aurora_provisioning,
+            ctx.planner_config,
+        )
+        redshift_transition_time_s = compute_redshift_transition_time_s(
+            ctx.current_blueprint.redshift_provisioning(),
+            self.redshift_provisioning,
+            ctx.planner_config,
+        )
+
+        self.provisioning_cost = aurora_prov_cost + redshift_prov_cost
+        self.provisioning_trans_time_s = (
+            aurora_transition_time_s + redshift_transition_time_s
+        )
 
     def clone(self) -> "_BlueprintCandidate":
         cloned = _BlueprintCandidate(

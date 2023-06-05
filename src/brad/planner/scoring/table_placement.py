@@ -15,22 +15,31 @@ def compute_athena_table_placement_cost(
     Estimates the hourly monetary cost of storing a table on Athena.
     """
     athena_table_storage_cost = 0.0
-    sources = [Engine.Athena, Engine.Aurora, Engine.Redshift]
     for tbl, locations in table_placements.items():
         if locations & EngineBitmapValues[Engine.Athena] == 0:
             # This table is not present on Athena.
             continue
+        athena_table_storage_cost += compute_single_athena_table_cost(
+            tbl, workload, planner_config
+        )
+    return athena_table_storage_cost
 
-        # We make a rough estimate of the table's size on the engine.
-        for src in sources:
-            size_mb = workload.table_size_on_engine(tbl, src)
-            if size_mb is not None:
-                break
 
-        # Table is present on at least one engine.
-        assert size_mb is not None
+def compute_single_athena_table_cost(
+    table_name: str, workload: Workload, planner_config: PlannerConfig
+) -> float:
+    athena_table_storage_cost = 0.0
 
-        athena_table_storage_cost += size_mb * planner_config.s3_usd_per_mb_per_month()
+    # We make a rough estimate of the table's size on the engine.
+    for src in [Engine.Athena, Engine.Aurora, Engine.Redshift]:
+        size_mb = workload.table_size_on_engine(table_name, src)
+        if size_mb is not None:
+            break
+
+    # Table is present on at least one engine.
+    assert size_mb is not None
+
+    athena_table_storage_cost += size_mb * planner_config.s3_usd_per_mb_per_month()
 
     # Rescale the cost to be USD per MB per hour. The provisioning cost is
     # based on an hour.
@@ -62,65 +71,81 @@ def compute_table_movement_time_and_cost(
 
     for table_name, cur in current_placement.items():
         nxt = next_placement[table_name]
-
-        # Tables not currently present on an engine but will be present on an
-        # engine (additions).
-        added = (~cur) & nxt
-
-        if added == 0:
-            # This means that this table is not being added to any engines.
-            # Dropping a table is "free".
-            continue
-
-        added_engines = Engine.from_bitmap(added)
-
-        move_from = _best_extract_engine(cur, planner_config)
-        source_table_size_mb = current_workload.table_size_on_engine(
-            table_name, move_from
+        result = compute_single_table_movement_time_and_cost(
+            table_name, cur, nxt, current_workload, planner_config
         )
-        assert source_table_size_mb is not None
+        movement_cost += result.movement_cost
+        movement_time_s += result.movement_time_s
 
-        # Extraction scoring.
-        if move_from == Engine.Athena:
+    return TableMovementScore(movement_cost, movement_time_s)
+
+
+def compute_single_table_movement_time_and_cost(
+    table_name: str,
+    current_placement: int,
+    next_placement: int,
+    current_workload: Workload,
+    planner_config: PlannerConfig,
+) -> TableMovementScore:
+    movement_cost = 0.0
+    movement_time_s = 0.0
+
+    # Tables not currently present on an engine but will be present on an
+    # engine (additions).
+    added = (~current_placement) & next_placement
+
+    if added == 0:
+        # This means that this table is not being added to any engines.
+        # Dropping a table is "free".
+        return TableMovementScore(movement_cost, movement_time_s)
+
+    added_engines = Engine.from_bitmap(added)
+
+    move_from = _best_extract_engine(current_placement, planner_config)
+    source_table_size_mb = current_workload.table_size_on_engine(table_name, move_from)
+    assert source_table_size_mb is not None
+
+    # Extraction scoring.
+    if move_from == Engine.Athena:
+        movement_time_s += (
+            source_table_size_mb / planner_config.athena_extract_rate_mb_per_s()
+        )
+        movement_cost += (
+            planner_config.athena_usd_per_mb_scanned() * source_table_size_mb
+        )
+
+    elif move_from == Engine.Aurora:
+        movement_time_s += (
+            source_table_size_mb / planner_config.aurora_extract_rate_mb_per_s()
+        )
+
+    elif move_from == Engine.Redshift:
+        movement_time_s += (
+            source_table_size_mb / planner_config.redshift_extract_rate_mb_per_s()
+        )
+
+    # Account for the computation needed to "import" data.
+    for into_loc in added_engines:
+        # Need to assume the table will have the same size as on the
+        # source engine. This is not necessarily true when Redshift
+        # is the source, because it uses compression.
+        if into_loc == Engine.Athena:
             movement_time_s += (
-                source_table_size_mb / planner_config.athena_extract_rate_mb_per_s()
+                source_table_size_mb / planner_config.athena_load_rate_mb_per_s()
             )
             movement_cost += (
                 planner_config.athena_usd_per_mb_scanned() * source_table_size_mb
             )
 
-        elif move_from == Engine.Aurora:
+        elif into_loc == Engine.Aurora:
             movement_time_s += (
-                source_table_size_mb / planner_config.aurora_extract_rate_mb_per_s()
+                source_table_size_mb / planner_config.aurora_load_rate_mb_per_s()
             )
 
-        elif move_from == Engine.Redshift:
+        elif into_loc == Engine.Redshift:
             movement_time_s += (
-                source_table_size_mb / planner_config.redshift_extract_rate_mb_per_s()
+                source_table_size_mb / planner_config.redshift_load_rate_mb_per_s()
             )
-
-        # Account for the computation needed to "import" data.
-        for into_loc in added_engines:
-            # Need to assume the table will have the same size as on the
-            # source engine. This is not necessarily true when Redshift
-            # is the source, because it uses compression.
-            if into_loc == Engine.Athena:
-                movement_time_s += (
-                    source_table_size_mb / planner_config.athena_load_rate_mb_per_s()
-                )
-                movement_cost += (
-                    planner_config.athena_usd_per_mb_scanned() * source_table_size_mb
-                )
-
-            elif into_loc == Engine.Aurora:
-                movement_time_s += (
-                    source_table_size_mb / planner_config.aurora_load_rate_mb_per_s()
-                )
-
-            elif into_loc == Engine.Redshift:
-                movement_time_s += (
-                    source_table_size_mb / planner_config.redshift_load_rate_mb_per_s()
-                )
 
     return TableMovementScore(movement_cost, movement_time_s)
 
