@@ -70,3 +70,15 @@ class PlannerConfig:
 
     def sample_set_size(self) -> int:
         return int(self._raw["sample_set_size"])
+
+    def aurora_alpha(self) -> float:
+        return float(self._raw["aurora_alpha"])
+
+    def aurora_gamma(self) -> float:
+        return float(self._raw["aurora_gamma"])
+
+    def redshift_alpha(self) -> float:
+        return float(self._raw["redshift_alpha"])
+
+    def redshift_gamma(self) -> float:
+        return float(self._raw["redshift_gamma"])

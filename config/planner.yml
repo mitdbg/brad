@@ -71,3 +71,14 @@ aurora_resource_scaling:
   aurora_WRITER_CPUUtilization_Average: 1.0
   aurora_WRITER_ReadIOPS_Average: 1.0
   aurora_WRITER_WriteIOPS_Average: 1.0
+
+
+###
+### Query latency scaling modifiers.
+###
+
+aurora_alpha: 0.97066455
+aurora_gamma: 0.722149076
+
+redshift_alpha: 0.7857837
+redshift_gamma: 0.635405229

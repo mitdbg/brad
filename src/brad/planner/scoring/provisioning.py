@@ -1,4 +1,5 @@
 import json
+import math
 import importlib.resources as pkg_resources
 from collections import namedtuple
 from typing import Dict, Iterable
@@ -94,3 +95,13 @@ def compute_redshift_transition_time_s(
     # resize and also the time it takes to transfer data). To start, we use one
     # fixed time.
     return planner_config.redshift_provisioning_change_time_s()
+
+
+def aurora_resource_value(prov: Provisioning) -> float:
+    specs = AuroraSpecs[prov.instance_type()]
+    return math.sqrt(specs.vcpus * specs.mem_mib)
+
+
+def redshift_resource_value(prov: Provisioning) -> float:
+    specs = RedshiftSpecs[prov.instance_type()]
+    return math.sqrt(specs.vcpus * specs.mem_mib) * prov.num_nodes()
