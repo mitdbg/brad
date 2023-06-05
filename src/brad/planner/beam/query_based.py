@@ -244,6 +244,7 @@ class _BlueprintCandidate:
         # If none, it means that we have not checked for feasibility yet.
         self.is_feasible: Optional[bool] = None
         self.scaled_query_latencies: Dict[Engine, npt.NDArray] = {}
+        self.summary_latency = np.inf
 
     def add_query(
         self,
@@ -363,7 +364,23 @@ class _BlueprintCandidate:
                 (len(self.base_query_latencies[Engine.Redshift]),), np.inf
             )
 
-    def is_better_than(self, _other: "_BlueprintCandidate") -> bool:
+        # We take a geomean to "summarize" the latency scores.
+        # TODO: This summary should be user-defined.
+        total_values = 0
+        accum = 0.0
+
+        total_values += len(self.scaled_query_latencies[Engine.Aurora])
+        accum += np.log(self.scaled_query_latencies[Engine.Aurora]).sum()
+
+        total_values += len(self.scaled_query_latencies[Engine.Redshift])
+        accum += np.log(self.scaled_query_latencies[Engine.Redshift]).sum()
+
+        total_values += len(self.base_query_latencies[Engine.Athena])
+        accum += np.log(self.scaled_query_latencies[Engine.Athena]).sum()
+
+        self.summary_latency = np.exp(accum / total_values)
+
+    def is_better_than(self, other: "_BlueprintCandidate") -> bool:
         raise NotImplementedError
 
     def __lt__(self, other: "_BlueprintCandidate") -> bool:
@@ -440,6 +457,10 @@ class _BlueprintCandidate:
         self.explored_provisionings = True
 
     def compute_provisioning_feasibility(self) -> None:
+        if self.is_feasible is not None:
+            # Already computed.
+            return
+
         if (
             len(self.base_query_latencies[Engine.Aurora]) > 0
             and self.aurora_provisioning.num_nodes() == 0
