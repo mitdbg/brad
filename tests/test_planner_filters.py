@@ -4,11 +4,11 @@ from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.table import Table
 from brad.config.engine import Engine
+from brad.planner.neighborhood.filters.aurora_transactions import AuroraTransactions
+from brad.planner.neighborhood.filters.no_data_loss import NoDataLoss
+from brad.planner.neighborhood.filters.single_engine_execution import SingleEngineExecution
+from brad.planner.neighborhood.filters.table_on_engine import TableOnEngine
 from brad.planner.workload import Workload
-from brad.planner.filters.aurora_transactions import AuroraTransactions
-from brad.planner.filters.no_data_loss import NoDataLoss
-from brad.planner.filters.single_engine_execution import SingleEngineExecution
-from brad.planner.filters.table_on_engine import TableOnEngine
 from brad.planner.workload.query import Query
 
 
