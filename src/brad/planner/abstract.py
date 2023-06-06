@@ -5,6 +5,7 @@ from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
+from brad.planner.compare.function import BlueprintComparator
 from brad.planner.workload import Workload
 from brad.planner.workload.provider import WorkloadProvider
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
@@ -29,6 +30,7 @@ class BlueprintPlanner:
         schema_name: str,
         workload_provider: WorkloadProvider,
         analytics_latency_scorer: AnalyticsLatencyScorer,
+        comparator: BlueprintComparator,
     ) -> None:
         self._planner_config = planner_config
         self._current_blueprint = current_blueprint
@@ -39,6 +41,7 @@ class BlueprintPlanner:
 
         self._workload_provider = workload_provider
         self._analytics_latency_scorer = analytics_latency_scorer
+        self._comparator = comparator
 
         self._callbacks: List[NewBlueprintCallback] = []
 

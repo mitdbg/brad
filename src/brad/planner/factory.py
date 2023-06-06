@@ -3,6 +3,7 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner import BlueprintPlanner
+from brad.planner.compare.function import BlueprintComparator
 from brad.planner.neighborhood.neighborhood import NeighborhoodSearchPlanner
 from brad.planner.beam.query_based import QueryBasedBeamPlanner
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
@@ -22,6 +23,7 @@ class BlueprintPlannerFactory:
         schema_name: str,
         workload_provider: WorkloadProvider,
         analytics_latency_scorer: AnalyticsLatencyScorer,
+        comparator: BlueprintComparator,
     ) -> BlueprintPlanner:
         strategy = planner_config.strategy()
         if (
@@ -37,6 +39,7 @@ class BlueprintPlannerFactory:
                 schema_name=schema_name,
                 workload_provider=workload_provider,
                 analytics_latency_scorer=analytics_latency_scorer,
+                comparator=comparator,
             )
 
         elif strategy == PlanningStrategy.QueryBasedBeam:
@@ -49,6 +52,7 @@ class BlueprintPlannerFactory:
                 schema_name=schema_name,
                 workload_provider=workload_provider,
                 analytics_latency_scorer=analytics_latency_scorer,
+                comparator=comparator,
             )
 
         else:

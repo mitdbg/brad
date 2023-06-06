@@ -6,6 +6,7 @@ from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
+from brad.planner.compare.cost import best_cost_under_geomean_latency
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.scoring.performance.precomputed_predictions import (
     PrecomputedPredictions,
@@ -56,6 +57,12 @@ def register_admin_action(subparser) -> None:
         action="store_true",
         help="Set to enable debug logging.",
     )
+    parser.add_argument(
+        "--latency-ceiling-s",
+        type=float,
+        default=10.0,
+        help="The geomean latency ceiling to use for blueprint planning.",
+    )
     parser.set_defaults(admin_action=run_planner)
 
 
@@ -101,6 +108,10 @@ def run_planner(args):
         workload_provider=FixedWorkloadProvider(workload),
         # Used for debugging purposes.
         analytics_latency_scorer=prediction_provider,
+        # TODO: Make this configurable.
+        comparator=best_cost_under_geomean_latency(
+            geomean_latency_ceiling_s=args.latency_ceiling_s
+        ),
     )
     monitor.force_read_metrics()
 
