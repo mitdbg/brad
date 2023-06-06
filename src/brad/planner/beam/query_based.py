@@ -99,6 +99,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             # 6. Initialize the top-k set (beam).
             for routing_engine in engines:
                 candidate = _BlueprintCandidate.based_on(self._current_blueprint)
+                # TODO: Initialize table placement for transactions.
                 query = analytical_queries[first_query_idx]
                 # N.B. We must use the current blueprint because the tables
                 # would not yet have been moved.
@@ -280,7 +281,6 @@ class _BlueprintCandidate:
         self.explored_provisionings = False
         self.feasibility = _BlueprintFeasibility.Unchecked
         self.scaled_query_latencies: Dict[Engine, npt.NDArray] = {}
-        self.summary_latency = np.inf
 
     def add_query(
         self,
@@ -404,22 +404,6 @@ class _BlueprintCandidate:
                 (len(self.base_query_latencies[Engine.Redshift]),), np.inf
             )
 
-        # We take a geomean to "summarize" the latency scores.
-        # TODO: This summary should be user-defined.
-        total_values = 0
-        accum = 0.0
-
-        total_values += len(self.scaled_query_latencies[Engine.Aurora])
-        accum += np.log(self.scaled_query_latencies[Engine.Aurora]).sum()
-
-        total_values += len(self.scaled_query_latencies[Engine.Redshift])
-        accum += np.log(self.scaled_query_latencies[Engine.Redshift]).sum()
-
-        total_values += len(self.base_query_latencies[Engine.Athena])
-        accum += np.log(self.scaled_query_latencies[Engine.Athena]).sum()
-
-        self.summary_latency = np.exp(accum / total_values)
-
     def is_better_than(self, other: "_BlueprintCandidate") -> bool:
         raise NotImplementedError
 
@@ -455,8 +439,7 @@ class _BlueprintCandidate:
         )
 
         working_candidate = self.clone()
-        current_best = working_candidate.clone()
-        current_best.recompute_provisioning_dependent_scoring(ctx)
+        current_best = None
 
         for aurora in aurora_it:
             working_candidate.update_aurora_provisioning(aurora)
@@ -469,10 +452,17 @@ class _BlueprintCandidate:
 
                 working_candidate.recompute_provisioning_dependent_scoring(ctx)
 
-                if working_candidate.is_better_than(current_best):
+                if current_best is None:
+                    current_best = working_candidate
+                    working_candidate = working_candidate.clone()
+
+                elif working_candidate.is_better_than(current_best):
                     current_best, working_candidate = working_candidate, current_best
 
-        if current_best.feasibility == _BlueprintFeasibility.Infeasible:
+        if (
+            current_best is None
+            or current_best.feasibility == _BlueprintFeasibility.Infeasible
+        ):
             self.feasibility = _BlueprintFeasibility.Infeasible
             self.explored_provisionings = True
             return
@@ -487,7 +477,8 @@ class _BlueprintCandidate:
 
     def check_feasibility(self) -> None:
         # This method checks structural feasibility only (not user-definied
-        # feasibility (e.g., all analytical queries must run under X seconds)).
+        # feasibility (e.g., it does not check for all analytical queries
+        # running under X seconds)).
 
         if self.feasibility != _BlueprintFeasibility.Unchecked:
             # Already checked.
