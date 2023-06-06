@@ -103,7 +103,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 candidate = _BlueprintCandidate.based_on(
                     self._current_blueprint, self._comparator
                 )
-                # TODO: Initialize table placement for transactions.
+                candidate.add_transactional_tables(ctx)
                 query = analytical_queries[first_query_idx]
                 # N.B. We must use the current blueprint because the tables
                 # would not yet have been moved.
@@ -315,9 +315,7 @@ class _BlueprintCandidate(ComparableBlueprint):
                 self.table_placements[table_name] |= engine_bitvalue
 
                 if orig != self.table_placements[table_name]:
-                    table_diffs.append(
-                        (table_name, orig, self.table_placements[table_name])
-                    )
+                    table_diffs.append((table_name, self.table_placements[table_name]))
 
             except KeyError:
                 # Some of the tables returned are not tables but names of CTEs.
@@ -334,10 +332,15 @@ class _BlueprintCandidate(ComparableBlueprint):
             )
 
         # Table movement costs that this query imposes.
-        for name, current_placement, next_placement in table_diffs:
+        for name, next_placement in table_diffs:
+            curr = ctx.current_blueprint.table_locations_bitmap()[name]
+            if ((~curr) & next_placement) == 0:
+                # This table was already present on the engine.
+                continue
+
             result = compute_single_table_movement_time_and_cost(
                 name,
-                current_placement,
+                curr,
                 next_placement,
                 ctx.current_workload,
                 ctx.planner_config,
@@ -345,20 +348,43 @@ class _BlueprintCandidate(ComparableBlueprint):
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
 
-            # If we added a table on Athena, we need to take into account its
+            # If we added a table to Athena, we need to take into account its
             # storage costs.
-            if (
-                ((~current_placement) & next_placement)
-                & (EngineBitmapValues[Engine.Athena])
-            ) != 0:
+            if (((~curr) & next_placement) & (EngineBitmapValues[Engine.Athena])) != 0:
                 # We added the table to Athena.
                 self.storage_cost += compute_single_athena_table_cost(
                     name, ctx.next_workload, ctx.planner_config
                 )
 
-        # Adding a new query affects feasibility of the provisioning.
+        # Adding a new query can affect the feasibility of the provisioning.
         self.feasibility = _BlueprintFeasibility.Unchecked
         self.explored_provisionings = False
+
+    def add_transactional_tables(self, ctx: ScoringContext) -> None:
+        referenced_tables = set()
+
+        # Make sure that tables referenced in transactions are present on
+        # Aurora.
+        for query in ctx.next_workload.transactional_queries():
+            for tbl in query.tables():
+                if tbl not in self.table_placements:
+                    # This is a CTE.
+                    continue
+                self.table_placements[tbl] |= EngineBitmapValues[Engine.Aurora]
+                referenced_tables.add(tbl)
+
+        # Update the table movement score if needed.
+        for tbl in referenced_tables:
+            cur = ctx.current_blueprint.table_locations_bitmap()[tbl]
+            nxt = self.table_placements[tbl]
+            if ((~cur) & nxt) == 0:
+                continue
+
+            result = compute_single_table_movement_time_and_cost(
+                tbl, cur, nxt, ctx.current_workload, ctx.planner_config
+            )
+            self.table_movement_trans_cost += result.movement_cost
+            self.table_movement_trans_time_s += result.movement_time_s
 
     def recompute_provisioning_dependent_scoring(self, ctx: ScoringContext) -> None:
         aurora_prov_cost = compute_aurora_hourly_operational_cost(
