@@ -218,10 +218,76 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
                 current_top_k = next_top_k
 
-            # TODO: Touch up the candidate blueprints (e.g., add placements for
-            # any tables that do not appear in any queries).
-
             # 8. Run a final greedy search over provisionings in the top-k set.
+            final_top_k: List[_BlueprintCandidate] = []
+
+            for candidate in current_top_k:
+                aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
+                aurora_it = aurora_enumerator.enumerate_nearby(
+                    ctx.current_blueprint.aurora_provisioning(),
+                    aurora_enumerator.scaling_to_distance(
+                        ctx.current_blueprint.aurora_provisioning(),
+                        ctx.planner_config.max_provisioning_multiplier(),
+                    ),
+                )
+
+                redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
+                redshift_it = redshift_enumerator.enumerate_nearby(
+                    ctx.current_blueprint.redshift_provisioning(),
+                    aurora_enumerator.scaling_to_distance(
+                        ctx.current_blueprint.redshift_provisioning(),
+                        ctx.planner_config.max_provisioning_multiplier(),
+                    ),
+                )
+
+                for aurora in aurora_it:
+                    for redshift in redshift_it:
+                        new_candidate = candidate.clone()
+                        new_candidate.update_aurora_provisioning(aurora)
+                        new_candidate.update_redshift_provisioning(redshift)
+                        new_candidate.check_feasibility()
+                        if (
+                            new_candidate.feasibility
+                            == _BlueprintFeasibility.Infeasible
+                        ):
+                            continue
+                        new_candidate.recompute_provisioning_dependent_scoring(ctx)
+
+                        if len(final_top_k) < beam_size:
+                            final_top_k.append(new_candidate)
+                            if len(final_top_k) == beam_size:
+                                heapq.heapify(final_top_k)
+                        elif new_candidate.is_better_than(final_top_k[0]):
+                            heapq.heappushpop(final_top_k, new_candidate)
+
+            # Best blueprint will be ordered first (we have a negated `__lt__`
+            # method to work with `heapq` to create a max heap).
+            final_top_k.sort(reverse=True)
+
+            if len(final_top_k) == 0:
+                logger.error(
+                    "The query-based beam planner failed to find any feasible blueprints."
+                )
+                return
+
+            best_candidate = final_top_k[0]
+
+            # 9. Touch up the table placements. Add any missing tables to ensure
+            #    we do not have data loss.
+            for tbl, placement_bitmap in best_candidate.table_placements.items():
+                if placement_bitmap != 0:
+                    continue
+                # Put the table on Athena (this is a heuristic: we assume the
+                # table is rarely accessed).
+                best_candidate.table_placements[tbl] |= EngineBitmapValues[
+                    Engine.Athena
+                ]
+
+            # 10. Output the new blueprint.
+            best_blueprint = best_candidate.to_blueprint()
+            self._current_blueprint = best_blueprint
+            self._current_workload = next_workload
+            await self._notify_new_blueprint(best_blueprint)
 
         finally:
             engine_connections.close_sync()
@@ -244,6 +310,7 @@ class _BlueprintCandidate(ComparableBlueprint):
         cls, blueprint: Blueprint, comparator: BlueprintComparator
     ) -> "_BlueprintCandidate":
         return cls(
+            blueprint,
             blueprint.aurora_provisioning().mutable_clone(),
             blueprint.redshift_provisioning().mutable_clone(),
             {t.name: 0 for t in blueprint.tables()},
@@ -252,6 +319,7 @@ class _BlueprintCandidate(ComparableBlueprint):
 
     def __init__(
         self,
+        source: Blueprint,
         aurora: MutableProvisioning,
         redshift: MutableProvisioning,
         table_placements: Dict[str, int],
@@ -262,6 +330,8 @@ class _BlueprintCandidate(ComparableBlueprint):
         # Table locations are represented using a bitmap. We initialize each
         # table to being present on no engines.
         self.table_placements = table_placements
+
+        self._source_blueprint = source
         self._comparator = comparator
 
         self.query_locations: Dict[Engine, List[int]] = {}
@@ -293,6 +363,17 @@ class _BlueprintCandidate(ComparableBlueprint):
 
         # Used during comparisons.
         self._memoized: Dict[str, Any] = {}
+
+    def to_blueprint(self) -> Blueprint:
+        # We use the source blueprint for table schema information.
+        return Blueprint(
+            self._source_blueprint.schema_name(),
+            self._source_blueprint.tables(),
+            self.get_table_placement(),
+            self.aurora_provisioning.clone(),
+            self.redshift_provisioning.clone(),
+            self._source_blueprint.router_provider(),
+        )
 
     def add_query(
         self,
@@ -567,6 +648,7 @@ class _BlueprintCandidate(ComparableBlueprint):
 
     def clone(self) -> "_BlueprintCandidate":
         cloned = _BlueprintCandidate(
+            self._source_blueprint,
             self.aurora_provisioning.mutable_clone(),
             self.redshift_provisioning.mutable_clone(),
             self.table_placements.copy(),
