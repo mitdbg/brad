@@ -12,6 +12,7 @@ from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner import BlueprintPlanner
 from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
+from brad.planner.debug_logger import BlueprintPlanningDebugLogger
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.workload.query import Query
 from brad.planner.scoring.context import ScoringContext
@@ -138,7 +139,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 return
 
             # 7. Run beam search to formulate the table placements.
-            for query_idx in query_indices[1:]:
+            for j, query_idx in enumerate(query_indices[1:]):
+                if j % 100 == 0:
+                    logger.info("Processing index %d of %d", j, len(query_indices[1:]))
+
                 next_top_k: List[_BlueprintCandidate] = []
                 query = analytical_queries[first_query_idx]
 
@@ -218,6 +222,14 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
                 current_top_k = next_top_k
 
+            # Log the placement top k for debugging purposes, if needed.
+            placement_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
+                "query_beam_placement_topk"
+            )
+            if placement_top_k_logger is not None:
+                for candidate in current_top_k:
+                    placement_top_k_logger.log_debug_values(candidate.to_debug_values())
+
             # 8. Run a final greedy search over provisionings in the top-k set.
             final_top_k: List[_BlueprintCandidate] = []
 
@@ -270,6 +282,16 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 )
                 return
 
+            # Log the final top k for debugging purposes, if needed.
+            final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
+                "query_beam_final_topk"
+            )
+            if final_top_k_logger is not None:
+                for candidate in final_top_k:
+                    final_top_k_logger.log_debug_values(candidate.to_debug_values())
+
+            # TODO: Consider re-ranking the final top k using the actual query
+            # routing policy.
             best_candidate = final_top_k[0]
 
             # 9. Touch up the table placements. Add any missing tables to ensure
@@ -288,6 +310,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             self._current_blueprint = best_blueprint
             self._current_workload = next_workload
             await self._notify_new_blueprint(best_blueprint)
+
+            logger.info("Selected blueprint:")
+            logger.info("%s", best_blueprint)
 
         finally:
             engine_connections.close_sync()
@@ -375,6 +400,34 @@ class _BlueprintCandidate(ComparableBlueprint):
             self._source_blueprint.router_provider(),
         )
 
+    def to_debug_values(self) -> Dict[str, int | float | str]:
+        values: Dict[str, int | float | str] = {}
+
+        # Provisioning.
+        values["aurora_instance"] = self.aurora_provisioning.instance_type()
+        values["aurora_nodes"] = self.aurora_provisioning.num_nodes()
+        values["redshift_instance"] = self.redshift_provisioning.instance_type()
+        values["redshift_nodes"] = self.redshift_provisioning.num_nodes()
+
+        # Tables placements.
+        for tbl, bitmap in self.table_placements.items():
+            values["table_{}".format(tbl)] = bitmap
+
+        # Query breakdowns (rough).
+        values["aurora_queries"] = len(self.query_locations[Engine.Aurora])
+        values["redshift_queries"] = len(self.query_locations[Engine.Redshift])
+        values["athena_queries"] = len(self.query_locations[Engine.Athena])
+
+        # Scoring components.
+        values["provisioning_cost"] = self.provisioning_cost
+        values["storage_cost"] = self.storage_cost
+        values["workload_scan_cost"] = self.workload_scan_cost
+        values["table_movement_trans_cost"] = self.table_movement_trans_cost
+        values["table_movement_trans_time_s"] = self.table_movement_trans_time_s
+        values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
+
+        return values
+
     def add_query(
         self,
         query_idx: int,
@@ -440,6 +493,7 @@ class _BlueprintCandidate(ComparableBlueprint):
         # Adding a new query can affect the feasibility of the provisioning.
         self.feasibility = _BlueprintFeasibility.Unchecked
         self.explored_provisionings = False
+        self._memoized.clear()
 
     def add_transactional_tables(self, ctx: ScoringContext) -> None:
         referenced_tables = set()
@@ -468,6 +522,7 @@ class _BlueprintCandidate(ComparableBlueprint):
             self.table_movement_trans_time_s += result.movement_time_s
 
     def recompute_provisioning_dependent_scoring(self, ctx: ScoringContext) -> None:
+        self._memoized.clear()
         aurora_prov_cost = compute_aurora_hourly_operational_cost(
             self.aurora_provisioning
         )
@@ -640,11 +695,13 @@ class _BlueprintCandidate(ComparableBlueprint):
         self.aurora_provisioning.set_instance_type(prov.instance_type())
         self.aurora_provisioning.set_num_nodes(prov.num_nodes())
         self.feasibility = _BlueprintFeasibility.Unchecked
+        self._memoized.clear()
 
     def update_redshift_provisioning(self, prov: Provisioning) -> None:
         self.redshift_provisioning.set_instance_type(prov.instance_type())
         self.redshift_provisioning.set_num_nodes(prov.num_nodes())
         self.feasibility = _BlueprintFeasibility.Unchecked
+        self._memoized.clear()
 
     def clone(self) -> "_BlueprintCandidate":
         cloned = _BlueprintCandidate(
