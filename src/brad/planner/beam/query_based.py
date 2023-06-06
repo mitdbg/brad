@@ -1,7 +1,8 @@
 import asyncio
 import enum
-import logging
 import heapq
+import json
+import logging
 import numpy as np
 import numpy.typing as npt
 from typing import Any, List, Dict, Optional
@@ -141,7 +142,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             # 7. Run beam search to formulate the table placements.
             for j, query_idx in enumerate(query_indices[1:]):
                 if j % 100 == 0:
-                    logger.info("Processing index %d of %d", j, len(query_indices[1:]))
+                    logger.debug("Processing index %d of %d", j, len(query_indices[1:]))
 
                 next_top_k: List[_BlueprintCandidate] = []
                 query = analytical_queries[first_query_idx]
@@ -246,7 +247,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
                 redshift_it = redshift_enumerator.enumerate_nearby(
                     ctx.current_blueprint.redshift_provisioning(),
-                    aurora_enumerator.scaling_to_distance(
+                    redshift_enumerator.scaling_to_distance(
                         ctx.current_blueprint.redshift_provisioning(),
                         ctx.planner_config.max_provisioning_multiplier(),
                     ),
@@ -313,6 +314,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
             logger.info("Selected blueprint:")
             logger.info("%s", best_blueprint)
+
+            debug_values = best_candidate.to_debug_values()
+            logger.debug("Selected blueprint details: %s", json.dumps(debug_values, indent=2))
 
         finally:
             engine_connections.close_sync()
@@ -606,7 +610,7 @@ class _BlueprintCandidate(ComparableBlueprint):
         redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
         redshift_it = redshift_enumerator.enumerate_nearby(
             ctx.current_blueprint.redshift_provisioning(),
-            aurora_enumerator.scaling_to_distance(
+            redshift_enumerator.scaling_to_distance(
                 ctx.current_blueprint.redshift_provisioning(),
                 ctx.planner_config.max_provisioning_multiplier(),
             ),
@@ -746,7 +750,7 @@ class _BlueprintCandidate(ComparableBlueprint):
         relevant.append(self.scaled_query_latencies[Engine.Aurora])
         relevant.append(self.scaled_query_latencies[Engine.Redshift])
         relevant.append(np.array(self.base_query_latencies[Engine.Athena]))
-        return np.stack(relevant, axis=0)
+        return np.concatenate(relevant)
 
     def get_operational_monetary_cost(self) -> float:
         return self.storage_cost + self.provisioning_cost + self.workload_scan_cost

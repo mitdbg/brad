@@ -57,4 +57,6 @@ def _get_or_compute_geomean_latency(bp: ComparableBlueprint) -> float:
 
 
 def _compute_max_ratio(value1: float, value2: float) -> float:
+    if value1 == 0.0 or value2 == 0.0:
+        return np.inf
     return max(value1 / value2, value2 / value1)

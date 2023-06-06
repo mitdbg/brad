@@ -1,4 +1,4 @@
-strategy: full_neighborhood
+strategy: query_based_beam
 
 ###
 ### Beam planning constants.
