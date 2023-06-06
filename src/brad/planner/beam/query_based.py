@@ -1,9 +1,10 @@
 import asyncio
+import enum
 import logging
 import heapq
 import numpy as np
 import numpy.typing as npt
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning, MutableProvisioning
@@ -115,8 +116,21 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     ),
                     ctx,
                 )
+                candidate.check_feasibility()
+
+                if candidate.feasibility == _BlueprintFeasibility.Infeasible:
+                    candidate.find_best_provisioning(ctx)
+                if candidate.feasibility == _BlueprintFeasibility.Infeasible:
+                    continue
+
                 candidate.recompute_provisioning_dependent_scoring(ctx)
                 current_top_k.append(candidate)
+
+            if len(current_top_k) == 0:
+                logger.error(
+                    "Query-based beam blueprint planning failed. Could not generate an initial set of feasible blueprints."
+                )
+                return
 
             # 7. Run beam search to formulate the table placements.
             for query_idx in query_indices[1:]:
@@ -145,6 +159,21 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                             ctx,
                         )
 
+                        # Make sure this candidate is feasible (otherwise skip it).
+                        next_candidate.check_feasibility()
+                        if (
+                            next_candidate.feasibility
+                            == _BlueprintFeasibility.Infeasible
+                        ):
+                            next_candidate.find_best_provisioning(ctx)
+                        if (
+                            next_candidate.feasibility
+                            == _BlueprintFeasibility.Infeasible
+                        ):
+                            continue
+
+                        next_candidate.recompute_provisioning_dependent_scoring(ctx)
+
                         if len(next_top_k) < beam_size:
                             next_top_k.append(next_candidate)
                             if len(next_top_k) == beam_size:
@@ -155,6 +184,8 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                         else:
                             # Need to eliminate a blueprint candidate.
                             if not (next_candidate.is_better_than(next_top_k[0])):
+                                # The candidate is worse than the current worst top-k blueprint.
+                                # Check if a better provisioning improves the candidate's score.
                                 next_candidate.find_best_provisioning(ctx)
 
                             if not (next_candidate.is_better_than(next_top_k[0])):
@@ -189,6 +220,12 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
         finally:
             engine_connections.close_sync()
+
+
+class _BlueprintFeasibility(enum.Enum):
+    Unchecked = 0
+    Feasible = 1
+    Infeasible = 2
 
 
 class _BlueprintCandidate:
@@ -241,8 +278,7 @@ class _BlueprintCandidate:
 
         # Used for scoring purposes.
         self.explored_provisionings = False
-        # If none, it means that we have not checked for feasibility yet.
-        self.is_feasible: Optional[bool] = None
+        self.feasibility = _BlueprintFeasibility.Unchecked
         self.scaled_query_latencies: Dict[Engine, npt.NDArray] = {}
         self.summary_latency = np.inf
 
@@ -307,6 +343,10 @@ class _BlueprintCandidate:
                 self.storage_cost += compute_single_athena_table_cost(
                     name, ctx.next_workload, ctx.planner_config
                 )
+
+        # Adding a new query affects feasibility of the provisioning.
+        self.feasibility = _BlueprintFeasibility.Unchecked
+        self.explored_provisionings = False
 
     def recompute_provisioning_dependent_scoring(self, ctx: ScoringContext) -> None:
         aurora_prov_cost = compute_aurora_hourly_operational_cost(
@@ -419,60 +459,52 @@ class _BlueprintCandidate:
         current_best.recompute_provisioning_dependent_scoring(ctx)
 
         for aurora in aurora_it:
-            working_candidate.aurora_provisioning.set_instance_type(
-                aurora.instance_type()
-            )
-            working_candidate.aurora_provisioning.set_num_nodes(aurora.num_nodes())
+            working_candidate.update_aurora_provisioning(aurora)
 
             for redshift in redshift_it:
-                working_candidate.redshift_provisioning.set_instance_type(
-                    redshift.instance_type()
-                )
-                working_candidate.redshift_provisioning.set_num_nodes(
-                    redshift.num_nodes()
-                )
-                working_candidate.is_feasible = None
-                working_candidate.compute_provisioning_feasibility()
-                if not working_candidate.is_feasible:
+                working_candidate.update_redshift_provisioning(redshift)
+                working_candidate.check_feasibility()
+                if working_candidate.feasibility == _BlueprintFeasibility.Infeasible:
                     continue
+
                 working_candidate.recompute_provisioning_dependent_scoring(ctx)
 
                 if working_candidate.is_better_than(current_best):
                     current_best, working_candidate = working_candidate, current_best
 
-        self.aurora_provisioning.set_instance_type(
-            current_best.aurora_provisioning.instance_type()
-        )
-        self.aurora_provisioning.set_num_nodes(
-            current_best.aurora_provisioning.num_nodes()
-        )
-        self.redshift_provisioning.set_instance_type(
-            current_best.redshift_provisioning.instance_type()
-        )
-        self.redshift_provisioning.set_num_nodes(
-            current_best.redshift_provisioning.num_nodes()
-        )
+        if current_best.feasibility == _BlueprintFeasibility.Infeasible:
+            self.feasibility = _BlueprintFeasibility.Infeasible
+            self.explored_provisionings = True
+            return
+
+        self.update_aurora_provisioning(current_best.aurora_provisioning)
+        self.update_redshift_provisioning(current_best.redshift_provisioning)
         self.provisioning_cost = current_best.provisioning_cost
         self.provisioning_trans_time_s = current_best.provisioning_trans_time_s
+
+        self.feasibility = current_best.feasibility
         self.explored_provisionings = True
 
-    def compute_provisioning_feasibility(self) -> None:
-        if self.is_feasible is not None:
-            # Already computed.
+    def check_feasibility(self) -> None:
+        # This method checks structural feasibility only (not user-definied
+        # feasibility (e.g., all analytical queries must run under X seconds)).
+
+        if self.feasibility != _BlueprintFeasibility.Unchecked:
+            # Already checked.
             return
 
         if (
             len(self.base_query_latencies[Engine.Aurora]) > 0
             and self.aurora_provisioning.num_nodes() == 0
         ):
-            self.is_feasible = False
+            self.feasibility = _BlueprintFeasibility.Infeasible
             return
 
         if (
             len(self.base_query_latencies[Engine.Redshift]) > 0
             and self.redshift_provisioning.num_nodes() == 0
         ):
-            self.is_feasible = False
+            self.feasibility = _BlueprintFeasibility.Infeasible
             return
 
         # Make sure the provisioning supports the table placement.
@@ -483,16 +515,26 @@ class _BlueprintCandidate:
         if (
             (EngineBitmapValues[Engine.Aurora] & total_bitmap) != 0
         ) and self.aurora_provisioning.num_nodes() == 0:
-            self.is_feasible = False
+            self.feasibility = _BlueprintFeasibility.Infeasible
             return
 
         if (
             (EngineBitmapValues[Engine.Redshift] & total_bitmap) != 0
         ) and self.redshift_provisioning.num_nodes() == 0:
-            self.is_feasible = False
+            self.feasibility = _BlueprintFeasibility.Infeasible
             return
 
-        self.is_feasible = True
+        self.feasibility = _BlueprintFeasibility.Feasible
+
+    def update_aurora_provisioning(self, prov: Provisioning) -> None:
+        self.aurora_provisioning.set_instance_type(prov.instance_type())
+        self.aurora_provisioning.set_num_nodes(prov.num_nodes())
+        self.feasibility = _BlueprintFeasibility.Unchecked
+
+    def update_redshift_provisioning(self, prov: Provisioning) -> None:
+        self.redshift_provisioning.set_instance_type(prov.instance_type())
+        self.redshift_provisioning.set_num_nodes(prov.num_nodes())
+        self.feasibility = _BlueprintFeasibility.Unchecked
 
     def clone(self) -> "_BlueprintCandidate":
         cloned = _BlueprintCandidate(
