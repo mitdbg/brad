@@ -4,12 +4,14 @@ import logging
 import heapq
 import numpy as np
 import numpy.typing as npt
-from typing import List, Dict
+from typing import Any, List, Dict, Optional
 
 from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning, MutableProvisioning
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner import BlueprintPlanner
+from brad.planner.compare.blueprint import ComparableBlueprint
+from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.workload.query import Query
 from brad.planner.scoring.context import ScoringContext
@@ -98,7 +100,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
             # 6. Initialize the top-k set (beam).
             for routing_engine in engines:
-                candidate = _BlueprintCandidate.based_on(self._current_blueprint)
+                candidate = _BlueprintCandidate.based_on(
+                    self._current_blueprint, self._comparator
+                )
                 # TODO: Initialize table placement for transactions.
                 query = analytical_queries[first_query_idx]
                 # N.B. We must use the current blueprint because the tables
@@ -229,18 +233,21 @@ class _BlueprintFeasibility(enum.Enum):
     Infeasible = 2
 
 
-class _BlueprintCandidate:
+class _BlueprintCandidate(ComparableBlueprint):
     """
     A "barebones" representation of a blueprint, used during the optimization
     process.
     """
 
     @classmethod
-    def based_on(cls, blueprint: Blueprint) -> "_BlueprintCandidate":
+    def based_on(
+        cls, blueprint: Blueprint, comparator: BlueprintComparator
+    ) -> "_BlueprintCandidate":
         return cls(
             blueprint.aurora_provisioning().mutable_clone(),
             blueprint.redshift_provisioning().mutable_clone(),
             {t.name: 0 for t in blueprint.tables()},
+            comparator,
         )
 
     def __init__(
@@ -248,12 +255,14 @@ class _BlueprintCandidate:
         aurora: MutableProvisioning,
         redshift: MutableProvisioning,
         table_placements: Dict[str, int],
+        comparator: BlueprintComparator,
     ) -> None:
         self.aurora_provisioning = aurora.mutable_clone()
         self.redshift_provisioning = redshift.mutable_clone()
         # Table locations are represented using a bitmap. We initialize each
         # table to being present on no engines.
         self.table_placements = table_placements
+        self._comparator = comparator
 
         self.query_locations: Dict[Engine, List[int]] = {}
         self.query_locations[Engine.Aurora] = []
@@ -281,6 +290,9 @@ class _BlueprintCandidate:
         self.explored_provisionings = False
         self.feasibility = _BlueprintFeasibility.Unchecked
         self.scaled_query_latencies: Dict[Engine, npt.NDArray] = {}
+
+        # Used during comparisons.
+        self._memoized: Dict[str, Any] = {}
 
     def add_query(
         self,
@@ -405,7 +417,7 @@ class _BlueprintCandidate:
             )
 
     def is_better_than(self, other: "_BlueprintCandidate") -> bool:
-        raise NotImplementedError
+        return self._comparator(self, other)
 
     def __lt__(self, other: "_BlueprintCandidate") -> bool:
         # This is implemented for use with Python's `heapq` module. It
@@ -532,6 +544,7 @@ class _BlueprintCandidate:
             self.aurora_provisioning.mutable_clone(),
             self.redshift_provisioning.mutable_clone(),
             self.table_placements.copy(),
+            self._comparator,
         )
 
         for engine, indices in self.query_locations.items():
@@ -548,6 +561,45 @@ class _BlueprintCandidate:
         cloned.provisioning_trans_time_s = self.provisioning_trans_time_s
 
         return cloned
+
+    # `ComparableBlueprint` methods follow.
+
+    def get_table_placement(self) -> Dict[str, List[Engine]]:
+        placements = {}
+        for name, bitmap in self.table_placements.items():
+            placements[name] = Engine.from_bitmap(bitmap)
+        return placements
+
+    def get_aurora_provisioning(self) -> Provisioning:
+        return self.aurora_provisioning
+
+    def get_redshift_provisioning(self) -> Provisioning:
+        return self.redshift_provisioning
+
+    def get_predicted_analytical_latencies(self) -> npt.NDArray:
+        relevant = []
+        relevant.append(self.scaled_query_latencies[Engine.Aurora])
+        relevant.append(self.scaled_query_latencies[Engine.Redshift])
+        relevant.append(np.array(self.base_query_latencies[Engine.Athena]))
+        return np.stack(relevant, axis=0)
+
+    def get_operational_monetary_cost(self) -> float:
+        return self.storage_cost + self.provisioning_cost + self.workload_scan_cost
+
+    def get_transition_cost(self) -> float:
+        return self.table_movement_trans_cost
+
+    def get_transition_time_s(self) -> float:
+        return self.table_movement_trans_time_s + self.provisioning_trans_time_s
+
+    def set_memoized_value(self, key: str, value: Any) -> None:
+        self._memoized[key] = value
+
+    def get_memoized_value(self, key: str) -> Optional[Any]:
+        try:
+            return self._memoized[key]
+        except KeyError:
+            return None
 
 
 _AURORA_BASE_RESOURCE_VALUE = aurora_resource_value(Provisioning("db.r6i.large", 1))

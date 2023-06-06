@@ -13,30 +13,30 @@ class ComparableBlueprint:
 
     # Blueprint configuration.
 
-    def table_placement(self) -> Dict[str, List[Engine]]:
+    def get_table_placement(self) -> Dict[str, List[Engine]]:
         raise NotImplementedError
 
-    def aurora_provisioning(self) -> Provisioning:
+    def get_aurora_provisioning(self) -> Provisioning:
         raise NotImplementedError
 
-    def redshift_provisioning(self) -> Provisioning:
+    def get_redshift_provisioning(self) -> Provisioning:
         raise NotImplementedError
 
     # Predicted performance.
 
-    def predicted_analytical_latencies(self) -> npt.NDArray:
+    def get_predicted_analytical_latencies(self) -> npt.NDArray:
         raise NotImplementedError
 
     # TODO: For more sophisticated comparisons, the user might want access to
     # predicted latency on a per-query basis.
 
-    def operational_monetary_cost(self) -> float:
+    def get_operational_monetary_cost(self) -> float:
         raise NotImplementedError
 
-    def transition_cost(self) -> float:
+    def get_transition_cost(self) -> float:
         raise NotImplementedError
 
-    def transition_time_s(self) -> float:
+    def get_transition_time_s(self) -> float:
         raise NotImplementedError
 
     # Used for efficiency purposes.

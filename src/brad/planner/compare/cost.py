@@ -24,8 +24,8 @@ def best_cost_under_geomean_latency(
             return True
 
         # Both are under the latency ceiling.
-        left_cost = left.operational_monetary_cost() + left.transition_cost()
-        right_cost = right.operational_monetary_cost() + right.transition_cost()
+        left_cost = left.get_operational_monetary_cost() + left.get_transition_cost()
+        right_cost = right.get_operational_monetary_cost() + right.get_transition_cost()
 
         # We treat the cost differences as significant only when they differ by more than 10%.
         max_cost_ratio = _compute_max_ratio(left_cost, right_cost)
@@ -34,10 +34,10 @@ def best_cost_under_geomean_latency(
 
         # The two blueprints have similar costs. We now rank by transition time.
         max_trans_ratio = _compute_max_ratio(
-            left.transition_time_s(), right.transition_time_s()
+            left.get_transition_time_s(), right.get_transition_time_s()
         )
         if max_trans_ratio >= 1.1:
-            return left.transition_time_s() < right.transition_time_s()
+            return left.get_transition_time_s() < right.get_transition_time_s()
 
         # Rank by performance.
         max_perf_ratio = _compute_max_ratio(left_lat, right_lat)
@@ -51,7 +51,7 @@ def _get_or_compute_geomean_latency(bp: ComparableBlueprint) -> float:
     if stored is not None:
         return stored
     else:
-        geomean_lat = np.exp(np.log(bp.predicted_analytical_latencies()).mean())
+        geomean_lat = np.exp(np.log(bp.get_predicted_analytical_latencies()).mean())
         bp.set_memoized_value("geomean_latency", geomean_lat)
         return geomean_lat
 
