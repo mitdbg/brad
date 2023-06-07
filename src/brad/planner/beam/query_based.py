@@ -234,8 +234,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             # 8. Run a final greedy search over provisionings in the top-k set.
             final_top_k: List[_BlueprintCandidate] = []
 
+            aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
+            redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
+
             for candidate in current_top_k:
-                aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
                 aurora_it = aurora_enumerator.enumerate_nearby(
                     ctx.current_blueprint.aurora_provisioning(),
                     aurora_enumerator.scaling_to_distance(
@@ -243,17 +245,14 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                         ctx.planner_config.max_provisioning_multiplier(),
                     ),
                 )
-
-                redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
-                redshift_it = redshift_enumerator.enumerate_nearby(
-                    ctx.current_blueprint.redshift_provisioning(),
-                    redshift_enumerator.scaling_to_distance(
-                        ctx.current_blueprint.redshift_provisioning(),
-                        ctx.planner_config.max_provisioning_multiplier(),
-                    ),
-                )
-
                 for aurora in aurora_it:
+                    redshift_it = redshift_enumerator.enumerate_nearby(
+                        ctx.current_blueprint.redshift_provisioning(),
+                        redshift_enumerator.scaling_to_distance(
+                            ctx.current_blueprint.redshift_provisioning(),
+                            ctx.planner_config.max_provisioning_multiplier(),
+                        ),
+                    )
                     for redshift in redshift_it:
                         new_candidate = candidate.clone()
                         new_candidate.update_aurora_provisioning(aurora)
@@ -316,7 +315,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             logger.info("%s", best_blueprint)
 
             debug_values = best_candidate.to_debug_values()
-            logger.debug("Selected blueprint details: %s", json.dumps(debug_values, indent=2))
+            logger.debug(
+                "Selected blueprint details: %s", json.dumps(debug_values, indent=2)
+            )
 
         finally:
             engine_connections.close_sync()
