@@ -193,6 +193,14 @@ class Workload:
             query_idx, self.EngineLatencyIndex[engine]
         ].item()
 
+    def get_predicted_analytical_latency_batch(
+        self, query_indices: List[int], engine: Engine
+    ) -> npt.NDArray:
+        assert self._predicted_analytical_latencies is not None
+        return self._predicted_analytical_latencies[
+            query_indices, self.EngineLatencyIndex[engine]
+        ]
+
     def compute_latency_gains(self) -> npt.NDArray:
         """
         We define "gain" as the largest ratio between predicted execution times
