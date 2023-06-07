@@ -733,6 +733,7 @@ class _BlueprintCandidate(ComparableBlueprint):
         cloned.explored_provisionings = self.explored_provisionings
         cloned.feasibility = self.feasibility
         cloned.scaled_query_latencies = self.scaled_query_latencies.copy()
+        # pylint: disable-next=protected-access
         cloned._memoized = self._memoized.copy()
 
         return cloned
