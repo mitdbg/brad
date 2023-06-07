@@ -12,5 +12,7 @@ class PlanningStrategy(str, enum.Enum):
             return PlanningStrategy.FullNeighborhood
         elif candidate == PlanningStrategy.SampledNeighborhood.value:
             return PlanningStrategy.SampledNeighborhood
+        elif candidate == PlanningStrategy.QueryBasedBeam.value:
+            return PlanningStrategy.QueryBasedBeam
         else:
             raise ValueError("Unrecognized planning strategy {}".format(candidate))

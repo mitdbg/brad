@@ -51,5 +51,5 @@ class PrecomputedPredictions(AnalyticsLatencyScorer):
     def apply_predicted_latencies(self, workload: Workload) -> None:
         query_indices = []
         for query in workload.analytical_queries():
-            query_indices.append(self._queries_map[query.raw_query])
+            query_indices.append(self._queries_map[query.raw_query.strip()])
         workload.set_predicted_analytical_latencies(self._predictions[query_indices, :])

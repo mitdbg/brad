@@ -1,7 +1,8 @@
 import asyncio
 import enum
-import logging
 import heapq
+import json
+import logging
 import numpy as np
 import numpy.typing as npt
 from typing import Any, List, Dict, Optional
@@ -141,7 +142,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             # 7. Run beam search to formulate the table placements.
             for j, query_idx in enumerate(query_indices[1:]):
                 if j % 100 == 0:
-                    logger.info("Processing index %d of %d", j, len(query_indices[1:]))
+                    logger.debug("Processing index %d of %d", j, len(query_indices[1:]))
 
                 next_top_k: List[_BlueprintCandidate] = []
                 query = analytical_queries[first_query_idx]
@@ -233,8 +234,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             # 8. Run a final greedy search over provisionings in the top-k set.
             final_top_k: List[_BlueprintCandidate] = []
 
+            aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
+            redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
+
             for candidate in current_top_k:
-                aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
                 aurora_it = aurora_enumerator.enumerate_nearby(
                     ctx.current_blueprint.aurora_provisioning(),
                     aurora_enumerator.scaling_to_distance(
@@ -242,17 +245,14 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                         ctx.planner_config.max_provisioning_multiplier(),
                     ),
                 )
-
-                redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
-                redshift_it = redshift_enumerator.enumerate_nearby(
-                    ctx.current_blueprint.redshift_provisioning(),
-                    aurora_enumerator.scaling_to_distance(
-                        ctx.current_blueprint.redshift_provisioning(),
-                        ctx.planner_config.max_provisioning_multiplier(),
-                    ),
-                )
-
                 for aurora in aurora_it:
+                    redshift_it = redshift_enumerator.enumerate_nearby(
+                        ctx.current_blueprint.redshift_provisioning(),
+                        redshift_enumerator.scaling_to_distance(
+                            ctx.current_blueprint.redshift_provisioning(),
+                            ctx.planner_config.max_provisioning_multiplier(),
+                        ),
+                    )
                     for redshift in redshift_it:
                         new_candidate = candidate.clone()
                         new_candidate.update_aurora_provisioning(aurora)
@@ -313,6 +313,11 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
             logger.info("Selected blueprint:")
             logger.info("%s", best_blueprint)
+
+            debug_values = best_candidate.to_debug_values()
+            logger.debug(
+                "Selected blueprint details: %s", json.dumps(debug_values, indent=2)
+            )
 
         finally:
             engine_connections.close_sync()
@@ -606,7 +611,7 @@ class _BlueprintCandidate(ComparableBlueprint):
         redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
         redshift_it = redshift_enumerator.enumerate_nearby(
             ctx.current_blueprint.redshift_provisioning(),
-            aurora_enumerator.scaling_to_distance(
+            redshift_enumerator.scaling_to_distance(
                 ctx.current_blueprint.redshift_provisioning(),
                 ctx.planner_config.max_provisioning_multiplier(),
             ),
@@ -725,6 +730,12 @@ class _BlueprintCandidate(ComparableBlueprint):
         cloned.table_movement_trans_time_s = self.table_movement_trans_time_s
         cloned.provisioning_trans_time_s = self.provisioning_trans_time_s
 
+        cloned.explored_provisionings = self.explored_provisionings
+        cloned.feasibility = self.feasibility
+        cloned.scaled_query_latencies = self.scaled_query_latencies.copy()
+        # pylint: disable-next=protected-access
+        cloned._memoized = self._memoized.copy()
+
         return cloned
 
     # `ComparableBlueprint` methods follow.
@@ -746,7 +757,7 @@ class _BlueprintCandidate(ComparableBlueprint):
         relevant.append(self.scaled_query_latencies[Engine.Aurora])
         relevant.append(self.scaled_query_latencies[Engine.Redshift])
         relevant.append(np.array(self.base_query_latencies[Engine.Athena]))
-        return np.stack(relevant, axis=0)
+        return np.concatenate(relevant)
 
     def get_operational_monetary_cost(self) -> float:
         return self.storage_cost + self.provisioning_cost + self.workload_scan_cost
