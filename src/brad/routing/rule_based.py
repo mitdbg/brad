@@ -1,7 +1,7 @@
 import os.path
 import json
 import logging
-from typing import List, Optional, Mapping, MutableMapping, Any
+from typing import List, Optional, Mapping, MutableMapping, Any, Dict
 from importlib.resources import files, as_file
 
 from brad.blueprint import Blueprint
@@ -60,6 +60,7 @@ class RuleBased(Router):
         # One of `blueprint_mgr` and `blueprint` must not be `None`.
         blueprint_mgr: Optional[BlueprintManager] = None,
         blueprint: Optional[Blueprint] = None,
+        table_placement_bitmap: Optional[Dict[str, int]] = None,
         monitor: Optional[Monitor] = None,
         catalog: Optional[MutableMapping[str, MutableMapping[str, Any]]] = None,
         use_decision_tree: bool = False,
@@ -67,6 +68,7 @@ class RuleBased(Router):
     ):
         self._blueprint_mgr = blueprint_mgr
         self._blueprint = blueprint
+        self._table_placement_bitmap = table_placement_bitmap
         self._monitor = monitor
         # catalog contains all tables' number of rows and columns
         self._catalog = catalog
@@ -188,13 +190,16 @@ class RuleBased(Router):
         if query.is_data_modification_query():
             return Engine.Aurora
 
-        if self._blueprint is not None:
-            blueprint = self._blueprint
+        if self._table_placement_bitmap is not None:
+            locations_bitmaps = self._table_placement_bitmap
         else:
-            assert self._blueprint_mgr is not None
-            blueprint = self._blueprint_mgr.get_blueprint()
+            if self._blueprint is not None:
+                blueprint = self._blueprint
+            else:
+                assert self._blueprint_mgr is not None
+                blueprint = self._blueprint_mgr.get_blueprint()
+            locations_bitmaps = blueprint.table_locations_bitmap()
 
-        locations_bitmaps = blueprint.table_locations_bitmap()
         valid_locations = Engine.bitmap_all()
         for table_name_str in query.tables():
             try:

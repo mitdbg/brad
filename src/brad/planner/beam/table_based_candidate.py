@@ -25,6 +25,7 @@ from brad.planner.scoring.table_placement import (
     compute_single_table_movement_time_and_cost,
 )
 from brad.routing import Router
+from brad.routing.rule_based import RuleBased
 
 
 class BlueprintCandidate(ComparableBlueprint):
@@ -159,8 +160,8 @@ class BlueprintCandidate(ComparableBlueprint):
     def add_query_cluster(
         self, query_cluster: List[int], reroute_prev: bool, ctx: ScoringContext
     ) -> None:
-        # TODO: Initialize the router.
-        router: Router = None
+        # TODO: The router should come from the blueprint.
+        router: Router = RuleBased(table_placement_bitmap=self.table_placements)
 
         if reroute_prev:
             self.query_locations[Engine.Aurora].clear()
