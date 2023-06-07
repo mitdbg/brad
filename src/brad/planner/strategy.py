@@ -5,6 +5,7 @@ class PlanningStrategy(str, enum.Enum):
     FullNeighborhood = "full_neighborhood"
     SampledNeighborhood = "sampled_neighborhood"
     QueryBasedBeam = "query_based_beam"
+    TableBasedBeam = "table_based_beam"
 
     @staticmethod
     def from_str(candidate: str) -> "PlanningStrategy":
@@ -14,5 +15,7 @@ class PlanningStrategy(str, enum.Enum):
             return PlanningStrategy.SampledNeighborhood
         elif candidate == PlanningStrategy.QueryBasedBeam.value:
             return PlanningStrategy.QueryBasedBeam
+        elif candidate == PlanningStrategy.TableBasedBeam.value:
+            return PlanningStrategy.TableBasedBeam
         else:
             raise ValueError("Unrecognized planning strategy {}".format(candidate))

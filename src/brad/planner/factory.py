@@ -6,6 +6,7 @@ from brad.planner import BlueprintPlanner
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.neighborhood.neighborhood import NeighborhoodSearchPlanner
 from brad.planner.beam.query_based import QueryBasedBeamPlanner
+from brad.planner.beam.table_based import TableBasedBeamPlanner
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 from brad.planner.strategy import PlanningStrategy
 from brad.planner.workload import Workload
@@ -44,6 +45,19 @@ class BlueprintPlannerFactory:
 
         elif strategy == PlanningStrategy.QueryBasedBeam:
             return QueryBasedBeamPlanner(
+                current_blueprint=current_blueprint,
+                current_workload=current_workload,
+                planner_config=planner_config,
+                monitor=monitor,
+                config=config,
+                schema_name=schema_name,
+                workload_provider=workload_provider,
+                analytics_latency_scorer=analytics_latency_scorer,
+                comparator=comparator,
+            )
+
+        elif strategy == PlanningStrategy.TableBasedBeam:
+            return TableBasedBeamPlanner(
                 current_blueprint=current_blueprint,
                 current_workload=current_workload,
                 planner_config=planner_config,
