@@ -730,6 +730,11 @@ class _BlueprintCandidate(ComparableBlueprint):
         cloned.table_movement_trans_time_s = self.table_movement_trans_time_s
         cloned.provisioning_trans_time_s = self.provisioning_trans_time_s
 
+        cloned.explored_provisionings = self.explored_provisionings
+        cloned.feasibility = self.feasibility
+        cloned.scaled_query_latencies = self.scaled_query_latencies.copy()
+        cloned._memoized = self._memoized.copy()
+
         return cloned
 
     # `ComparableBlueprint` methods follow.
