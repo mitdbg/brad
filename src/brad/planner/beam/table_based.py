@@ -88,10 +88,10 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                 placement_changed = candidate.add_placement(
                     placement_bitmap, tables, ctx
                 )
-                # TODO: Populate query data access size.
                 candidate.add_query_cluster(
                     queries,
                     reroute_prev=placement_changed,
+                    engine_connections=engine_connections,
                     ctx=ctx,
                 )
                 candidate.check_feasibility()
@@ -139,10 +139,10 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                             # table placement that includes this query cluster.
                             continue
 
-                        # TODO: Populate query data access size.
-                        candidate.add_query_cluster(
+                        next_candidate.add_query_cluster(
                             queries,
                             reroute_prev=placement_changed,
+                            engine_connections=engine_connections,
                             ctx=ctx,
                         )
 

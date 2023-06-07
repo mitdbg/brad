@@ -26,6 +26,7 @@ from brad.planner.scoring.table_placement import (
 )
 from brad.routing import Router
 from brad.routing.rule_based import RuleBased
+from brad.server.engine_connections import EngineConnections
 
 
 class BlueprintCandidate(ComparableBlueprint):
@@ -158,7 +159,11 @@ class BlueprintCandidate(ComparableBlueprint):
         return changed
 
     def add_query_cluster(
-        self, query_cluster: List[int], reroute_prev: bool, ctx: ScoringContext
+        self,
+        query_cluster: List[int],
+        reroute_prev: bool,
+        engine_connections: EngineConnections,
+        ctx: ScoringContext,
     ) -> None:
         # TODO: The router should come from the blueprint.
         router: Router = RuleBased(table_placement_bitmap=self.table_placements)
@@ -172,7 +177,9 @@ class BlueprintCandidate(ComparableBlueprint):
                 dests,
                 aurora_scan_cost,
                 athena_scan_cost,
-            ) = self._route_queries_compute_scan_costs(self.queries, router, ctx)
+            ) = self._route_queries_compute_scan_costs(
+                self.queries, router, engine_connections, ctx
+            )
             for eng, query_indices in dests.items():
                 self.query_locations[eng].extend(query_indices)
 
@@ -182,7 +189,9 @@ class BlueprintCandidate(ComparableBlueprint):
             cluster_dests,
             incr_aurora_scan_cost,
             incr_athena_scan_cost,
-        ) = self._route_queries_compute_scan_costs(query_cluster, router, ctx)
+        ) = self._route_queries_compute_scan_costs(
+            query_cluster, router, engine_connections, ctx
+        )
         for eng, query_indices in cluster_dests.items():
             self.query_locations[eng].extend(query_indices)
 
@@ -196,7 +205,11 @@ class BlueprintCandidate(ComparableBlueprint):
         self._memoized.clear()
 
     def _route_queries_compute_scan_costs(
-        self, queries: List[int], router: Router, ctx: ScoringContext
+        self,
+        queries: List[int],
+        router: Router,
+        engine_connections: EngineConnections,
+        ctx: ScoringContext,
     ) -> Tuple[Dict[Engine, List[int]], float, float]:
         all_queries = ctx.next_workload.analytical_queries()
         dests: Dict[Engine, List[int]] = {
@@ -206,7 +219,15 @@ class BlueprintCandidate(ComparableBlueprint):
         }
 
         for qidx in queries:
-            eng = router.engine_for(all_queries[qidx])
+            q = all_queries[qidx]
+            eng = router.engine_for(q)
+            # N.B. Need to use the current blueprint because the tables are not
+            # necessarily present on the next blueprint's placements.
+            q.populate_data_accessed_mb(
+                for_engine=eng,
+                connections=engine_connections,
+                blueprint=ctx.current_blueprint,
+            )
             dests[eng].append(qidx)
 
         aurora_scan_cost = compute_aurora_scan_cost(
