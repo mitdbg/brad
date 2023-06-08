@@ -188,17 +188,20 @@ def main():
         p.start()
         processes.append(p)
 
-    print("Waiting for startup...")
+    print("Waiting for startup...", flush=True)
     for _ in range(args.num_clients):
         start_queue.get()
 
-    print("Telling {} clients to start.".format(args.num_clients))
+    print("Telling {} clients to start.".format(args.num_clients), flush=True)
     for _ in range(args.num_clients):
         stop_queue.put("")
 
     if args.run_all_times is None:
         if args.run_for_s is not None:
-            print("Letting the experiment run for {} seconds...".format(args.run_for_s))
+            print(
+                "Letting the experiment run for {} seconds...".format(args.run_for_s),
+                flush=True,
+            )
             current_time = time.time()
             stop_time = current_time + args.run_for_s
             while True:
@@ -207,6 +210,7 @@ def main():
                 if now < stop_time:
                     time.sleep(10)
                 else:
+                    print(metrics_reader.get_metrics(metric_ids=METRICS), flush=True)
                     break
 
         else:

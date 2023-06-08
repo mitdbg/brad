@@ -21,3 +21,22 @@ run_experiment_group(
     for clients in NUM_CLIENTS
   ],
 )
+
+run_experiment_group(
+  name="ra3_xlplus",
+  run="python3 ../olap_batch_runner.py",
+  experiments=[
+    ExperimentInstance(
+      name="ra3_xlplus-{}".format(clients),
+      options={
+        "num_clients": clients,
+        "cstr_var": CSTR_VAR,
+        "query_file": QUERY_FILE,
+        "avg_gap_s": AVG_GAP_S,
+        "run_for_s": RUN_FOR_S,
+        "redshift_cluster": "redshift-ra3-test-2",
+      },
+    )
+    for clients in NUM_CLIENTS
+  ],
+)
