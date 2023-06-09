@@ -43,7 +43,17 @@ def compute_redshift_load_factor(
         * resource_ratio
         * ctx.planner_config.redshift_load_resource_alpha()
     )
+
+    if (
+        curr_cpu_avg <= ctx.planner_config.redshift_load_min_scaling_cpu()
+        and next_cpu <= ctx.planner_config.redshift_load_min_scaling_cpu()
+    ):
+        # The CPU is predicted to stay below a threshold where there should be
+        # no effects on execution time from load.
+        return 1.0
+
     next_cpu = max(next_cpu, ctx.planner_config.redshift_load_min_scaling_cpu())
-    cpu_change = next_cpu / curr_cpu_avg
+    starting_cpu = max(curr_cpu_avg, ctx.planner_config.redshift_load_min_scaling_cpu())
+    cpu_change = next_cpu / starting_cpu
 
     return cpu_change * ctx.planner_config.redshift_load_cpu_to_load_alpha()

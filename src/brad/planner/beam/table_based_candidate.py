@@ -10,6 +10,10 @@ from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
+from brad.planner.scoring.performance.provisioning_scaling import (
+    scale_aurora_predicted_latency,
+    scale_redshift_predicted_latency,
+)
 from brad.planner.scoring.provisioning import (
     compute_aurora_hourly_operational_cost,
     compute_redshift_hourly_operational_cost,
@@ -310,40 +314,20 @@ class BlueprintCandidate(ComparableBlueprint):
 
         # Predicted query performance.
         self.scaled_query_latencies.clear()
-        if self.aurora_provisioning.num_nodes() > 0:
-            aurora_base = ctx.next_workload.get_predicted_analytical_latency_batch(
+        self.scaled_query_latencies[Engine.Aurora] = scale_aurora_predicted_latency(
+            ctx.next_workload.get_predicted_analytical_latency_batch(
                 self.query_locations[Engine.Aurora], Engine.Aurora
-            )
-            aurora_predicted = (
-                aurora_base
-                * ctx.planner_config.aurora_gamma()
-                * ctx.planner_config.aurora_alpha()
-                * _AURORA_BASE_RESOURCE_VALUE
-                / aurora_resource_value(self.aurora_provisioning)
-            ) + (aurora_base * (1.0 - ctx.planner_config.aurora_gamma()))
-            self.scaled_query_latencies[Engine.Aurora] = aurora_predicted
-        else:
-            self.scaled_query_latencies[Engine.Aurora] = np.full(
-                (len(self.query_locations[Engine.Aurora]),), np.inf
-            )
-
-        if self.redshift_provisioning.num_nodes() > 0:
-            redshift_base = ctx.next_workload.get_predicted_analytical_latency_batch(
+            ),
+            self.aurora_provisioning,
+            ctx,
+        )
+        self.scaled_query_latencies[Engine.Redshift] = scale_redshift_predicted_latency(
+            ctx.next_workload.get_predicted_analytical_latency_batch(
                 self.query_locations[Engine.Redshift], Engine.Redshift
-            )
-            redshift_predicted = (
-                redshift_base
-                * ctx.planner_config.redshift_gamma()
-                * ctx.planner_config.redshift_alpha()
-                * _REDSHIFT_BASE_RESOURCE_VALUE
-                / redshift_resource_value(self.redshift_provisioning)
-            ) + (redshift_base * (1.0 - ctx.planner_config.redshift_gamma()))
-            self.scaled_query_latencies[Engine.Redshift] = redshift_predicted
-        else:
-            self.scaled_query_latencies[Engine.Redshift] = np.full(
-                (len(self.query_locations[Engine.Redshift]),), np.inf
-            )
-
+            ),
+            self.redshift_provisioning,
+            ctx,
+        )
         self.scaled_query_latencies[
             Engine.Athena
         ] = ctx.next_workload.get_predicted_analytical_latency_batch(
