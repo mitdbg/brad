@@ -13,6 +13,7 @@ from brad.planner.debug_logger import BlueprintPlanningDebugLogger
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.workload import Workload
+from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 
@@ -38,6 +39,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         # 1. Fetch the next workload and make query execution predictions.
         next_workload = self._workload_provider.next_workload()
         self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
+        self._analytics_latency_scorer.apply_predicted_latencies(self._current_workload)
 
         # 2. Cluster queries by tables and sort by gains (sum).
         clusters = self._preprocess_workload_queries(next_workload)
@@ -67,6 +69,12 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                 next_workload,
                 self._planner_config,
             )
+            ctx.simulate_current_workload_routing(
+                RuleBased(
+                    table_placement=self._current_blueprint.table_locations_bitmap()
+                )
+            )
+            ctx.compute_engine_latency_weights()
 
             # 5. Initialize planning state.
             beam_size = self._planner_config.beam_size()
