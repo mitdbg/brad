@@ -74,7 +74,7 @@ aurora_resource_scaling:
 
 
 ###
-### Query latency scaling modifiers.
+### Query latency scaling modifiers (across provisionings).
 ###
 
 aurora_alpha: 0.97066455
@@ -89,6 +89,12 @@ redshift_gamma: 0.635405229
 ###
 
 redshift_load_factor:
+  resource_alpha: 0.753694931989888
+  cpu_to_load_alpha: 0.7861541
+  min_scaling_cpu: 30
+
+# TODO: These are Redshift values.
+aurora_load_factor:
   resource_alpha: 0.753694931989888
   cpu_to_load_alpha: 0.7861541
   min_scaling_cpu: 30
