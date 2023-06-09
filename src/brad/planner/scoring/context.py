@@ -3,6 +3,7 @@ from typing import Dict, List
 from brad.config.engine import Engine
 from brad.blueprint import Blueprint
 from brad.config.planner import PlannerConfig
+from brad.planner.metrics import Metrics
 from brad.planner.workload import Workload
 from brad.routing import Router
 
@@ -17,11 +18,13 @@ class ScoringContext:
         current_blueprint: Blueprint,
         current_workload: Workload,
         next_workload: Workload,
+        metrics: Metrics,
         planner_config: PlannerConfig,
     ) -> None:
         self.current_blueprint = current_blueprint
         self.current_workload = current_workload
         self.next_workload = next_workload
+        self.metrics = metrics
         self.planner_config = planner_config
 
         self.current_query_locations: Dict[Engine, List[int]] = {}

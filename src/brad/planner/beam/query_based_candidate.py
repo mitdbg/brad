@@ -10,6 +10,10 @@ from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
+from brad.planner.scoring.performance.load_factor import (
+    compute_existing_aurora_load_factor,
+    compute_existing_redshift_load_factor,
+)
 from brad.planner.scoring.performance.provisioning_scaling import (
     scale_aurora_predicted_latency,
     scale_redshift_predicted_latency,
@@ -96,6 +100,10 @@ class BlueprintCandidate(ComparableBlueprint):
         # Used during comparisons.
         self._memoized: Dict[str, Any] = {}
 
+        # Used for debug purposes.
+        self._aurora_load_factor = np.nan
+        self._redshift_load_factor = np.nan
+
     def to_blueprint(self) -> Blueprint:
         # We use the source blueprint for table schema information.
         return Blueprint(
@@ -132,6 +140,9 @@ class BlueprintCandidate(ComparableBlueprint):
         values["table_movement_trans_cost"] = self.table_movement_trans_cost
         values["table_movement_trans_time_s"] = self.table_movement_trans_time_s
         values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
+
+        values["aurora_load_factor"] = self._aurora_load_factor
+        values["redshift_load_factor"] = self._redshift_load_factor
 
         return values
 
@@ -264,6 +275,33 @@ class BlueprintCandidate(ComparableBlueprint):
             self.redshift_provisioning,
             ctx,
         )
+
+        # Account for load.
+        if (
+            ctx.current_blueprint.aurora_provisioning().num_nodes() > 0
+            and self.aurora_provisioning.num_nodes() > 0
+        ):
+            self._aurora_load_factor = compute_existing_aurora_load_factor(
+                ctx.metrics.aurora_cpu_avg,
+                ctx.current_blueprint.aurora_provisioning(),
+                self.aurora_provisioning,
+                self.scaled_query_latencies[Engine.Aurora].sum(),
+                ctx,
+            )
+            self.scaled_query_latencies[Engine.Aurora] *= self._aurora_load_factor
+
+        if (
+            ctx.current_blueprint.redshift_provisioning().num_nodes() > 0
+            and self.redshift_provisioning.num_nodes() > 0
+        ):
+            self._redshift_load_factor = compute_existing_redshift_load_factor(
+                ctx.metrics.redshift_cpu_avg,
+                ctx.current_blueprint.redshift_provisioning(),
+                self.redshift_provisioning,
+                self.scaled_query_latencies[Engine.Redshift].sum(),
+                ctx,
+            )
+            self.scaled_query_latencies[Engine.Redshift] *= self._redshift_load_factor
 
     def is_better_than(self, other: "BlueprintCandidate") -> bool:
         return self._comparator(self, other)
