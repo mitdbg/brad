@@ -73,7 +73,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             )
             ctx.simulate_current_workload_routing(
                 RuleBased(
-                    table_placement=self._current_blueprint.table_locations_bitmap()
+                    table_placement_bitmap=self._current_blueprint.table_locations_bitmap()
                 )
             )
             ctx.compute_engine_latency_weights()
