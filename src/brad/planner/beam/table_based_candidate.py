@@ -10,6 +10,14 @@ from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
+from brad.planner.scoring.performance.load_factor import (
+    compute_existing_aurora_load_factor,
+    compute_existing_redshift_load_factor,
+)
+from brad.planner.scoring.performance.provisioning_scaling import (
+    scale_aurora_predicted_latency,
+    scale_redshift_predicted_latency,
+)
 from brad.planner.scoring.provisioning import (
     compute_aurora_hourly_operational_cost,
     compute_redshift_hourly_operational_cost,
@@ -92,6 +100,10 @@ class BlueprintCandidate(ComparableBlueprint):
         # Used during comparisons.
         self._memoized: Dict[str, Any] = {}
 
+        # Used for debug purposes.
+        self._aurora_load_factor = np.nan
+        self._redshift_load_factor = np.nan
+
     def to_blueprint(self) -> Blueprint:
         # We use the source blueprint for table schema information.
         return Blueprint(
@@ -128,6 +140,9 @@ class BlueprintCandidate(ComparableBlueprint):
         values["table_movement_trans_cost"] = self.table_movement_trans_cost
         values["table_movement_trans_time_s"] = self.table_movement_trans_time_s
         values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
+
+        values["aurora_load_factor"] = self._aurora_load_factor
+        values["redshift_load_factor"] = self._redshift_load_factor
 
         return values
 
@@ -310,45 +325,52 @@ class BlueprintCandidate(ComparableBlueprint):
 
         # Predicted query performance.
         self.scaled_query_latencies.clear()
-        if self.aurora_provisioning.num_nodes() > 0:
-            aurora_base = ctx.next_workload.get_predicted_analytical_latency_batch(
+        self.scaled_query_latencies[Engine.Aurora] = scale_aurora_predicted_latency(
+            ctx.next_workload.get_predicted_analytical_latency_batch(
                 self.query_locations[Engine.Aurora], Engine.Aurora
-            )
-            aurora_predicted = (
-                aurora_base
-                * ctx.planner_config.aurora_gamma()
-                * ctx.planner_config.aurora_alpha()
-                * _AURORA_BASE_RESOURCE_VALUE
-                / aurora_resource_value(self.aurora_provisioning)
-            ) + (aurora_base * (1.0 - ctx.planner_config.aurora_gamma()))
-            self.scaled_query_latencies[Engine.Aurora] = aurora_predicted
-        else:
-            self.scaled_query_latencies[Engine.Aurora] = np.full(
-                (len(self.query_locations[Engine.Aurora]),), np.inf
-            )
-
-        if self.redshift_provisioning.num_nodes() > 0:
-            redshift_base = ctx.next_workload.get_predicted_analytical_latency_batch(
+            ),
+            self.aurora_provisioning,
+            ctx,
+        )
+        self.scaled_query_latencies[Engine.Redshift] = scale_redshift_predicted_latency(
+            ctx.next_workload.get_predicted_analytical_latency_batch(
                 self.query_locations[Engine.Redshift], Engine.Redshift
-            )
-            redshift_predicted = (
-                redshift_base
-                * ctx.planner_config.redshift_gamma()
-                * ctx.planner_config.redshift_alpha()
-                * _REDSHIFT_BASE_RESOURCE_VALUE
-                / redshift_resource_value(self.redshift_provisioning)
-            ) + (redshift_base * (1.0 - ctx.planner_config.redshift_gamma()))
-            self.scaled_query_latencies[Engine.Redshift] = redshift_predicted
-        else:
-            self.scaled_query_latencies[Engine.Redshift] = np.full(
-                (len(self.query_locations[Engine.Redshift]),), np.inf
-            )
-
+            ),
+            self.redshift_provisioning,
+            ctx,
+        )
         self.scaled_query_latencies[
             Engine.Athena
         ] = ctx.next_workload.get_predicted_analytical_latency_batch(
             self.query_locations[Engine.Athena], Engine.Athena
         )
+
+        # Account for load.
+        if (
+            ctx.current_blueprint.aurora_provisioning().num_nodes() > 0
+            and self.aurora_provisioning.num_nodes() > 0
+        ):
+            self._aurora_load_factor = compute_existing_aurora_load_factor(
+                ctx.metrics.aurora_cpu_avg,
+                ctx.current_blueprint.aurora_provisioning(),
+                self.aurora_provisioning,
+                self.scaled_query_latencies[Engine.Aurora].sum(),
+                ctx,
+            )
+            self.scaled_query_latencies[Engine.Aurora] *= self._aurora_load_factor
+
+        if (
+            ctx.current_blueprint.redshift_provisioning().num_nodes() > 0
+            and self.redshift_provisioning.num_nodes() > 0
+        ):
+            self._redshift_load_factor = compute_existing_redshift_load_factor(
+                ctx.metrics.redshift_cpu_avg,
+                ctx.current_blueprint.redshift_provisioning(),
+                self.redshift_provisioning,
+                self.scaled_query_latencies[Engine.Redshift].sum(),
+                ctx,
+            )
+            self.scaled_query_latencies[Engine.Redshift] *= self._redshift_load_factor
 
     def is_better_than(self, other: "BlueprintCandidate") -> bool:
         return self._comparator(self, other)

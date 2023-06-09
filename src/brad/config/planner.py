@@ -82,3 +82,23 @@ class PlannerConfig:
 
     def redshift_gamma(self) -> float:
         return float(self._raw["redshift_gamma"])
+
+    # Redshift load scaling
+    def redshift_load_resource_alpha(self) -> float:
+        return float(self._raw["redshift_load_factor"]["resource_alpha"])
+
+    def redshift_load_cpu_to_load_alpha(self) -> float:
+        return float(self._raw["redshift_load_factor"]["cpu_to_load_alpha"])
+
+    def redshift_load_min_scaling_cpu(self) -> float:
+        return float(self._raw["redshift_load_factor"]["min_scaling_cpu"])
+
+    # Aurora load scaling
+    def aurora_load_resource_alpha(self) -> float:
+        return float(self._raw["aurora_load_factor"]["resource_alpha"])
+
+    def aurora_load_cpu_to_load_alpha(self) -> float:
+        return float(self._raw["aurora_load_factor"]["cpu_to_load_alpha"])
+
+    def aurora_load_min_scaling_cpu(self) -> float:
+        return float(self._raw["aurora_load_factor"]["min_scaling_cpu"])
