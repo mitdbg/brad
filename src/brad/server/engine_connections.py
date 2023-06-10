@@ -54,7 +54,9 @@ class EngineConnections:
                 dsn=config.get_odbc_connection_string(
                     Engine.Aurora,
                     schema_name,
-                    (read_only, conn_info.get(Engine.Aurora)),
+                    (read_only, conn_info.get(Engine.Aurora))
+                    if conn_info != {}
+                    else None,
                 ),
                 autocommit=autocommit,
             )
