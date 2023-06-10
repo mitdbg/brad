@@ -1,4 +1,4 @@
-s3_bucket: <your bucket>
+s3_bucket: geoffxy-research
 s3_bucket_region: us-east-1
 schema_name: tpch
 
@@ -39,13 +39,13 @@ tables:
     redshift_options: DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
 
-- table_name: nation
+  - table_name: nation
     s3_path: tpch/sf010/nation/nation.tbl
     aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
     redshift_options: DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
 
-- table_name: region
+  - table_name: region
     s3_path: tpch/sf010/region/region.tbl
     aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
     redshift_options: DELIMITER '|' BLANKSASNULL

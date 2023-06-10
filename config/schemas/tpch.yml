@@ -5,171 +5,171 @@ tables:
   - table_name: part
     columns:
       - name: p_partkey
-        type: INTEGER
+        data_type: INT
         primary_key: true
       - name: p_name
-        type: VARCHAR(55)
+        data_type: TEXT
       - name: p_mfgr
-        type: CHAR(25)
+        data_type: TEXT
       - name: p_brand
-        type: CHAR(10)
+        data_type: TEXT
       - name: p_type
-        type: VARCHAR(25)
+        data_type: TEXT
       - name: p_size
-        type: INTEGER
+        data_type: INT
       - name: p_container
-        type: CHAR(10)
+        data_type: TEXT
       - name: p_retailprice
-        type: DECIMAL
+        data_type: DECIMAL(10)
       - name: p_comment
-        type: VARCHAR(23)
+        data_type: TEXT
       - name: p_extra
-        type: CHAR(1)
+        data_type: TEXT
 
   - table_name: supplier
     columns:
       - name: s_suppkey
-        type: INTEGER
+        data_type: INT
         primary_key: true
       - name: s_name
-        type: CHAR(25)
+        data_type: TEXT
       - name: s_address
-        type: VARCHAR(40)
+        data_type: TEXT
       - name: s_nationkey
-        type: BIGINT
+        data_type: BIGINT
       - name: s_phone
-        type: CHAR(15)
+        data_type: TEXT
       - name: s_acctbal
-        type: DECIMAL
+        data_type: DECIMAL(10)
       - name: s_comment
-        type: VARCHAR(101)
+        data_type: TEXT
       - name: s_extra
-        type: CHAR(1)
+        data_type: TEXT
 
   - table_name: partsupp
     columns:
       - name: ps_partkey
-        type: BIGINT
+        data_type: BIGINT
         primary_key: true
       - name: ps_suppkey
-        type: BIGINT
+        data_type: BIGINT
         primary_key: true
       - name: ps_availqty
-        type: INTEGER
+        data_type: INT
       - name: ps_supplycost
-        type: DECIMAL
+        data_type: DECIMAL(10)
       - name: ps_comment
-        type: VARCHAR(199)
+        data_type: TEXT
       - name: ps_extra
-        type: CHAR(1)
+        data_type: TEXT
 
   - table_name: customer
     columns:
       - name: c_custkey
-        type: INTEGER
+        data_type: INT
         primary_key: true
       - name: c_name
-        type: VARCHAR(25)
+        data_type: TEXT
       - name: c_address
-        type: VARCHAR(40)
+        data_type: TEXT
       - name: c_nationkey
-        type: BIGINT
+        data_type: BIGINT
       - name: c_phone
-        type: CHAR(15)
+        data_type: TEXT
       - name: c_acctbal
-        type: DECIMAL
+        data_type: DECIMAL(10)
       - name: c_mktsegment
-        type: CHAR(10)
+        data_type: TEXT
       - name: c_comment
-        type: VARCHAR(117)
+        data_type: TEXT
       - name: c_extra
-        type: CHAR(1)
+        data_type: TEXT
 
   - table_name: orders
     columns:
       - name: o_orderkey
-        type: INTEGER
+        data_type: INT
         primary_key: true
       - name: o_custkey
-        type: BIGINT
+        data_type: BIGINT
       - name: o_orderstatus
-        type: CHAR(1)
+        data_type: TEXT
       - name: o_totalprice
-        type: DECIMAL
+        data_type: DECIMAL(10)
       - name: o_orderdate
-        type: DATE
+        data_type: DATE
       - name: o_orderpriority
-        type: CHAR(15)
+        data_type: TEXT
       - name: o_clerk
-        type: CHAR(15)
+        data_type: TEXT
       - name: o_shippriority
-        type: INTEGER
+        data_type: INT
       - name: o_comment
-        type: VARCHAR(79)
+        data_type: TEXT
       - name: o_extra
-        type: CHAR(1)
+        data_type: TEXT
 
   - table_name: lineitem
     columns:
       - name: l_orderkey
-        type: BIGINT
+        data_type: BIGINT
         primary_key: true
       - name: l_partkey
-        type: BIGINT
+        data_type: BIGINT
       - name: l_suppkey
-        type: BIGINT
+        data_type: BIGINT
       - name: l_linenumber
-        type: INTEGER
+        data_type: INT
         primary_key: true
       - name: l_quantity
-        type: DECIMAL
+        data_type: DECIMAL(10)
       - name: l_extendedprice
-        type:	DECIMAL
+        data_type: DECIMAL(10)
       - name: l_discount
-        type: DECIMAL
+        data_type: DECIMAL(10)
       - name: l_tax
-        type: DECIMAL
+        data_type: DECIMAL(10)
       - name: l_returnflag
-        type: CHAR(1)
+        data_type: TEXT
       - name: l_linestatus
-        type: CHAR(1)
+        data_type: TEXT
       - name: l_shipdate
-        type: DATE
+        data_type: DATE
       - name: l_commitdate
-        type: DATE
+        data_type: DATE
       - name: l_receiptdate
-        type: DATE
+        data_type: DATE
       - name: l_shipinstruct
-      	type: CHAR(25)
+        data_type: TEXT
       - name: l_shipmode
-        type: CHAR(10)
+        data_type: TEXT
       - name: l_comment
-        type: VARCHAR(44)
+        data_type: TEXT
       - name: l_extra
-        type: CHAR(1)
+        data_type: TEXT
 
   - table_name: nation
     columns:
       - name: n_nationkey
-        type: INTEGER
+        data_type: INT
         primary_key: true
       - name: n_name
-        type: CHAR(25)
+        data_type: TEXT
       - name: n_regionkey
-        type: BIGINT
+        data_type: BIGINT
       - name: n_comment
-        type: VARCHAR(152)
+        data_type: TEXT
       - name: n_extra
-        type: CHAR(1)
+        data_type: TEXT
 
   - table_name: region
     columns:
       - name: r_regionkey
-        type: INTEGER
+        data_type: INT
         primary_key: true
       - name: r_name
-        type: CHAR(25)
+        data_type: TEXT
       - name: r_comment
-        type: VARCHAR(152)
+        data_type: TEXT
       - name: r_extra
-        type: CHAR(1)
+        data_type: TEXT
