@@ -1,0 +1,52 @@
+s3_bucket: <your bucket>
+s3_bucket_region: us-east-1
+schema_name: tpch
+
+tables:
+  - table_name: part
+    s3_path: tpch/sf010/part/part.tbl
+    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: DELIMITER '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+
+  - table_name: supplier
+    s3_path: tpch/sf010/supplier/supplier.tbl
+    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: DELIMITER '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+
+  - table_name: partsupp
+    s3_path: tpch/sf010/partsupp/partsupp.tbl
+    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: DELIMITER '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+
+  - table_name: customer
+    s3_path: tpch/sf010/customer/customer.tbl
+    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: DELIMITER '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+
+  - table_name: orders
+    s3_path: tpch/sf010/orders/orders.tbl
+    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: DELIMITER '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+
+  - table_name: lineitem
+    s3_path: tpch/sf010/lineitem/lineitem.tbl
+    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: DELIMITER '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+
+- table_name: nation
+    s3_path: tpch/sf010/nation/nation.tbl
+    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: DELIMITER '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+
+- table_name: region
+    s3_path: tpch/sf010/region/region.tbl
+    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: DELIMITER '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
