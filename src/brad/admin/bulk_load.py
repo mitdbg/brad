@@ -3,7 +3,7 @@ import logging
 import yaml
 from concurrent.futures import ThreadPoolExecutor
 from collections import namedtuple
-from typing import Any, Coroutine, Iterator, List
+from typing import Any, Coroutine, Iterator, List, Set
 
 from brad.blueprint import Blueprint
 from brad.blueprint.sql_gen.table import (
@@ -73,6 +73,12 @@ def register_admin_action(subparser) -> None:
         help="If set, this tool will load the tables one-by-one.",
     )
     parser.add_argument(
+        "--only-engines",
+        type=str,
+        nargs="+",
+        help="Use this flag to run bulk loads against a subset of the engines.",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Bulk load is normally only allowed when the table(s) are all empty. "
@@ -82,7 +88,10 @@ def register_admin_action(subparser) -> None:
 
 
 async def _ensure_empty(
-    manifest, blueprint: Blueprint, engines: EngineConnections
+    manifest,
+    blueprint: Blueprint,
+    engines: EngineConnections,
+    engines_filter: Set[Engine],
 ) -> None:
     """
     Verifies that the tables being loaded into are empty.
@@ -94,6 +103,9 @@ async def _ensure_empty(
             table_locations = blueprint.get_table_locations(table_name)
 
             for engine in table_locations:
+                if engine not in engines_filter:
+                    continue
+
                 conn = engines.get_connection(engine)
                 cursor = await conn.cursor()
                 await cursor.execute("SELECT COUNT(*) FROM {}".format(table_name))
@@ -107,8 +119,10 @@ async def _ensure_empty(
                     logger.error(message)
                     raise RuntimeError(message)
     finally:
-        await engines.get_connection(Engine.Aurora).rollback()
-        await engines.get_connection(Engine.Redshift).rollback()
+        if Engine.Aurora in engines_filter:
+            await engines.get_connection(Engine.Aurora).rollback()
+        if Engine.Redshift in engines_filter:
+            await engines.get_connection(Engine.Redshift).rollback()
 
 
 async def _load_aurora(
@@ -283,12 +297,20 @@ async def bulk_load_impl(args, manifest) -> None:
     await blueprint_mgr.load()
     blueprint = blueprint_mgr.get_blueprint()
 
+    # Check for specific engines.
+    if args.only_engines is not None and len(args.only_engines) > 0:
+        engines_filter = {Engine.from_str(val) for val in args.only_engines}
+    else:
+        engines_filter = {Engine.Aurora, Engine.Athena, Engine.Redshift}
+
     try:
         running: List[asyncio.Task[Engine] | Coroutine[Any, Any, Engine]] = []
-        engines = await EngineConnections.connect(config, manifest["schema_name"])
+        engines = await EngineConnections.connect(
+            config, manifest["schema_name"], specific_engines=engines_filter
+        )
         if not args.force:
             logger.info("Verifying that all tables are empty...")
-            await _ensure_empty(manifest, blueprint, engines)
+            await _ensure_empty(manifest, blueprint, engines, engines_filter)
         else:
             logger.info("Not checking for empty tables.")
 
@@ -299,6 +321,9 @@ async def bulk_load_impl(args, manifest) -> None:
         def load_tasks_for_engine(
             engine: Engine,
         ) -> Iterator[Coroutine[Any, Any, Engine]]:
+            if engine not in engines_filter:
+                return
+
             for table_options in manifest["tables"]:
                 table_name = table_options["table_name"]
                 table_locations = blueprint.get_table_locations(table_name)
@@ -361,14 +386,17 @@ async def bulk_load_impl(args, manifest) -> None:
                     elif engine == Engine.Athena:
                         _try_add_task(athena_loads, running)
 
-        await engines.get_connection(Engine.Aurora).commit()
-        await engines.get_connection(Engine.Redshift).commit()
+        if Engine.Aurora in engines_filter:
+            await engines.get_connection(Engine.Aurora).commit()
+        if Engine.Redshift in engines_filter:
+            await engines.get_connection(Engine.Redshift).commit()
         # Athena does not support transactions.
 
         # Update the sync tables.
-        await _update_sync_progress(
-            manifest, blueprint, engines.get_connection(Engine.Aurora)
-        )
+        if Engine.Aurora in engines_filter:
+            await _update_sync_progress(
+                manifest, blueprint, engines.get_connection(Engine.Aurora)
+            )
 
     except:
         for to_cancel in running:

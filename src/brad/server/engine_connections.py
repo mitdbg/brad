@@ -1,7 +1,7 @@
 import logging
 import aioodbc
 import pyodbc
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Set
 
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
@@ -22,6 +22,7 @@ class EngineConnections:
         autocommit: bool = True,
         read_only: bool = False,
         conn_info: Optional[Dict[Engine, Any]] = None,
+        specific_engines: Optional[Set[Engine]] = None,
     ) -> "EngineConnections":
         """
         Establishes connections to the underlying engines. The connections made
@@ -34,28 +35,46 @@ class EngineConnections:
         logger.debug(
             "Establishing a new set of connections to the underlying engines..."
         )
-        logger.debug("Connecting to Athena...")
-        athena = await aioodbc.connect(
-            dsn=config.get_odbc_connection_string(
-                Engine.Athena, schema_name, conn_info.get(Engine.Athena)
-            ),
-            autocommit=autocommit,
-        )
-        logger.debug("Connecting to Aurora...")
-        aurora = await aioodbc.connect(
-            dsn=config.get_odbc_connection_string(
-                Engine.Aurora, schema_name, (read_only, conn_info.get(Engine.Aurora))
-            ),
-            autocommit=autocommit,
-        )
-        logger.debug("Connecting to Redshift...")
-        redshift = await aioodbc.connect(
-            dsn=config.get_odbc_connection_string(
-                Engine.Redshift, schema_name, conn_info.get(Engine.Redshift)
-            ),
-            autocommit=autocommit,
-        )
-        await redshift.execute("SET enable_result_cache_for_session = off")
+
+        if specific_engines is None or Engine.Athena in specific_engines:
+            logger.debug("Connecting to Athena...")
+            athena = await aioodbc.connect(
+                dsn=config.get_odbc_connection_string(
+                    Engine.Athena, schema_name, conn_info.get(Engine.Athena)
+                ),
+                autocommit=autocommit,
+            )
+        else:
+            logger.debug("Not connecting to Athena.")
+            athena = None
+
+        if specific_engines is None or Engine.Aurora in specific_engines:
+            logger.debug("Connecting to Aurora...")
+            aurora = await aioodbc.connect(
+                dsn=config.get_odbc_connection_string(
+                    Engine.Aurora,
+                    schema_name,
+                    (read_only, conn_info.get(Engine.Aurora)),
+                ),
+                autocommit=autocommit,
+            )
+        else:
+            logger.debug("Not connecting to Aurora.")
+            aurora = None
+
+        if specific_engines is None or Engine.Redshift in specific_engines:
+            logger.debug("Connecting to Redshift...")
+            redshift = await aioodbc.connect(
+                dsn=config.get_odbc_connection_string(
+                    Engine.Redshift, schema_name, conn_info.get(Engine.Redshift)
+                ),
+                autocommit=autocommit,
+            )
+            await redshift.execute("SET enable_result_cache_for_session = off")
+        else:
+            logger.debug("Not connecting to Redshift.")
+            redshift = None
+
         return cls(athena, aurora, redshift, schema_name)
 
     @classmethod
@@ -64,6 +83,7 @@ class EngineConnections:
         config: ConfigFile,
         schema_name: Optional[str] = None,
         autocommit: bool = True,
+        specific_engines: Optional[Set[Engine]] = None,
     ) -> "EngineConnections":
         """
         Synchronously establishes connections to the underlying engines. The
@@ -74,22 +94,38 @@ class EngineConnections:
         logger.debug(
             "Establishing a new set of connections to the underlying engines..."
         )
-        logger.debug("Connecting to Athena...")
-        athena = pyodbc.connect(
-            config.get_odbc_connection_string(Engine.Athena, schema_name),
-            autocommit=autocommit,
-        )
-        logger.debug("Connecting to Aurora...")
-        aurora = pyodbc.connect(
-            config.get_odbc_connection_string(Engine.Aurora, schema_name),
-            autocommit=autocommit,
-        )
-        logger.debug("Connecting to Redshift...")
-        redshift = pyodbc.connect(
-            config.get_odbc_connection_string(Engine.Redshift, schema_name),
-            autocommit=autocommit,
-        )
-        redshift.execute("SET enable_result_cache_for_session = off")
+
+        if specific_engines is None or Engine.Athena in specific_engines:
+            logger.debug("Connecting to Athena...")
+            athena = pyodbc.connect(
+                config.get_odbc_connection_string(Engine.Athena, schema_name),
+                autocommit=autocommit,
+            )
+        else:
+            logger.debug("Not connecting to Athena.")
+            athena = None
+
+        if specific_engines is None or Engine.Aurora in specific_engines:
+            logger.debug("Connecting to Aurora...")
+            aurora = pyodbc.connect(
+                config.get_odbc_connection_string(Engine.Aurora, schema_name),
+                autocommit=autocommit,
+            )
+        else:
+            logger.debug("Not connecting to Aurora.")
+            aurora = None
+
+        if specific_engines is None or Engine.Redshift in specific_engines:
+            logger.debug("Connecting to Redshift...")
+            redshift = pyodbc.connect(
+                config.get_odbc_connection_string(Engine.Redshift, schema_name),
+                autocommit=autocommit,
+            )
+            redshift.execute("SET enable_result_cache_for_session = off")
+        else:
+            logger.debug("Not connecting to Redshift.")
+            redshift = None
+
         return cls(athena, aurora, redshift, schema_name)
 
     def __init__(self, athena, aurora, redshift, schema_name: Optional[str]):
@@ -105,10 +141,13 @@ class EngineConnections:
 
     def get_connection(self, db: Engine):
         if db == Engine.Athena:
+            assert self._athena is not None
             return self._athena
         elif db == Engine.Aurora:
+            assert self._aurora is not None
             return self._aurora
         elif db == Engine.Redshift:
+            assert self._redshift is not None
             return self._redshift
         else:
             raise AssertionError("Unsupported database type: " + str(db))
@@ -117,11 +156,20 @@ class EngineConnections:
         """
         Call to close the connections when opened in async mode.
         """
-        await self._athena.close()
-        await self._aurora.close()
-        await self._redshift.close()
+        if self._athena is not None:
+            await self._athena.close()
+        if self._aurora is not None:
+            await self._aurora.close()
+        if self._redshift is not None:
+            await self._redshift.close()
 
     def close_sync(self):
-        self._athena.close()
-        self._aurora.close()
-        self._redshift.close()
+        """
+        Call to close the connections when opened in sync mode.
+        """
+        if self._athena is not None:
+            self._athena.close()
+        if self._aurora is not None:
+            self._aurora.close()
+        if self._redshift is not None:
+            self._redshift.close()
