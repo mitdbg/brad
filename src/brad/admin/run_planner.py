@@ -100,7 +100,7 @@ def parse_metrics(kv_str: str) -> Dict[str, float]:
     return metrics
 
 
-def run_planner(args):
+def run_planner(args) -> None:
     """
     This admin action is used to manually test the blueprint planner
     independently of the rest of BRAD.
