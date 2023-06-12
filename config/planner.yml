@@ -5,6 +5,8 @@ strategy: query_based_beam
 ###
 
 beam_size: 100
+max_provisioning_multiplier: 5
+max_feasible_cpu: 85
 
 
 ###
@@ -12,7 +14,6 @@ beam_size: 100
 ###
 
 max_num_table_moves: 3
-max_provisioning_multiplier: 2
 
 # Used by the "sampled_neighborhood" strategy
 sample_set_size: 100000

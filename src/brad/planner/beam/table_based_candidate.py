@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import numpy.typing as npt
 from typing import Any, Dict, List, Optional, Iterable, Tuple
@@ -503,6 +504,29 @@ class BlueprintCandidate(ComparableBlueprint):
             return
 
         self.feasibility = BlueprintFeasibility.StructurallyFeasible
+
+    def check_runtime_feasibility(self, ctx: ScoringContext) -> None:
+        if self.feasibility != BlueprintFeasibility.StructurallyFeasible:
+            # Check structural feasibility first (or the blueprint is infeasible).
+            return
+
+        if (
+            not math.isnan(self.aurora_cpu)
+            and self.aurora_cpu >= ctx.planner_config.max_feasible_cpu()
+        ):
+            self.feasibility = BlueprintFeasibility.Infeasible
+            return
+
+        if (
+            not math.isnan(self.redshift_cpu)
+            and self.redshift_cpu >= ctx.planner_config.max_feasible_cpu()
+        ):
+            self.feasibility = BlueprintFeasibility.Infeasible
+            return
+
+        # TODO: Add checks for transaction feasibility.
+
+        self.feasibility = BlueprintFeasibility.Feasible
 
     def update_aurora_provisioning(self, prov: Provisioning) -> None:
         self.aurora_provisioning.set_instance_type(prov.instance_type())

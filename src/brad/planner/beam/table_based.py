@@ -110,6 +110,10 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                 if candidate.feasibility == BlueprintFeasibility.Infeasible:
                     continue
 
+                candidate.check_runtime_feasibility(ctx)
+                if candidate.feasibility == BlueprintFeasibility.Infeasible:
+                    continue
+
                 candidate.recompute_provisioning_dependent_scoring(ctx)
                 current_top_k.append(candidate)
 
@@ -174,6 +178,12 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                             continue
 
                         next_candidate.recompute_provisioning_dependent_scoring(ctx)
+                        next_candidate.check_runtime_feasibility(ctx)
+                        if (
+                            next_candidate.feasibility
+                            == BlueprintFeasibility.Infeasible
+                        ):
+                            continue
 
                         if len(next_top_k) < beam_size:
                             next_top_k.append(next_candidate)
@@ -252,6 +262,9 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                         if new_candidate.feasibility == BlueprintFeasibility.Infeasible:
                             continue
                         new_candidate.recompute_provisioning_dependent_scoring(ctx)
+                        new_candidate.check_runtime_feasibility(ctx)
+                        if new_candidate.feasibility == BlueprintFeasibility.Infeasible:
+                            continue
 
                         if len(final_top_k) < beam_size:
                             final_top_k.append(new_candidate)
