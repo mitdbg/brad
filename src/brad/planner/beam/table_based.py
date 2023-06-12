@@ -103,7 +103,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                     engine_connections=engine_connections,
                     ctx=ctx,
                 )
-                candidate.check_feasibility()
+                candidate.check_structural_feasibility()
 
                 if candidate.feasibility == BlueprintFeasibility.Infeasible:
                     candidate.find_best_provisioning(ctx)
@@ -161,7 +161,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                             already_processed_identical = True
 
                         # Make sure this candidate is feasible (otherwise skip it).
-                        next_candidate.check_feasibility()
+                        next_candidate.check_structural_feasibility()
                         if (
                             next_candidate.feasibility
                             == BlueprintFeasibility.Infeasible
@@ -248,7 +248,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                         new_candidate = candidate.clone()
                         new_candidate.update_aurora_provisioning(aurora)
                         new_candidate.update_redshift_provisioning(redshift)
-                        new_candidate.check_feasibility()
+                        new_candidate.check_structural_feasibility()
                         if new_candidate.feasibility == BlueprintFeasibility.Infeasible:
                             continue
                         new_candidate.recompute_provisioning_dependent_scoring(ctx)

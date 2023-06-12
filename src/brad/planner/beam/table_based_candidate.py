@@ -433,7 +433,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
             for redshift in redshift_it:
                 working_candidate.update_redshift_provisioning(redshift)
-                working_candidate.check_feasibility()
+                working_candidate.check_structural_feasibility()
                 if working_candidate.feasibility == BlueprintFeasibility.Infeasible:
                     continue
 
@@ -462,7 +462,7 @@ class BlueprintCandidate(ComparableBlueprint):
         self.feasibility = current_best.feasibility
         self.explored_provisionings = True
 
-    def check_feasibility(self) -> None:
+    def check_structural_feasibility(self) -> None:
         # This method checks structural feasibility only (not user-definied
         # feasibility (e.g., it does not check for all analytical queries
         # running under X seconds)).
@@ -502,7 +502,7 @@ class BlueprintCandidate(ComparableBlueprint):
             self.feasibility = BlueprintFeasibility.Infeasible
             return
 
-        self.feasibility = BlueprintFeasibility.Feasible
+        self.feasibility = BlueprintFeasibility.StructurallyFeasible
 
     def update_aurora_provisioning(self, prov: Provisioning) -> None:
         self.aurora_provisioning.set_instance_type(prov.instance_type())
