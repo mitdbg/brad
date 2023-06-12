@@ -65,6 +65,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     self._current_blueprint, table_sizer
                 )
                 next_workload.set_dataset_size_from_table_sizes()
+            else:
+                logger.debug("Skipping table sizing because sizes are already present.")
+
             ctx = ScoringContext(
                 self._current_blueprint,
                 self._current_workload,

@@ -4,6 +4,7 @@ from pathlib import Path
 from itertools import combinations
 import boto3
 import re
+import pickle
 import numpy as np
 import numpy.typing as npt
 
@@ -106,6 +107,11 @@ class Workload:
 
         return cls(analytical_queries, txn_queries, sampling_prob, 0)
 
+    @classmethod
+    def from_pickle(cls, file_path: str | Path) -> "Workload":
+        with open(file_path, "rb") as in_file:
+            return pickle.load(in_file)
+
     def __init__(
         self,
         analytical_queries: List[Query],
@@ -126,6 +132,10 @@ class Workload:
         # Shape: (N x 3) where `N` is the number of queries and 3 represents our
         # three engines (Aurora, Redshift, Athena) in that order.
         self._predicted_analytical_latencies: Optional[npt.NDArray] = None
+
+    def serialize_for_debugging(self, output_path: str | Path) -> None:
+        with open(output_path, "wb") as out_file:
+            pickle.dump(self, out_file)
 
     def analytical_queries(self) -> List[Query]:
         return self._analytical_queries

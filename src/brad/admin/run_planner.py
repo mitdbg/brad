@@ -48,6 +48,11 @@ def register_admin_action(subparser) -> None:
         help="Path to the workload to load for planning purposes.",
     )
     parser.add_argument(
+        "--load-pickle",
+        action="store_true",
+        help="If set, load the workload from a pickled file.",
+    )
+    parser.add_argument(
         "--predictions-dir",
         type=str,
         required=True,
@@ -74,6 +79,11 @@ def register_admin_action(subparser) -> None:
         "--use-fixed-metrics",
         type=str,
         help="If set, use comma-separated hardcoded metrics of the form 'metric_name=value'.",
+    )
+    parser.add_argument(
+        "--save-pickle",
+        action="store_true",
+        help="If set, serialize the decorated workload.",
     )
     parser.set_defaults(admin_action=run_planner)
 
@@ -106,7 +116,12 @@ def run_planner(args):
     logger.info("%s", blueprint_mgr.get_blueprint())
 
     # 4. Load the workload.
-    workload = Workload.from_extracted_logs(args.workload_dir)
+    if args.load_pickle:
+        workload = Workload.from_pickle(
+            pathlib.Path(args.workload_dir) / _PICKLE_FILE_NAME
+        )
+    else:
+        workload = Workload.from_extracted_logs(args.workload_dir)
 
     # 5. Load the pre-computed predictions.
     prediction_dir = pathlib.Path(args.predictions_dir)
@@ -156,3 +171,11 @@ def run_planner(args):
     event_loop.set_debug(enabled=args.debug)
     asyncio.set_event_loop(event_loop)
     asyncio.run(planner.run_replan())
+
+    if args.save_pickle:
+        workload.serialize_for_debugging(
+            pathlib.Path(args.workload_dir) / _PICKLE_FILE_NAME
+        )
+
+
+_PICKLE_FILE_NAME = "workload.pickle"
