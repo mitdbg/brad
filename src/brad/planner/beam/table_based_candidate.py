@@ -116,7 +116,7 @@ class BlueprintCandidate(ComparableBlueprint):
         )
 
     def to_debug_values(self) -> Dict[str, int | float | str]:
-        values: Dict[str, int | float | str] = {}
+        values: Dict[str, int | float | str] = self._memoized.copy()
 
         # Provisioning.
         values["aurora_instance"] = self.aurora_provisioning.instance_type()
