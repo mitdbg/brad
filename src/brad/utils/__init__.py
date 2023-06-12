@@ -11,3 +11,11 @@ def set_up_logging(filename=None, debug_mode=False):
         # Logs will be written to a file.
         logging_kwargs["filename"] = filename
     logging.basicConfig(**logging_kwargs)
+
+    # boto3 logging is too verbose - it interferes with our debug messages. This
+    # snippet disables debug logging on boto3 related modules.
+    logging.getLogger("boto3").setLevel(logging.INFO)
+    logging.getLogger("botocore").setLevel(logging.INFO)
+    logging.getLogger("nose").setLevel(logging.INFO)
+    logging.getLogger("s3transfer").setLevel(logging.INFO)
+    logging.getLogger("urllib3").setLevel(logging.INFO)
