@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 
 class RuleBasedParams(object):
-    def __init__(self):
+    def __init__(self) -> None:
         # Ideal location threshold
-        ideal_location_upper_limit: MutableMapping[str, Optional[float]] = dict()
+        ideal_location_upper_limit: MutableMapping[str, float] = dict()
         ideal_location_upper_limit["aurora_num_table"] = 6
         ideal_location_upper_limit["aurora_table_size_max"] = 5e7
         ideal_location_upper_limit["aurora_table_size_sum"] = 2e8
@@ -29,7 +29,7 @@ class RuleBasedParams(object):
         ideal_location_upper_limit["redshift_table_size_max"] = 5e9
         ideal_location_upper_limit["redshift_table_size_sum"] = 2e11
         self.ideal_location_upper_limit = ideal_location_upper_limit
-        ideal_location_lower_limit: MutableMapping[str, Optional[float]] = dict()
+        ideal_location_lower_limit: MutableMapping[str, float] = dict()
         ideal_location_lower_limit["redshift_num_table"] = 3.0
         self.ideal_location_lower_limit = ideal_location_lower_limit
 

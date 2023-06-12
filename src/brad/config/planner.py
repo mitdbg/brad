@@ -102,3 +102,6 @@ class PlannerConfig:
 
     def aurora_load_min_scaling_cpu(self) -> float:
         return float(self._raw["aurora_load_factor"]["min_scaling_cpu"])
+
+    def max_feasible_cpu(self) -> float:
+        return float(self._raw["max_feasible_cpu"])

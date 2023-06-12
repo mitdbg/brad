@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import numpy.typing as npt
 from typing import Any, Dict, List, Optional
@@ -13,6 +14,10 @@ from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.performance.load_factor import (
     compute_existing_aurora_load_factor,
     compute_existing_redshift_load_factor,
+)
+from brad.planner.scoring.performance.cpu import (
+    compute_next_aurora_cpu,
+    compute_next_redshift_cpu,
 )
 from brad.planner.scoring.performance.provisioning_scaling import (
     scale_aurora_predicted_latency,
@@ -96,6 +101,8 @@ class BlueprintCandidate(ComparableBlueprint):
         self.explored_provisionings = False
         self.feasibility = BlueprintFeasibility.Unchecked
         self.scaled_query_latencies: Dict[Engine, npt.NDArray] = {}
+        self.aurora_cpu = np.nan
+        self.redshift_cpu = np.nan
 
         # Used during comparisons.
         self._memoized: Dict[str, Any] = {}
@@ -116,7 +123,7 @@ class BlueprintCandidate(ComparableBlueprint):
         )
 
     def to_debug_values(self) -> Dict[str, int | float | str]:
-        values: Dict[str, int | float | str] = {}
+        values: Dict[str, int | float | str] = self._memoized.copy()
 
         # Provisioning.
         values["aurora_instance"] = self.aurora_provisioning.instance_type()
@@ -140,6 +147,9 @@ class BlueprintCandidate(ComparableBlueprint):
         values["table_movement_trans_cost"] = self.table_movement_trans_cost
         values["table_movement_trans_time_s"] = self.table_movement_trans_time_s
         values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
+
+        values["aurora_cpu"] = self.aurora_cpu
+        values["redshift_cpu"] = self.redshift_cpu
 
         values["aurora_load_factor"] = self._aurora_load_factor
         values["redshift_load_factor"] = self._redshift_load_factor
@@ -281,11 +291,16 @@ class BlueprintCandidate(ComparableBlueprint):
             ctx.current_blueprint.aurora_provisioning().num_nodes() > 0
             and self.aurora_provisioning.num_nodes() > 0
         ):
-            self._aurora_load_factor = compute_existing_aurora_load_factor(
+            self.aurora_cpu = compute_next_aurora_cpu(
                 ctx.metrics.aurora_cpu_avg,
                 ctx.current_blueprint.aurora_provisioning(),
                 self.aurora_provisioning,
                 self.scaled_query_latencies[Engine.Aurora].sum(),
+                ctx,
+            )
+            self._aurora_load_factor = compute_existing_aurora_load_factor(
+                ctx.metrics.aurora_cpu_avg,
+                self.aurora_cpu,
                 ctx,
             )
             self.scaled_query_latencies[Engine.Aurora] *= self._aurora_load_factor
@@ -294,11 +309,16 @@ class BlueprintCandidate(ComparableBlueprint):
             ctx.current_blueprint.redshift_provisioning().num_nodes() > 0
             and self.redshift_provisioning.num_nodes() > 0
         ):
-            self._redshift_load_factor = compute_existing_redshift_load_factor(
+            self.redshift_cpu = compute_next_redshift_cpu(
                 ctx.metrics.redshift_cpu_avg,
                 ctx.current_blueprint.redshift_provisioning(),
                 self.redshift_provisioning,
                 self.scaled_query_latencies[Engine.Redshift].sum(),
+                ctx,
+            )
+            self._redshift_load_factor = compute_existing_redshift_load_factor(
+                ctx.metrics.redshift_cpu_avg,
+                self.redshift_cpu,
                 ctx,
             )
             self.scaled_query_latencies[Engine.Redshift] *= self._redshift_load_factor
@@ -345,7 +365,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
             for redshift in redshift_it:
                 working_candidate.update_redshift_provisioning(redshift)
-                working_candidate.check_feasibility()
+                working_candidate.check_structural_feasibility()
                 if working_candidate.feasibility == BlueprintFeasibility.Infeasible:
                     continue
 
@@ -374,7 +394,7 @@ class BlueprintCandidate(ComparableBlueprint):
         self.feasibility = current_best.feasibility
         self.explored_provisionings = True
 
-    def check_feasibility(self) -> None:
+    def check_structural_feasibility(self) -> None:
         # This method checks structural feasibility only (not user-definied
         # feasibility (e.g., it does not check for all analytical queries
         # running under X seconds)).
@@ -413,6 +433,29 @@ class BlueprintCandidate(ComparableBlueprint):
         ) and self.redshift_provisioning.num_nodes() == 0:
             self.feasibility = BlueprintFeasibility.Infeasible
             return
+
+        self.feasibility = BlueprintFeasibility.StructurallyFeasible
+
+    def check_runtime_feasibility(self, ctx: ScoringContext) -> None:
+        if self.feasibility != BlueprintFeasibility.StructurallyFeasible:
+            # Check structural feasibility first (or the blueprint is infeasible).
+            return
+
+        if (
+            not math.isnan(self.aurora_cpu)
+            and self.aurora_cpu >= ctx.planner_config.max_feasible_cpu()
+        ):
+            self.feasibility = BlueprintFeasibility.Infeasible
+            return
+
+        if (
+            not math.isnan(self.redshift_cpu)
+            and self.redshift_cpu >= ctx.planner_config.max_feasible_cpu()
+        ):
+            self.feasibility = BlueprintFeasibility.Infeasible
+            return
+
+        # TODO: Add checks for transaction feasibility.
 
         self.feasibility = BlueprintFeasibility.Feasible
 

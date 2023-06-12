@@ -115,7 +115,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     ),
                     ctx,
                 )
-                candidate.check_feasibility()
+                candidate.check_structural_feasibility()
 
                 if candidate.feasibility == BlueprintFeasibility.Infeasible:
                     candidate.find_best_provisioning(ctx)
@@ -123,6 +123,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     continue
 
                 candidate.recompute_provisioning_dependent_scoring(ctx)
+                candidate.check_runtime_feasibility(ctx)
+                if candidate.feasibility == BlueprintFeasibility.Infeasible:
+                    continue
+
                 current_top_k.append(candidate)
 
             if len(current_top_k) == 0:
@@ -162,7 +166,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                         )
 
                         # Make sure this candidate is feasible (otherwise skip it).
-                        next_candidate.check_feasibility()
+                        next_candidate.check_structural_feasibility()
                         if (
                             next_candidate.feasibility
                             == BlueprintFeasibility.Infeasible
@@ -175,6 +179,12 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                             continue
 
                         next_candidate.recompute_provisioning_dependent_scoring(ctx)
+                        next_candidate.check_runtime_feasibility(ctx)
+                        if (
+                            next_candidate.feasibility
+                            == BlueprintFeasibility.Infeasible
+                        ):
+                            continue
 
                         if len(next_top_k) < beam_size:
                             next_top_k.append(next_candidate)
@@ -249,10 +259,14 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                         new_candidate = candidate.clone()
                         new_candidate.update_aurora_provisioning(aurora)
                         new_candidate.update_redshift_provisioning(redshift)
-                        new_candidate.check_feasibility()
+                        new_candidate.check_structural_feasibility()
                         if new_candidate.feasibility == BlueprintFeasibility.Infeasible:
                             continue
+
                         new_candidate.recompute_provisioning_dependent_scoring(ctx)
+                        new_candidate.check_runtime_feasibility(ctx)
+                        if new_candidate.feasibility == BlueprintFeasibility.Infeasible:
+                            continue
 
                         if len(final_top_k) < beam_size:
                             final_top_k.append(new_candidate)
