@@ -14,6 +14,10 @@ from brad.planner.scoring.performance.load_factor import (
     compute_existing_aurora_load_factor,
     compute_existing_redshift_load_factor,
 )
+from brad.planner.scoring.performance.cpu import (
+    compute_next_aurora_cpu,
+    compute_next_redshift_cpu,
+)
 from brad.planner.scoring.performance.provisioning_scaling import (
     scale_aurora_predicted_latency,
     scale_redshift_predicted_latency,
@@ -99,6 +103,8 @@ class BlueprintCandidate(ComparableBlueprint):
 
         # Used during comparisons.
         self._memoized: Dict[str, Any] = {}
+        self.aurora_cpu = np.nan
+        self.redshift_cpu = np.nan
 
         # Used for debug purposes.
         self._aurora_load_factor = np.nan
@@ -140,6 +146,9 @@ class BlueprintCandidate(ComparableBlueprint):
         values["table_movement_trans_cost"] = self.table_movement_trans_cost
         values["table_movement_trans_time_s"] = self.table_movement_trans_time_s
         values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
+
+        values["aurora_cpu"] = self.aurora_cpu
+        values["redshift_cpu"] = self.redshift_cpu
 
         values["aurora_load_factor"] = self._aurora_load_factor
         values["redshift_load_factor"] = self._redshift_load_factor
@@ -350,11 +359,16 @@ class BlueprintCandidate(ComparableBlueprint):
             ctx.current_blueprint.aurora_provisioning().num_nodes() > 0
             and self.aurora_provisioning.num_nodes() > 0
         ):
-            self._aurora_load_factor = compute_existing_aurora_load_factor(
+            self.aurora_cpu = compute_next_aurora_cpu(
                 ctx.metrics.aurora_cpu_avg,
                 ctx.current_blueprint.aurora_provisioning(),
                 self.aurora_provisioning,
                 self.scaled_query_latencies[Engine.Aurora].sum(),
+                ctx,
+            )
+            self._aurora_load_factor = compute_existing_aurora_load_factor(
+                ctx.metrics.aurora_cpu_avg,
+                self.aurora_cpu,
                 ctx,
             )
             self.scaled_query_latencies[Engine.Aurora] *= self._aurora_load_factor
@@ -363,11 +377,16 @@ class BlueprintCandidate(ComparableBlueprint):
             ctx.current_blueprint.redshift_provisioning().num_nodes() > 0
             and self.redshift_provisioning.num_nodes() > 0
         ):
-            self._redshift_load_factor = compute_existing_redshift_load_factor(
+            self.redshift_cpu = compute_next_redshift_cpu(
                 ctx.metrics.redshift_cpu_avg,
                 ctx.current_blueprint.redshift_provisioning(),
                 self.redshift_provisioning,
                 self.scaled_query_latencies[Engine.Redshift].sum(),
+                ctx,
+            )
+            self._redshift_load_factor = compute_existing_redshift_load_factor(
+                ctx.metrics.redshift_cpu_avg,
+                self.redshift_cpu,
                 ctx,
             )
             self.scaled_query_latencies[Engine.Redshift] *= self._redshift_load_factor
