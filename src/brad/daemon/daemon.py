@@ -10,6 +10,7 @@ from brad.daemon.messages import ShutdownDaemon, NewBlueprint, ReceivedQuery
 from brad.daemon.monitor import Monitor
 from brad.planner.compare.cost import best_cost_under_geomean_latency
 from brad.planner.factory import BlueprintPlannerFactory
+from brad.planner.metrics import MetricsFromMonitor
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 from brad.planner.workload.provider import WorkloadProvider
 from brad.planner.workload import Workload
@@ -62,6 +63,7 @@ class BradDaemon:
             analytics_latency_scorer=_NoopAnalyticsScorer(),
             # TODO: Make this configurable.
             comparator=best_cost_under_geomean_latency(geomean_latency_ceiling_s=10),
+            metrics_provider=MetricsFromMonitor(self._monitor, forecasted=True),
         )
 
     async def run_forever(self) -> None:

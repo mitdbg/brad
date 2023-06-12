@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import pathlib
+from typing import Dict
 
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
@@ -10,6 +11,12 @@ from brad.planner.compare.cost import best_cost_under_geomean_latency
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.scoring.performance.precomputed_predictions import (
     PrecomputedPredictions,
+)
+from brad.planner.metrics import (
+    MetricsFromMonitor,
+    FixedMetricsProvider,
+    Metrics,
+    MetricsProvider,
 )
 from brad.planner.workload import Workload
 from brad.planner.workload.provider import FixedWorkloadProvider
@@ -63,7 +70,22 @@ def register_admin_action(subparser) -> None:
         default=10.0,
         help="The geomean latency ceiling to use for blueprint planning.",
     )
+    parser.add_argument(
+        "--use-fixed-metrics",
+        type=str,
+        help="If set, use comma-separated hardcoded metrics of the form 'metric_name=value'.",
+    )
     parser.set_defaults(admin_action=run_planner)
+
+
+def parse_metrics(kv_str: str) -> Dict[str, float]:
+    # `kv_str` contains comma-separated values of the form `metric_name=value`.
+    pairs = kv_str.split(",")
+    metrics = {}
+    for p in pairs:
+        kv = p.split("=")
+        metrics[kv[0]] = float(kv[1])
+    return metrics
 
 
 def run_planner(args):
@@ -97,6 +119,13 @@ def run_planner(args):
 
     # 6. Start the planner.
     monitor = Monitor.from_config_file(config)
+    if args.use_fixed_metrics is not None:
+        metrics_provider: MetricsProvider = FixedMetricsProvider(
+            Metrics(**parse_metrics(args.use_fixed_metrics))
+        )
+    else:
+        metrics_provider = MetricsFromMonitor(monitor, forecasted=True)
+
     planner = BlueprintPlannerFactory.create(
         current_blueprint=blueprint_mgr.get_blueprint(),
         current_workload=workload,
@@ -112,6 +141,7 @@ def run_planner(args):
         comparator=best_cost_under_geomean_latency(
             geomean_latency_ceiling_s=args.latency_ceiling_s
         ),
+        metrics_provider=metrics_provider,
     )
     monitor.force_read_metrics()
 

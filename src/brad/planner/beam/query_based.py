@@ -10,7 +10,6 @@ from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.query_based_candidate import BlueprintCandidate
 from brad.planner.debug_logger import BlueprintPlanningDebugLogger
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
-from brad.planner.metrics import fetch_metrics
 from brad.planner.scoring.context import ScoringContext
 from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
@@ -70,7 +69,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 self._current_blueprint,
                 self._current_workload,
                 next_workload,
-                fetch_metrics(self._monitor),
+                self._metrics_provider.get_metrics(),
                 self._planner_config,
             )
             ctx.simulate_current_workload_routing(
