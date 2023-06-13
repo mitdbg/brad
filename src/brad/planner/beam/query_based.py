@@ -11,9 +11,11 @@ from brad.planner.beam.query_based_candidate import BlueprintCandidate
 from brad.planner.debug_logger import BlueprintPlanningDebugLogger
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
+from brad.planner.scoring.table_placement import compute_single_athena_table_cost
 from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
+
 
 logger = logging.getLogger(__name__)
 
@@ -115,15 +117,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     ),
                     ctx,
                 )
-                candidate.check_structural_feasibility()
-
-                if candidate.feasibility == BlueprintFeasibility.Infeasible:
-                    candidate.find_best_provisioning(ctx)
-                if candidate.feasibility == BlueprintFeasibility.Infeasible:
-                    continue
-
-                candidate.recompute_provisioning_dependent_scoring(ctx)
-                candidate.check_runtime_feasibility(ctx)
+                candidate.try_to_make_feasible_if_needed(ctx)
                 if candidate.feasibility == BlueprintFeasibility.Infeasible:
                     continue
 
@@ -164,28 +158,14 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                             ),
                             ctx,
                         )
-
-                        # Make sure this candidate is feasible (otherwise skip it).
-                        next_candidate.check_structural_feasibility()
-                        if (
-                            next_candidate.feasibility
-                            == BlueprintFeasibility.Infeasible
-                        ):
-                            next_candidate.find_best_provisioning(ctx)
                         if (
                             next_candidate.feasibility
                             == BlueprintFeasibility.Infeasible
                         ):
                             continue
 
-                        next_candidate.recompute_provisioning_dependent_scoring(ctx)
-                        next_candidate.check_runtime_feasibility(ctx)
-                        if (
-                            next_candidate.feasibility
-                            == BlueprintFeasibility.Infeasible
-                        ):
-                            continue
-
+                        # Check if this blueprint is part of the top k. If so,
+                        # add it to the next top k.
                         if len(next_top_k) < beam_size:
                             next_top_k.append(next_candidate)
                             if len(next_top_k) == beam_size:
@@ -259,12 +239,11 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                         new_candidate = candidate.clone()
                         new_candidate.update_aurora_provisioning(aurora)
                         new_candidate.update_redshift_provisioning(redshift)
-                        new_candidate.check_structural_feasibility()
-                        if new_candidate.feasibility == BlueprintFeasibility.Infeasible:
+                        if not new_candidate.is_structurally_feasible():
                             continue
 
                         new_candidate.recompute_provisioning_dependent_scoring(ctx)
-                        new_candidate.check_runtime_feasibility(ctx)
+                        new_candidate.compute_runtime_feasibility(ctx)
                         if new_candidate.feasibility == BlueprintFeasibility.Infeasible:
                             continue
 
@@ -275,8 +254,8 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                         elif new_candidate.is_better_than(final_top_k[0]):
                             heapq.heappushpop(final_top_k, new_candidate)
 
-            # Best blueprint will be ordered first (we have a negated `__lt__`
-            # method to work with `heapq` to create a max heap).
+            # The best blueprint will be ordered first (we have a negated
+            # `__lt__` method to work with `heapq` to create a max heap).
             final_top_k.sort(reverse=True)
 
             if len(final_top_k) == 0:
@@ -307,6 +286,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 best_candidate.table_placements[tbl] |= EngineBitmapValues[
                     Engine.Athena
                 ]
+                # We added the table to Athena.
+                best_candidate.storage_cost += compute_single_athena_table_cost(
+                    tbl, ctx.next_workload, ctx.planner_config
+                )
 
             # 10. Output the new blueprint.
             best_blueprint = best_candidate.to_blueprint()

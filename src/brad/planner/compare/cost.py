@@ -16,8 +16,8 @@ def best_cost_under_geomean_latency(
             and right_lat > geomean_latency_ceiling_s
         ):
             # Both are above the latency ceiling.
-            # TODO: Maybe rank by other metrics here?
-            return False
+            # So the better blueprint is the one that does better on performance.
+            return left_lat < right_lat
         elif left_lat > geomean_latency_ceiling_s:
             return False
         elif right_lat > geomean_latency_ceiling_s:
@@ -53,8 +53,8 @@ def best_cost_under_max_latency(max_latency_ceiling_s: float) -> BlueprintCompar
 
         if left_lat > max_latency_ceiling_s and right_lat > max_latency_ceiling_s:
             # Both are above the latency ceiling.
-            # TODO: Maybe rank by other metrics here?
-            return False
+            # So the better blueprint is the one that does better on performance.
+            return left_lat < right_lat
         elif left_lat > max_latency_ceiling_s:
             return False
         elif right_lat > max_latency_ceiling_s:

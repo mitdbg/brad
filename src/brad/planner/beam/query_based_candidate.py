@@ -30,8 +30,6 @@ from brad.planner.scoring.provisioning import (
     compute_athena_scan_cost,
     compute_aurora_transition_time_s,
     compute_redshift_transition_time_s,
-    aurora_resource_value,
-    redshift_resource_value,
 )
 from brad.planner.scoring.table_placement import (
     compute_single_athena_table_cost,
@@ -249,6 +247,27 @@ class BlueprintCandidate(ComparableBlueprint):
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
 
+    def try_to_make_feasible_if_needed(self, ctx: ScoringContext) -> None:
+        """
+        Checks if this blueprint is already feasible, and if so, does nothing
+        else. Otherwise, this method varies this blueprint's provisioning in the
+        neighborhood to try and make it feasible.
+
+        The idea is to avoid enumerating the provisioning if the blueprint is
+        already feasible. This method is used as an intermediate during
+        beam-based planning.
+        """
+        if not self.is_structurally_feasible():
+            self.find_best_provisioning(ctx)
+
+        else:
+            # Already structurally feasible. Make sure it is also
+            # "runtime-feasible".
+            self.recompute_provisioning_dependent_scoring(ctx)
+            self.compute_runtime_feasibility(ctx)
+            if self.feasibility == BlueprintFeasibility.Infeasible:
+                self.find_best_provisioning(ctx)
+
     def recompute_provisioning_dependent_scoring(self, ctx: ScoringContext) -> None:
         self._memoized.clear()
         aurora_prov_cost = compute_aurora_hourly_operational_cost(
@@ -332,8 +351,10 @@ class BlueprintCandidate(ComparableBlueprint):
         return not self.is_better_than(other)
 
     def find_best_provisioning(self, ctx: ScoringContext) -> None:
-        # Tries all provisioinings in the neighborhood and finds the best
-        # scoring one for the current table placement and routing.
+        """
+        Tries all provisioinings in the neighborhood and finds the best
+        scoring one for the current table placement and routing.
+        """
 
         if self.explored_provisionings:
             # Already ran before.
@@ -348,28 +369,30 @@ class BlueprintCandidate(ComparableBlueprint):
             ),
         )
 
-        redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
-        redshift_it = redshift_enumerator.enumerate_nearby(
-            ctx.current_blueprint.redshift_provisioning(),
-            redshift_enumerator.scaling_to_distance(
-                ctx.current_blueprint.redshift_provisioning(),
-                ctx.planner_config.max_provisioning_multiplier(),
-            ),
-        )
-
         working_candidate = self.clone()
         current_best = None
 
         for aurora in aurora_it:
             working_candidate.update_aurora_provisioning(aurora)
 
+            redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
+            redshift_it = redshift_enumerator.enumerate_nearby(
+                ctx.current_blueprint.redshift_provisioning(),
+                redshift_enumerator.scaling_to_distance(
+                    ctx.current_blueprint.redshift_provisioning(),
+                    ctx.planner_config.max_provisioning_multiplier(),
+                ),
+            )
+
             for redshift in redshift_it:
                 working_candidate.update_redshift_provisioning(redshift)
-                working_candidate.check_structural_feasibility()
-                if working_candidate.feasibility == BlueprintFeasibility.Infeasible:
+                if not working_candidate.is_structurally_feasible():
                     continue
 
                 working_candidate.recompute_provisioning_dependent_scoring(ctx)
+                working_candidate.compute_runtime_feasibility(ctx)
+                if working_candidate.feasibility == BlueprintFeasibility.Infeasible:
+                    continue
 
                 if current_best is None:
                     current_best = working_candidate
@@ -394,28 +417,22 @@ class BlueprintCandidate(ComparableBlueprint):
         self.feasibility = current_best.feasibility
         self.explored_provisionings = True
 
-    def check_structural_feasibility(self) -> None:
-        # This method checks structural feasibility only (not user-definied
-        # feasibility (e.g., it does not check for all analytical queries
-        # running under X seconds)).
-
-        if self.feasibility != BlueprintFeasibility.Unchecked:
-            # Already checked.
-            return
-
+    def is_structurally_feasible(self) -> bool:
+        """
+        Ensures that an engine is "on" if queries are assigned to it or if
+        tables are placed on it.
+        """
         if (
             len(self.base_query_latencies[Engine.Aurora]) > 0
             and self.aurora_provisioning.num_nodes() == 0
         ):
-            self.feasibility = BlueprintFeasibility.Infeasible
-            return
+            return False
 
         if (
             len(self.base_query_latencies[Engine.Redshift]) > 0
             and self.redshift_provisioning.num_nodes() == 0
         ):
-            self.feasibility = BlueprintFeasibility.Infeasible
-            return
+            return False
 
         # Make sure the provisioning supports the table placement.
         total_bitmap = 0
@@ -425,20 +442,20 @@ class BlueprintCandidate(ComparableBlueprint):
         if (
             (EngineBitmapValues[Engine.Aurora] & total_bitmap) != 0
         ) and self.aurora_provisioning.num_nodes() == 0:
-            self.feasibility = BlueprintFeasibility.Infeasible
-            return
+            # Aurora is turned off but we put tables on it.
+            return False
 
         if (
             (EngineBitmapValues[Engine.Redshift] & total_bitmap) != 0
         ) and self.redshift_provisioning.num_nodes() == 0:
-            self.feasibility = BlueprintFeasibility.Infeasible
-            return
+            # Redshift is turned off but we put tables on it.
+            return False
 
-        self.feasibility = BlueprintFeasibility.StructurallyFeasible
+        return True
 
-    def check_runtime_feasibility(self, ctx: ScoringContext) -> None:
-        if self.feasibility != BlueprintFeasibility.StructurallyFeasible:
-            # Check structural feasibility first (or the blueprint is infeasible).
+    def compute_runtime_feasibility(self, ctx: ScoringContext) -> None:
+        if self.feasibility != BlueprintFeasibility.Unchecked:
+            # Already ran.
             return
 
         if (
@@ -539,7 +556,3 @@ class BlueprintCandidate(ComparableBlueprint):
             return self._memoized[key]
         except KeyError:
             return None
-
-
-_AURORA_BASE_RESOURCE_VALUE = aurora_resource_value(Provisioning("db.r6i.large", 1))
-_REDSHIFT_BASE_RESOURCE_VALUE = redshift_resource_value(Provisioning("dc2.large", 1))

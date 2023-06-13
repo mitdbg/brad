@@ -12,6 +12,7 @@ from brad.planner.beam.table_based_candidate import BlueprintCandidate
 from brad.planner.debug_logger import BlueprintPlanningDebugLogger
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
+from brad.planner.scoring.table_placement import compute_single_athena_table_cost
 from brad.planner.workload import Workload
 from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
@@ -103,23 +104,16 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                     engine_connections=engine_connections,
                     ctx=ctx,
                 )
-                candidate.check_structural_feasibility()
 
-                if candidate.feasibility == BlueprintFeasibility.Infeasible:
-                    candidate.find_best_provisioning(ctx)
+                candidate.try_to_make_feasible_if_needed(ctx)
                 if candidate.feasibility == BlueprintFeasibility.Infeasible:
                     continue
 
-                candidate.check_runtime_feasibility(ctx)
-                if candidate.feasibility == BlueprintFeasibility.Infeasible:
-                    continue
-
-                candidate.recompute_provisioning_dependent_scoring(ctx)
                 current_top_k.append(candidate)
 
             if len(current_top_k) == 0:
                 logger.error(
-                    "Query-based beam blueprint planning failed. Could not generate an initial set of feasible blueprints."
+                    "Table-based beam blueprint planning failed. Could not generate an initial set of feasible blueprints."
                 )
                 return
 
@@ -164,21 +158,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                             # placements that include this query cluster.
                             already_processed_identical = True
 
-                        # Make sure this candidate is feasible (otherwise skip it).
-                        next_candidate.check_structural_feasibility()
-                        if (
-                            next_candidate.feasibility
-                            == BlueprintFeasibility.Infeasible
-                        ):
-                            next_candidate.find_best_provisioning(ctx)
-                        if (
-                            next_candidate.feasibility
-                            == BlueprintFeasibility.Infeasible
-                        ):
-                            continue
-
-                        next_candidate.recompute_provisioning_dependent_scoring(ctx)
-                        next_candidate.check_runtime_feasibility(ctx)
+                        next_candidate.try_to_make_feasible_if_needed(ctx)
                         if (
                             next_candidate.feasibility
                             == BlueprintFeasibility.Infeasible
@@ -258,11 +238,11 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                         new_candidate = candidate.clone()
                         new_candidate.update_aurora_provisioning(aurora)
                         new_candidate.update_redshift_provisioning(redshift)
-                        new_candidate.check_structural_feasibility()
-                        if new_candidate.feasibility == BlueprintFeasibility.Infeasible:
+                        if not new_candidate.is_structurally_feasible():
                             continue
+
                         new_candidate.recompute_provisioning_dependent_scoring(ctx)
-                        new_candidate.check_runtime_feasibility(ctx)
+                        new_candidate.compute_runtime_feasibility(ctx)
                         if new_candidate.feasibility == BlueprintFeasibility.Infeasible:
                             continue
 
@@ -303,6 +283,9 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                 best_candidate.table_placements[tbl] |= EngineBitmapValues[
                     Engine.Athena
                 ]
+                best_candidate.storage_cost += compute_single_athena_table_cost(
+                    tbl, ctx.next_workload, ctx.planner_config
+                )
 
             # 10. Output the new blueprint.
             best_blueprint = best_candidate.to_blueprint()
