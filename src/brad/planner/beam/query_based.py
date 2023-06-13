@@ -11,9 +11,11 @@ from brad.planner.beam.query_based_candidate import BlueprintCandidate
 from brad.planner.debug_logger import BlueprintPlanningDebugLogger
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
+from brad.planner.scoring.table_placement import compute_single_athena_table_cost
 from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
+
 
 logger = logging.getLogger(__name__)
 
@@ -284,6 +286,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 best_candidate.table_placements[tbl] |= EngineBitmapValues[
                     Engine.Athena
                 ]
+                # We added the table to Athena.
+                best_candidate.storage_cost += compute_single_athena_table_cost(
+                    tbl, ctx.next_workload, ctx.planner_config
+                )
 
             # 10. Output the new blueprint.
             best_blueprint = best_candidate.to_blueprint()

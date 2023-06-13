@@ -97,8 +97,9 @@ def compute_next_aurora_cpu(
 
     if curr_prov != next_prov:
         # Resource change scaling factor (inversely proportional).
-        curr_val = aurora_resource_value(curr_prov)
-        next_val = aurora_resource_value(next_prov)
+        # Adding more nodes creates read replicas, which should decrease CPU usage.
+        curr_val = aurora_resource_value(curr_prov) * curr_prov.num_nodes()
+        next_val = aurora_resource_value(next_prov) * next_prov.num_nodes()
         resource_ratio = curr_val / next_val
 
         next_cpu *= (
