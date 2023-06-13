@@ -22,23 +22,25 @@ def compute_next_redshift_cpu(
         # Special case - should be handled differently.
         raise ValueError
 
-    base_latency = ctx.current_latency_weights[Engine.Redshift]
-    if base_latency == 0.0:
-        # Special case - should be handled differently.
-        raise ValueError
+    if Engine.Redshift not in ctx.current_latency_weights:
+        # Special case. We cannot reweigh the queries because nothing in the
+        # current workload ran on Redshift.
+        query_factor = 1.0
+    else:
+        # We scale the predicted query execution times by a factor "l", which is
+        # meant to capture the load on the system (e.g., concurrently running
+        # queries). We model l as being proportional to the predicted change in CPU
+        # utilization across deployments.
+        #
+        # First we calculate the predicted CPU utilization on the next blueprint
+        # (Redshift provisioning and query placement). Then we compute the CPU
+        # utilization change and translate this value into l.
 
-    # We scale the predicted query execution times by a factor "l", which is
-    # meant to capture the load on the system (e.g., concurrently running
-    # queries). We model l as being proportional to the predicted change in CPU
-    # utilization across deployments.
-    #
-    # First we calculate the predicted CPU utilization on the next blueprint
-    # (Redshift provisioning and query placement). Then we compute the CPU
-    # utilization change and translate this value into l.
-
-    # Query movement scaling factor.
-    # Captures change in queries routed to this engine.
-    query_factor = total_next_latency / base_latency
+        # Query movement scaling factor.
+        # Captures change in queries routed to this engine.
+        base_latency = ctx.current_latency_weights[Engine.Redshift]
+        assert base_latency != 0.0
+        query_factor = total_next_latency / base_latency
 
     next_cpu = curr_cpu_avg * query_factor
 
@@ -71,23 +73,25 @@ def compute_next_aurora_cpu(
         # Special case - should be handled differently.
         raise ValueError
 
-    base_latency = ctx.current_latency_weights[Engine.Aurora]
-    if base_latency == 0.0:
-        # Special case - should be handled differently.
-        raise ValueError
+    if Engine.Aurora not in ctx.current_latency_weights:
+        # Special case. We cannot reweigh the queries because nothing in the
+        # current workload ran on Redshift.
+        query_factor = 1.0
+    else:
+        # We scale the predicted query execution times by a factor "l", which is
+        # meant to capture the load on the system (e.g., concurrently running
+        # queries). We model l as being proportional to the predicted change in CPU
+        # utilization across deployments.
+        #
+        # First we calculate the predicted CPU utilization on the next blueprint
+        # (Aurora provisioning and query placement). Then we compute the CPU
+        # utilization change and translate this value into l.
 
-    # We scale the predicted query execution times by a factor "l", which is
-    # meant to capture the load on the system (e.g., concurrently running
-    # queries). We model l as being proportional to the predicted change in CPU
-    # utilization across deployments.
-    #
-    # First we calculate the predicted CPU utilization on the next blueprint
-    # (Aurora provisioning and query placement). Then we compute the CPU
-    # utilization change and translate this value into l.
-
-    # Query movement scaling factor.
-    # Captures change in queries routed to this engine.
-    query_factor = total_next_latency / base_latency
+        # Query movement scaling factor.
+        # Captures change in queries routed to this engine.
+        base_latency = ctx.current_latency_weights[Engine.Aurora]
+        assert base_latency != 0.0
+        query_factor = total_next_latency / base_latency
 
     next_cpu = curr_cpu_avg * query_factor
 

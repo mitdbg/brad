@@ -79,6 +79,10 @@ def compute_aurora_transition_time_s(
     if diff is None:
         return 0.0
 
+    if diff.new_num_nodes() is not None and diff.new_num_nodes() == 0:
+        # Special case: Shutting down an engine is "free".
+        return 0.0
+
     # Some provisioning changes may take longer than others. To start, we use
     # one fixed time.
     return planner_config.aurora_provisioning_change_time_s()
@@ -89,6 +93,10 @@ def compute_redshift_transition_time_s(
 ) -> float:
     diff = ProvisioningDiff.of(old, new)
     if diff is None:
+        return 0.0
+
+    if diff.new_num_nodes() is not None and diff.new_num_nodes() == 0:
+        # Special case: Shutting down an engine is "free".
         return 0.0
 
     # Some provisioning changes may take longer than others (classic vs. elastic
