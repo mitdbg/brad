@@ -26,6 +26,9 @@ METRICS = [
     "aurora_WRITER_ReadIOPS_Average",
     "aurora_WRITER_ReadIOPS_Minimum",
     "aurora_WRITER_ReadIOPS_Maximum",
+    "aurora_WRITER_DatabaseConnections_Minimum",
+    "aurora_WRITER_DatabaseConnections_Maximum",
+    "aurora_WRITER_DatabaseConnections_Average",
 ]
 
 

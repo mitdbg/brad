@@ -3,6 +3,7 @@ import boto3
 import pandas as pd
 import numpy as np
 import pytz
+import time
 
 from importlib.resources import files, as_file
 from datetime import datetime, timedelta, timezone
@@ -230,3 +231,17 @@ class MetricsHelper:
             if self._values.empty
             else pd.concat([self._values, df.loc[df.index > self._values.index[-1]]])
         )
+
+
+if __name__ == "__main__":
+    metrics_reader = MetricsHelper(
+        aurora_cluster_name="aurora-2",
+        redshift_cluster_name="redshift-ra3-test",
+        epoch_length=timedelta(minutes=3),
+    )
+
+    while True:
+        metrics_reader.load_metrics()
+        df = metrics_reader.get_metrics(["aurora_WRITER_DatabaseConnections_Average"])
+        print(df)
+        time.sleep(10)
