@@ -67,6 +67,7 @@ class BradServer(BradInterface):
         formatter = logging.Formatter("%(message)s")
         qhandler.setFormatter(formatter)
         self._qlogger.addHandler(qhandler)
+        self._qlogger.propagate = False  # Avoids printing to stdout
 
         # We have different routing policies for performance evaluation and
         # testing purposes.
