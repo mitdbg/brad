@@ -135,7 +135,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     logger.debug("Processing index %d of %d", j, len(query_indices[1:]))
 
                 next_top_k: List[BlueprintCandidate] = []
-                query = analytical_queries[first_query_idx]
+                query = analytical_queries[query_idx]
 
                 # For each candidate in the current top k, expand it by one
                 # query in the workload.
@@ -158,6 +158,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                             ),
                             ctx,
                         )
+                        next_candidate.try_to_make_feasible_if_needed(ctx)
                         if (
                             next_candidate.feasibility
                             == BlueprintFeasibility.Infeasible
@@ -213,13 +214,47 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 for candidate in current_top_k:
                     placement_top_k_logger.log_debug_values(candidate.to_debug_values())
 
-            # 8. Run a final greedy search over provisionings in the top-k set.
+            # 8. We generated the placements by placing queries using run time
+            #    predictions. Now we re-route the queries using the fixed placements
+            #    but with the actual routing policy that we will use at runtime.
+            rerouted_top_k: List[BlueprintCandidate] = []
+
+            for candidate in current_top_k:
+                query_indices = candidate.get_all_query_indices()
+                candidate.reset_routing()
+                # TODO: We should not hard code this policy.
+                router = RuleBased(table_placement_bitmap=candidate.table_placements)
+                for qidx in query_indices:
+                    query = analytical_queries[qidx]
+                    routing_engine = router.engine_for(query)
+                    candidate.add_query_last_step(
+                        qidx,
+                        query,
+                        routing_engine,
+                        next_workload.get_predicted_analytical_latency(
+                            qidx, routing_engine
+                        ),
+                        ctx,
+                    )
+
+                if not candidate.is_structurally_feasible():
+                    continue
+
+                rerouted_top_k.append(candidate)
+
+            if len(rerouted_top_k) == 0:
+                logger.error(
+                    "The query-based beam planner failed to find any feasible placements after re-routing the queries."
+                )
+                return
+
+            # 9. Run a final greedy search over provisionings in the top-k set.
             final_top_k: List[BlueprintCandidate] = []
 
             aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
             redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
 
-            for candidate in current_top_k:
+            for candidate in rerouted_top_k:
                 aurora_it = aurora_enumerator.enumerate_nearby(
                     ctx.current_blueprint.aurora_provisioning(),
                     aurora_enumerator.scaling_to_distance(
@@ -254,15 +289,15 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                         elif new_candidate.is_better_than(final_top_k[0]):
                             heapq.heappushpop(final_top_k, new_candidate)
 
-            # The best blueprint will be ordered first (we have a negated
-            # `__lt__` method to work with `heapq` to create a max heap).
-            final_top_k.sort(reverse=True)
-
             if len(final_top_k) == 0:
                 logger.error(
                     "The query-based beam planner failed to find any feasible blueprints."
                 )
                 return
+
+            # The best blueprint will be ordered first (we have a negated
+            # `__lt__` method to work with `heapq` to create a max heap).
+            final_top_k.sort(reverse=True)
 
             # Log the final top k for debugging purposes, if needed.
             final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
@@ -272,8 +307,6 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 for candidate in final_top_k:
                     final_top_k_logger.log_debug_values(candidate.to_debug_values())
 
-            # TODO: Consider re-ranking the final top k using the actual query
-            # routing policy.
             best_candidate = final_top_k[0]
 
             # 9. Touch up the table placements. Add any missing tables to ensure
