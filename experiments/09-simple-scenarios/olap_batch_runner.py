@@ -63,7 +63,7 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                     pass
                 end = time.time()
                 print(
-                    "{},{}".format(
+                    "{},{},{}".format(
                         next_query_idx,
                         end - start,
                         engine.value if engine is not None else "unknown",
@@ -85,12 +85,20 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                         flush=True,
                     )
                 for _ in range(args.run_all_times):
+                    engine = None
                     start = time.time()
-                    for _ in brad_client.run_query(q):
+                    for _, engine in brad_client.run_query(q):
                         # Pull the results from BRAD (row-by-row).
                         pass
                     end = time.time()
-                    print("{},{}".format(idx, end - start), file=file)
+                    print(
+                        "{},{},{}".format(
+                            idx,
+                            end - start,
+                            engine.value if engine is not None else "unknown",
+                        ),
+                        file=file,
+                    )
 
 
 def run_warmup(args):
@@ -99,10 +107,11 @@ def run_warmup(args):
     with BradGrpcClient(args.host, args.port) as brad_client, open(
         "olap_batch_warmup.csv", "w"
     ) as file:
-        print("query_idx,run_time_s", file=file)
+        print("query_idx,run_time_s,engine", file=file)
         for idx, q in enumerate(queries):
+            engine = None
             start = time.time()
-            for _ in brad_client.run_query(q):
+            for _, engine in brad_client.run_query(q):
                 # Pull the results from BRAD (row-by-row).
                 pass
             end = time.time()
@@ -114,7 +123,13 @@ def run_warmup(args):
             )
             if run_time_s >= 29:
                 print("Warning: Query index {} takes longer than 30 s".format(idx))
-            print("{},{}".format(idx, run_time_s), file=file, flush=True)
+            print(
+                "{},{},{}".format(
+                    idx, run_time_s, engine.value if engine is not None else "unknown"
+                ),
+                file=file,
+                flush=True,
+            )
 
 
 def main():
