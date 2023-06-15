@@ -37,7 +37,7 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
     with BradGrpcClient(args.host, args.port) as brad_client, open(
         out_dir / "olap_batch_{}.csv".format(idx), "w"
     ) as file:
-        print("query_idx,run_time_s", file=file, flush=True)
+        print("query_idx,run_time_s,engine", file=file, flush=True)
 
         # Signal that we're ready to start and wait for the controller.
         start_queue.put_nowait("")
@@ -56,13 +56,20 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                     next_query_idx = args.specific_query_idx
                 next_query = queries[next_query_idx]
 
+                engine = None
                 start = time.time()
-                for _ in brad_client.run_query(next_query):
+                for _, engine in brad_client.run_query(next_query):
                     # Pull the results from BRAD (row-by-row).
                     pass
                 end = time.time()
                 print(
-                    "{},{}".format(next_query_idx, end - start), file=file, flush=True
+                    "{},{}".format(
+                        next_query_idx,
+                        end - start,
+                        engine.value if engine is not None else "unknown",
+                    ),
+                    file=file,
+                    flush=True,
                 )
 
                 try:

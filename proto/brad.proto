@@ -39,6 +39,9 @@ message RunQueryResponse {
     QueryResultRow row = 1;
     QueryError error = 2;
   }
+
+  // The engine that was used to actually run the query.
+  ExecutionEngine executor = 100;
 }
 
 message QueryResultRow {
@@ -56,4 +59,11 @@ message EndSessionRequest {
 
 message EndSessionResponse {
   uint64 unused = 100;
+}
+
+enum ExecutionEngine {
+  ENG_UNKNOWN = 0;
+  ENG_AURORA = 1;
+  ENG_REDSHIFT = 2;
+  ENG_ATHENA = 3;
 }
