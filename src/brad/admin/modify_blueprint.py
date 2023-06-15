@@ -27,6 +27,11 @@ def register_admin_action(subparser) -> None:
         help="The name of the schema to drop.",
     )
     parser.add_argument(
+        "--fetch-only",
+        action="store_true",
+        help="If set, just load and print the persisted blueprint.",
+    )
+    parser.add_argument(
         "--aurora-instance-type",
         type=str,
         help="The Aurora instance type to set.",
@@ -63,6 +68,11 @@ def modify_blueprint(args):
     blueprint_mgr = BlueprintManager(config, args.schema_name)
     blueprint_mgr.load_sync()
     blueprint = blueprint_mgr.get_blueprint()
+
+    if args.fetch_only:
+        print(blueprint)
+        return
+
     enum_blueprint = EnumeratedBlueprint(blueprint)
 
     # 3. Modify parts of the blueprint as needed.
