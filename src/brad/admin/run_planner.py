@@ -8,7 +8,7 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner.compare.cost import (
-    best_cost_under_max_latency,
+    best_cost_under_p99_latency,
 )
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.scoring.performance.precomputed_predictions import (
@@ -155,7 +155,7 @@ def run_planner(args) -> None:
         # Used for debugging purposes.
         analytics_latency_scorer=prediction_provider,
         # TODO: Make this configurable.
-        comparator=best_cost_under_max_latency(
+        comparator=best_cost_under_p99_latency(
             max_latency_ceiling_s=args.latency_ceiling_s
         ),
         metrics_provider=metrics_provider,

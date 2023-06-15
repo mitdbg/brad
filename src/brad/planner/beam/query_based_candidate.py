@@ -221,6 +221,60 @@ class BlueprintCandidate(ComparableBlueprint):
         self.explored_provisionings = False
         self._memoized.clear()
 
+    def get_all_query_indices(self) -> List[int]:
+        return (
+            self.query_locations[Engine.Aurora]
+            + self.query_locations[Engine.Redshift]
+            + self.query_locations[Engine.Athena]
+        )
+
+    def reset_routing(self) -> None:
+        """
+        This is used in the last step of the planner. We place queries during
+        the optimization process using the learned predictions. In the last
+        step, we want to re-route the queries using the router to re-score the
+        final top k.
+        """
+        self.query_locations[Engine.Aurora].clear()
+        self.query_locations[Engine.Redshift].clear()
+        self.query_locations[Engine.Athena].clear()
+
+        self.base_query_latencies[Engine.Aurora].clear()
+        self.base_query_latencies[Engine.Redshift].clear()
+        self.base_query_latencies[Engine.Athena].clear()
+
+        self.scaled_query_latencies.clear()
+
+        self.workload_scan_cost = 0.0
+        self.feasibility = BlueprintFeasibility.Unchecked
+        self._memoized.clear()
+
+    def add_query_last_step(
+        self,
+        query_idx: int,
+        query: Query,
+        location: Engine,
+        base_latency: float,
+        ctx: ScoringContext,
+    ) -> None:
+        """
+        This is used in the last step of the planner. We do not modify the table
+        placement in this step. The query must be assigned to an engine that can
+        support it.
+        """
+        self.query_locations[location].append(query_idx)
+        self.base_query_latencies[location].append(base_latency)
+
+        # Scan monetary costs that this query imposes.
+        if location == Engine.Athena:
+            self.workload_scan_cost += compute_athena_scan_cost(
+                [query], ctx.planner_config
+            )
+        elif location == Engine.Aurora:
+            self.workload_scan_cost += compute_aurora_scan_cost(
+                [query], ctx.planner_config
+            )
+
     def add_transactional_tables(self, ctx: ScoringContext) -> None:
         referenced_tables = set()
 

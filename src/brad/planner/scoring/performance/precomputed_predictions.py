@@ -42,6 +42,11 @@ class PrecomputedPredictions(AnalyticsLatencyScorer):
 
         predictions = np.stack(preds, axis=-1)
 
+        # Replace any `inf` values in the predictions with this value. This
+        # prevents a degenerate case in performance estimation.
+        timeout_value_s = 210.0
+        predictions[np.isinf(predictions)] = timeout_value_s
+
         return cls(queries_map, predictions)
 
     def __init__(self, queries_map: Dict[str, int], predictions: npt.NDArray) -> None:
