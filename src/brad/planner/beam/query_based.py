@@ -328,7 +328,6 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             best_blueprint = best_candidate.to_blueprint()
             self._current_blueprint = best_blueprint
             self._current_workload = next_workload
-            await self._notify_new_blueprint(best_blueprint)
 
             logger.info("Selected blueprint:")
             logger.info("%s", best_blueprint)
@@ -337,6 +336,8 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             logger.debug(
                 "Selected blueprint details: %s", json.dumps(debug_values, indent=2)
             )
+
+            await self._notify_new_blueprint(best_blueprint)
 
         finally:
             engine_connections.close_sync()

@@ -1,11 +1,11 @@
-strategy: table_based_beam
+strategy: query_based_beam
 
 ###
 ### Beam planning constants.
 ###
 
 beam_size: 100
-max_provisioning_multiplier: 2
+max_provisioning_multiplier: 3
 max_feasible_cpu: 85
 
 

@@ -139,6 +139,7 @@ class BradServer(BradInterface):
 
     async def run_setup(self):
         await self._blueprint_mgr.load()
+        logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
         if self._config.data_sync_period_seconds > 0:
             self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
         await self._data_sync_executor.establish_connections()

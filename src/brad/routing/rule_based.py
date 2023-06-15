@@ -312,9 +312,14 @@ class RuleBased(Router):
                 col_value = list(raw_sys_metric.values)[0]
                 sys_metric = {col_name[i]: col_value[i] for i in range(len(col_value))}
                 for loc in ideal_location_rank:
-                    if self.check_engine_state(loc, sys_metric):
+                    if loc in locations and self.check_engine_state(loc, sys_metric):
                         return loc
 
                 # In the case of all system are overloaded (time to trigger replan),
                 # we assign it to the optimal one. But Athena should not be overloaded at any time
-                return ideal_location_rank[0]
+                for loc in ideal_location_rank:
+                    if loc in locations:
+                        return loc
+
+                # Should be unreachable since len(locations) > 0.
+                assert False
