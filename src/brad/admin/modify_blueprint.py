@@ -1,5 +1,6 @@
 import logging
 
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.planner.enumeration.blueprint import EnumeratedBlueprint
 from brad.server.blueprint_manager import BlueprintManager
@@ -45,6 +46,11 @@ def register_admin_action(subparser) -> None:
         type=int,
         help="The number of Redshift instances to set.",
     )
+    parser.add_argument(
+        "--place-tables-everywhere",
+        action="store_true",
+        help="Updates the blueprint's table placement and places tables on all engines.",
+    )
     parser.set_defaults(admin_action=modify_blueprint)
 
 
@@ -77,6 +83,12 @@ def modify_blueprint(args):
         if args.redshift_num_nodes is not None:
             redshift_prov.set_num_nodes(args.redshift_num_nodes)
         enum_blueprint.set_redshift_provisioning(redshift_prov)
+
+    if args.place_tables_everywhere:
+        new_placement = {}
+        for tbl in blueprint.table_locations().keys():
+            new_placement[tbl] = Engine.from_bitmap(Engine.bitmap_all())
+        enum_blueprint.set_table_locations(new_placement)
 
     # 3. Write the changes back.
     modified_blueprint = enum_blueprint.to_blueprint()
