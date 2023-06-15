@@ -1,8 +1,9 @@
 import grpc
-from typing import Generator, Optional
+from typing import Generator, Optional, Tuple
 
 import brad.proto_gen.brad_pb2 as b
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
+from brad.config.engine import Engine
 from brad.config.session import SessionId
 
 # pylint: disable=no-member
@@ -42,7 +43,7 @@ class BradGrpcClient:
         self._impl.close()
         self._session_id = None
 
-    def run_query(self, query: str) -> Generator[bytes, None, None]:
+    def run_query(self, query: str) -> Generator[Tuple[bytes, Engine], None, None]:
         """
         Send a query to BRAD. The query result will come back row-by-row in
         encoded form. For simplicity, each row is currently encoded as a UTF-8
@@ -110,7 +111,7 @@ class BradRawGrpcClient:
 
     def run_query(
         self, session_id: SessionId, query: str
-    ) -> Generator[bytes, None, None]:
+    ) -> Generator[Tuple[bytes, Engine], None, None]:
         """
         Send a query to BRAD. The query result will come back row-by-row in
         encoded form. For simplicity, each row is currently encoded as a UTF-8
@@ -129,11 +130,22 @@ class BradRawGrpcClient:
             elif msg_kind == "error":
                 raise BradClientError(message=response_msg.error.error_msg)
             elif msg_kind == "row":
-                yield response_msg.row.row_data
+                executor = response_msg.executor
+                yield (response_msg.row.row_data, self._convert_engine(executor))
             else:
                 raise BradClientError(
                     message="BRAD RPC error: Unknown result message kind."
                 )
+
+    def _convert_engine(self, engine: b.ExecutionEngine) -> Engine:
+        if engine == b.ENG_AURORA:
+            return Engine.Aurora
+        elif engine == b.ENG_REDSHIFT:
+            return Engine.Redshift
+        elif engine == b.ENG_ATHENA:
+            return Engine.Athena
+        else:
+            raise ValueError("Unknown engine: {}".format(engine))
 
 
 class BradClientError(Exception):

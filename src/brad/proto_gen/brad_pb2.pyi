@@ -1,8 +1,13 @@
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from typing import ClassVar as _ClassVar, Mapping as _Mapping, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
+ENG_ATHENA: ExecutionEngine
+ENG_AURORA: ExecutionEngine
+ENG_REDSHIFT: ExecutionEngine
+ENG_UNKNOWN: ExecutionEngine
 
 class EndSessionRequest(_message.Message):
     __slots__ = ["id"]
@@ -37,12 +42,14 @@ class RunQueryRequest(_message.Message):
     def __init__(self, id: _Optional[_Union[SessionId, _Mapping]] = ..., query: _Optional[str] = ...) -> None: ...
 
 class RunQueryResponse(_message.Message):
-    __slots__ = ["error", "row"]
+    __slots__ = ["error", "executor", "row"]
     ERROR_FIELD_NUMBER: _ClassVar[int]
+    EXECUTOR_FIELD_NUMBER: _ClassVar[int]
     ROW_FIELD_NUMBER: _ClassVar[int]
     error: QueryError
+    executor: ExecutionEngine
     row: QueryResultRow
-    def __init__(self, row: _Optional[_Union[QueryResultRow, _Mapping]] = ..., error: _Optional[_Union[QueryError, _Mapping]] = ...) -> None: ...
+    def __init__(self, row: _Optional[_Union[QueryResultRow, _Mapping]] = ..., error: _Optional[_Union[QueryError, _Mapping]] = ..., executor: _Optional[_Union[ExecutionEngine, str]] = ...) -> None: ...
 
 class SessionId(_message.Message):
     __slots__ = ["id_value"]
@@ -61,3 +68,6 @@ class StartSessionResponse(_message.Message):
     ID_FIELD_NUMBER: _ClassVar[int]
     id: SessionId
     def __init__(self, id: _Optional[_Union[SessionId, _Mapping]] = ...) -> None: ...
+
+class ExecutionEngine(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):  # type: ignore
+    __slots__ = []  # type: ignore

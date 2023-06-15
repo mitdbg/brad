@@ -166,6 +166,18 @@ def run_planner(args) -> None:
         logger.info("Selected new blueprint")
         logger.info("%s", blueprint)
 
+        while True:
+            response = input("Do you want to persist this blueprint? (y/n): ").lower()
+            if response == "y":
+                blueprint_mgr.set_blueprint(blueprint)
+                blueprint_mgr.persist_sync()
+                print("Done!")
+                break
+            elif response == "n":
+                break
+            else:
+                print("Invalid input. Please enter 'y' or 'n'.")
+
     planner.register_new_blueprint_callback(on_new_blueprint)
 
     # 7. Trigger replanning.

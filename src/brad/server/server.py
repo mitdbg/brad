@@ -4,7 +4,7 @@ import logging
 import queue
 from datetime import datetime, timezone
 import multiprocessing as mp
-from typing import AsyncIterable, Optional
+from typing import AsyncIterable, Optional, Dict, Any
 import random
 
 import grpc
@@ -67,6 +67,7 @@ class BradServer(BradInterface):
         formatter = logging.Formatter("%(message)s")
         qhandler.setFormatter(formatter)
         self._qlogger.addHandler(qhandler)
+        self._qlogger.propagate = False  # Avoids printing to stdout
 
         # We have different routing policies for performance evaluation and
         # testing purposes.
@@ -193,7 +194,7 @@ class BradServer(BradInterface):
 
     # pylint: disable-next=invalid-overridden-method
     async def run_query(
-        self, session_id: SessionId, query: str
+        self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
     ) -> AsyncIterable[bytes]:
         session = self._sessions.get_session(session_id)
         if session is None:
@@ -213,6 +214,7 @@ class BradServer(BradInterface):
             query_rep = QueryRep(query)
             engine_to_use = self._router.engine_for(query_rep)
             logger.debug("Routing '%s' to %s", query, engine_to_use)
+            debug_info["executor"] = engine_to_use
 
             # 3. Actually execute the query.
             connection = session.engines.get_connection(engine_to_use)
