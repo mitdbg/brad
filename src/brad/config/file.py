@@ -48,6 +48,10 @@ class ConfigFile:
         return _ensure_slash_terminated(self._raw[Engine.Athena]["s3_data_path"])
 
     @property
+    def athena_s3_output_path(self) -> str:
+        return _ensure_slash_terminated(self._raw[Engine.Athena]["s3_output_path"])
+
+    @property
     def redshift_s3_iam_role(self) -> str:
         """Needed when importing data from S3."""
         return self._raw[Engine.Redshift]["s3_iam_role"]
