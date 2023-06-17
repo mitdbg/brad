@@ -195,6 +195,7 @@ def main():
     output_file_path = get_output_file_name(args)
     logger.info("Will save results in %s", output_file_path)
 
+    overall_start = time.time()
     for query_idx, query_str in enumerate(queries):
         if query_idx < query_start_offset:
             continue
@@ -208,7 +209,8 @@ def main():
         except Exception as ex:
             if isinstance(ex, KeyboardInterrupt):
                 # User initiated abort (via Ctrl-C).
-                raise
+                logger.info("Aborting...")
+                break
 
             # Log errors, but do not abort the data collection.
             logger.exception("Encountered error while running a query.")
@@ -223,6 +225,8 @@ def main():
             )
 
     save_checkpoint(recorded_results, output_file_path)
+    overall_end = time.time()
+    logger.info("Done! Took %.2f seconds in total.", overall_end - overall_start)
 
 
 if __name__ == "__main__":
