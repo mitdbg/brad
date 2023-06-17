@@ -69,7 +69,7 @@ def run_query(
         if elapsed_time > args.timeout_s:
             # Cancel the query execution if timeout exceeded
             client.stop_query_execution(QueryExecutionId=query_execution_id)
-            logger.warn("Timeout exceeded. Query index %d cancelled.", qidx)
+            logger.warning("Timeout exceeded. Query index %d cancelled.", qidx)
             status = "TIMEOUT"
             break
 
@@ -147,7 +147,7 @@ def main():
     )
     parser.add_argument("--schema-name", type=str, default="imdb")
     parser.add_argument(
-        "--timeout-s", type=int, default=200, help="The query timeout in seconds."
+        "--timeout-s", type=float, default=200.0, help="The query timeout in seconds."
     )
     parser.add_argument(
         "--checkpoint-every",
