@@ -8,6 +8,7 @@ import pathlib
 import datetime
 import pyodbc
 import os
+import numpy as np
 
 from typing import Any, Dict, List
 
@@ -122,6 +123,11 @@ def main():
         "--timeout-s", type=float, default=200.0, help="The query timeout in seconds."
     )
     parser.add_argument(
+        "--existing-run-times",
+        type=str,
+        help="Path to an existing measured query run time file, if it exists.",
+    )
+    parser.add_argument(
         "--checkpoint-every",
         type=int,
         default=50,
@@ -146,6 +152,11 @@ def main():
     if args.rank == args.world_size - 1:
         # For simplicity, the last worker takes on the remainder queries.
         query_end_offset = len(queries)
+
+    if args.existing_run_times is not None:
+        existing_run_times = np.load(args.existing_run_times)
+    else:
+        existing_run_times = None
 
     logger.info("Rank %d, World size: %d.", args.rank, args.world_size)
     logger.info(
@@ -195,16 +206,30 @@ def main():
         if query_idx >= query_end_offset:
             break
 
-        try:
-            recorded_results.append(run_query(args, cursor, query_str, query_idx))
-        except Exception as ex:
-            if isinstance(ex, KeyboardInterrupt):
-                # User initiated abort (via Ctrl-C).
-                logger.info("Aborting...")
-                break
+        if existing_run_times is not None and np.isinf(existing_run_times[query_idx]):
+            logger.info(
+                "Skipping query index %d because it will cause a timeout.", query_idx
+            )
+            recorded_results.append(
+                {
+                    "query_index": query_idx,
+                    "status": "TIMEOUT",
+                    "run_time_s": args.timeout_s,
+                }
+            )
 
-            # Log errors, but do not abort the data collection.
-            logger.exception("Encountered error while running a query.")
+        else:
+            try:
+                recorded_results.append(run_query(args, cursor, query_str, query_idx))
+            except Exception as ex:
+                if isinstance(ex, KeyboardInterrupt):
+                    # User initiated abort (via Ctrl-C).
+                    logger.info("Aborting...")
+                    break
+
+                # Log errors, but do not abort the data collection.
+                logger.exception("Encountered error while running a query.")
+
         num_recorded += 1
 
         if num_recorded % args.checkpoint_every == 0:
