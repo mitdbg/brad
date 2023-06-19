@@ -133,6 +133,11 @@ def main():
         default=50,
         help="Checkpoint the gathered data every X queries.",
     )
+    parser.add_argument(
+        "--resume-from-index",
+        type=int,
+        help="If set, resume collection from the specified index.",
+    )
     # Used for parallelizing the data collection.
     parser.add_argument("--world-size", type=int, default=1)
     parser.add_argument("--rank", type=int, default=0)
@@ -164,6 +169,13 @@ def main():
         query_start_offset,
         query_end_offset,
     )
+
+    if args.resume_from_index is not None:
+        query_start_offset = args.resume_from_index
+        logger.info(
+            "Actually starting from index %d",
+            query_start_offset,
+        )
 
     client = boto3.client("rds")
 
@@ -219,6 +231,18 @@ def main():
             )
 
         else:
+            # Make sure the connection is still alive.
+            connection_retry_count = 0
+            while True:
+                try:
+                    cursor = connection.cursor()
+                    break
+                except pyodbc.Error as ex:
+                    if connection_retry_count > 10:
+                        raise RuntimeError("Connection failed.") from ex
+                connection_retry_count += 1
+                connection = pyodbc.connect(cstr, autocommit=True)
+
             try:
                 recorded_results.append(run_query(args, cursor, query_str, query_idx))
             except Exception as ex:
