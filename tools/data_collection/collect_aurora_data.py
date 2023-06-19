@@ -59,7 +59,7 @@ def run_query(args, cursor, query: str, qidx: int) -> Dict[str, Any]:
         }
 
     except pyodbc.Error:
-        logger.warning("Query index %d timed out.", qidx)
+        logger.exception("Query index %d probably timed out.", qidx)
 
         return {
             "query_index": qidx,
