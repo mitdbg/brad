@@ -235,13 +235,15 @@ def main():
             connection_retry_count = 0
             while True:
                 try:
-                    cursor = connection.cursor()
+                    cursor.execute("SELECT 1")
+                    _ = cursor.fetchall()
                     break
                 except pyodbc.Error as ex:
                     if connection_retry_count > 10:
                         raise RuntimeError("Connection failed.") from ex
                 connection_retry_count += 1
                 connection = pyodbc.connect(cstr, autocommit=True)
+                cursor = connection.cursor()
 
             try:
                 recorded_results.append(run_query(args, cursor, query_str, query_idx))
