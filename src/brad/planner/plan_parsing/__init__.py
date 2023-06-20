@@ -4,7 +4,9 @@ from typing import Any, Dict, List, Tuple
 from .parse_plan import parse_plans
 
 ParsedPlan = Dict[str, Any]
-BaseCardinality = namedtuple("BaseCardinality", ["table_name", "cardinality", "width"])
+BaseCardinality = namedtuple(
+    "BaseCardinality", ["table_name", "cardinality", "width", "access_op_name"]
+)
 
 
 def parse_explain_verbose(lines: List[str] | List[Tuple[Any, ...]]) -> ParsedPlan:
@@ -36,6 +38,7 @@ def extract_base_cardinalities(plan: ParsedPlan) -> List[BaseCardinality]:
                     op["plan_parameters"]["table"],
                     op["plan_parameters"]["est_card"],
                     op["plan_parameters"]["est_width"],
+                    op["plan_parameters"]["op_name"],
                 )
             )
         else:

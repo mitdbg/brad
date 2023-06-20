@@ -21,3 +21,6 @@ build
 
 venv
 .python-version
+
+# Used for any scratch data/results that are not meant to be checked in.
+scratch
