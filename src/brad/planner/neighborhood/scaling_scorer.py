@@ -3,7 +3,7 @@ import json
 import logging
 import math
 from collections import namedtuple
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List
 
 from .score import Scorer, Score, ScoringContext
 import brad.planner.scoring.data as score_data
@@ -273,7 +273,7 @@ class ScalingScorer(Scorer):
         """
         Returns the best source engine to extract a table from.
         """
-        options = []
+        options: List[Tuple[Engine, float]] = []
         for loc in blueprint.get_table_locations(table_name):
             if loc == Engine.Aurora:
                 options.append(
