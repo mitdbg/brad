@@ -1,5 +1,6 @@
 import logging
 
+from brad.asset_manager import AssetManager
 from brad.blueprint.user import UserProvidedBlueprint
 from brad.blueprint.sql_gen.table import TableSqlGenerator
 from brad.config.engine import Engine
@@ -95,7 +96,8 @@ def bootstrap_schema(args):
     aurora.commit()
 
     # 11. Persist the data blueprint.
-    blueprint_mgr = BlueprintManager(config, blueprint.schema_name())
+    assets = AssetManager(config)
+    blueprint_mgr = BlueprintManager(assets, blueprint.schema_name())
     blueprint_mgr.set_blueprint(blueprint)
     blueprint_mgr.persist_sync()
 
