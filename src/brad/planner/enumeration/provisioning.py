@@ -107,7 +107,9 @@ class ProvisioningEnumerator:
 
 def _load_instance_resources(file_name: str) -> Dict[str, Dict[str, int | float]]:
     # Load data.
-    with pkg_resources.open_text(scoring_data, file_name) as data:
+    with pkg_resources.files(scoring_data).joinpath(file_name).open(
+        "r", encoding="UTF-8"
+    ) as data:
         instances = json.load(data)
     instances_map = {}
     for inst in instances:
