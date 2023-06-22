@@ -8,7 +8,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import RandomOverSampler
 
-from . import ORDERED_ENGINES, ENGINE_LABELS
+from . import ORDERED_ENGINES
 from brad.query_rep import QueryRep
 from brad.blueprint.table import Table
 from brad.blueprint.user import UserProvidedBlueprint
@@ -46,7 +46,7 @@ class ForestTrainer:
         self._compute_features()
 
     @classmethod
-    def load(
+    def load_saved_data(
         cls,
         schema_file: pathlib.Path,
         queries_file: pathlib.Path,
@@ -56,7 +56,7 @@ class ForestTrainer:
     ) -> "ForestTrainer":
         bp = UserProvidedBlueprint.load_from_yaml_file(schema_file)
 
-        with open(queries_file, "r") as file:
+        with open(queries_file, "r", encoding="UTF-8") as file:
             raw_queries = [line.strip() for line in file]
 
         aurora_rt = np.load(aurora_run_times)
@@ -200,7 +200,7 @@ class ForestTrainer:
 
     def _split_dataset(
         self, test_frac: float = 0.2, random_state: int = 0
-    ) -> Dict[int, npt.NDArray]:
+    ) -> Dict[str, npt.NDArray]:
         (
             X_train,
             X_test,
