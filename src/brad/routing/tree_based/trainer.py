@@ -50,11 +50,11 @@ class ForestTrainer:
     @classmethod
     def load_saved_data(
         cls,
-        schema_file: pathlib.Path,
-        queries_file: pathlib.Path,
-        aurora_run_times: pathlib.Path,
-        redshift_run_times: pathlib.Path,
-        athena_run_times: pathlib.Path,
+        schema_file: str | pathlib.Path,
+        queries_file: str | pathlib.Path,
+        aurora_run_times: str | pathlib.Path,
+        redshift_run_times: str | pathlib.Path,
+        athena_run_times: str | pathlib.Path,
     ) -> "ForestTrainer":
         bp = UserProvidedBlueprint.load_from_yaml_file(schema_file)
 
@@ -205,7 +205,7 @@ class ForestTrainer:
         # Workload completion time
         oracle_times = self._oracle_times[query_indices]
         oracle_completion = oracle_times.sum()
-        routing_times = self._run_times[predictions, query_indices]
+        routing_times = self._run_times[query_indices, predictions]
         routed_completion = routing_times.sum()
 
         # Slowdown over best times
@@ -252,7 +252,8 @@ class ForestTrainer:
         X_res, y_res = ros.fit_resample(X, y)
 
         ros = RandomOverSampler(random_state=0)
-        qidx_res, y_res2 = ros.fit_resample(query_indices, y)
+        indices = np.expand_dims(query_indices, axis=1)
+        qidx_res, y_res2 = ros.fit_resample(indices, y)
         qidx_res = np.squeeze(qidx_res)
 
         assert np.all(y_res2 == y_res)
