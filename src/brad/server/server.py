@@ -90,7 +90,7 @@ class BradServer(BradInterface):
                 blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
             )
         elif routing_policy == RoutingPolicy.DecisionForest:
-            self._router = ForestRouter(
+            self._router = ForestRouter.for_server(
                 self._schema_name, self._assets, self._blueprint_mgr
             )
         else:
