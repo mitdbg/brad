@@ -65,6 +65,12 @@ def register_admin_action(subparser) -> None:
         help="If set, the tool will persist the trained model "
         "locally for debugging purposes.",
     )
+    parser.add_argument(
+        "--num-trees",
+        type=int,
+        default=25,
+        help="Used to specify the number of trees in the forest.",
+    )
     parser.set_defaults(admin_action=train_router)
 
 
@@ -84,16 +90,10 @@ def train_router(args):
         redshift_run_times=args.data_redshift_rt,
         athena_run_times=args.data_athena_rt,
     )
-    model, quality = trainer.train()
+    model, quality = trainer.train(num_trees=args.num_trees)
     logger.info("Model quality: %s", json.dumps(quality, indent=2))
 
-    if args.persist:
-        config = ConfigFile(args.config_file)
-        assets = AssetManager(config)
-        ForestRouter.static_persist_sync(model, schema_name, assets)
-        logger.info("Model persisted successfully.")
-
-    elif args.persist_local:
+    if args.persist_local:
         serialized = model.to_pickle()
         file_name = "{}-forest_router.pickle".format(schema_name)
         with open(file_name, "wb") as file:
@@ -101,4 +101,16 @@ def train_router(args):
         logger.info("Model persisted locally.")
 
     else:
-        logger.info("Not persisting the model.")
+        while True:
+            response = input("Do you want to persist this model? (y/n): ").lower()
+            if response == "y":
+                config = ConfigFile(args.config_file)
+                assets = AssetManager(config)
+                ForestRouter.static_persist_sync(model, schema_name, assets)
+                logger.info("Model persisted successfully.")
+                break
+            elif response == "n":
+                logger.info("Not persisting the model.")
+                break
+            else:
+                print("Invalid input. Please enter 'y' or 'n'.")

@@ -7,6 +7,7 @@ def test_only_one_location():
     query = QueryRep("SELECT * FROM test")
     bitmap = {"test": EngineBitmapValues[Engine.Aurora]}
     r = Router()
+    # pylint: disable-next=protected-access
     valid_locations, only_location = r._run_location_routing(query, bitmap)
     assert only_location is not None
     assert only_location == Engine.Aurora
@@ -22,6 +23,7 @@ def test_multiple_locations():
         ),
     }
     r = Router()
+    # pylint: disable-next=protected-access
     valid_locations, only_location = r._run_location_routing(query, bitmap)
     assert only_location is None
     assert (valid_locations & EngineBitmapValues[Engine.Aurora]) == 0
