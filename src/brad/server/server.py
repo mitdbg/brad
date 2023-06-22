@@ -25,6 +25,7 @@ from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.rule_based import RuleBased
 from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
+from brad.routing.tree_based.forest_router import ForestRouter
 from brad.routing.policy import RoutingPolicy
 from brad.server.brad_interface import BradInterface
 from brad.server.blueprint_manager import BlueprintManager
@@ -88,6 +89,10 @@ class BradServer(BradInterface):
             self._router = RuleBased(
                 blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
             )
+        elif routing_policy == RoutingPolicy.DecisionForest:
+            self._router = ForestRouter(
+                self._schema_name, self._assets, self._blueprint_mgr
+            )
         else:
             raise RuntimeError(
                 "Unsupported routing policy: {}".format(str(routing_policy))
@@ -145,6 +150,7 @@ class BradServer(BradInterface):
         if self._config.data_sync_period_seconds > 0:
             self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
         await self._data_sync_executor.establish_connections()
+        await self._router.run_setup()
 
         # Launch the daemon process.
         self._daemon_mp_manager = mp.Manager()
