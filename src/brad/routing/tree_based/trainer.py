@@ -3,7 +3,7 @@ import pathlib
 import numpy as np
 import numpy.typing as npt
 
-from typing import List
+from typing import List, Dict, Tuple
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import RandomOverSampler
@@ -11,6 +11,10 @@ from imblearn.over_sampling import RandomOverSampler
 from . import ORDERED_ENGINES, ENGINE_LABELS
 from brad.query_rep import QueryRep
 from brad.blueprint.table import Table
+from brad.blueprint.user import UserProvidedBlueprint
+
+
+ModelQuality = Dict[str, Dict[str, float]]
 
 
 class ForestTrainer:
@@ -41,6 +45,79 @@ class ForestTrainer:
         self._preprocess_training_data()
         self._compute_features()
 
+    @classmethod
+    def load(
+        cls,
+        schema_file: pathlib.Path,
+        queries_file: pathlib.Path,
+        aurora_run_times: pathlib.Path,
+        redshift_run_times: pathlib.Path,
+        athena_run_times: pathlib.Path,
+    ) -> "ForestTrainer":
+        bp = UserProvidedBlueprint.load_from_yaml_file(schema_file)
+
+        with open(queries_file, "r") as file:
+            raw_queries = [line.strip() for line in file]
+
+        aurora_rt = np.load(aurora_run_times)
+        redshift_rt = np.load(redshift_run_times)
+        athena_rt = np.load(athena_run_times)
+
+        stacked = np.stack([aurora_rt, redshift_rt, athena_rt], axis=cls.m)
+
+        return cls(bp.tables, raw_queries, stacked)
+
+    def train(
+        self,
+        train_full: bool = True,
+        max_depth: int = 15,
+        min_samples_split: int = 10,
+        num_trees: int = 100,
+    ) -> Tuple[RandomForestClassifier, ModelQuality]:
+        # TODO: We should select the hyperparameters above automatically.
+        # `sklearn` has helper functions for this, but we have a slightly more
+        # involved training pipeline (with resampling), so we are punting on it
+        # for now.
+
+        # Run a train/test split at first to get a rough estimate of the
+        # forest's quality.
+        data = self._split_dataset()
+        X, y, qidx = self._resample_data(
+            data["inp_train"], data["labels_train"], data["qidx_train"]
+        )
+        clf = RandomForestClassifier(
+            n_estimators=num_trees,
+            criterion="entropy",
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+        )
+        model_for_eval = clf.fit(X, y)
+        train_pred = model_for_eval.predict(X)
+        test_pred = model_for_eval.predict(data["inp_test"])
+
+        train_quality = self._compute_routing_quality(train_pred, qidx)
+        test_quality = self._compute_routing_quality(test_pred, data["qidx_test"])
+        quality = {"train": train_quality, "test": test_quality}
+
+        if not train_full:
+            return model_for_eval, quality
+
+        X, y, qidx = self._resample_data(
+            self._f_table_presence,
+            self._oracle_routing,
+            np.array(range(len(self._valid_queries))),
+        )
+        model = clf.fit(X, y)
+        train_pred = model.predict(X)
+        train_quality = self._compute_routing_quality(train_pred, qidx)
+
+        return model, {
+            "train": train_quality,
+            # This is an estimated test quality (since it is based on the model
+            # trained with held out data).
+            "test": test_quality,
+        }
+
     def _preprocess_training_data(self) -> None:
         # Used to remove queries that time out everywhere.
         all_timeout_idx = np.where(np.all(np.isinf(self._raw_run_times), axis=self.m))
@@ -48,15 +125,13 @@ class ForestTrainer:
         # Create a (N, m) validity mask.
         val_mask = np.ones(self._raw_run_times.shape[self.N], dtype=bool)
         val_mask[all_timeout_idx] = False
-        val_mask = np.expand_dims(val_mask, axis=self.m)
-        val_mask = np.concatenate([val_mask] * len(ORDERED_ENGINES), axis=self.m)
 
         # Filter out queries that time out across all engines.
         valid_queries = list(
             map(
                 lambda tup: QueryRep(tup[1]),
                 filter(
-                    lambda tup: tup[0] not in all_timeout_idx,
+                    lambda tup: tup[0] not in all_timeout_idx[0],
                     enumerate(self._raw_queries),
                 ),
             )
@@ -96,5 +171,71 @@ class ForestTrainer:
         self._table_order = table_order
         self._f_table_presence = np.array(f_table_presence)
 
-    def train(self):
-        pass
+    def _compute_routing_quality(
+        self, predictions: npt.NDArray, query_indices: npt.NDArray
+    ) -> Dict[str, float]:
+        num_queries = predictions.shape[0]
+
+        if query_indices is None:
+            query_indices = np.array(range(len(self._valid_queries)))
+
+        # Routing accuracy
+        oracle_locations = self._oracle_routing[query_indices]
+        accuracy = np.sum(predictions == oracle_locations) / num_queries
+
+        # Workload completion time
+        oracle_times = self._oracle_times[query_indices]
+        oracle_completion = oracle_times.sum()
+        routing_times = self._run_times[predictions, query_indices]
+        routed_completion = routing_times.sum()
+
+        # Slowdown over best times
+        slowdowns = routing_times / oracle_times
+
+        return {
+            "accuracy": accuracy,
+            "total_slowdown_rel_oracle": routed_completion / oracle_completion,
+            "geomean_slowdown": np.exp(np.log(slowdowns).mean()),
+        }
+
+    def _split_dataset(
+        self, test_frac: float = 0.2, random_state: int = 0
+    ) -> Dict[int, npt.NDArray]:
+        (
+            X_train,
+            X_test,
+            y_train,
+            y_test,
+            qidx_train,
+            qidx_test,
+        ) = train_test_split(
+            self._f_table_presence,  # Input features
+            self._oracle_routing,  # Labels
+            np.array(range(len(self._valid_queries))),  # Queries in the dataset
+            stratify=self._oracle_routing,
+            test_size=test_frac,
+            random_state=random_state,
+        )
+
+        return {
+            "inp_train": X_train,
+            "inp_test": X_test,
+            "labels_train": y_train,
+            "labels_test": y_test,
+            "qidx_train": qidx_train,
+            "qidx_test": qidx_test,
+        }
+
+    def _resample_data(
+        self, X: npt.NDArray, y: npt.NDArray, query_indices: npt.NDArray
+    ) -> Tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
+        ros = RandomOverSampler(random_state=0)
+        X_res, y_res = ros.fit_resample(X, y)
+
+        ros = RandomOverSampler(random_state=0)
+        qidx_res, y_res2 = ros.fit_resample(query_indices, y)
+        qidx_res = np.squeeze(qidx_res)
+
+        assert np.all(y_res2 == y_res)
+
+        return X_res, y_res, qidx_res
