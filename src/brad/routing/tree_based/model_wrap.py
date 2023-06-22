@@ -1,3 +1,5 @@
+import pathlib
+import pickle
 import numpy as np
 import numpy.typing as npt
 from typing import List
@@ -15,6 +17,11 @@ class ModelWrap:
     serialization/deserialization.
     """
 
+    @classmethod
+    def from_pickle(cls, file_path: str | pathlib.Path) -> "ModelWrap":
+        with open(file_path, "rb") as file:
+            return pickle.load(file)
+
     def __init__(self, table_order: List[str], model: RandomForestClassifier) -> None:
         self._table_order = table_order
         self._model = model
@@ -30,6 +37,11 @@ class ModelWrap:
         preds = np.squeeze(preds)
         low_to_high = np.argsort(preds)
         return [ENGINE_LABELS[label] for label in reversed(low_to_high)]
+
+    def to_pickle(self, save_to: str | pathlib.Path) -> None:
+        # TODO: Pickling might not be the best option.
+        with open(save_to, "wb") as file:
+            pickle.dump(self, file)
 
     def _featurize_query(self, query: QueryRep) -> npt.NDArray:
         one_hot_table_presence = np.zeros(len(self._table_order))

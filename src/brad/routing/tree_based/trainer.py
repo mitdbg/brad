@@ -1,5 +1,4 @@
 import pathlib
-import pickle
 
 import numpy as np
 import numpy.typing as npt
@@ -69,30 +68,13 @@ class ForestTrainer:
 
         return cls(bp.tables, raw_queries, stacked)
 
-    def train_and_serialize(
-        self,
-        save_to: str,
-        train_full: bool = True,
-        max_depth: int = 15,
-        min_samples_split: int = 10,
-        num_trees: int = 100,
-    ) -> Tuple[RandomForestClassifier, ModelQuality]:
-        clf, quality = self.train(train_full, max_depth, min_samples_split, num_trees)
-        model = ModelWrap(self._table_order, clf)
-
-        # TODO: Pickling may not be the best option here.
-        with open(save_to, "wb") as file:
-            pickle.dump(model, file)
-
-        return clf, quality
-
     def train(
         self,
         train_full: bool = True,
         max_depth: int = 15,
         min_samples_split: int = 10,
         num_trees: int = 100,
-    ) -> Tuple[RandomForestClassifier, ModelQuality]:
+    ) -> Tuple[ModelWrap, ModelQuality]:
         # TODO: We should select the hyperparameters above automatically.
         # `sklearn` has helper functions for this, but we have a slightly more
         # involved training pipeline (with resampling), so we are punting on it
@@ -130,7 +112,7 @@ class ForestTrainer:
         train_pred = model.predict(X)
         train_quality = self._compute_routing_quality(train_pred, qidx)
 
-        return model, {
+        return ModelWrap(self._table_order, model), {
             "train": train_quality,
             # This is an estimated test quality (since it is based on the model
             # trained with held out data).
