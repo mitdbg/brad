@@ -65,12 +65,12 @@ class ConfigFile:
         return self._raw["aws_access_key_secret"]
 
     @property
-    def s3_metadata_bucket(self) -> str:
-        return self._raw["s3_metadata_bucket"]
+    def s3_assets_bucket(self) -> str:
+        return self._raw["s3_assets_bucket"]
 
     @property
-    def s3_metadata_path(self) -> str:
-        return _ensure_slash_terminated(self._raw["s3_metadata_path"])
+    def s3_assets_path(self) -> str:
+        return _ensure_slash_terminated(self._raw["s3_assets_path"])
 
     @property
     def s3_extract_bucket(self) -> str:

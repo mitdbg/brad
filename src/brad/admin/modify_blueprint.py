@@ -1,5 +1,6 @@
 import logging
 
+from brad.asset_manager import AssetManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.planner.enumeration.blueprint import EnumeratedBlueprint
@@ -65,7 +66,8 @@ def modify_blueprint(args):
     config = ConfigFile(args.config_file)
 
     # 2. Load the existing blueprint.
-    blueprint_mgr = BlueprintManager(config, args.schema_name)
+    assets = AssetManager(config)
+    blueprint_mgr = BlueprintManager(assets, args.schema_name)
     blueprint_mgr.load_sync()
     blueprint = blueprint_mgr.get_blueprint()
 

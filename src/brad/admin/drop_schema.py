@@ -1,6 +1,7 @@
 import logging
 import pyodbc
 
+from brad.asset_manager import AssetManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.server.blueprint_manager import BlueprintManager
@@ -31,7 +32,8 @@ def drop_schema(args):
     config = ConfigFile(args.config_file)
 
     # 2. Delete the persisted data blueprint, if it exists.
-    data_blueprint_mgr = BlueprintManager(config, args.schema_name)
+    assets = AssetManager(config)
+    data_blueprint_mgr = BlueprintManager(assets, args.schema_name)
     data_blueprint_mgr.delete_sync()
 
     # 3. Connect to the underlying engines without an explicit database.

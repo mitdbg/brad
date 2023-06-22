@@ -12,6 +12,7 @@ import pyodbc
 
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
 
+from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
 from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.config.engine import Engine
@@ -24,6 +25,7 @@ from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.rule_based import RuleBased
 from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
+from brad.routing.tree_based.forest_router import ForestRouter
 from brad.routing.policy import RoutingPolicy
 from brad.server.brad_interface import BradInterface
 from brad.server.blueprint_manager import BlueprintManager
@@ -49,7 +51,8 @@ class BradServer(BradInterface):
         self._config = config
         self._schema_name = schema_name
         self._debug_mode = debug_mode
-        self._blueprint_mgr = BlueprintManager(self._config, self._schema_name)
+        self._assets = AssetManager(self._config)
+        self._blueprint_mgr = BlueprintManager(self._assets, self._schema_name)
         self._path_to_planner_config = path_to_planner_config
         self._monitor: Optional[Monitor] = None
 
@@ -85,6 +88,10 @@ class BradServer(BradInterface):
             self._monitor = Monitor.from_config_file(config)
             self._router = RuleBased(
                 blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
+            )
+        elif routing_policy == RoutingPolicy.DecisionForest:
+            self._router = ForestRouter.for_server(
+                self._schema_name, self._assets, self._blueprint_mgr
             )
         else:
             raise RuntimeError(
@@ -143,6 +150,7 @@ class BradServer(BradInterface):
         if self._config.data_sync_period_seconds > 0:
             self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
         await self._data_sync_executor.establish_connections()
+        await self._router.run_setup()
 
         # Launch the daemon process.
         self._daemon_mp_manager = mp.Manager()

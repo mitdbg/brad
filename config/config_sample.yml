@@ -28,9 +28,10 @@ epoch_length:
 aws_access_key: ABCABCABC123ABCABC45
 aws_access_key_secret: abCD+E1f2Gxhi3J4klmN/OP5QrSTuvwXYzabcdEF
 
-# BRAD stores metadata here (e.g., the physical data blueprint).
-s3_metadata_bucket: your-bucket
-s3_metadata_path: metadata/path/
+# BRAD stores assets and metadata here (e.g., the physical data blueprint,
+# serialized models, etc.).
+s3_assets_bucket: your-bucket
+s3_assets_path: brad-assets/path/
 
 # Holds intermediate results during data syncing.
 s3_extract_bucket: your-bucket

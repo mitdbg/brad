@@ -190,136 +190,111 @@ class RuleBased(Router):
         if query.is_data_modification_query():
             return Engine.Aurora
 
-        if self._table_placement_bitmap is not None:
-            locations_bitmaps = self._table_placement_bitmap
-        else:
+        if self._table_placement_bitmap is None:
             if self._blueprint is not None:
                 blueprint = self._blueprint
             else:
                 assert self._blueprint_mgr is not None
                 blueprint = self._blueprint_mgr.get_blueprint()
-            locations_bitmaps = blueprint.table_locations_bitmap()
+            self._table_placement_bitmap = blueprint.table_locations_bitmap()
 
-        valid_locations = Engine.bitmap_all()
-        for table_name_str in query.tables():
-            try:
-                valid_locations &= locations_bitmaps[table_name_str]
-            except KeyError:
-                # The query is referencing a non-existent table (could be a CTE
-                # - the parser does not differentiate between CTE tables and
-                # "actual" tables).
-                pass
-
-        if valid_locations == 0:
-            # This happens when a query references a set of tables that do not
-            # all have a presence in the same location.
-            raise RuntimeError(
-                "A single location is not available for tables {}".format(
-                    ", ".join(query.tables())
-                )
-            )
+        valid_locations, only_location = self._run_location_routing(
+            query, self._table_placement_bitmap
+        )
+        if only_location is not None:
+            return only_location
 
         locations = Engine.from_bitmap(valid_locations)
-        if len(locations) == 1:
-            return locations[0]
+        assert len(locations) > 1
+        ideal_location_rank: List[Engine] = []
+        touched_tables = query.tables()
+        if (
+            len(touched_tables)
+            < self._params.ideal_location_lower_limit["redshift_num_table"]
+        ):
+            ideal_location_rank = [Engine.Aurora, Engine.Redshift, Engine.Athena]
+        elif (
+            len(touched_tables)
+            <= self._params.ideal_location_upper_limit["aurora_num_table"]
+        ):
+            ideal_location_rank = [Engine.Redshift, Engine.Aurora, Engine.Athena]
+            if self._catalog:
+                n_rows = []
+                n_cols = []
+                for table_name in query.tables():
+                    if table_name in self._catalog:
+                        n_rows.append(self._catalog[table_name]["nrow"])
+                        n_cols.append(self._catalog[table_name]["ncol"])
+                if (
+                    max(n_rows)
+                    < self._params.ideal_location_upper_limit["aurora_table_size_max"]
+                    and sum(n_rows)
+                    < self._params.ideal_location_upper_limit["aurora_table_size_sum"]
+                    and max(n_cols)
+                    < self._params.ideal_location_upper_limit[
+                        "aurora_table_ncolumn_max"
+                    ]
+                    and sum(n_cols)
+                    < self._params.ideal_location_upper_limit[
+                        "aurora_table_ncolumn_sum"
+                    ]
+                ):
+                    ideal_location_rank = [
+                        Engine.Aurora,
+                        Engine.Redshift,
+                        Engine.Athena,
+                    ]
+        elif (
+            len(touched_tables)
+            <= self._params.ideal_location_upper_limit["redshift_num_table"]
+        ):
+            ideal_location_rank = [Engine.Redshift, Engine.Athena, Engine.Aurora]
+            if self._catalog:
+                n_rows = []
+                for table_name in query.tables():
+                    if table_name in self._catalog:
+                        n_rows.append(self._catalog[table_name]["nrow"])
+                if (
+                    max(n_rows)
+                    > self._params.ideal_location_upper_limit["redshift_table_size_max"]
+                    and sum(n_rows)
+                    > self._params.ideal_location_upper_limit["redshift_table_size_sum"]
+                ):
+                    ideal_location_rank = [
+                        Engine.Athena,
+                        Engine.Redshift,
+                        Engine.Aurora,
+                    ]
         else:
-            ideal_location_rank: List[Engine] = []
-            touched_tables = query.tables()
-            if (
-                len(touched_tables)
-                < self._params.ideal_location_lower_limit["redshift_num_table"]
-            ):
-                ideal_location_rank = [Engine.Aurora, Engine.Redshift, Engine.Athena]
-            elif (
-                len(touched_tables)
-                <= self._params.ideal_location_upper_limit["aurora_num_table"]
-            ):
-                ideal_location_rank = [Engine.Redshift, Engine.Aurora, Engine.Athena]
-                if self._catalog:
-                    n_rows = []
-                    n_cols = []
-                    for table_name in query.tables():
-                        if table_name in self._catalog:
-                            n_rows.append(self._catalog[table_name]["nrow"])
-                            n_cols.append(self._catalog[table_name]["ncol"])
-                    if (
-                        max(n_rows)
-                        < self._params.ideal_location_upper_limit[
-                            "aurora_table_size_max"
-                        ]
-                        and sum(n_rows)
-                        < self._params.ideal_location_upper_limit[
-                            "aurora_table_size_sum"
-                        ]
-                        and max(n_cols)
-                        < self._params.ideal_location_upper_limit[
-                            "aurora_table_ncolumn_max"
-                        ]
-                        and sum(n_cols)
-                        < self._params.ideal_location_upper_limit[
-                            "aurora_table_ncolumn_sum"
-                        ]
-                    ):
-                        ideal_location_rank = [
-                            Engine.Aurora,
-                            Engine.Redshift,
-                            Engine.Athena,
-                        ]
-            elif (
-                len(touched_tables)
-                <= self._params.ideal_location_upper_limit["redshift_num_table"]
-            ):
-                ideal_location_rank = [Engine.Redshift, Engine.Athena, Engine.Aurora]
-                if self._catalog:
-                    n_rows = []
-                    for table_name in query.tables():
-                        if table_name in self._catalog:
-                            n_rows.append(self._catalog[table_name]["nrow"])
-                    if (
-                        max(n_rows)
-                        > self._params.ideal_location_upper_limit[
-                            "redshift_table_size_max"
-                        ]
-                        and sum(n_rows)
-                        > self._params.ideal_location_upper_limit[
-                            "redshift_table_size_sum"
-                        ]
-                    ):
-                        ideal_location_rank = [
-                            Engine.Athena,
-                            Engine.Redshift,
-                            Engine.Aurora,
-                        ]
-            else:
-                ideal_location_rank = [Engine.Athena, Engine.Redshift, Engine.Aurora]
+            ideal_location_rank = [Engine.Athena, Engine.Redshift, Engine.Aurora]
 
-            if self._monitor is None:
-                for loc in ideal_location_rank:
-                    if loc in locations:
-                        return loc
-                # This should be unreachable since len(locations) > 0.
-                assert False
-            else:
-                # Todo(Ziniu): this can be stored in this class to reduce latency
-                raw_sys_metric = self._monitor.read_k_most_recent(k=1)
-                if raw_sys_metric.empty:
-                    logger.warning(
-                        "Routing without system metrics when we expect to have metrics."
-                    )
-                    return ideal_location_rank[0]
+        if self._monitor is None:
+            for loc in ideal_location_rank:
+                if loc in locations:
+                    return loc
+            # This should be unreachable since len(locations) > 0.
+            assert False
+        else:
+            # Todo(Ziniu): this can be stored in this class to reduce latency
+            raw_sys_metric = self._monitor.read_k_most_recent(k=1)
+            if raw_sys_metric.empty:
+                logger.warning(
+                    "Routing without system metrics when we expect to have metrics."
+                )
+                return ideal_location_rank[0]
 
-                col_name = list(raw_sys_metric.columns)
-                col_value = list(raw_sys_metric.values)[0]
-                sys_metric = {col_name[i]: col_value[i] for i in range(len(col_value))}
-                for loc in ideal_location_rank:
-                    if loc in locations and self.check_engine_state(loc, sys_metric):
-                        return loc
+            col_name = list(raw_sys_metric.columns)
+            col_value = list(raw_sys_metric.values)[0]
+            sys_metric = {col_name[i]: col_value[i] for i in range(len(col_value))}
+            for loc in ideal_location_rank:
+                if loc in locations and self.check_engine_state(loc, sys_metric):
+                    return loc
 
-                # In the case of all system are overloaded (time to trigger replan),
-                # we assign it to the optimal one. But Athena should not be overloaded at any time
-                for loc in ideal_location_rank:
-                    if loc in locations:
-                        return loc
+            # In the case of all system are overloaded (time to trigger replan),
+            # we assign it to the optimal one. But Athena should not be overloaded at any time
+            for loc in ideal_location_rank:
+                if loc in locations:
+                    return loc
 
-                # Should be unreachable since len(locations) > 0.
-                assert False
+            # Should be unreachable since len(locations) > 0.
+            assert False

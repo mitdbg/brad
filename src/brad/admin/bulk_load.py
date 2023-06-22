@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from collections import namedtuple
 from typing import Any, Coroutine, Iterator, List, Set
 
+from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
 from brad.blueprint.sql_gen.table import (
     comma_separated_column_names_and_types,
@@ -293,7 +294,8 @@ def _try_add_task(
 
 async def bulk_load_impl(args, manifest) -> None:
     config = ConfigFile(args.config_file)
-    blueprint_mgr = BlueprintManager(config, manifest["schema_name"])
+    assets = AssetManager(config)
+    blueprint_mgr = BlueprintManager(assets, manifest["schema_name"])
     await blueprint_mgr.load()
     blueprint = blueprint_mgr.get_blueprint()
 
