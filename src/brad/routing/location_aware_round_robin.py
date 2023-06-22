@@ -1,5 +1,3 @@
-from typing import Set, List
-
 from brad.config.engine import Engine
 from brad.server.blueprint_manager import BlueprintManager
 from brad.routing import Router
@@ -21,30 +19,13 @@ class LocationAwareRoundRobin(Router):
             return Engine.Aurora
 
         blueprint = self._blueprint_mgr.get_blueprint()
-
-        location_sets: List[Set[Engine]] = []
-        for table_name_str in query.tables():
-            try:
-                table_locations = blueprint.get_table_locations(table_name_str)
-                location_sets.append(set(table_locations))
-            except ValueError:
-                # The query is referencing a non-existent table (could be a CTE
-                # - the parser does not differentiate between CTE tables and
-                # "actual" tables).
-                pass
-        locations: List[Engine] = (
-            list(set.intersection(*location_sets)) if len(location_sets) > 0 else []
+        valid_locations, only_location = self._run_location_routing(
+            query, blueprint.table_locations_bitmap()
         )
+        if only_location is not None:
+            return only_location
 
-        if len(locations) == 0:
-            # This happens when a query references a set of tables that do not
-            # all have a presence in the same location.
-            raise RuntimeError(
-                "A single location is not available for tables {}".format(
-                    ", ".join(query.tables())
-                )
-            )
-
+        locations = Engine.from_bitmap(valid_locations)
         self._curr_idx %= len(locations)
         selected_location = locations[self._curr_idx]
         self._curr_idx += 1
