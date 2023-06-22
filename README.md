@@ -71,6 +71,16 @@ your_schema_name`). Note that this command will delete the data in the tables
 (and will drop the tables)!
 
 
+### Upgrade Steps
+
+This section documents manual update steps you will need to take if you were
+running an older version of BRAD and have existing configurations and legacy
+files.
+
+- (06/22/2023) Rename the `s3_metadata_bucket` and `s3_metadata_path` keys in
+  the configuration to `s3_assets_bucket` and `s3_assets_path` respectively.
+
+
 ### Generate IMDB workload
 
 Required package (pip install): pandas, absl-py, numpy

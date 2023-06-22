@@ -12,6 +12,7 @@ import pyodbc
 
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
 
+from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
 from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.config.engine import Engine
@@ -49,7 +50,8 @@ class BradServer(BradInterface):
         self._config = config
         self._schema_name = schema_name
         self._debug_mode = debug_mode
-        self._blueprint_mgr = BlueprintManager(self._config, self._schema_name)
+        self._assets = AssetManager(self._config)
+        self._blueprint_mgr = BlueprintManager(self._assets, self._schema_name)
         self._path_to_planner_config = path_to_planner_config
         self._monitor: Optional[Monitor] = None
 

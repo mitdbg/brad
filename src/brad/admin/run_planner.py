@@ -3,6 +3,7 @@ import logging
 import pathlib
 from typing import Dict
 
+from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
@@ -112,7 +113,8 @@ def run_planner(args) -> None:
     planner_config = PlannerConfig(args.planner_config_file)
 
     # 3. Load the blueprint.
-    blueprint_mgr = BlueprintManager(config, args.schema_name)
+    assets = AssetManager(config)
+    blueprint_mgr = BlueprintManager(assets, args.schema_name)
     blueprint_mgr.load_sync()
     logger.info("Current blueprint:")
     logger.info("%s", blueprint_mgr.get_blueprint())
