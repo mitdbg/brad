@@ -24,7 +24,7 @@ def test_location_constraints():
         "test2": EngineBitmapValues[Engine.Aurora]
         | EngineBitmapValues[Engine.Redshift],
     }
-    router = ForestRouter.for_testing("test_schema", model, bitmap)
+    router = ForestRouter.for_planner("test_schema", model, bitmap)
 
     query1 = QueryRep("SELECT * FROM test1")
     loc = router.engine_for(query1)
@@ -43,7 +43,7 @@ def test_model_codepath_partial():
         "test2": EngineBitmapValues[Engine.Aurora]
         | EngineBitmapValues[Engine.Redshift],
     }
-    router = ForestRouter.for_testing("test_schema", model, bitmap)
+    router = ForestRouter.for_planner("test_schema", model, bitmap)
 
     query = QueryRep("SELECT * FROM test1, test2")
     loc = router.engine_for(query)
@@ -57,7 +57,7 @@ def test_model_codepath_all():
         "test2": EngineBitmapValues[Engine.Aurora]
         | EngineBitmapValues[Engine.Redshift],
     }
-    router = ForestRouter.for_testing("test_schema", model, bitmap)
+    router = ForestRouter.for_planner("test_schema", model, bitmap)
 
     query = QueryRep("SELECT * FROM test1")
     loc = router.engine_for(query)

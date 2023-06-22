@@ -7,6 +7,7 @@ from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning, MutableProvisioning
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.beam.feasibility import BlueprintFeasibility
+from brad.planner.beam.router_provider import RouterProvider
 from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
@@ -36,7 +37,6 @@ from brad.planner.scoring.table_placement import (
     compute_single_table_movement_time_and_cost,
 )
 from brad.routing import Router
-from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
 
 
@@ -183,13 +183,13 @@ class BlueprintCandidate(ComparableBlueprint):
 
     def add_query_cluster(
         self,
+        router_provider: RouterProvider,
         query_cluster: List[int],
         reroute_prev: bool,
         engine_connections: EngineConnections,
         ctx: ScoringContext,
     ) -> None:
-        # TODO: The router should come from the blueprint.
-        router: Router = RuleBased(table_placement_bitmap=self.table_placements)
+        router: Router = router_provider.get_router(self.table_placements)
 
         if reroute_prev:
             self.query_locations[Engine.Aurora].clear()

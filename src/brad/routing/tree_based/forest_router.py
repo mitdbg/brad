@@ -17,7 +17,7 @@ class ForestRouter(Router):
         return cls(schema_name, assets=assets, blueprint_mgr=blueprint_mgr)
 
     @classmethod
-    def for_testing(
+    def for_planner(
         cls, schema_name: str, model: ModelWrap, table_bitmap: Dict[str, int]
     ) -> "ForestRouter":
         return cls(schema_name, model=model, table_placement_bitmap=table_bitmap)
@@ -94,6 +94,12 @@ class ForestRouter(Router):
         key = _SERIALIZED_KEY.format(schema_name=schema_name)
         serialized = model.to_pickle()
         assets.persist_sync(key, serialized)
+
+    @staticmethod
+    def static_load_model_sync(schema_name: str, assets: AssetManager) -> ModelWrap:
+        key = _SERIALIZED_KEY.format(schema_name=schema_name)
+        serialized = assets.load_sync(key)
+        return ModelWrap.from_pickle_bytes(serialized)
 
 
 _SERIALIZED_KEY = "{schema_name}/forest_router.pickle"
