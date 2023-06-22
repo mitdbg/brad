@@ -1,4 +1,5 @@
 import pathlib
+import pickle
 
 import numpy as np
 import numpy.typing as npt
@@ -9,6 +10,7 @@ from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import RandomOverSampler
 
 from . import ORDERED_ENGINES
+from .model_wrap import ModelWrap
 from brad.query_rep import QueryRep
 from brad.blueprint.table import Table
 from brad.blueprint.user import UserProvidedBlueprint
@@ -66,6 +68,23 @@ class ForestTrainer:
         stacked = np.stack([aurora_rt, redshift_rt, athena_rt], axis=cls.m)
 
         return cls(bp.tables, raw_queries, stacked)
+
+    def train_and_serialize(
+        self,
+        save_to: str,
+        train_full: bool = True,
+        max_depth: int = 15,
+        min_samples_split: int = 10,
+        num_trees: int = 100,
+    ) -> Tuple[RandomForestClassifier, ModelQuality]:
+        clf, quality = self.train(train_full, max_depth, min_samples_split, num_trees)
+        model = ModelWrap(self._table_order, clf)
+
+        # TODO: Pickling may not be the best option here.
+        with open(save_to, "wb") as file:
+            pickle.dump(model, file)
+
+        return clf, quality
 
     def train(
         self,
