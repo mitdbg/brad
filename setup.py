@@ -35,6 +35,8 @@ INSTALL_REQUIRES = [
     "pandas",
     "scikit-learn",
     "types-pytz",
+    "numpy",
+    "imbalanced-learn",
 ]
 
 DEV_REQUIRES = [
@@ -42,13 +44,11 @@ DEV_REQUIRES = [
     "black",
     "grpcio-tools",
     "mypy",
-    "numpy",
     "pylint",
     "pytest",
     "types-PyYAML",
     "types-protobuf",
     "absl-py",
-    "numpy",
     "immutables",
     "attrs",
     "typing-extensions",

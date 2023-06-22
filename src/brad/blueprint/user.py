@@ -1,4 +1,5 @@
 import yaml
+import pathlib
 from typing import List, Set
 
 from .provisioning import Provisioning
@@ -21,7 +22,7 @@ class UserProvidedBlueprint:
     """
 
     @classmethod
-    def load_from_yaml_file(cls, path: str) -> "UserProvidedBlueprint":
+    def load_from_yaml_file(cls, path: str | pathlib.Path) -> "UserProvidedBlueprint":
         with open(path, "r", encoding="UTF-8") as file:
             raw_yaml = yaml.load(file, Loader=yaml.Loader)
         return cls._load_from_raw_yaml(raw_yaml)
