@@ -8,11 +8,11 @@ from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner import BlueprintPlanner
 from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.query_based_candidate import BlueprintCandidate
+from brad.planner.beam.router_provider import RouterProvider
 from brad.planner.debug_logger import BlueprintPlanningDebugLogger
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
-from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 
@@ -21,6 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 class QueryBasedBeamPlanner(BlueprintPlanner):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._router_provider = RouterProvider(self._schema_name, self._config)
+
     async def run_forever(self) -> None:
         while True:
             await asyncio.sleep(3)
@@ -78,8 +82,8 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 self._planner_config,
             )
             ctx.simulate_current_workload_routing(
-                RuleBased(
-                    table_placement_bitmap=self._current_blueprint.table_locations_bitmap()
+                self._router_provider.get_router(
+                    self._current_blueprint.table_locations_bitmap()
                 )
             )
             ctx.compute_engine_latency_weights()
@@ -222,8 +226,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             for candidate in current_top_k:
                 query_indices = candidate.get_all_query_indices()
                 candidate.reset_routing()
-                # TODO: We should not hard code this policy.
-                router = RuleBased(table_placement_bitmap=candidate.table_placements)
+                router = self._router_provider.get_router(candidate.table_placements)
                 for qidx in query_indices:
                     query = analytical_queries[qidx]
                     routing_engine = router.engine_for(query)

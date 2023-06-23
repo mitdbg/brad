@@ -8,13 +8,13 @@ from typing import List, Tuple, Dict
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner import BlueprintPlanner
 from brad.planner.beam.feasibility import BlueprintFeasibility
+from brad.planner.beam.router_provider import RouterProvider
 from brad.planner.beam.table_based_candidate import BlueprintCandidate
 from brad.planner.debug_logger import BlueprintPlanningDebugLogger
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
 from brad.planner.workload import Workload
-from brad.routing.rule_based import RuleBased
 from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 
@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 class TableBasedBeamPlanner(BlueprintPlanner):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._router_provider = RouterProvider(self._schema_name, self._config)
+
     async def run_forever(self) -> None:
         while True:
             await asyncio.sleep(3)
@@ -72,8 +76,8 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                 self._planner_config,
             )
             ctx.simulate_current_workload_routing(
-                RuleBased(
-                    table_placement_bitmap=self._current_blueprint.table_locations_bitmap()
+                self._router_provider.get_router(
+                    self._current_blueprint.table_locations_bitmap()
                 )
             )
             ctx.compute_engine_latency_weights()
@@ -99,6 +103,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                     placement_bitmap, tables, ctx
                 )
                 candidate.add_query_cluster(
+                    self._router_provider,
                     queries,
                     reroute_prev=placement_changed,
                     engine_connections=engine_connections,
@@ -147,6 +152,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                             continue
 
                         next_candidate.add_query_cluster(
+                            self._router_provider,
                             queries,
                             reroute_prev=placement_changed,
                             engine_connections=engine_connections,
