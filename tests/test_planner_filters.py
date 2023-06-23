@@ -1,4 +1,5 @@
 from typing import List
+from datetime import timedelta
 
 from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning
@@ -23,7 +24,7 @@ def workload_from_queries(query_list: List[str]) -> Workload:
             transactional.append(qr)
         else:
             analytical.append(qr)
-    return Workload(analytical, transactional, 0.01, 1000)
+    return Workload(timedelta(hours=1), analytical, transactional, 0, {})
 
 
 def test_aurora_transactions():

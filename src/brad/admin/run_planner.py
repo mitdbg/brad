@@ -2,6 +2,7 @@ import asyncio
 import logging
 import pathlib
 from typing import Dict
+from datetime import timedelta
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -22,8 +23,11 @@ from brad.planner.metrics import (
     MetricsProvider,
 )
 from brad.planner.workload import Workload
+from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import FixedWorkloadProvider
 from brad.server.blueprint_manager import BlueprintManager
+from brad.server.engine_connections import EngineConnections
+from brad.utils.table_sizer import TableSizer
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +70,16 @@ def register_admin_action(subparser) -> None:
         type=str,
         required=True,
         help="The name of the schema to run against.",
+    )
+    parser.add_argument(
+        "--analytical-rate-per-s",
+        type=float,
+        help="The number of analytical queries issued per second.",
+    )
+    parser.add_argument(
+        "--transactional-rate-per-s",
+        type=float,
+        help="The number of transactions issued per second.",
     )
     parser.add_argument(
         "--debug",
@@ -124,8 +138,30 @@ def run_planner(args) -> None:
         workload = Workload.from_pickle(
             pathlib.Path(args.workload_dir) / _PICKLE_FILE_NAME
         )
+
     else:
-        workload = Workload.from_extracted_logs(args.workload_dir)
+        assert args.analytical_rate_per_s is not None
+        assert args.transactional_rate_per_s is not None
+
+        engines = EngineConnections.connect_sync(
+            config, args.schema_name, autocommit=True
+        )
+        table_sizer = TableSizer(engines, config)
+        workload_dir = pathlib.Path(args.workload_dir)
+        builder = WorkloadBuilder()
+        workload = (
+            builder.add_analytical_queries_from_file(workload_dir / "olap.sql")
+            .add_transactional_queries_from_file(workload_dir / "oltp.sql")
+            .uniform_per_analytical_query_rate(
+                args.analytical_rate_per_s, period=timedelta(seconds=1)
+            )
+            .uniform_total_transaction_rate(
+                args.transactional_rate_per_s, period=timedelta(seconds=1)
+            )
+            .for_period(timedelta(hours=1))
+            .table_sizes_from_engines(blueprint_mgr.get_blueprint(), table_sizer)
+            .build()
+        )
 
     # 5. Load the pre-computed predictions.
     prediction_dir = pathlib.Path(args.predictions_dir)
