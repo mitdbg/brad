@@ -1,4 +1,4 @@
-from brad.planner.workload.utils import workload_from_s3_logs
+from brad.planner.workload.legacy_utils import workload_from_s3_logs
 from brad.config.file import ConfigFile
 
 

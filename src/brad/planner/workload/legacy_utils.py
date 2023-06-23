@@ -31,7 +31,7 @@ def workload_from_extracted_logs(file_path: str, period=timedelta(hours=1)) -> W
     with open(path / "sample_prob.txt", encoding="UTF-8") as sample_file:
         sampling_prob = float(sample_file.read().strip())
 
-    return Workload(period, analytical_queries, txn_queries, sampling_prob, 0)
+    return Workload(period, analytical_queries, txn_queries, sampling_prob, {})
 
 
 def workload_from_s3_logs(
@@ -78,4 +78,4 @@ def workload_from_s3_logs(
                 q = re.findall(r"Query: (.+) Engine:", line)[0]
                 txn_queries.append(Query(q))
 
-    return Workload(period, analytical_queries, txn_queries, sampling_prob, 0)
+    return Workload(period, analytical_queries, txn_queries, sampling_prob, {})

@@ -48,7 +48,7 @@ class Workload:
 
     @classmethod
     def empty(cls) -> "Workload":
-        return cls(timedelta(hours=1), [], [], 0.01, 0)
+        return cls(timedelta(hours=1), [], [], 0.01, {})
 
     @classmethod
     def from_pickle(cls, file_path: str | Path) -> "Workload":
@@ -61,7 +61,7 @@ class Workload:
         analytical_queries: List[Query],
         transactional_queries: List[Query],
         transaction_sample_fraction: float,
-        dataset_size_mb: int,
+        table_sizes: Dict[str, int],
     ) -> None:
         self._period = period
 
@@ -70,8 +70,7 @@ class Workload:
         self._transactional_queries: List[Query] = transactional_queries
         self._transaction_sample_fraction = transaction_sample_fraction
 
-        self._table_sizes_mb: Dict[Tuple[str, Engine], int] = {}
-        self._dataset_size_mb = dataset_size_mb
+        self._table_sizes = table_sizes
 
         # The predicted latencies of the analytical queries.
         # This property is set and used by the blueprint planner.
@@ -86,6 +85,8 @@ class Workload:
 
         # The size of a table on an engine.
         self._aurora_row_size_bytes: Dict[str, int] = {}
+        self._table_sizes_mb: Dict[Tuple[str, Engine], int] = {}
+        self._dataset_size_mb = 0
 
     def serialize_for_debugging(self, output_path: str | Path) -> None:
         with open(output_path, "wb") as out_file:

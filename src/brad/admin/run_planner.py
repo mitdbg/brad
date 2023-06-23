@@ -23,7 +23,7 @@ from brad.planner.metrics import (
 )
 from brad.planner.workload import Workload
 from brad.planner.workload.provider import FixedWorkloadProvider
-from brad.planner.workload.utils import workload_from_extracted_logs
+from brad.planner.workload.legacy_utils import workload_from_extracted_logs
 from brad.server.blueprint_manager import BlueprintManager
 
 logger = logging.getLogger(__name__)
