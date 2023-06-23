@@ -52,6 +52,36 @@ s3_usd_per_mb_per_month: 0.000023
 
 
 ###
+### Dataset-specific Transition Constants
+###
+
+# Use tools/calibration/table_sizes.py
+table_extract_bytes_per_row:
+  imdb:
+    aka_name: 82.32090609799353
+    aka_title: 115.56655840563032
+    cast_info: 42.24659189517344
+    char_name: 72.90391741131415
+    comp_cast_type: 11.25
+    company_name: 78.17681702901008
+    company_type: 23.0
+    complete_cast: 17.87376189982678
+    info_type: 17.061946902654867
+    keyword: 29.722837823099574
+    kind_type: 12.142857142857142
+    link_type: 14.5
+    movie_companies: 38.37564715243578
+    movie_info_idx: 27.599008162123223
+    movie_keyword: 20.829555089708155
+    movie_link: 21.888322165549887
+    name: 79.93293378151274
+    role_type: 13.333333333333334
+    title: 90.16314998231906
+    movie_info: 73.69504549846432
+    person_info: 133.59130584387262
+
+
+###
 ### Performance metrics scaling modifiers.
 ### (Used by neighborhood planning.)
 ###

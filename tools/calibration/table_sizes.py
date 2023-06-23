@@ -1,3 +1,5 @@
+import boto3
+import asyncio
 import argparse
 import logging
 import json
@@ -6,12 +8,93 @@ from typing import Dict
 from brad.asset_manager import AssetManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
+from brad.data_sync.execution.context import ExecutionContext
+from brad.data_sync.operators.unload_to_s3 import UnloadToS3
 from brad.server.blueprint_manager import BlueprintManager
 from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)
+
+
+def s3_object_size_bytes(client, bucket: str, key: str) -> int:
+    response = client.head_object(Bucket=bucket, Key=key)
+    return response["ContentLength"]
+
+
+def delete_s3_object(client, bucket: str, key: str) -> None:
+    client.delete_object(Bucket=bucket, Key=key)
+
+
+async def main_impl(args):
+    config = ConfigFile(args.config_file)
+    assets = AssetManager(config)
+    mgr = BlueprintManager(assets, args.schema_name)
+    await mgr.load()
+
+    bp = mgr.get_blueprint()
+    logger.info("Using blueprint: %s", bp)
+
+    engines_sync = EngineConnections.connect_sync(
+        config, args.schema_name, autocommit=True, specific_engines={Engine.Aurora}
+    )
+    engines = await EngineConnections.connect(
+        config, args.schema_name, autocommit=True, specific_engines={Engine.Aurora}
+    )
+
+    boto_client = boto3.client(
+        "s3",
+        aws_access_key_id=config.aws_access_key,
+        aws_secret_access_key=config.aws_access_key_secret,
+    )
+    table_sizer = TableSizer(engines_sync, config)
+    ctx = ExecutionContext(
+        engines.get_connection(Engine.Aurora), None, None, bp, config
+    )
+
+    # We need a rough measure of how much data we will export and import per
+    # table (in bytes) when transferring tables. We will unload data from Aurora
+    # to estimate the transfer size per row.
+
+    bytes_per_row: Dict[str, float] = {}
+
+    for table, locations in bp.tables_with_locations():
+        if Engine.Aurora not in locations:
+            logger.warning(
+                "Skipping %s because it is not present on Aurora.", table.name
+            )
+            continue
+
+        extract_file = f"{table.name}_test.tbl"
+        full_extract_path = f"{config.s3_extract_path}{extract_file}"
+
+        num_rows = table_sizer.table_size_rows(table.name, Engine.Aurora)
+        op = UnloadToS3(table.name, extract_file, Engine.Aurora)
+        await op.execute(ctx)
+
+        table_bytes = s3_object_size_bytes(
+            boto_client, config.s3_extract_bucket, full_extract_path
+        )
+
+        b_per_row = table_bytes / num_rows
+        logger.info(
+            "%s: %d rows, extracted %d B total", table.name, num_rows, table_bytes
+        )
+        bytes_per_row[table.name] = b_per_row
+
+        delete_s3_object(boto_client, config.s3_extract_bucket, full_extract_path)
+
+    if args.debug:
+        logger.debug("Recorded stats: %s", json.dumps(bytes_per_row, indent=2))
+
+    print("table_extract_bytes_per_row:", flush=True)
+    print(f"  {args.schema_name}:")
+    for table, bpr in bytes_per_row.items():
+        print(f"    {table}: {bpr}", flush=True)
+
+    await engines.close()
+    engines_sync.close_sync()
 
 
 def main():
@@ -26,48 +109,7 @@ def main():
 
     set_up_logging(debug_mode=args.debug)
 
-    config = ConfigFile(args.config_file)
-    assets = AssetManager(config)
-    mgr = BlueprintManager(assets, args.schema_name)
-    mgr.load_sync()
-
-    bp = mgr.get_blueprint()
-    logger.info("Using blueprint: %s", bp)
-
-    engine_set = {Engine.Aurora, Engine.Athena, Engine.Redshift}
-    if bp.aurora_provisioning().num_nodes() == 0:
-        engine_set.remove(Engine.Aurora)
-    if bp.redshift_provisioning().num_nodes() == 0:
-        engine_set.remove(Engine.Redshift)
-
-    engines = EngineConnections.connect_sync(
-        config, args.schema_name, autocommit=True, specific_engines=engine_set
-    )
-    table_sizer = TableSizer(engines, config)
-
-    overall: Dict[str, Dict[Engine, float]] = {}
-
-    for table, locations in bp.tables_with_locations():
-        per_table: Dict[Engine, float] = {}
-        for loc in locations:
-            num_rows = table_sizer.table_size_rows(table.name, loc)
-            table_bytes = table_sizer.table_size_bytes(table.name, loc)
-            b_per_row = table_bytes / num_rows
-            per_table[loc] = b_per_row
-            logger.info(
-                "%s on %s: %d rows, %d B total", table.name, loc, num_rows, table_bytes
-            )
-        overall[table.name] = per_table
-
-    if args.debug:
-        logger.debug("Recorded stats: %s", json.dumps(overall, indent=2))
-
-    print("table_bytes_per_row:", flush=True)
-    print(f"  {args.schema_name}:")
-    for table, size_info in overall.items():
-        print(f"    {table}:", flush=True)
-        for engine, b_per_row in size_info.items():
-            print(f"      {engine.value}: {b_per_row}", flush=True)
+    asyncio.run(main_impl(args))
 
 
 if __name__ == "__main__":
