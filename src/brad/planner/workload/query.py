@@ -12,14 +12,22 @@ logger = logging.getLogger(__name__)
 
 class Query(QueryRep):
     """
-    A `QueryRep` that is decorated with statistics that need to be obtained at
-    runtime.
+    A `QueryRep` that is decorated with additional statistics that are used for
+    blueprint planning.
     """
 
-    def __init__(self, sql_query: str):
+    def __init__(self, sql_query: str, arrival_count: int = 1):
         super().__init__(sql_query)
+        self._arrival_count = arrival_count
+
+        # Legacy statistics.
         self._data_accessed_mb: Dict[Engine, int] = {}
         self._tuples_accessed: Dict[Engine, int] = {}
+
+    def arrival_count(self) -> int:
+        return self._arrival_count
+
+    # The methods below are legacy code.
 
     def data_accessed_mb(self, engine: Engine) -> int:
         return self._data_accessed_mb[engine]

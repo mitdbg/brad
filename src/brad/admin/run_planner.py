@@ -23,6 +23,7 @@ from brad.planner.metrics import (
 )
 from brad.planner.workload import Workload
 from brad.planner.workload.provider import FixedWorkloadProvider
+from brad.planner.workload.utils import workload_from_extracted_logs
 from brad.server.blueprint_manager import BlueprintManager
 
 logger = logging.getLogger(__name__)
@@ -125,7 +126,7 @@ def run_planner(args) -> None:
             pathlib.Path(args.workload_dir) / _PICKLE_FILE_NAME
         )
     else:
-        workload = Workload.from_extracted_logs(args.workload_dir)
+        workload = workload_from_extracted_logs(args.workload_dir)
 
     # 5. Load the pre-computed predictions.
     prediction_dir = pathlib.Path(args.predictions_dir)
