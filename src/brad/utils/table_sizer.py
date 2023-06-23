@@ -3,6 +3,7 @@ import logging
 
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
+from brad.config.strings import source_table_name
 from brad.server.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,18 @@ class TableSizer:
                 "Unknown location {} for table {}".format(str(location), table_name)
             )
 
+    def table_size_bytes(self, table_name: str, location: Engine) -> int:
+        if location == Engine.Aurora:
+            return self._table_size_bytes_aurora(table_name)
+        elif location == Engine.Athena:
+            return self._table_size_bytes_athena(table_name)
+        elif location == Engine.Redshift:
+            return self._table_size_bytes_redshift(table_name)
+        else:
+            raise RuntimeError(
+                "Unknown location {} for table {}".format(str(location), table_name)
+            )
+
     def table_size_rows(self, table_name: str, location: Engine) -> int:
         query = "SELECT COUNT(*) FROM {}".format(table_name)
         if location == Engine.Aurora:
@@ -60,33 +73,40 @@ class TableSizer:
         return int(row[0])
 
     def _table_size_mb_athena(self, table_name: str) -> int:
+        return int(self._table_size_bytes_athena(table_name) / 1000 / 1000)
+
+    def _table_size_bytes_athena(self, table_name: str) -> int:
         # Format: s3://bucket/path/to/files/
         parts = self._config.athena_s3_data_path.split("/")
         bucket_name = parts[2]
         data_prefix = "/".join(parts[3:])
-        table_prefix = "/" + data_prefix + table_name + "/"
+        table_prefix = data_prefix + table_name + "/"
 
         # NOTE: This may be problematic when there are many objects in a prefix.
         def run_inner():
             total_size_bytes = 0
             bucket = self._s3.Bucket(bucket_name)
+            print(bucket_name, table_prefix)
             for obj in bucket.objects.filter(Prefix=table_prefix):
                 total_size_bytes += obj.size
             # `total_size` is in bytes.
             return total_size_bytes
 
         total_size_bytes = run_inner()
-        return int(total_size_bytes / 1000 / 1000)
+        return total_size_bytes
 
     def _table_size_mb_aurora(self, table_name: str) -> int:
-        query = "SELECT pg_table_size('{}')".format(table_name)
+        return int(self._table_size_bytes_aurora(table_name) / 1000 / 1000)
+
+    def _table_size_bytes_aurora(self, table_name: str) -> int:
+        query = "SELECT pg_table_size('{}')".format(source_table_name(table_name))
         aurora = self._engines.get_connection(Engine.Aurora)
         cursor = aurora.cursor()
         logger.debug("Running on Aurora: %s", query)
         cursor.execute(query)
         result = cursor.fetchone()
         # The result is in bytes.
-        return int(int(result[0]) / 1000 / 1000)
+        return int(result[0])
 
     def _table_size_mb_redshift(self, table_name: str) -> int:
         query = "SELECT size FROM svv_table_info WHERE \"table\" = '{}';".format(
@@ -99,3 +119,6 @@ class TableSizer:
         result = cursor.fetchone()
         table_size_mb = int(result[0])
         return table_size_mb
+
+    def _table_size_bytes_redshift(self, table_name: str) -> int:
+        return self._table_size_mb_redshift(table_name) * 1000 * 1000
