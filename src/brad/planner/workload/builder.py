@@ -28,10 +28,13 @@ class WorkloadBuilder:
 
     def build(self) -> Workload:
         analytics = [
-            Query(q, arrival_count=self._analytics_count_per)
-            for q in self._analytical_queries
+            Query(q, arrival_count=self._analytics_count_per * count)
+            for q, count in self._deduplicate_queries(self._analytical_queries).items()
         ]
-        transactions = [Query(q, arrival_count=0) for q in self._transactional_queries]
+        transactions = [
+            Query(q, arrival_count=0)
+            for q in self._deduplicate_queries(self._transactional_queries).keys()
+        ]
         return Workload(
             period=self._period,
             analytical_queries=analytics,
@@ -106,3 +109,15 @@ class WorkloadBuilder:
                 break
             assert table.name in self._table_sizes
         return self
+
+    def _deduplicate_queries(self, queries: List[str]) -> Dict[str, int]:
+        """
+        Deduplication is by exact string match only.
+        """
+        deduped: Dict[str, int] = {}
+        for q in queries:
+            if q in deduped:
+                deduped[q] += 1
+            else:
+                deduped[q] = 1
+        return deduped
