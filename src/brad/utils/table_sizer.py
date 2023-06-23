@@ -86,7 +86,6 @@ class TableSizer:
         def run_inner():
             total_size_bytes = 0
             bucket = self._s3.Bucket(bucket_name)
-            print(bucket_name, table_prefix)
             for obj in bucket.objects.filter(Prefix=table_prefix):
                 total_size_bytes += obj.size
             # `total_size` is in bytes.

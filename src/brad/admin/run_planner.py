@@ -73,12 +73,12 @@ def register_admin_action(subparser) -> None:
     )
     parser.add_argument(
         "--analytical-rate-per-s",
-        type=int,
+        type=float,
         help="The number of analytical queries issued per second.",
     )
     parser.add_argument(
         "--transactional-rate-per-s",
-        type=int,
+        type=float,
         help="The number of transactions issued per second.",
     )
     parser.add_argument(

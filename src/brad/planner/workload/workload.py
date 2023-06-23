@@ -59,7 +59,7 @@ class Workload:
         period: timedelta,
         analytical_queries: List[Query],
         transactional_queries: List[Query],
-        transaction_arrival_count: int,
+        transaction_arrival_count: float,
         table_sizes: Dict[str, int],
     ) -> None:
         self._period = period
@@ -100,7 +100,7 @@ class Workload:
     def all_queries(self) -> Iterable[Query]:
         return chain(self._transactional_queries, self._analytical_queries)
 
-    def transaction_arrival_count(self) -> int:
+    def transaction_arrival_count(self) -> float:
         return self._transaction_arrival_count
 
     ###

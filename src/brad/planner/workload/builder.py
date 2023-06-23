@@ -21,8 +21,8 @@ class WorkloadBuilder:
     def __init__(self) -> None:
         self._analytical_queries: List[str] = []
         self._transactional_queries: List[str] = []
-        self._analytics_count_per: int = 1
-        self._total_transaction_count: int = 0
+        self._analytics_count_per: float = 1.0
+        self._total_transaction_count: float = 0.0
         self._period = timedelta(hours=1)
         self._table_sizes: Dict[str, int] = {}
 
@@ -48,7 +48,7 @@ class WorkloadBuilder:
         return self
 
     def uniform_per_analytical_query_rate(
-        self, count: int, period: Optional[timedelta] = None
+        self, count: float, period: Optional[timedelta] = None
     ) -> "WorkloadBuilder":
         """
         Used to express that all queries run `count` times during the period. If
@@ -58,11 +58,11 @@ class WorkloadBuilder:
             self._analytics_count_per = count
         else:
             scaled = count / period.total_seconds() * self._period.total_seconds()
-            self._analytics_count_per = int(scaled)
+            self._analytics_count_per = scaled
         return self
 
     def uniform_total_transaction_rate(
-        self, count: int, period: Optional[timedelta] = None
+        self, count: float, period: Optional[timedelta] = None
     ) -> "WorkloadBuilder":
         """
         Used to express the rate of transactions arriving during the period. If
@@ -75,7 +75,7 @@ class WorkloadBuilder:
             self._total_transaction_count = count
         else:
             scaled = count / period.total_seconds() * self._period.total_seconds()
-            self._total_transaction_count = int(scaled)
+            self._total_transaction_count = scaled
         return self
 
     def add_analytical_queries_from_file(
