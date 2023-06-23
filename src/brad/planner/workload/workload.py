@@ -28,12 +28,11 @@ class Workload:
         twice during the period)
     - Transactions
       - List of the queries that appear in transactions
-      - Sample probability
       - Transaction arrival count in the epoch (e.g., 1e6 means 1 million
-        transactions arrive during the period)
+        transactions arrive during the period). This count is independent of the
+        individual queries; we only look at the transaction rate in aggregate.
     - Dataset statistics
-      - Table sizes
-      - Total dataset size
+      - Logical table sizes (number of rows per table)
 
     The planner uses the `Workload` when computing scores to compare blueprints.
     The intention is that these values can also be _forecasted_.
@@ -48,7 +47,7 @@ class Workload:
 
     @classmethod
     def empty(cls) -> "Workload":
-        return cls(timedelta(hours=1), [], [], 0.01, {})
+        return cls(timedelta(hours=1), [], [], 0, {})
 
     @classmethod
     def from_pickle(cls, file_path: str | Path) -> "Workload":
@@ -60,16 +59,13 @@ class Workload:
         period: timedelta,
         analytical_queries: List[Query],
         transactional_queries: List[Query],
-        transaction_sample_fraction: float,
+        transaction_arrival_count: int,
         table_sizes: Dict[str, int],
     ) -> None:
         self._period = period
-
         self._analytical_queries: List[Query] = analytical_queries
-
         self._transactional_queries: List[Query] = transactional_queries
-        self._transaction_sample_fraction = transaction_sample_fraction
-
+        self._transaction_arrival_count = transaction_arrival_count
         self._table_sizes = table_sizes
 
         # The predicted latencies of the analytical queries.
@@ -103,6 +99,9 @@ class Workload:
 
     def all_queries(self) -> Iterable[Query]:
         return chain(self._transactional_queries, self._analytical_queries)
+
+    def transaction_arrival_count(self) -> int:
+        return self._transaction_arrival_count
 
     ###
     ### The methods below are meant for the blueprint planner.

@@ -28,10 +28,7 @@ def workload_from_extracted_logs(file_path: str, period=timedelta(hours=1)) -> W
         for q in analytics:
             analytical_queries.append(Query(q))
 
-    with open(path / "sample_prob.txt", encoding="UTF-8") as sample_file:
-        sampling_prob = float(sample_file.read().strip())
-
-    return Workload(period, analytical_queries, txn_queries, sampling_prob, {})
+    return Workload(period, analytical_queries, txn_queries, 0, {})
 
 
 def workload_from_s3_logs(
@@ -78,4 +75,7 @@ def workload_from_s3_logs(
                 q = re.findall(r"Query: (.+) Engine:", line)[0]
                 txn_queries.append(Query(q))
 
-    return Workload(period, analytical_queries, txn_queries, sampling_prob, {})
+    # N.B. Sampling probability is currently unused, but is still needed to
+    # reweigh the transactions.
+
+    return Workload(period, analytical_queries, txn_queries, 0, {})

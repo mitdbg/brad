@@ -34,6 +34,19 @@ class TableSizer:
                 "Unknown location {} for table {}".format(str(location), table_name)
             )
 
+    def table_size_rows(self, table_name: str, location: Engine) -> int:
+        query = "SELECT COUNT(*) FROM {}".format(table_name)
+        if location == Engine.Aurora:
+            conn = self._engines.get_connection(Engine.Aurora)
+        elif location == Engine.Redshift:
+            conn = self._engines.get_connection(Engine.Redshift)
+        elif location == Engine.Athena:
+            conn = self._engines.get_connection(Engine.Athena)
+        cursor = conn.cursor()
+        cursor.execute(query)
+        row = cursor.fetchone()
+        return int(row[0])
+
     def aurora_row_size_bytes(self, table_name: str) -> int:
         """
         A rough estimate for the size of a row in Aurora, in bytes.
