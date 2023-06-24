@@ -1,54 +1,35 @@
 from collections import namedtuple
-from typing import Dict
+from datetime import timedelta
 
 from brad.config.engine import Engine, EngineBitmapValues
-from brad.config.planner import PlannerConfig
-from brad.planner.workload import Workload
+from brad.planner.scoring.context import ScoringContext
 
 
-def compute_athena_table_placement_cost(
-    table_placements: Dict[str, int],
-    workload: Workload,
-    planner_config: PlannerConfig,
-) -> float:
-    """
-    Estimates the hourly monetary cost of storing a table on Athena.
-    """
-    athena_table_storage_cost = 0.0
-    for tbl, locations in table_placements.items():
-        if locations & EngineBitmapValues[Engine.Athena] == 0:
-            # This table is not present on Athena.
-            continue
-        athena_table_storage_cost += compute_single_athena_table_cost(
-            tbl, workload, planner_config
-        )
-    return athena_table_storage_cost
-
-
-def compute_single_athena_table_cost(
-    table_name: str, workload: Workload, planner_config: PlannerConfig
-) -> float:
-    athena_table_storage_cost = 0.0
+def compute_single_athena_table_cost(table_name: str, ctx: ScoringContext) -> float:
+    athena_table_storage_usd_per_mb_per_month = 0.0
 
     # We make a rough estimate of the table's size on the engine.
-    for src in [Engine.Athena, Engine.Aurora, Engine.Redshift]:
-        size_mb = workload.table_size_on_engine(table_name, src)
-        if size_mb is not None:
-            break
+    # This is an overestimate since we use Parquet to store the data on S3,
+    # which will compress the columns.
+    #
+    # N.B. We use sizing information from the next workload here.
+    num_rows = ctx.next_workload.table_num_rows(table_name)
+    raw_extract_bytes = num_rows * ctx.planner_config.extract_table_bytes_per_row(
+        ctx.schema_name, table_name
+    )
+    raw_extract_mb = raw_extract_bytes / 1000 / 1000
 
-    # Table is present on at least one engine.
-    assert size_mb is not None
+    athena_table_storage_usd_per_mb_per_month += (
+        raw_extract_mb * ctx.planner_config.s3_usd_per_mb_per_month()
+    )
+    source_period = timedelta(days=30)
+    dest_period = ctx.next_workload.period()
 
-    athena_table_storage_cost += size_mb * planner_config.s3_usd_per_mb_per_month()
-
-    # Rescale the cost to be USD per MB per hour. The provisioning cost is
-    # based on an hour.
-    # We use 30 days to represent a month.
-    # TODO: Make the time period configurable (we may want a cost for a day,
-    # for example).
-    athena_table_storage_cost /= 30 * 24
-
-    return athena_table_storage_cost
+    return (
+        athena_table_storage_usd_per_mb_per_month
+        * (1.0 / source_period.total_seconds())
+        * dest_period.total_seconds()
+    )
 
 
 TableMovementScore = namedtuple(
@@ -56,36 +37,11 @@ TableMovementScore = namedtuple(
 )
 
 
-def compute_table_movement_time_and_cost(
-    current_placement: Dict[str, int],
-    next_placement: Dict[str, int],
-    current_workload: Workload,
-    planner_config: PlannerConfig,
-) -> TableMovementScore:
-    # Table movement.
-    movement_cost = 0.0
-    movement_time_s = 0.0
-
-    # We currently do not handle schema changes (adding/removing tables).
-    assert len(current_placement) == len(next_placement)
-
-    for table_name, cur in current_placement.items():
-        nxt = next_placement[table_name]
-        result = compute_single_table_movement_time_and_cost(
-            table_name, cur, nxt, current_workload, planner_config
-        )
-        movement_cost += result.movement_cost
-        movement_time_s += result.movement_time_s
-
-    return TableMovementScore(movement_cost, movement_time_s)
-
-
 def compute_single_table_movement_time_and_cost(
     table_name: str,
     current_placement: int,
     next_placement: int,
-    current_workload: Workload,
-    planner_config: PlannerConfig,
+    ctx: ScoringContext,
 ) -> TableMovementScore:
     movement_cost = 0.0
     movement_time_s = 0.0
@@ -101,78 +57,83 @@ def compute_single_table_movement_time_and_cost(
 
     added_engines = Engine.from_bitmap(added)
 
-    move_from = _best_extract_engine(current_placement, planner_config)
-    source_table_size_mb = current_workload.table_size_on_engine(table_name, move_from)
-    assert source_table_size_mb is not None
+    move_from = _best_extract_engine(current_placement, ctx)
+    extract_s3_rows = ctx.current_workload.table_num_rows(table_name)
+    extract_s3_bytes = extract_s3_rows * ctx.planner_config.extract_table_bytes_per_row(
+        ctx.schema_name, table_name
+    )
+    # N.B. The extract rates are all in MB/s, not MiB/s.
+    extract_s3_mb = extract_s3_bytes / 1000 / 1000
 
     # Extraction scoring.
     if move_from == Engine.Athena:
+        # N.B. "Extracting" data from Athena will depend on whether or not the
+        # downstream engine(s) can read Iceberg Parquet files directly.
+        # Otherwise, we will need to convert the data into a common format
+        # (e.g., CSV).
         movement_time_s += (
-            source_table_size_mb / planner_config.athena_extract_rate_mb_per_s()
+            extract_s3_mb / ctx.planner_config.athena_extract_rate_mb_per_s()
         )
-        movement_cost += (
-            planner_config.athena_usd_per_mb_scanned() * source_table_size_mb
-        )
+        movement_cost += ctx.planner_config.athena_usd_per_mb_scanned() * extract_s3_mb
 
     elif move_from == Engine.Aurora:
         movement_time_s += (
-            source_table_size_mb / planner_config.aurora_extract_rate_mb_per_s()
+            extract_s3_mb / ctx.planner_config.aurora_extract_rate_mb_per_s()
         )
 
     elif move_from == Engine.Redshift:
         movement_time_s += (
-            source_table_size_mb / planner_config.redshift_extract_rate_mb_per_s()
+            extract_s3_mb / ctx.planner_config.redshift_extract_rate_mb_per_s()
         )
 
     # Account for the computation needed to "import" data.
     for into_loc in added_engines:
-        # Need to assume the table will have the same size as on the
-        # source engine. This is not necessarily true when Redshift
-        # is the source, because it uses compression.
         if into_loc == Engine.Athena:
             movement_time_s += (
-                source_table_size_mb / planner_config.athena_load_rate_mb_per_s()
+                extract_s3_mb / ctx.planner_config.athena_load_rate_mb_per_s()
             )
             movement_cost += (
-                planner_config.athena_usd_per_mb_scanned() * source_table_size_mb
+                ctx.planner_config.athena_usd_per_mb_scanned() * extract_s3_mb
             )
 
         elif into_loc == Engine.Aurora:
             movement_time_s += (
-                source_table_size_mb / planner_config.aurora_load_rate_mb_per_s()
+                extract_s3_mb / ctx.planner_config.aurora_load_rate_mb_per_s()
             )
 
         elif into_loc == Engine.Redshift:
             movement_time_s += (
-                source_table_size_mb / planner_config.redshift_load_rate_mb_per_s()
+                extract_s3_mb / ctx.planner_config.redshift_load_rate_mb_per_s()
             )
 
     return TableMovementScore(movement_cost, movement_time_s)
 
 
-def _best_extract_engine(
-    existing_locations: int, planner_config: PlannerConfig
-) -> Engine:
+def _best_extract_engine(existing_locations: int, ctx: ScoringContext) -> Engine:
     """
     Returns the best source engine to extract a table from.
     """
     options = []
 
     if (existing_locations & EngineBitmapValues[Engine.Aurora]) != 0:
-        options.append((Engine.Aurora, planner_config.aurora_extract_rate_mb_per_s()))
+        options.append(
+            (Engine.Aurora, ctx.planner_config.aurora_extract_rate_mb_per_s())
+        )
 
     elif (existing_locations & EngineBitmapValues[Engine.Athena]) != 0:
-        options.append((Engine.Athena, planner_config.athena_extract_rate_mb_per_s()))
+        options.append(
+            (Engine.Athena, ctx.planner_config.athena_extract_rate_mb_per_s())
+        )
 
     elif (existing_locations & EngineBitmapValues[Engine.Redshift]) != 0:
         options.append(
-            (Engine.Redshift, planner_config.redshift_extract_rate_mb_per_s())
+            (Engine.Redshift, ctx.planner_config.redshift_extract_rate_mb_per_s())
         )
 
     options.sort(key=lambda op: op[1])
 
     if len(options) > 1 and options[0][0] == Engine.Athena:
-        # Avoid Athena if possible because we need to pay for extraction.
+        # Avoid Athena if possible because we may need to pay for extraction.
         return options[1][0]
     else:
         return options[0][0]

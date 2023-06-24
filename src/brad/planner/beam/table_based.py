@@ -16,7 +16,6 @@ from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
 from brad.planner.workload import Workload
 from brad.server.engine_connections import EngineConnections
-from brad.utils.table_sizer import TableSizer
 
 logger = logging.getLogger(__name__)
 
@@ -61,14 +60,9 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         )
 
         try:
-            # 4. Fetch any additional state needed for scoring.
-            table_sizer = TableSizer(engine_connections, self._config)
-            if next_workload.table_sizes_empty():
-                next_workload.populate_table_sizes_using_blueprint(
-                    self._current_blueprint, table_sizer
-                )
-                next_workload.set_dataset_size_from_table_sizes()
+            # 4. Initialize planning state.
             ctx = ScoringContext(
+                self._schema_name,
                 self._current_blueprint,
                 self._current_workload,
                 next_workload,
@@ -82,7 +76,6 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             )
             ctx.compute_engine_latency_weights()
 
-            # 5. Initialize planning state.
             beam_size = self._planner_config.beam_size()
             placement_options = self._get_table_placement_options_bitmap()
             first_cluster = clusters[0]
@@ -92,7 +85,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             # below if this condition is true.
             assert beam_size >= len(placement_options)
 
-            # 6. Initialize the top-k set (beam).
+            # 5. Initialize the top-k set (beam).
             for placement_bitmap in placement_options:
                 candidate = BlueprintCandidate.based_on(
                     self._current_blueprint, self._comparator
@@ -122,7 +115,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                 )
                 return
 
-            # 7. Run beam search to formulate the rest of the table placements.
+            # 6. Run beam search to formulate the rest of the table placements.
             for j, cluster in enumerate(clusters[1:]):
                 if j % 100 == 0:
                     logger.debug("Processing index %d of %d", j, len(clusters[1:]))
@@ -218,7 +211,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                 for candidate in current_top_k:
                     placement_top_k_logger.log_debug_values(candidate.to_debug_values())
 
-            # 8. Run a final greedy search over provisionings in the top-k set.
+            # 7. Run a final greedy search over provisionings in the top-k set.
             final_top_k: List[BlueprintCandidate] = []
 
             aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
@@ -279,7 +272,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
             best_candidate = final_top_k[0]
 
-            # 9. Touch up the table placements. Add any missing tables to ensure
+            # 8. Touch up the table placements. Add any missing tables to ensure
             #    we do not have data loss.
             for tbl, placement_bitmap in best_candidate.table_placements.items():
                 if placement_bitmap != 0:
@@ -290,10 +283,10 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                     Engine.Athena
                 ]
                 best_candidate.storage_cost += compute_single_athena_table_cost(
-                    tbl, ctx.next_workload, ctx.planner_config
+                    tbl, ctx
                 )
 
-            # 10. Output the new blueprint.
+            # 9. Output the new blueprint.
             best_blueprint = best_candidate.to_blueprint()
             self._current_blueprint = best_blueprint
             self._current_workload = next_workload

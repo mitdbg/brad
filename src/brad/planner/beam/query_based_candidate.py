@@ -199,11 +199,7 @@ class BlueprintCandidate(ComparableBlueprint):
                 continue
 
             result = compute_single_table_movement_time_and_cost(
-                name,
-                curr,
-                next_placement,
-                ctx.current_workload,
-                ctx.planner_config,
+                name, curr, next_placement, ctx
             )
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
@@ -212,9 +208,7 @@ class BlueprintCandidate(ComparableBlueprint):
             # storage costs.
             if (((~curr) & next_placement) & (EngineBitmapValues[Engine.Athena])) != 0:
                 # We added the table to Athena.
-                self.storage_cost += compute_single_athena_table_cost(
-                    name, ctx.next_workload, ctx.planner_config
-                )
+                self.storage_cost += compute_single_athena_table_cost(name, ctx)
 
         # Adding a new query can affect the feasibility of the provisioning.
         self.feasibility = BlueprintFeasibility.Unchecked
@@ -295,9 +289,7 @@ class BlueprintCandidate(ComparableBlueprint):
             if ((~cur) & nxt) == 0:
                 continue
 
-            result = compute_single_table_movement_time_and_cost(
-                tbl, cur, nxt, ctx.current_workload, ctx.planner_config
-            )
+            result = compute_single_table_movement_time_and_cost(tbl, cur, nxt, ctx)
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
 

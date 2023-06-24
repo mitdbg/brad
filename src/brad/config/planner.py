@@ -105,3 +105,7 @@ class PlannerConfig:
 
     def max_feasible_cpu(self) -> float:
         return float(self._raw["max_feasible_cpu"])
+
+    # Extraction: Bytes per row
+    def extract_table_bytes_per_row(self, schema_name: str, table_name: str) -> float:
+        return float(self._raw["table_extract_bytes_per_row"][schema_name][table_name])

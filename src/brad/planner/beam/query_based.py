@@ -14,7 +14,6 @@ from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
 from brad.server.engine_connections import EngineConnections
-from brad.utils.table_sizer import TableSizer
 
 
 logger = logging.getLogger(__name__)
@@ -64,17 +63,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         )
 
         try:
-            # 4. Fetch any additional state needed for scoring.
-            table_sizer = TableSizer(engine_connections, self._config)
-            if next_workload.table_sizes_empty():
-                next_workload.populate_table_sizes_using_blueprint(
-                    self._current_blueprint, table_sizer
-                )
-                next_workload.set_dataset_size_from_table_sizes()
-            else:
-                logger.debug("Skipping table sizing because sizes are already present.")
-
+            # 4. Initialize planning state.
             ctx = ScoringContext(
+                self._schema_name,
                 self._current_blueprint,
                 self._current_workload,
                 next_workload,
@@ -88,7 +79,6 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             )
             ctx.compute_engine_latency_weights()
 
-            # 5. Initialize planning state.
             beam_size = self._planner_config.beam_size()
             engines = [Engine.Aurora, Engine.Redshift, Engine.Athena]
             first_query_idx = query_indices[0]
@@ -98,7 +88,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             # below if this condition is true.
             assert beam_size >= len(engines)
 
-            # 6. Initialize the top-k set (beam).
+            # 5. Initialize the top-k set (beam).
             for routing_engine in engines:
                 candidate = BlueprintCandidate.based_on(
                     self._current_blueprint, self._comparator
@@ -133,7 +123,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 )
                 return
 
-            # 7. Run beam search to formulate the table placements.
+            # 6. Run beam search to formulate the table placements.
             for j, query_idx in enumerate(query_indices[1:]):
                 if j % 100 == 0:
                     logger.debug("Processing index %d of %d", j, len(query_indices[1:]))
@@ -218,7 +208,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 for candidate in current_top_k:
                     placement_top_k_logger.log_debug_values(candidate.to_debug_values())
 
-            # 8. We generated the placements by placing queries using run time
+            # 7. We generated the placements by placing queries using run time
             #    predictions. Now we re-route the queries using the fixed placements
             #    but with the actual routing policy that we will use at runtime.
             rerouted_top_k: List[BlueprintCandidate] = []
@@ -251,7 +241,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 )
                 return
 
-            # 9. Run a final greedy search over provisionings in the top-k set.
+            # 8. Run a final greedy search over provisionings in the top-k set.
             final_top_k: List[BlueprintCandidate] = []
 
             aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
@@ -324,7 +314,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 ]
                 # We added the table to Athena.
                 best_candidate.storage_cost += compute_single_athena_table_cost(
-                    tbl, ctx.next_workload, ctx.planner_config
+                    tbl, ctx
                 )
 
             # 10. Output the new blueprint.

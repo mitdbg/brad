@@ -290,9 +290,7 @@ class BlueprintCandidate(ComparableBlueprint):
             if ((~cur) & nxt) == 0:
                 continue
 
-            result = compute_single_table_movement_time_and_cost(
-                tbl, cur, nxt, ctx.current_workload, ctx.planner_config
-            )
+            result = compute_single_table_movement_time_and_cost(tbl, cur, nxt, ctx)
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
 
@@ -300,9 +298,7 @@ class BlueprintCandidate(ComparableBlueprint):
             # storage costs.
             if (((~cur) & nxt) & (EngineBitmapValues[Engine.Athena])) != 0:
                 # We added the table to Athena.
-                self.storage_cost += compute_single_athena_table_cost(
-                    tbl, ctx.next_workload, ctx.planner_config
-                )
+                self.storage_cost += compute_single_athena_table_cost(tbl, ctx)
 
     def try_to_make_feasible_if_needed(self, ctx: ScoringContext) -> None:
         """
