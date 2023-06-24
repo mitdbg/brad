@@ -1,4 +1,5 @@
 import pathlib
+import logging
 from datetime import timedelta
 from typing import List, Dict, Optional
 
@@ -7,6 +8,8 @@ from brad.config.engine import Engine
 from brad.planner.workload import Workload
 from brad.planner.workload.query import Query
 from brad.utils.table_sizer import TableSizer
+
+logger = logging.getLogger(__name__)
 
 
 class WorkloadBuilder:
@@ -21,7 +24,7 @@ class WorkloadBuilder:
     def __init__(self) -> None:
         self._analytical_queries: List[str] = []
         self._transactional_queries: List[str] = []
-        self._analytics_count_per: float = 1.0
+        self._analytics_count_per: int = 1
         self._total_transaction_count: float = 0.0
         self._period = timedelta(hours=1)
         self._table_sizes: Dict[str, int] = {}
@@ -55,10 +58,14 @@ class WorkloadBuilder:
         `period` is None, it defaults to the current period in the workload.
         """
         if period is None:
-            self._analytics_count_per = count
+            self._analytics_count_per = int(count)
         else:
             scaled = count / period.total_seconds() * self._period.total_seconds()
-            self._analytics_count_per = scaled
+            self._analytics_count_per = int(scaled)
+        if self._analytics_count_per == 0:
+            logger.warning(
+                "Analytical rate rounded down to 0 queries. Original count: %f", count
+            )
         return self
 
     def uniform_total_transaction_rate(

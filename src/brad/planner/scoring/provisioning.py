@@ -9,6 +9,7 @@ import brad.planner.scoring.data as score_data
 from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.provisioning import Provisioning
 from brad.config.planner import PlannerConfig
+from brad.planner.workload.query import Query
 
 
 ProvisioningResources = namedtuple(
@@ -49,6 +50,16 @@ def compute_redshift_hourly_operational_cost(provisioning: Provisioning) -> floa
     )
 
 
+def compute_aurora_accessed_pages(
+    queries: Iterable[Query],
+    accessed_pages_per_query: Iterable[int],
+) -> int:
+    total_pages = 0
+    for query, accessed_pages in zip(queries, accessed_pages_per_query):
+        total_pages += query.arrival_count() * accessed_pages
+    return total_pages
+
+
 def compute_aurora_scan_cost(
     total_accessed_pages: int,
     buffer_pool_hit_rate: float,
@@ -60,15 +71,18 @@ def compute_aurora_scan_cost(
 
 
 def compute_athena_scanned_bytes(
+    queries: Iterable[Query],
     accessed_bytes_per_query: Iterable[int],
     planner_config: PlannerConfig,
 ) -> int:
     # N.B. There is a minimum charge of 10 MB per query.
     min_bytes_per_query = planner_config.athena_min_mb_per_query() * 1000 * 1000
-    accessed_bytes = sum(
-        map(lambda data_b: max(data_b, min_bytes_per_query), accessed_bytes_per_query)
-    )
-    return accessed_bytes
+    total_accessed_bytes = 0
+    for query, accessed_bytes in zip(queries, accessed_bytes_per_query):
+        total_accessed_bytes += query.arrival_count() * max(
+            accessed_bytes, min_bytes_per_query
+        )
+    return total_accessed_bytes
 
 
 def compute_athena_scan_cost(

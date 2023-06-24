@@ -28,6 +28,7 @@ from brad.planner.scoring.provisioning import (
     compute_aurora_hourly_operational_cost,
     compute_redshift_hourly_operational_cost,
     compute_aurora_scan_cost,
+    compute_aurora_accessed_pages,
     compute_athena_scan_cost,
     compute_athena_scanned_bytes,
     compute_aurora_transition_time_s,
@@ -253,11 +254,15 @@ class BlueprintCandidate(ComparableBlueprint):
             eng = router.engine_for(q)
             dests[eng].append(qidx)
 
-        aurora_accessed_pages = (
-            ctx.next_workload.get_predicted_aurora_pages_accessed_batch(queries).sum()
+        aurora_queries = [all_queries[qidx] for qidx in dests[Engine.Aurora]]
+        aurora_accessed_pages = compute_aurora_accessed_pages(
+            aurora_queries,
+            ctx.next_workload.get_predicted_aurora_pages_accessed_batch(queries),
         )
 
+        athena_queries = [all_queries[qidx] for qidx in dests[Engine.Athena]]
         athena_scanned_bytes = compute_athena_scanned_bytes(
+            athena_queries,
             ctx.next_workload.get_predicted_athena_bytes_accessed_batch(
                 dests[Engine.Athena]
             ),

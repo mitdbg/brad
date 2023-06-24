@@ -27,6 +27,7 @@ from brad.planner.scoring.provisioning import (
     compute_aurora_hourly_operational_cost,
     compute_redshift_hourly_operational_cost,
     compute_aurora_scan_cost,
+    compute_aurora_accessed_pages,
     compute_athena_scan_cost,
     compute_athena_scanned_bytes,
     compute_aurora_transition_time_s,
@@ -194,12 +195,14 @@ class BlueprintCandidate(ComparableBlueprint):
         # Scan monetary costs that this query imposes.
         if location == Engine.Athena:
             self.athena_scanned_bytes += compute_athena_scanned_bytes(
+                [query],
                 [ctx.next_workload.get_predicted_athena_bytes_accessed(query_idx)],
                 ctx.planner_config,
             )
         elif location == Engine.Aurora:
-            self.aurora_accessed_pages += (
-                ctx.next_workload.get_predicted_aurora_pages_accessed(query_idx)
+            self.aurora_accessed_pages += compute_aurora_accessed_pages(
+                [query],
+                [ctx.next_workload.get_predicted_aurora_pages_accessed(query_idx)],
             )
 
         self.workload_scan_cost = compute_athena_scan_cost(
@@ -268,7 +271,7 @@ class BlueprintCandidate(ComparableBlueprint):
     def add_query_last_step(
         self,
         query_idx: int,
-        _query: Query,
+        query: Query,
         location: Engine,
         base_latency: float,
         ctx: ScoringContext,
@@ -284,12 +287,14 @@ class BlueprintCandidate(ComparableBlueprint):
         # Scan monetary costs that this query imposes.
         if location == Engine.Athena:
             self.athena_scanned_bytes += compute_athena_scanned_bytes(
+                [query],
                 [ctx.next_workload.get_predicted_athena_bytes_accessed(query_idx)],
                 ctx.planner_config,
             )
         elif location == Engine.Aurora:
-            self.aurora_accessed_pages += (
-                ctx.next_workload.get_predicted_aurora_pages_accessed(query_idx)
+            self.aurora_accessed_pages += compute_aurora_accessed_pages(
+                [query],
+                [ctx.next_workload.get_predicted_aurora_pages_accessed(query_idx)],
             )
 
         self.workload_scan_cost = compute_athena_scan_cost(
