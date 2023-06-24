@@ -38,7 +38,6 @@ from brad.planner.scoring.table_placement import (
     compute_single_table_movement_time_and_cost,
 )
 from brad.routing import Router
-from brad.server.engine_connections import EngineConnections
 
 
 class BlueprintCandidate(ComparableBlueprint):
@@ -191,7 +190,6 @@ class BlueprintCandidate(ComparableBlueprint):
         router_provider: RouterProvider,
         query_cluster: List[int],
         reroute_prev: bool,
-        engine_connections: EngineConnections,
         ctx: ScoringContext,
     ) -> None:
         router: Router = router_provider.get_router(self.table_placements)
@@ -205,9 +203,7 @@ class BlueprintCandidate(ComparableBlueprint):
                 dests,
                 aurora_accessed_pages,
                 athena_scanned_bytes,
-            ) = self._route_queries_compute_scan_stats(
-                self.queries, router, engine_connections, ctx
-            )
+            ) = self._route_queries_compute_scan_stats(self.queries, router, ctx)
             for eng, query_indices in dests.items():
                 self.query_locations[eng].extend(query_indices)
 
@@ -218,9 +214,7 @@ class BlueprintCandidate(ComparableBlueprint):
             cluster_dests,
             incr_aurora_accessed_pages,
             incr_athena_scanned_bytes,
-        ) = self._route_queries_compute_scan_stats(
-            query_cluster, router, engine_connections, ctx
-        )
+        ) = self._route_queries_compute_scan_stats(query_cluster, router, ctx)
         for eng, query_indices in cluster_dests.items():
             self.query_locations[eng].extend(query_indices)
 
@@ -245,7 +239,6 @@ class BlueprintCandidate(ComparableBlueprint):
         self,
         queries: List[int],
         router: Router,
-        engine_connections: EngineConnections,
         ctx: ScoringContext,
     ) -> Tuple[Dict[Engine, List[int]], int, int]:
         all_queries = ctx.next_workload.analytical_queries()
@@ -258,13 +251,6 @@ class BlueprintCandidate(ComparableBlueprint):
         for qidx in queries:
             q = all_queries[qidx]
             eng = router.engine_for(q)
-            # N.B. Need to use the current blueprint because the tables are not
-            # necessarily present on the next blueprint's placements.
-            q.populate_data_accessed_mb(
-                for_engine=eng,
-                connections=engine_connections,
-                blueprint=ctx.current_blueprint,
-            )
             dests[eng].append(qidx)
 
         aurora_accessed_pages = (
