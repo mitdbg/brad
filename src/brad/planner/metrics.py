@@ -1,7 +1,9 @@
 from collections import namedtuple
 from brad.daemon.monitor import Monitor
 
-Metrics = namedtuple("Metrics", ["redshift_cpu_avg", "aurora_cpu_avg"])
+Metrics = namedtuple(
+    "Metrics", ["redshift_cpu_avg", "aurora_cpu_avg", "buffer_hit_pct_avg"]
+)
 
 
 class MetricsProvider:
@@ -42,15 +44,17 @@ class MetricsFromMonitor(MetricsProvider):
             )
 
         if metrics.empty:
-            return Metrics(1.0, 1.0)
+            return Metrics(1.0, 1.0, 100.0)
 
         redshift_cpu = metrics[_RELEVANT_METRICS["redshift_cpu_avg"]].iloc[0]
         aurora_cpu = metrics[_RELEVANT_METRICS["aurora_cpu_avg"]].iloc[0]
+        hit_pct = metrics[_RELEVANT_METRICS["buffer_hit_pct_avg"]].iloc[0]
 
-        return Metrics(redshift_cpu, aurora_cpu)
+        return Metrics(redshift_cpu, aurora_cpu, hit_pct)
 
 
 _RELEVANT_METRICS = {
     "redshift_cpu_avg": "redshift_CPUUtilization_Average",
     "aurora_cpu_avg": "aurora_WRITER_CPUUtilization_Average",
+    "buffer_hit_pct_avg": "aurora_WRITER_BufferCacheHitRatio_Average",
 }

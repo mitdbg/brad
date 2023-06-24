@@ -206,7 +206,7 @@ class BlueprintCandidate(ComparableBlueprint):
             self.athena_scanned_bytes, ctx.planner_config
         ) + compute_aurora_scan_cost(
             self.aurora_accessed_pages,
-            buffer_pool_hit_rate=1.0,
+            buffer_pool_hit_rate=ctx.metrics.buffer_hit_pct_avg / 100,
             planner_config=ctx.planner_config,
         )
 
@@ -296,7 +296,7 @@ class BlueprintCandidate(ComparableBlueprint):
             self.athena_scanned_bytes, ctx.planner_config
         ) + compute_aurora_scan_cost(
             self.aurora_accessed_pages,
-            buffer_pool_hit_rate=1.0,
+            buffer_pool_hit_rate=ctx.metrics.buffer_hit_pct_avg / 100,
             planner_config=ctx.planner_config,
         )
 
