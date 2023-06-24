@@ -283,7 +283,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                     Engine.Athena
                 ]
                 best_candidate.storage_cost += compute_single_athena_table_cost(
-                    tbl, ctx.next_workload, ctx.planner_config
+                    tbl, ctx
                 )
 
             # 9. Output the new blueprint.

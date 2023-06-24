@@ -208,9 +208,7 @@ class BlueprintCandidate(ComparableBlueprint):
             # storage costs.
             if (((~curr) & next_placement) & (EngineBitmapValues[Engine.Athena])) != 0:
                 # We added the table to Athena.
-                self.storage_cost += compute_single_athena_table_cost(
-                    name, ctx.next_workload, ctx.planner_config
-                )
+                self.storage_cost += compute_single_athena_table_cost(name, ctx)
 
         # Adding a new query can affect the feasibility of the provisioning.
         self.feasibility = BlueprintFeasibility.Unchecked

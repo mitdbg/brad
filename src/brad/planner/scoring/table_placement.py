@@ -1,55 +1,35 @@
 from collections import namedtuple
-from typing import Dict
+from datetime import timedelta
 
 from brad.config.engine import Engine, EngineBitmapValues
-from brad.config.planner import PlannerConfig
 from brad.planner.scoring.context import ScoringContext
-from brad.planner.workload import Workload
 
 
-def compute_athena_table_placement_cost(
-    table_placements: Dict[str, int],
-    workload: Workload,
-    planner_config: PlannerConfig,
-) -> float:
-    """
-    Estimates the hourly monetary cost of storing a table on Athena.
-    """
-    athena_table_storage_cost = 0.0
-    for tbl, locations in table_placements.items():
-        if locations & EngineBitmapValues[Engine.Athena] == 0:
-            # This table is not present on Athena.
-            continue
-        athena_table_storage_cost += compute_single_athena_table_cost(
-            tbl, workload, planner_config
-        )
-    return athena_table_storage_cost
-
-
-def compute_single_athena_table_cost(
-    table_name: str, workload: Workload, planner_config: PlannerConfig
-) -> float:
-    athena_table_storage_cost = 0.0
+def compute_single_athena_table_cost(table_name: str, ctx: ScoringContext) -> float:
+    athena_table_storage_usd_per_mb_per_month = 0.0
 
     # We make a rough estimate of the table's size on the engine.
-    for src in [Engine.Athena, Engine.Aurora, Engine.Redshift]:
-        size_mb = workload.table_size_on_engine(table_name, src)
-        if size_mb is not None:
-            break
+    # This is an overestimate since we use Parquet to store the data on S3,
+    # which will compress the columns.
+    #
+    # N.B. We use sizing information from the next workload here.
+    num_rows = ctx.next_workload.table_num_rows(table_name)
+    raw_extract_bytes = num_rows * ctx.planner_config.extract_table_bytes_per_row(
+        ctx.schema_name, table_name
+    )
+    raw_extract_mb = raw_extract_bytes / 1000 / 1000
 
-    # Table is present on at least one engine.
-    assert size_mb is not None
+    athena_table_storage_usd_per_mb_per_month += (
+        raw_extract_mb * ctx.planner_config.s3_usd_per_mb_per_month()
+    )
+    source_period = timedelta(days=30)
+    dest_period = ctx.next_workload.period()
 
-    athena_table_storage_cost += size_mb * planner_config.s3_usd_per_mb_per_month()
-
-    # Rescale the cost to be USD per MB per hour. The provisioning cost is
-    # based on an hour.
-    # We use 30 days to represent a month.
-    # TODO: Make the time period configurable (we may want a cost for a day,
-    # for example).
-    athena_table_storage_cost /= 30 * 24
-
-    return athena_table_storage_cost
+    return (
+        athena_table_storage_usd_per_mb_per_month
+        * (1.0 / source_period.total_seconds())
+        * dest_period.total_seconds()
+    )
 
 
 TableMovementScore = namedtuple(
