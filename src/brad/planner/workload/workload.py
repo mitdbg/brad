@@ -142,6 +142,26 @@ class Workload:
         self._predicted_aurora_pages_accessed = aurora_pages
         self._predicted_athena_bytes_accessed = athena_bytes
 
+    def get_predicted_aurora_pages_accessed(self, query_idx: int) -> int:
+        assert self._predicted_aurora_pages_accessed is not None
+        return self._predicted_aurora_pages_accessed[query_idx].item()
+
+    def get_predicted_aurora_bytes_accessed_batch(
+        self, query_indices: List[int]
+    ) -> npt.NDArray:
+        assert self._predicted_aurora_pages_accessed is not None
+        return self._predicted_aurora_pages_accessed[query_indices]
+
+    def get_predicted_athena_bytes_accessed(self, query_idx: int) -> int:
+        assert self._predicted_athena_bytes_accessed is not None
+        return self._predicted_athena_bytes_accessed[query_idx].item()
+
+    def get_predicted_athena_bytes_accessed_batch(
+        self, query_indicies: List[int]
+    ) -> npt.NDArray:
+        assert self._predicted_athena_bytes_accessed is not None
+        return self._predicted_athena_bytes_accessed[query_indicies]
+
     def compute_latency_gains(self) -> npt.NDArray:
         """
         We define "gain" as the largest ratio between predicted execution times

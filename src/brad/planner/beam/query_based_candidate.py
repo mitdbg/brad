@@ -184,7 +184,8 @@ class BlueprintCandidate(ComparableBlueprint):
         # Scan monetary costs that this query imposes.
         if location == Engine.Athena:
             self.workload_scan_cost += compute_athena_scan_cost(
-                [query], ctx.planner_config
+                [ctx.next_workload.get_predicted_athena_bytes_accessed(query_idx)],
+                ctx.planner_config,
             )
         elif location == Engine.Aurora:
             self.workload_scan_cost += compute_aurora_scan_cost(
@@ -262,7 +263,8 @@ class BlueprintCandidate(ComparableBlueprint):
         # Scan monetary costs that this query imposes.
         if location == Engine.Athena:
             self.workload_scan_cost += compute_athena_scan_cost(
-                [query], ctx.planner_config
+                [ctx.next_workload.get_predicted_athena_bytes_accessed(query_idx)],
+                ctx.planner_config,
             )
         elif location == Engine.Aurora:
             self.workload_scan_cost += compute_aurora_scan_cost(

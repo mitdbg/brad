@@ -258,7 +258,9 @@ class BlueprintCandidate(ComparableBlueprint):
             ctx.planner_config,
         )
         athena_scan_cost = compute_athena_scan_cost(
-            map(lambda qidx: all_queries[qidx], dests[Engine.Athena]),
+            ctx.next_workload.get_predicted_athena_bytes_accessed_batch(
+                dests[Engine.Athena]
+            ),
             ctx.planner_config,
         )
 

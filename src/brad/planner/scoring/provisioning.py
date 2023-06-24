@@ -63,13 +63,16 @@ def compute_aurora_scan_cost(
 
 
 def compute_athena_scan_cost(
-    athena_queries: Iterable[Query],
+    accessed_bytes_per_query: Iterable[int],
     planner_config: PlannerConfig,
 ) -> float:
-    athena_access_mb = 0
-    for q in athena_queries:
-        athena_access_mb += q.data_accessed_mb(Engine.Athena)
-    return athena_access_mb * planner_config.athena_usd_per_mb_scanned()
+    # N.B. There is a minimum charge of 10 MB per query.
+    min_bytes_per_query = planner_config.athena_min_mb_per_query() * 1000 * 1000
+    accessed_bytes = sum(
+        map(lambda data_b: max(data_b, min_bytes_per_query), accessed_bytes_per_query)
+    )
+    accessed_mb = accessed_bytes / 1000 / 1000
+    return accessed_mb * planner_config.athena_usd_per_mb_scanned()
 
 
 def compute_aurora_transition_time_s(
