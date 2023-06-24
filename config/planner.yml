@@ -30,8 +30,7 @@ athena_min_mb_per_query: 10
 
 # 1 I/O operation per 8 KB page.
 # $0.20 per 1 million I/O operations.
-# $0.000025 per MB scanned.
-aurora_usd_per_mb_scanned: 0.000025
+aurora_usd_per_million_ios: 0.20
 
 # Assumption is a fixed time cost for a provisioning change.
 # The provisioning change time likely is a function of the instance types being
@@ -50,7 +49,6 @@ athena_extract_rate_mb_per_s: 10.0
 athena_load_rate_mb_per_s: 10.0
 
 s3_usd_per_mb_per_month: 0.000023
-
 
 ###
 ### Dataset-specific Transition Constants
@@ -104,6 +102,9 @@ aurora_resource_scaling:
   aurora_WRITER_ReadIOPS_Average: 1.0
   aurora_WRITER_WriteIOPS_Average: 1.0
 
+# Legacy Aurora scan cost estimator.
+# $0.000025 per MB scanned.
+aurora_usd_per_mb_scanned: 0.000025
 
 ###
 ### Query latency scaling modifiers (across provisionings).

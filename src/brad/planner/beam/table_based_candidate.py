@@ -29,6 +29,7 @@ from brad.planner.scoring.provisioning import (
     compute_redshift_hourly_operational_cost,
     compute_aurora_scan_cost,
     compute_athena_scan_cost,
+    compute_athena_scanned_bytes,
     compute_aurora_transition_time_s,
     compute_redshift_transition_time_s,
 )
@@ -90,6 +91,8 @@ class BlueprintCandidate(ComparableBlueprint):
         self.provisioning_cost = 0.0
         self.storage_cost = 0.0
         self.workload_scan_cost = 0.0
+        self.athena_scanned_bytes = 0
+        self.aurora_accessed_pages = 0
         self.table_movement_trans_cost = 0.0
 
         # Transition times.
@@ -142,6 +145,8 @@ class BlueprintCandidate(ComparableBlueprint):
         values["provisioning_cost"] = self.provisioning_cost
         values["storage_cost"] = self.storage_cost
         values["workload_scan_cost"] = self.workload_scan_cost
+        values["athena_scanned_bytes"] = self.athena_scanned_bytes
+        values["aurora_accessed_pages"] = self.aurora_accessed_pages
         values["table_movement_trans_cost"] = self.table_movement_trans_cost
         values["table_movement_trans_time_s"] = self.table_movement_trans_time_s
         values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
@@ -198,28 +203,37 @@ class BlueprintCandidate(ComparableBlueprint):
 
             (
                 dests,
-                aurora_scan_cost,
-                athena_scan_cost,
-            ) = self._route_queries_compute_scan_costs(
+                aurora_accessed_pages,
+                athena_scanned_bytes,
+            ) = self._route_queries_compute_scan_stats(
                 self.queries, router, engine_connections, ctx
             )
             for eng, query_indices in dests.items():
                 self.query_locations[eng].extend(query_indices)
 
-            self.workload_scan_cost = aurora_scan_cost + athena_scan_cost
+            self.aurora_accessed_pages = aurora_accessed_pages
+            self.athena_scanned_bytes = athena_scanned_bytes
 
         (
             cluster_dests,
-            incr_aurora_scan_cost,
-            incr_athena_scan_cost,
-        ) = self._route_queries_compute_scan_costs(
+            incr_aurora_accessed_pages,
+            incr_athena_scanned_bytes,
+        ) = self._route_queries_compute_scan_stats(
             query_cluster, router, engine_connections, ctx
         )
         for eng, query_indices in cluster_dests.items():
             self.query_locations[eng].extend(query_indices)
 
-        self.workload_scan_cost += incr_aurora_scan_cost
-        self.workload_scan_cost += incr_athena_scan_cost
+        self.aurora_accessed_pages += incr_aurora_accessed_pages
+        self.athena_scanned_bytes += incr_athena_scanned_bytes
+
+        self.workload_scan_cost = compute_athena_scan_cost(
+            self.athena_scanned_bytes, ctx.planner_config
+        ) + compute_aurora_scan_cost(
+            self.aurora_accessed_pages,
+            buffer_pool_hit_rate=1.0,
+            planner_config=ctx.planner_config,
+        )
 
         self.queries.extend(query_cluster)
 
@@ -227,13 +241,13 @@ class BlueprintCandidate(ComparableBlueprint):
         self.explored_provisionings = False
         self._memoized.clear()
 
-    def _route_queries_compute_scan_costs(
+    def _route_queries_compute_scan_stats(
         self,
         queries: List[int],
         router: Router,
         engine_connections: EngineConnections,
         ctx: ScoringContext,
-    ) -> Tuple[Dict[Engine, List[int]], float, float]:
+    ) -> Tuple[Dict[Engine, List[int]], int, int]:
         all_queries = ctx.next_workload.analytical_queries()
         dests: Dict[Engine, List[int]] = {
             Engine.Aurora: [],
@@ -253,18 +267,18 @@ class BlueprintCandidate(ComparableBlueprint):
             )
             dests[eng].append(qidx)
 
-        aurora_scan_cost = compute_aurora_scan_cost(
-            map(lambda qidx: all_queries[qidx], dests[Engine.Aurora]),
-            ctx.planner_config,
+        aurora_accessed_pages = (
+            ctx.next_workload.get_predicted_aurora_pages_accessed_batch(queries).sum()
         )
-        athena_scan_cost = compute_athena_scan_cost(
+
+        athena_scanned_bytes = compute_athena_scanned_bytes(
             ctx.next_workload.get_predicted_athena_bytes_accessed_batch(
                 dests[Engine.Athena]
             ),
             ctx.planner_config,
         )
 
-        return dests, aurora_scan_cost, athena_scan_cost
+        return dests, aurora_accessed_pages, athena_scanned_bytes
 
     def add_transactional_tables(self, ctx: ScoringContext) -> None:
         referenced_tables = set()
@@ -571,6 +585,8 @@ class BlueprintCandidate(ComparableBlueprint):
         cloned.provisioning_cost = self.provisioning_cost
         cloned.storage_cost = self.storage_cost
         cloned.workload_scan_cost = self.workload_scan_cost
+        cloned.aurora_accessed_pages = self.aurora_accessed_pages
+        cloned.athena_scanned_bytes = self.athena_scanned_bytes
         cloned.table_movement_trans_cost = self.table_movement_trans_cost
 
         cloned.table_movement_trans_time_s = self.table_movement_trans_time_s

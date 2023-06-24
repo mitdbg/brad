@@ -146,7 +146,7 @@ class Workload:
         assert self._predicted_aurora_pages_accessed is not None
         return self._predicted_aurora_pages_accessed[query_idx].item()
 
-    def get_predicted_aurora_bytes_accessed_batch(
+    def get_predicted_aurora_pages_accessed_batch(
         self, query_indices: List[int]
     ) -> npt.NDArray:
         assert self._predicted_aurora_pages_accessed is not None
