@@ -8,6 +8,7 @@ from brad.planner.neighborhood.neighborhood import NeighborhoodSearchPlanner
 from brad.planner.beam.query_based import QueryBasedBeamPlanner
 from brad.planner.beam.table_based import TableBasedBeamPlanner
 from brad.planner.metrics import MetricsProvider
+from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 from brad.planner.strategy import PlanningStrategy
 from brad.planner.workload import Workload
@@ -27,6 +28,7 @@ class BlueprintPlannerFactory:
         analytics_latency_scorer: AnalyticsLatencyScorer,
         comparator: BlueprintComparator,
         metrics_provider: MetricsProvider,
+        data_access_provider: DataAccessProvider,
     ) -> BlueprintPlanner:
         strategy = planner_config.strategy()
         if (
@@ -44,6 +46,7 @@ class BlueprintPlannerFactory:
                 analytics_latency_scorer=analytics_latency_scorer,
                 comparator=comparator,
                 metrics_provider=metrics_provider,
+                data_access_provider=data_access_provider,
             )
 
         elif strategy == PlanningStrategy.QueryBasedBeam:
@@ -58,6 +61,7 @@ class BlueprintPlannerFactory:
                 analytics_latency_scorer=analytics_latency_scorer,
                 comparator=comparator,
                 metrics_provider=metrics_provider,
+                data_access_provider=data_access_provider,
             )
 
         elif strategy == PlanningStrategy.TableBasedBeam:
@@ -72,6 +76,7 @@ class BlueprintPlannerFactory:
                 analytics_latency_scorer=analytics_latency_scorer,
                 comparator=comparator,
                 metrics_provider=metrics_provider,
+                data_access_provider=data_access_provider,
             )
 
         else:
