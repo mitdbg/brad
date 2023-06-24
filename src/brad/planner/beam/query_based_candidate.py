@@ -199,11 +199,7 @@ class BlueprintCandidate(ComparableBlueprint):
                 continue
 
             result = compute_single_table_movement_time_and_cost(
-                name,
-                curr,
-                next_placement,
-                ctx.current_workload,
-                ctx.planner_config,
+                name, curr, next_placement, ctx
             )
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
@@ -295,9 +291,7 @@ class BlueprintCandidate(ComparableBlueprint):
             if ((~cur) & nxt) == 0:
                 continue
 
-            result = compute_single_table_movement_time_and_cost(
-                tbl, cur, nxt, ctx.current_workload, ctx.planner_config
-            )
+            result = compute_single_table_movement_time_and_cost(tbl, cur, nxt, ctx)
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
 

@@ -15,12 +15,14 @@ class ScoringContext:
 
     def __init__(
         self,
+        schema_name: str,
         current_blueprint: Blueprint,
         current_workload: Workload,
         next_workload: Workload,
         metrics: Metrics,
         planner_config: PlannerConfig,
     ) -> None:
+        self.schema_name = schema_name
         self.current_blueprint = current_blueprint
         self.current_workload = current_workload
         self.next_workload = next_workload

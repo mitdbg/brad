@@ -103,6 +103,9 @@ class Workload:
     def transaction_arrival_count(self) -> float:
         return self._transaction_arrival_count
 
+    def table_num_rows(self, table_name: str) -> int:
+        return self._table_sizes[table_name]
+
     ###
     ### The methods below are meant for the blueprint planner.
     ###
