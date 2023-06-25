@@ -16,7 +16,7 @@ class Query(QueryRep):
     blueprint planning.
     """
 
-    def __init__(self, sql_query: str, arrival_count: float = 1.0):
+    def __init__(self, sql_query: str, arrival_count: int = 1):
         super().__init__(sql_query)
         self._arrival_count = arrival_count
 
@@ -24,7 +24,7 @@ class Query(QueryRep):
         self._data_accessed_mb: Dict[Engine, int] = {}
         self._tuples_accessed: Dict[Engine, int] = {}
 
-    def arrival_count(self) -> float:
+    def arrival_count(self) -> int:
         return self._arrival_count
 
     # The methods below are legacy code.

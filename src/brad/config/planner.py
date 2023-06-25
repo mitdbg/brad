@@ -29,6 +29,12 @@ class PlannerConfig:
     def athena_usd_per_mb_scanned(self) -> float:
         return float(self._raw["athena_usd_per_mb_scanned"])
 
+    def athena_min_mb_per_query(self) -> int:
+        return int(self._raw["athena_min_mb_per_query"])
+
+    def aurora_usd_per_million_ios(self) -> float:
+        return float(self._raw["aurora_usd_per_million_ios"])
+
     def aurora_usd_per_mb_scanned(self) -> float:
         return float(self._raw["aurora_usd_per_mb_scanned"])
 

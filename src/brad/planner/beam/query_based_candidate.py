@@ -27,7 +27,9 @@ from brad.planner.scoring.provisioning import (
     compute_aurora_hourly_operational_cost,
     compute_redshift_hourly_operational_cost,
     compute_aurora_scan_cost,
+    compute_aurora_accessed_pages,
     compute_athena_scan_cost,
+    compute_athena_scanned_bytes,
     compute_aurora_transition_time_s,
     compute_redshift_transition_time_s,
 )
@@ -88,8 +90,15 @@ class BlueprintCandidate(ComparableBlueprint):
         # Monetary costs.
         self.provisioning_cost = 0.0
         self.storage_cost = 0.0
-        self.workload_scan_cost = 0.0
         self.table_movement_trans_cost = 0.0
+
+        # We compute the total scan cost from the Athena and Aurora data access
+        # statistics. We do not compute the workload scan cost itself
+        # incrementally to avoid numerical precision errors over large
+        # workloads.
+        self.workload_scan_cost = 0.0
+        self.athena_scanned_bytes = 0
+        self.aurora_accessed_pages = 0
 
         # Transition times.
         self.table_movement_trans_time_s = 0.0
@@ -142,6 +151,8 @@ class BlueprintCandidate(ComparableBlueprint):
         values["provisioning_cost"] = self.provisioning_cost
         values["storage_cost"] = self.storage_cost
         values["workload_scan_cost"] = self.workload_scan_cost
+        values["athena_scanned_bytes"] = self.athena_scanned_bytes
+        values["aurora_accessed_pages"] = self.aurora_accessed_pages
         values["table_movement_trans_cost"] = self.table_movement_trans_cost
         values["table_movement_trans_time_s"] = self.table_movement_trans_time_s
         values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
@@ -183,13 +194,24 @@ class BlueprintCandidate(ComparableBlueprint):
 
         # Scan monetary costs that this query imposes.
         if location == Engine.Athena:
-            self.workload_scan_cost += compute_athena_scan_cost(
-                [query], ctx.planner_config
+            self.athena_scanned_bytes += compute_athena_scanned_bytes(
+                [query],
+                [ctx.next_workload.get_predicted_athena_bytes_accessed(query_idx)],
+                ctx.planner_config,
             )
         elif location == Engine.Aurora:
-            self.workload_scan_cost += compute_aurora_scan_cost(
-                [query], ctx.planner_config
+            self.aurora_accessed_pages += compute_aurora_accessed_pages(
+                [query],
+                [ctx.next_workload.get_predicted_aurora_pages_accessed(query_idx)],
             )
+
+        self.workload_scan_cost = compute_athena_scan_cost(
+            self.athena_scanned_bytes, ctx.planner_config
+        ) + compute_aurora_scan_cost(
+            self.aurora_accessed_pages,
+            buffer_pool_hit_rate=ctx.metrics.buffer_hit_pct_avg / 100,
+            planner_config=ctx.planner_config,
+        )
 
         # Table movement costs that this query imposes.
         for name, next_placement in table_diffs:
@@ -240,6 +262,9 @@ class BlueprintCandidate(ComparableBlueprint):
         self.scaled_query_latencies.clear()
 
         self.workload_scan_cost = 0.0
+        self.athena_scanned_bytes = 0
+        self.aurora_accessed_pages = 0
+
         self.feasibility = BlueprintFeasibility.Unchecked
         self._memoized.clear()
 
@@ -261,13 +286,24 @@ class BlueprintCandidate(ComparableBlueprint):
 
         # Scan monetary costs that this query imposes.
         if location == Engine.Athena:
-            self.workload_scan_cost += compute_athena_scan_cost(
-                [query], ctx.planner_config
+            self.athena_scanned_bytes += compute_athena_scanned_bytes(
+                [query],
+                [ctx.next_workload.get_predicted_athena_bytes_accessed(query_idx)],
+                ctx.planner_config,
             )
         elif location == Engine.Aurora:
-            self.workload_scan_cost += compute_aurora_scan_cost(
-                [query], ctx.planner_config
+            self.aurora_accessed_pages += compute_aurora_accessed_pages(
+                [query],
+                [ctx.next_workload.get_predicted_aurora_pages_accessed(query_idx)],
             )
+
+        self.workload_scan_cost = compute_athena_scan_cost(
+            self.athena_scanned_bytes, ctx.planner_config
+        ) + compute_aurora_scan_cost(
+            self.aurora_accessed_pages,
+            buffer_pool_hit_rate=ctx.metrics.buffer_hit_pct_avg / 100,
+            planner_config=ctx.planner_config,
+        )
 
     def add_transactional_tables(self, ctx: ScoringContext) -> None:
         referenced_tables = set()
@@ -551,6 +587,8 @@ class BlueprintCandidate(ComparableBlueprint):
         cloned.provisioning_cost = self.provisioning_cost
         cloned.storage_cost = self.storage_cost
         cloned.workload_scan_cost = self.workload_scan_cost
+        cloned.athena_scanned_bytes = self.athena_scanned_bytes
+        cloned.aurora_accessed_pages = self.aurora_accessed_pages
         cloned.table_movement_trans_cost = self.table_movement_trans_cost
 
         cloned.table_movement_trans_time_s = self.table_movement_trans_time_s

@@ -8,7 +8,6 @@ import brad.planner.scoring.data as score_data
 
 from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.provisioning import Provisioning
-from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
 from brad.planner.workload.query import Query
 
@@ -51,25 +50,47 @@ def compute_redshift_hourly_operational_cost(provisioning: Provisioning) -> floa
     )
 
 
+def compute_aurora_accessed_pages(
+    queries: Iterable[Query],
+    accessed_pages_per_query: Iterable[int],
+) -> int:
+    total_pages = 0
+    for query, accessed_pages in zip(queries, accessed_pages_per_query):
+        total_pages += query.arrival_count() * accessed_pages
+    return total_pages
+
+
 def compute_aurora_scan_cost(
-    aurora_queries: Iterable[Query],
+    total_accessed_pages: int,
+    buffer_pool_hit_rate: float,
     planner_config: PlannerConfig,
 ) -> float:
-    # Data access (scan) costs.
-    aurora_access_mb = 0
-    for q in aurora_queries:
-        aurora_access_mb += q.data_accessed_mb(Engine.Aurora)
-    return aurora_access_mb * planner_config.aurora_usd_per_mb_scanned()
+    expected_ios = (1.0 - buffer_pool_hit_rate) * total_accessed_pages
+    expected_million_ios = expected_ios / 1e6
+    return expected_million_ios * planner_config.aurora_usd_per_million_ios()
+
+
+def compute_athena_scanned_bytes(
+    queries: Iterable[Query],
+    accessed_bytes_per_query: Iterable[int],
+    planner_config: PlannerConfig,
+) -> int:
+    # N.B. There is a minimum charge of 10 MB per query.
+    min_bytes_per_query = planner_config.athena_min_mb_per_query() * 1000 * 1000
+    total_accessed_bytes = 0
+    for query, accessed_bytes in zip(queries, accessed_bytes_per_query):
+        total_accessed_bytes += query.arrival_count() * max(
+            accessed_bytes, min_bytes_per_query
+        )
+    return total_accessed_bytes
 
 
 def compute_athena_scan_cost(
-    athena_queries: Iterable[Query],
+    total_accessed_bytes: int,
     planner_config: PlannerConfig,
 ) -> float:
-    athena_access_mb = 0
-    for q in athena_queries:
-        athena_access_mb += q.data_accessed_mb(Engine.Athena)
-    return athena_access_mb * planner_config.athena_usd_per_mb_scanned()
+    accessed_mb = total_accessed_bytes / 1000 / 1000
+    return accessed_mb * planner_config.athena_usd_per_mb_scanned()
 
 
 def compute_aurora_transition_time_s(

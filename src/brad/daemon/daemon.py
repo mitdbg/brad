@@ -11,6 +11,7 @@ from brad.daemon.monitor import Monitor
 from brad.planner.compare.cost import best_cost_under_geomean_latency
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import MetricsFromMonitor
+from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 from brad.planner.workload.provider import WorkloadProvider
 from brad.planner.workload import Workload
@@ -64,6 +65,8 @@ class BradDaemon:
             # TODO: Make this configurable.
             comparator=best_cost_under_geomean_latency(geomean_latency_ceiling_s=10),
             metrics_provider=MetricsFromMonitor(self._monitor, forecasted=True),
+            # TODO: Hook into the data access models. This is a placeholder.
+            data_access_provider=_NoopDataAccessProvider(),
         )
 
     async def run_forever(self) -> None:
@@ -177,4 +180,9 @@ class _EmptyWorkloadProvider(WorkloadProvider):
 
 class _NoopAnalyticsScorer(AnalyticsLatencyScorer):
     def apply_predicted_latencies(self, _workload: Workload) -> None:
+        pass
+
+
+class _NoopDataAccessProvider(DataAccessProvider):
+    def apply_access_statistics(self, _workload: Workload) -> None:
         pass

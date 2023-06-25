@@ -75,6 +75,13 @@ class Workload:
         # three engines (Aurora, Redshift, Athena) in that order.
         self._predicted_analytical_latencies: Optional[npt.NDArray] = None
 
+        # Data access statistics (predicted).
+        # These properties are set and used by the blueprint planner.
+        #
+        # Shape: (N,) where `N` is the number of queries.
+        self._predicted_aurora_pages_accessed: Optional[npt.NDArray] = None
+        self._predicted_athena_bytes_accessed: Optional[npt.NDArray] = None
+
         ###
         ### Legacy properties below.
         ###
@@ -128,6 +135,32 @@ class Workload:
         return self._predicted_analytical_latencies[
             query_indices, self.EngineLatencyIndex[engine]
         ]
+
+    def set_predicted_data_access_statistics(
+        self, aurora_pages: npt.NDArray, athena_bytes: npt.NDArray
+    ) -> None:
+        self._predicted_aurora_pages_accessed = aurora_pages
+        self._predicted_athena_bytes_accessed = athena_bytes
+
+    def get_predicted_aurora_pages_accessed(self, query_idx: int) -> int:
+        assert self._predicted_aurora_pages_accessed is not None
+        return self._predicted_aurora_pages_accessed[query_idx].item()
+
+    def get_predicted_aurora_pages_accessed_batch(
+        self, query_indices: List[int]
+    ) -> npt.NDArray:
+        assert self._predicted_aurora_pages_accessed is not None
+        return self._predicted_aurora_pages_accessed[query_indices]
+
+    def get_predicted_athena_bytes_accessed(self, query_idx: int) -> int:
+        assert self._predicted_athena_bytes_accessed is not None
+        return self._predicted_athena_bytes_accessed[query_idx].item()
+
+    def get_predicted_athena_bytes_accessed_batch(
+        self, query_indicies: List[int]
+    ) -> npt.NDArray:
+        assert self._predicted_athena_bytes_accessed is not None
+        return self._predicted_athena_bytes_accessed[query_indicies]
 
     def compute_latency_gains(self) -> npt.NDArray:
         """

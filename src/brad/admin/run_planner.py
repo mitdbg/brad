@@ -13,6 +13,9 @@ from brad.planner.compare.cost import (
     best_cost_under_p99_latency,
 )
 from brad.planner.factory import BlueprintPlannerFactory
+from brad.planner.scoring.data_access.precomputed_values import (
+    PrecomputedDataAccessProvider,
+)
 from brad.planner.scoring.performance.precomputed_predictions import (
     PrecomputedPredictions,
 )
@@ -63,7 +66,7 @@ def register_admin_action(subparser) -> None:
         "--predictions-dir",
         type=str,
         required=True,
-        help="Path to the workload's predicted execution times.",
+        help="Path to the workload's predicted statistics (execution times, data access).",
     )
     parser.add_argument(
         "--schema-name",
@@ -171,6 +174,13 @@ def run_planner(args) -> None:
         redshift_predictions_path=prediction_dir / "pred_redshift_runtime.npy",
         athena_predictions_path=prediction_dir / "pred_athena_runtime.npy",
     )
+    data_access_provider = PrecomputedDataAccessProvider.load(
+        workload_file_path=prediction_dir / "all_queries.sql",
+        aurora_accessed_pages_path=prediction_dir
+        / "all_queries_aurora_blocks_accessed.npy",
+        athena_accessed_bytes_path=prediction_dir
+        / "all_queries_athena_scanned_bytes.npy",
+    )
 
     # 6. Start the planner.
     monitor = Monitor.from_config_file(config)
@@ -197,6 +207,7 @@ def run_planner(args) -> None:
             max_latency_ceiling_s=args.latency_ceiling_s
         ),
         metrics_provider=metrics_provider,
+        data_access_provider=data_access_provider,
     )
     monitor.force_read_metrics()
 
