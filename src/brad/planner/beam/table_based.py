@@ -39,10 +39,12 @@ class TableBasedBeamPlanner(BlueprintPlanner):
     async def run_replan(self) -> None:
         logger.info("Running a replan...")
 
-        # 1. Fetch the next workload and make query execution predictions.
+        # 1. Fetch the next workload and apply predictions.
         next_workload = self._workload_provider.next_workload()
         self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
         self._analytics_latency_scorer.apply_predicted_latencies(self._current_workload)
+        self._data_access_provider.apply_access_statistics(next_workload)
+        self._data_access_provider.apply_access_statistics(self._current_workload)
 
         # 2. Cluster queries by tables and sort by gains (sum).
         clusters = self._preprocess_workload_queries(next_workload)

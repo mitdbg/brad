@@ -179,7 +179,7 @@ def run_planner(args) -> None:
         aurora_accessed_pages_path=prediction_dir
         / "all_queries_aurora_blocks_accessed.npy",
         athena_accessed_bytes_path=prediction_dir
-        / "all_queries_athena_bytes_accessed.npy",
+        / "all_queries_athena_scanned_bytes.npy",
     )
 
     # 6. Start the planner.
