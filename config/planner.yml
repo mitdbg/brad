@@ -123,6 +123,11 @@ redshift_gamma: 0.635405229
 
 redshift_load_factor:
   resource_alpha: 0.753694931989888
+  # p = [alpha * base * gamma * CPU] + [(1 - gamma) * base]
+  cpu_alpha: 0.04322972
+  cpu_gamma: 0.500017
+
+  # Legacy factors.
   cpu_to_load_alpha: 0.7861541
   min_scaling_cpu: 30
 

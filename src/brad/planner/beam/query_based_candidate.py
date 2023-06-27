@@ -12,8 +12,8 @@ from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.performance.load_factor import (
+    scale_redshift_run_time_by_load,
     compute_existing_aurora_load_factor,
-    compute_existing_redshift_load_factor,
 )
 from brad.planner.scoring.performance.cpu import (
     compute_next_aurora_cpu,
@@ -116,7 +116,6 @@ class BlueprintCandidate(ComparableBlueprint):
 
         # Used for debug purposes.
         self._aurora_load_factor = np.nan
-        self._redshift_load_factor = np.nan
 
     def to_blueprint(self) -> Blueprint:
         # We use the source blueprint for table schema information.
@@ -161,7 +160,6 @@ class BlueprintCandidate(ComparableBlueprint):
         values["redshift_cpu"] = self.redshift_cpu
 
         values["aurora_load_factor"] = self._aurora_load_factor
-        values["redshift_load_factor"] = self._redshift_load_factor
 
         return values
 
@@ -417,12 +415,11 @@ class BlueprintCandidate(ComparableBlueprint):
                 self.scaled_query_latencies[Engine.Redshift].sum(),
                 ctx,
             )
-            self._redshift_load_factor = compute_existing_redshift_load_factor(
-                ctx.metrics.redshift_cpu_avg,
-                self.redshift_cpu,
-                ctx,
+            self.scaled_query_latencies[
+                Engine.Redshift
+            ] = scale_redshift_run_time_by_load(
+                self.scaled_query_latencies[Engine.Redshift], self.redshift_cpu, ctx
             )
-            self.scaled_query_latencies[Engine.Redshift] *= self._redshift_load_factor
 
     def is_better_than(self, other: "BlueprintCandidate") -> bool:
         return self._comparator(self, other)
