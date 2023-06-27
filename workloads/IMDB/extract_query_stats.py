@@ -93,7 +93,7 @@ def main():
 
     # Make sure stats are up to date.
     print("Running vacuum + analyze...", file=sys.stderr, flush=True)
-    #cursor.execute("VACUUM ANALYZE")
+    cursor.execute("VACUUM ANALYZE")
 
     print("Loading queries...", file=sys.stderr, flush=True)
     queries = load_all_queries(args.queries_file)
