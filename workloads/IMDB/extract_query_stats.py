@@ -119,17 +119,21 @@ def main():
         base_cards = extract_base_cardinalities(plan)
 
         table_selectivity = {}
+        table_cardinality = {}
         table_access_widths = {}
+        table_access_widths_pct = {}
         table_access_method = {}
 
         for bc in base_cards:
             table_name = base_table_name(bc.table_name)
             total_tups = table_sizes[table_name]
+
             selectivity = bc.cardinality / total_tups
             selectivity = min(selectivity, 1.0)
 
             total_width = table_widths[table_name]
-            access_width = bc.width / total_width
+            access_width_pct = bc.width / total_width
+            access_width = bc.width
 
             if table_name in table_selectivity:
                 table_selectivity[table_name] = max(
@@ -145,10 +149,24 @@ def main():
             else:
                 table_access_widths[table_name] = access_width
 
+            if table_name in table_access_widths_pct:
+                table_access_widths_pct[table_name] = max(
+                    table_access_widths_pct[table_name], access_width_pct
+                )
+            else:
+                table_access_widths_pct[table_name] = access_width_pct
+
             if table_name not in table_access_method:
                 table_access_method[table_name] = [bc.access_op_name]
             else:
                 table_access_method[table_name].append(bc.access_op_name)
+
+            if table_name in table_cardinality:
+                table_cardinality[table_name] = max(
+                    table_cardinality[table_name], bc.cardinality
+                )
+            else:
+                table_cardinality[table_name] = bc.cardinality
 
         results.append(
             {
@@ -156,18 +174,20 @@ def main():
                 "selectivity": table_selectivity,
                 "access_width": table_access_widths,
                 "access_methods": table_access_method,
+                "est_cardinality": table_cardinality,
+                "access_width_pct": access_width_pct,
             }
         )
 
         if qidx % 500 == 0:
-            save_checkpoint(results, pathlib.Path("query_selectivity.json"))
+            save_checkpoint(results, pathlib.Path("all_queries_features.json"))
             print(
                 "Completed index {} of {}".format(qidx, len(queries) - 1),
                 file=sys.stderr,
                 flush=True,
             )
 
-    save_checkpoint(results, pathlib.Path("query_selectivity.json"))
+    save_checkpoint(results, pathlib.Path("all_queries_features.json"))
 
 
 if __name__ == "__main__":
