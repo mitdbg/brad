@@ -93,7 +93,7 @@ def main():
 
     # Make sure stats are up to date.
     print("Running vacuum + analyze...", file=sys.stderr, flush=True)
-    cursor.execute("VACUUM ANALYZE")
+    #cursor.execute("VACUUM ANALYZE")
 
     print("Loading queries...", file=sys.stderr, flush=True)
     queries = load_all_queries(args.queries_file)
@@ -175,7 +175,7 @@ def main():
                 "access_width": table_access_widths,
                 "access_methods": table_access_method,
                 "est_cardinality": table_cardinality,
-                "access_width_pct": access_width_pct,
+                "access_width_pct": table_access_widths_pct,
             }
         )
 
