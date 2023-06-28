@@ -9,10 +9,12 @@ import pathlib
 import signal
 import threading
 import sys
+import json
 
 from typing import List
 from datetime import timedelta
 from metrics import MetricsHelper
+from db_load_metrics_test import fetch_metrics_max
 
 METRICS = [
     "redshift_CPUUtilization_Average",
@@ -211,7 +213,7 @@ def main():
     metrics_reader = MetricsHelper(
         aurora_cluster_name=args.aurora_cluster,
         redshift_cluster_name=args.redshift_cluster,
-        epoch_length=timedelta(minutes=3),
+        epoch_length=timedelta(seconds=60),
     )
 
     processes = []
@@ -275,6 +277,12 @@ def main():
 
     metrics_df = metrics_reader.get_metrics(metric_ids=METRICS)
     metrics_df.to_csv(out_dir / "metrics.csv")
+
+    instance_metrics = fetch_metrics_max(
+        epoch_length=timedelta(seconds=60), num_epochs=20
+    )
+    with open(out_dir / "max_metrics.json", "w", encoding="UTF-8") as file:
+        json.dump(instance_metrics, file)
 
     # Wait for the experiment to finish.
     for p in processes:
