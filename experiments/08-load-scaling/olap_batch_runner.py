@@ -282,7 +282,7 @@ def main():
         epoch_length=timedelta(seconds=60), num_epochs=20
     )
     with open(out_dir / "max_metrics.json", "w", encoding="UTF-8") as file:
-        json.dump(instance_metrics, file)
+        json.dump(instance_metrics, file, indent=2, default=str)
 
     # Wait for the experiment to finish.
     for p in processes:
