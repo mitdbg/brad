@@ -1,7 +1,7 @@
 CSTR_VAR = "AURORA_CSTR"
 QUERY_FILE = "../queries.sql"
 AVG_GAP_S = 1
-RUN_FOR_S = 3 * 60 + 10  # 3 minutes, 10 seconds
+RUN_FOR_S = 3 * 60 + 45  # 3 minutes, 45 seconds
 
 run_experiment_group(
   name="r6i_large",

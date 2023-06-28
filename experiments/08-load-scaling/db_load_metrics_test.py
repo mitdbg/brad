@@ -8,7 +8,7 @@ def fetch_metrics_max(epoch_length: timedelta, num_epochs: int):
     client = boto3.client("cloudwatch")
 
     queries = []
-    instance_metrics = ["DBLoad", "DBLoadNonCPU", "DBLoadCPU", "CPUUtilization"]
+    instance_metrics = ["DBLoad", "DBLoadNonCPU", "DBLoadCPU", "CommitThroughput", "CPUUtilization"]
     for im in instance_metrics:
         queries.append(
             {
@@ -52,7 +52,7 @@ def fetch_metrics_max(epoch_length: timedelta, num_epochs: int):
 
 def main():
     epoch_length = timedelta(seconds=60)
-    num_epochs = 20
+    num_epochs = 30
     res = fetch_metrics_max(epoch_length, num_epochs)
     print(json.dumps(res, indent=2, default=str))
 
