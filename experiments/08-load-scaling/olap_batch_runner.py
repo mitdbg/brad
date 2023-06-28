@@ -278,8 +278,11 @@ def main():
     metrics_df = metrics_reader.get_metrics(metric_ids=METRICS)
     metrics_df.to_csv(out_dir / "metrics.csv")
 
+    print("Waiting a few seconds before retrieving metrics...", file=sys.stderr)
+    time.sleep(20)
+
     instance_metrics = fetch_metrics_max(
-        epoch_length=timedelta(seconds=60), num_epochs=20
+        epoch_length=timedelta(seconds=60), num_epochs=30
     )
     with open(out_dir / "max_metrics.json", "w", encoding="UTF-8") as file:
         json.dump(instance_metrics, file, indent=2, default=str)
