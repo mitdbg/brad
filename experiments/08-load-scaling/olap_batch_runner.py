@@ -8,6 +8,7 @@ import os
 import pathlib
 import signal
 import threading
+import sys
 
 from typing import List
 from datetime import timedelta
@@ -83,13 +84,25 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                     next_query_idx = args.specific_query_idx
                 next_query = queries[next_query_idx]
 
-                start = time.time()
-                cursor.execute(next_query)
-                cursor.fetchall()
-                end = time.time()
-                print(
-                    "{},{}".format(next_query_idx, end - start), file=file, flush=True
-                )
+                try:
+                    start = time.time()
+                    cursor.execute(next_query)
+                    cursor.fetchall()
+                    end = time.time()
+                    print(
+                        "{},{}".format(next_query_idx, end - start),
+                        file=file,
+                        flush=True,
+                    )
+                except pyodbc.Error as ex:
+                    print(
+                        "Skipping query {} because of an error (potentially timeout)".format(
+                            idx
+                        ),
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    print(ex, file=sys.stderr, flush=True)
 
                 try:
                     _ = stop_queue.get_nowait()
@@ -104,20 +117,26 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                         flush=True,
                     )
                 for _ in range(args.run_all_times):
-                    start = time.time()
-                    cursor.execute(q)
-                    cursor.fetchall()
-                    end = time.time()
-                    print("{},{}".format(idx, end - start), file=file)
+                    try:
+                        start = time.time()
+                        cursor.execute(q)
+                        cursor.fetchall()
+                        end = time.time()
+                        print("{},{}".format(idx, end - start), file=file)
+                    except pyodbc.Error as ex:
+                        print(
+                            "Skipping query {} because of an error (potentially timeout)".format(
+                                idx
+                            ),
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                        print(ex, file=sys.stderr, flush=True)
 
 
 def run_warmup(args):
     cstr = os.environ[args.cstr_var]
     conn = pyodbc.connect(cstr)
-    try:
-        conn.timeout = 30
-    except pyodbc.Error:
-        pass
     cursor = conn.cursor()
 
     # Hacky way to disable the query cache when applicable.
@@ -129,19 +148,29 @@ def run_warmup(args):
     with open("olap_batch_warmup.csv", "w") as file:
         print("query_idx,run_time_s", file=file)
         for idx, q in enumerate(queries):
-            start = time.time()
-            cursor.execute(q)
-            cursor.fetchall()
-            end = time.time()
-            run_time_s = end - start
-            print(
-                "Warmed up {} of {}. Run time (s): {}".format(
-                    idx + 1, len(queries), run_time_s
+            try:
+                start = time.time()
+                cursor.execute(q)
+                cursor.fetchall()
+                end = time.time()
+                run_time_s = end - start
+                print(
+                    "Warmed up {} of {}. Run time (s): {}".format(
+                        idx + 1, len(queries), run_time_s
+                    )
                 )
-            )
-            if run_time_s >= 29:
-                print("Warning: Query index {} takes longer than 30 s".format(idx))
-            print("{},{}".format(idx, run_time_s), file=file, flush=True)
+                if run_time_s >= 29:
+                    print("Warning: Query index {} takes longer than 30 s".format(idx))
+                print("{},{}".format(idx, run_time_s), file=file, flush=True)
+            except pyodbc.Error as ex:
+                print(
+                    "Skipping query {} because of an error (potentially timeout)".format(
+                        idx
+                    ),
+                    file=sys.stderr,
+                    flush=True,
+                )
+                print(ex, file=sys.stderr, flush=True)
 
 
 def main():
