@@ -8,10 +8,13 @@ import os
 import pathlib
 import signal
 import threading
+import sys
+import json
 
 from typing import List
 from datetime import timedelta
 from metrics import MetricsHelper
+from db_load_metrics_test import fetch_metrics_max
 
 METRICS = [
     "redshift_CPUUtilization_Average",
@@ -83,13 +86,25 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                     next_query_idx = args.specific_query_idx
                 next_query = queries[next_query_idx]
 
-                start = time.time()
-                cursor.execute(next_query)
-                cursor.fetchall()
-                end = time.time()
-                print(
-                    "{},{}".format(next_query_idx, end - start), file=file, flush=True
-                )
+                try:
+                    start = time.time()
+                    cursor.execute(next_query)
+                    cursor.fetchall()
+                    end = time.time()
+                    print(
+                        "{},{}".format(next_query_idx, end - start),
+                        file=file,
+                        flush=True,
+                    )
+                except pyodbc.Error as ex:
+                    print(
+                        "Skipping query {} because of an error (potentially timeout)".format(
+                            idx
+                        ),
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    print(ex, file=sys.stderr, flush=True)
 
                 try:
                     _ = stop_queue.get_nowait()
@@ -104,20 +119,26 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                         flush=True,
                     )
                 for _ in range(args.run_all_times):
-                    start = time.time()
-                    cursor.execute(q)
-                    cursor.fetchall()
-                    end = time.time()
-                    print("{},{}".format(idx, end - start), file=file)
+                    try:
+                        start = time.time()
+                        cursor.execute(q)
+                        cursor.fetchall()
+                        end = time.time()
+                        print("{},{}".format(idx, end - start), file=file)
+                    except pyodbc.Error as ex:
+                        print(
+                            "Skipping query {} because of an error (potentially timeout)".format(
+                                idx
+                            ),
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                        print(ex, file=sys.stderr, flush=True)
 
 
 def run_warmup(args):
     cstr = os.environ[args.cstr_var]
     conn = pyodbc.connect(cstr)
-    try:
-        conn.timeout = 30
-    except pyodbc.Error:
-        pass
     cursor = conn.cursor()
 
     # Hacky way to disable the query cache when applicable.
@@ -129,19 +150,29 @@ def run_warmup(args):
     with open("olap_batch_warmup.csv", "w") as file:
         print("query_idx,run_time_s", file=file)
         for idx, q in enumerate(queries):
-            start = time.time()
-            cursor.execute(q)
-            cursor.fetchall()
-            end = time.time()
-            run_time_s = end - start
-            print(
-                "Warmed up {} of {}. Run time (s): {}".format(
-                    idx + 1, len(queries), run_time_s
+            try:
+                start = time.time()
+                cursor.execute(q)
+                cursor.fetchall()
+                end = time.time()
+                run_time_s = end - start
+                print(
+                    "Warmed up {} of {}. Run time (s): {}".format(
+                        idx + 1, len(queries), run_time_s
+                    )
                 )
-            )
-            if run_time_s >= 29:
-                print("Warning: Query index {} takes longer than 30 s".format(idx))
-            print("{},{}".format(idx, run_time_s), file=file, flush=True)
+                if run_time_s >= 29:
+                    print("Warning: Query index {} takes longer than 30 s".format(idx))
+                print("{},{}".format(idx, run_time_s), file=file, flush=True)
+            except pyodbc.Error as ex:
+                print(
+                    "Skipping query {} because of an error (potentially timeout)".format(
+                        idx
+                    ),
+                    file=sys.stderr,
+                    flush=True,
+                )
+                print(ex, file=sys.stderr, flush=True)
 
 
 def main():
@@ -182,7 +213,7 @@ def main():
     metrics_reader = MetricsHelper(
         aurora_cluster_name=args.aurora_cluster,
         redshift_cluster_name=args.redshift_cluster,
-        epoch_length=timedelta(minutes=3),
+        epoch_length=timedelta(seconds=60),
     )
 
     processes = []
@@ -246,6 +277,15 @@ def main():
 
     metrics_df = metrics_reader.get_metrics(metric_ids=METRICS)
     metrics_df.to_csv(out_dir / "metrics.csv")
+
+    print("Waiting a few seconds before retrieving metrics...", file=sys.stderr)
+    time.sleep(20)
+
+    instance_metrics = fetch_metrics_max(
+        epoch_length=timedelta(seconds=60), num_epochs=30
+    )
+    with open(out_dir / "max_metrics.json", "w", encoding="UTF-8") as file:
+        json.dump(instance_metrics, file, indent=2, default=str)
 
     # Wait for the experiment to finish.
     for p in processes:

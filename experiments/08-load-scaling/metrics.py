@@ -195,7 +195,7 @@ class MetricsHelper:
         # Retrieve more than 1 epoch, for robustness; If we retrieve once per
         # minute and things are logged every minute, small delays might cause
         # us to miss some points. Deduplication is performed later on.
-        start_time = end_time - 5 * self._epoch_length
+        start_time = end_time - 20 * self._epoch_length
 
         if not self._values.empty:
             start_time = self._values.index[-1]
