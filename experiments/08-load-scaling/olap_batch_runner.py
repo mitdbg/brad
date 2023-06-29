@@ -73,6 +73,10 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
         start_queue.put_nowait("")
         _ = stop_queue.get()
 
+        rand_query_order = list(range(len(queries)))
+        random.shuffle(rand_query_order)
+        rand_idx = 0
+
         if args.run_all_times is None:
             while True:
                 wait_for_s = prng.gauss(args.avg_gap_s, args.std_gap_s)
@@ -80,7 +84,11 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                     wait_for_s = 0.0
                 time.sleep(wait_for_s)
 
-                if args.specific_query_idx is None:
+                if args.run_ordered:
+                    next_query_idx = rand_query_order[rand_idx]
+                    rand_idx += 1
+                    rand_idx %= len(rand_query_order)
+                elif args.specific_query_idx is None:
                     next_query_idx = prng.randrange(len(queries))
                 else:
                     next_query_idx = args.specific_query_idx
@@ -200,6 +208,7 @@ def main():
     parser.add_argument("--std_gap_s", type=float, default=0.5)
     parser.add_argument("--aurora_cluster", type=str, default="aurora-2")
     parser.add_argument("--redshift_cluster", type=str, default="redshift-ra3-test")
+    parser.add_argument("--run_ordered", action="store_true")
     args = parser.parse_args()
 
     if args.run_warmup:
