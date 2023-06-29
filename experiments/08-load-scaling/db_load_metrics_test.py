@@ -1,6 +1,7 @@
 import boto3
 import json
 import pytz
+from itertools import product
 from datetime import datetime, timedelta, timezone
 
 
@@ -15,10 +16,15 @@ def fetch_metrics_max(epoch_length: timedelta, num_epochs: int):
         "CommitThroughput",
         "CPUUtilization",
     ]
-    for im in instance_metrics:
+    stats = [
+        "Minimum",
+        "Maximum",
+        "Average",
+    ]
+    for im, stat in product(instance_metrics, stats):
         queries.append(
             {
-                "Id": f"instance_{im}",
+                "Id": f"instance_{stat}_{im}",
                 "MetricStat": {
                     "Metric": {
                         "Namespace": "AWS/RDS",
@@ -31,7 +37,7 @@ def fetch_metrics_max(epoch_length: timedelta, num_epochs: int):
                         ],
                     },
                     "Period": int(epoch_length.total_seconds()),
-                    "Stat": "Maximum",
+                    "Stat": stat,
                 },
                 "ReturnData": True,
             }
