@@ -110,6 +110,13 @@ class PlannerConfig:
     def aurora_load_resource_alpha(self) -> float:
         return float(self._raw["aurora_load_factor"]["resource_alpha"])
 
+    def aurora_load_cpu_alpha(self) -> float:
+        return float(self._raw["aurora_load_factor"]["cpu_alpha"])
+
+    def aurora_load_cpu_gamma(self) -> float:
+        return float(self._raw["aurora_load_factor"]["cpu_gamma"])
+
+    # These two are legacy scaling factors.
     def aurora_load_cpu_to_load_alpha(self) -> float:
         return float(self._raw["aurora_load_factor"]["cpu_to_load_alpha"])
 

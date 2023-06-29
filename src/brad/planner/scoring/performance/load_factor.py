@@ -18,6 +18,21 @@ def scale_redshift_run_time_by_load(
     return scaled + static
 
 
+def scale_aurora_run_time_by_load(
+    base_run_times: npt.NDArray, next_cpu_avg: float, ctx: ScoringContext
+) -> npt.NDArray:
+    """
+    `curr_cpu_avg` should be in the range [0, 100].
+    """
+    scaled = base_run_times * ctx.planner_config.aurora_load_cpu_gamma()
+    scaled *= next_cpu_avg * ctx.planner_config.aurora_load_cpu_alpha()
+
+    static_pct = 1.0 - ctx.planner_config.aurora_load_cpu_gamma()
+    static = base_run_times * static_pct
+
+    return scaled + static
+
+
 def compute_existing_redshift_load_factor(
     curr_cpu_avg: float,
     next_cpu: float,

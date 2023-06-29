@@ -131,8 +131,12 @@ redshift_load_factor:
   cpu_to_load_alpha: 0.7861541
   min_scaling_cpu: 30
 
-# TODO: These are Redshift values.
 aurora_load_factor:
-  resource_alpha: 0.753694931989888
+  resource_alpha: 1.0
+  # p = [alpha * base * gamma * CPU] + [(1 - gamma) * base]
+  cpu_alpha: 0.04416129
+  cpu_gamma: 1.0
+
+  # Legacy factors.
   cpu_to_load_alpha: 0.8761541
   min_scaling_cpu: 30
