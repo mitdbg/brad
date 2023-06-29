@@ -217,8 +217,11 @@ def main():
         return
 
     if args.wait_before_start is not None:
+        print(
+            "Waiting {} seconds before starting...".format(args.wait_before_start),
+            flush=True,
+        )
         time.sleep(args.wait_before_start)
-        return
 
     mgr = mp.Manager()
     start_queue = mgr.Queue()
