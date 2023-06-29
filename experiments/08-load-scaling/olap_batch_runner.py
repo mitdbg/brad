@@ -209,10 +209,15 @@ def main():
     parser.add_argument("--aurora_cluster", type=str, default="aurora-2")
     parser.add_argument("--redshift_cluster", type=str, default="redshift-ra3-test")
     parser.add_argument("--run_ordered", action="store_true")
+    parser.add_argument("--wait_before_start", type=int)
     args = parser.parse_args()
 
     if args.run_warmup:
         run_warmup(args)
+        return
+
+    if args.wait_before_start is not None:
+        time.sleep(args.wait_before_start)
         return
 
     mgr = mp.Manager()
