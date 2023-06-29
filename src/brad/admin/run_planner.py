@@ -52,16 +52,19 @@ def register_admin_action(subparser) -> None:
         help="Path to the blueprint planner's configuration file.",
     )
     parser.add_argument(
-        "--workload-dir",
+        "--workload-source",
         type=str,
         required=True,
-        help="Path to the workload to load for planning purposes.",
+        help="Used to specify how to construct the workload to use.",
     )
     parser.add_argument(
-        "--load-pickle",
-        action="store_true",
-        help="If set, load the workload from a pickled file.",
+        "--workload-dir",
+        type=str,
+        help="Path to the workload to load for planning purposes.",
     )
+    parser.add_argument("--query-bank-file", type=str)
+    parser.add_argument("--query-counts-file", type=str)
+    parser.add_argument("--query-counts-multiplier", type=int, default=1)
     parser.add_argument(
         "--predictions-dir",
         type=str,
@@ -137,12 +140,39 @@ def run_planner(args) -> None:
     logger.info("%s", blueprint_mgr.get_blueprint())
 
     # 4. Load the workload.
-    if args.load_pickle:
+    if args.workload_source == "pickle":
         workload = Workload.from_pickle(
             pathlib.Path(args.workload_dir) / _PICKLE_FILE_NAME
         )
 
-    else:
+    elif args.workload_source == "query_bank":
+        assert args.query_bank_file is not None
+        assert args.query_counts_file is not None
+        assert args.transactional_rate_per_s is not None
+        assert args.workload_dir is not None
+
+        engines = EngineConnections.connect_sync(
+            config, args.schema_name, autocommit=True
+        )
+        workload_dir = pathlib.Path(args.workload_dir)
+        table_sizer = TableSizer(engines, config)
+        builder = WorkloadBuilder()
+        workload = (
+            builder.add_analytical_queries_and_counts_from_file(
+                args.query_bank_file,
+                args.query_counts_file,
+                args.query_counts_multiplier,
+            )
+            .add_transactional_queries_from_file(workload_dir / "oltp.sql")
+            .uniform_total_transaction_rate(
+                args.transactional_rate_per_s, period=timedelta(seconds=1)
+            )
+            .for_period(timedelta(hours=1))
+            .table_sizes_from_engines(blueprint_mgr.get_blueprint(), table_sizer)
+            .build()
+        )
+
+    elif args.workload_source == "workload_dir":
         assert args.analytical_rate_per_s is not None
         assert args.transactional_rate_per_s is not None
 

@@ -1,3 +1,4 @@
+import csv
 import pathlib
 import logging
 from datetime import timedelta
@@ -28,16 +29,24 @@ class WorkloadBuilder:
         self._total_transaction_count: float = 0.0
         self._period = timedelta(hours=1)
         self._table_sizes: Dict[str, int] = {}
+        self._prespecified_queries: List[Query] = []
 
     def build(self) -> Workload:
-        analytics = [
-            Query(q, arrival_count=self._analytics_count_per * count)
-            for q, count in self._deduplicate_queries(self._analytical_queries).items()
-        ]
+        if len(self._analytical_queries) > 0:
+            analytics = [
+                Query(q, arrival_count=self._analytics_count_per * count)
+                for q, count in self._deduplicate_queries(
+                    self._analytical_queries
+                ).items()
+            ]
+        else:
+            analytics = self._prespecified_queries
+
         transactions = [
             Query(q, arrival_count=0)
             for q in self._deduplicate_queries(self._transactional_queries).keys()
         ]
+
         return Workload(
             period=self._period,
             analytical_queries=analytics,
@@ -85,9 +94,34 @@ class WorkloadBuilder:
             self._total_transaction_count = scaled
         return self
 
+    def add_analytical_queries_and_counts_from_file(
+        self,
+        query_bank_file: str | pathlib.Path,
+        query_counts: str | pathlib.Path,
+        multiplier: int = 1,
+    ) -> "WorkloadBuilder":
+        self._analytical_queries.clear()
+
+        with open(query_bank_file, encoding="UTF-8") as bank:
+            all_queries = [q.strip() for q in bank]
+
+        with open(query_counts, encoding="UTF-8") as queries:
+            reader = csv.reader(queries)
+            for i, row in enumerate(reader):
+                if i == 0:
+                    continue
+                query_idx = int(row[0])
+                run_count = int(row[1])
+                self._prespecified_queries.append(
+                    Query(all_queries[query_idx], run_count * multiplier)
+                )
+        return self
+
     def add_analytical_queries_from_file(
         self, file_path: str | pathlib.Path
     ) -> "WorkloadBuilder":
+        self._prespecified_queries.clear()
+
         with open(file_path, encoding="UTF-8") as analytics:
             for q in analytics:
                 self._analytical_queries.append(q.strip())
