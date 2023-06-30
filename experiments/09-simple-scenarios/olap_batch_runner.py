@@ -192,7 +192,9 @@ def main():
         if not args.run_ordered:
             if args.run_for_s is not None:
                 print(
-                    "Letting the experiment run for {} seconds...".format(args.run_for_s),
+                    "Letting the experiment run for {} seconds...".format(
+                        args.run_for_s
+                    ),
                     flush=True,
                 )
                 time.sleep(args.run_for_s)
