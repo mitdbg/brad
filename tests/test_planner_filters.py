@@ -33,8 +33,8 @@ def test_aurora_transactions():
     bp1 = Blueprint(
         "schema",
         table_schemas=[
-            Table("test", [], [], None),
-            Table("test2", [], [], None),
+            Table("test", [], [], None, []),
+            Table("test2", [], [], None, []),
         ],
         table_locations={
             "test": [Engine.Aurora],
@@ -47,8 +47,8 @@ def test_aurora_transactions():
     bp2 = Blueprint(
         "schema",
         table_schemas=[
-            Table("test", [], [], None),
-            Table("test2", [], [], None),
+            Table("test", [], [], None, []),
+            Table("test2", [], [], None, []),
         ],
         table_locations={
             "test": [Engine.Aurora],
@@ -79,9 +79,9 @@ def test_single_engine_execution():
     bp1 = Blueprint(
         "schema",
         table_schemas=[
-            Table("test", [], [], None),
-            Table("test2", [], [], None),
-            Table("test3", [], [], None),
+            Table("test", [], [], None, []),
+            Table("test2", [], [], None, []),
+            Table("test3", [], [], None, []),
         ],
         table_locations={
             "test": [Engine.Aurora],
@@ -95,9 +95,9 @@ def test_single_engine_execution():
     bp2 = Blueprint(
         "schema",
         table_schemas=[
-            Table("test", [], [], None),
-            Table("test2", [], [], None),
-            Table("test3", [], [], None),
+            Table("test", [], [], None, []),
+            Table("test2", [], [], None, []),
+            Table("test3", [], [], None, []),
         ],
         table_locations={
             "test": [Engine.Aurora],
@@ -125,9 +125,9 @@ def test_table_on_engine():
     bp1 = Blueprint(
         "schema",
         table_schemas=[
-            Table("test", [], [], None),
-            Table("test2", [], [], None),
-            Table("test3", [], [], None),
+            Table("test", [], [], None, []),
+            Table("test2", [], [], None, []),
+            Table("test3", [], [], None, []),
         ],
         table_locations={
             "test": [Engine.Aurora],
@@ -141,9 +141,9 @@ def test_table_on_engine():
     bp2 = Blueprint(
         "schema",
         table_schemas=[
-            Table("test", [], [], None),
-            Table("test2", [], [], None),
-            Table("test3", [], [], None),
+            Table("test", [], [], None, []),
+            Table("test2", [], [], None, []),
+            Table("test3", [], [], None, []),
         ],
         table_locations={
             "test": [Engine.Aurora],
@@ -157,9 +157,9 @@ def test_table_on_engine():
     bp3 = Blueprint(
         "schema",
         table_schemas=[
-            Table("test", [], [], None),
-            Table("test2", [], [], None),
-            Table("test3", [], [], None),
+            Table("test", [], [], None, []),
+            Table("test2", [], [], None, []),
+            Table("test3", [], [], None, []),
         ],
         table_locations={
             "test": [Engine.Athena],
@@ -181,9 +181,9 @@ def test_no_data_loss():
     bp1 = Blueprint(
         "schema",
         table_schemas=[
-            Table("test", [], [], None),
-            Table("test2", [], [], None),
-            Table("test3", [], [], None),
+            Table("test", [], [], None, []),
+            Table("test2", [], [], None, []),
+            Table("test3", [], [], None, []),
         ],
         table_locations={
             "test": [Engine.Aurora],
@@ -197,9 +197,9 @@ def test_no_data_loss():
     bp2 = Blueprint(
         "schema",
         table_schemas=[
-            Table("test", [], [], None),
-            Table("test2", [], [], None),
-            Table("test3", [], [], None),
+            Table("test", [], [], None, []),
+            Table("test2", [], [], None, []),
+            Table("test3", [], [], None, []),
         ],
         table_locations={
             "test": [Engine.Aurora],

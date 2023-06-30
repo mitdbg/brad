@@ -96,6 +96,7 @@ def test_location_change():
                 columns=[],
                 table_dependencies=[],
                 transform_text=None,
+                secondary_indexed_columns=[],
             )
         ],
         {"table1": [Engine.Aurora]},
@@ -111,6 +112,7 @@ def test_location_change():
                 columns=[],
                 table_dependencies=[],
                 transform_text=None,
+                secondary_indexed_columns=[],
             )
         ],
         {"table1": [Engine.Aurora, Engine.Redshift]},
@@ -137,6 +139,7 @@ def test_location_change():
                 columns=[],
                 table_dependencies=[],
                 transform_text=None,
+                secondary_indexed_columns=[],
             )
         ],
         {"table1": [Engine.Athena]},
