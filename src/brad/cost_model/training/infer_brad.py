@@ -16,10 +16,14 @@ from workloads.cross_db_benchmark.benchmark_tools.parse_run import parse_query_g
 
 def rename_database_stats(database_stats):
     for col_stats in database_stats.column_stats:
-        if not col_stats.tablename.endswith("_brad_source") and not col_stats.tablename.endswith("_brad_shadow"):
+        if not col_stats.tablename.endswith(
+            "_brad_source"
+        ) and not col_stats.tablename.endswith("_brad_shadow"):
             col_stats.tablename = col_stats.tablename + "_brad_source"
     for tab_stats in database_stats.table_stats:
-        if not tab_stats.relname.endswith("_brad_source") and not tab_stats.relname.endswith("_brad_shadow"):
+        if not tab_stats.relname.endswith(
+            "_brad_source"
+        ) and not tab_stats.relname.endswith("_brad_shadow"):
             tab_stats.relname = tab_stats.relname + "_brad_source"
 
 

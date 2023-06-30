@@ -131,7 +131,7 @@ def parse_queries(
     save_cache=False,
     cap_queries=None,
     target_path=None,
-    is_brad=False
+    is_brad=False,
 ):
     if database == DatabaseSystem.POSTGRES:
         return parse_plans_with_query_postgres(
@@ -171,7 +171,7 @@ def parse_queries(
             save_cache=save_cache,
             cap_queries=cap_queries,
             target_path=target_path,
-            is_brad=is_brad
+            is_brad=is_brad,
         )
     elif database == DatabaseSystem.REDSHIFT:
         return parse_queries_redshift(
@@ -190,7 +190,7 @@ def parse_queries(
             save_cache=save_cache,
             cap_queries=cap_queries,
             target_path=target_path,
-            is_brad=is_brad
+            is_brad=is_brad,
         )
     elif database == DatabaseSystem.ATHENA:
         # It is currently the same as parsing on REDSHIFT, might change it later
@@ -210,7 +210,7 @@ def parse_queries(
             save_cache=save_cache,
             cap_queries=cap_queries,
             target_path=target_path,
-            is_brad=is_brad
+            is_brad=is_brad,
         )
     else:
         raise NotImplementedError(f"Database {database} not yet supported.")

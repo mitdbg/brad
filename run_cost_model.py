@@ -58,7 +58,7 @@ def parse_queries_wrapper(
         max_runtime=args.max_runtime,
         zero_card_min_runtime=args.min_query_ms * 5,
         target_path=target,
-        is_brad=is_brad
+        is_brad=is_brad,
     )
     with open(target, "w") as outfile:
         json.dump(parsed_runs, outfile, default=dumper)
@@ -294,7 +294,7 @@ if __name__ == "__main__":
                 target,
                 cap_queries,
                 args.db_name,
-                args.is_brad
+                args.is_brad,
             )
 
     if args.argment_dataset:

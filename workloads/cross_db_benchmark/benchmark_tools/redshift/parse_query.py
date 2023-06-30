@@ -129,7 +129,10 @@ def parse_queries_redshift(
             aurora_q.verbose_plan, analyze=False, parse=True
         )
         verbose_plan.parse_lines_recursively(
-            alias_dict=alias_dict, parse_baseline=False, parse_join_conds=False, is_brad=is_brad
+            alias_dict=alias_dict,
+            parse_baseline=False,
+            parse_join_conds=False,
+            is_brad=is_brad,
         )
 
         tables, filter_columns, operators = plan_statistics(verbose_plan)

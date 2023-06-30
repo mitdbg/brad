@@ -495,7 +495,10 @@ def parse_plans_with_query_aurora(
 
             # parse information contained in operator nodes (different information in verbose and analyze plan)
             analyze_plan.parse_lines_recursively(
-                alias_dict=alias_dict, parse_baseline=False, parse_join_conds=False, is_brad=is_brad
+                alias_dict=alias_dict,
+                parse_baseline=False,
+                parse_join_conds=False,
+                is_brad=is_brad,
             )
 
         elif is_timeout:
@@ -507,7 +510,10 @@ def parse_plans_with_query_aurora(
         # only explain plan (not executed)
         verbose_plan, _, _ = parse_plan(q.verbose_plan, analyze=False, parse=True)
         verbose_plan.parse_lines_recursively(
-            alias_dict=alias_dict, parse_baseline=False, parse_join_conds=False, is_brad=is_brad
+            alias_dict=alias_dict,
+            parse_baseline=False,
+            parse_join_conds=False,
+            is_brad=is_brad,
         )
         # raw_info_plan = copy.deepcopy(verbose_plan)
 
@@ -575,7 +581,7 @@ def parse_plans_with_query_aurora(
             timeout_ms=timeout_ms,
             return_namespace=False,
             is_brad=is_brad,
-            cache=cache
+            cache=cache,
         )
         if "tables" in analyze_plan:
             analyze_plan["tables"] = list(analyze_plan["tables"])
