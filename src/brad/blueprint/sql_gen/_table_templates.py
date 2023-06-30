@@ -43,7 +43,11 @@ AURORA_TRIGGER_TEMPLATE = """
     EXECUTE PROCEDURE {trigger_fn_name}();
 """
 
-AURORA_INDEX_TEMPLATE = (
+AURORA_CREATE_BTREE_INDEX_TEMPLATE = (
+    "CREATE INDEX {index_name} ON {table_name} USING btree ({columns});"
+)
+
+AURORA_SEQ_COL_INDEX_TEMPLATE = (
     "CREATE INDEX {index_name} ON {table_name} USING btree (" + AURORA_SEQ_COLUMN + ");"
 )
 

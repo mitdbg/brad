@@ -16,7 +16,8 @@ from brad.config.strings import (
     update_trigger_name,
 )
 from ._table_templates import (
-    AURORA_INDEX_TEMPLATE,
+    AURORA_CREATE_BTREE_INDEX_TEMPLATE,
+    AURORA_SEQ_COL_INDEX_TEMPLATE,
     AURORA_SEQ_CREATE_TABLE_TEMPLATE,
     AURORA_CREATE_SOURCE_VIEW_TEMPLATE,
     AURORA_DELETE_TRIGGER_FN_TEMPLATE,
@@ -57,7 +58,7 @@ class TableSqlGenerator:
                     pkey_columns=pkey_columns,
                 )
                 # The index on the monotonically increasing column.
-                create_source_index = AURORA_INDEX_TEMPLATE.format(
+                create_source_index = AURORA_SEQ_COL_INDEX_TEMPLATE.format(
                     index_name=seq_index_name(table, for_shadow=False),
                     table_name=source_table_name(table),
                 )
@@ -78,7 +79,7 @@ class TableSqlGenerator:
                     pkey_columns=pkey_columns,
                 )
                 # The index on the shadow table's monotonically increasing column.
-                create_shadow_index = AURORA_INDEX_TEMPLATE.format(
+                create_shadow_index = AURORA_SEQ_COL_INDEX_TEMPLATE.format(
                     index_name=seq_index_name(table, for_shadow=True),
                     table_name=shadow_table_name(table),
                 )
@@ -119,6 +120,19 @@ class TableSqlGenerator:
                     trigger_cond="BEFORE UPDATE",
                 )
 
+                # Any secondary indexes.
+                # NOTE: Aurora creates primary key indexes automatically.
+                create_indexes = []
+                for index_cols in table.secondary_indexed_columns:
+                    col_names = list(map(lambda col: col.name, index_cols))
+                    create_indexes.append(
+                        AURORA_CREATE_BTREE_INDEX_TEMPLATE.format(
+                            index_name="{}_index".format("_".join(col_names)),
+                            table_name=source_table_name(table),
+                            columns=", ".join(col_names),
+                        )
+                    )
+
                 return (
                     [
                         create_source_table,
@@ -130,6 +144,7 @@ class TableSqlGenerator:
                         create_trigger,
                         create_update_trigger_fn,
                         create_update_trigger,
+                        *create_indexes,
                     ],
                     Engine.Aurora,
                 )
