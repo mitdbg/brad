@@ -1,4 +1,4 @@
-QUERY_FILE = "../queries.sql"
+QUERY_FILE = "queries.sql"
 
 run_experiment(
   name="initial_low_before_opt",
