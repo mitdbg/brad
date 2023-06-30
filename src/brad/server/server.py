@@ -97,6 +97,7 @@ class BradServer(BradInterface):
             raise RuntimeError(
                 "Unsupported routing policy: {}".format(str(routing_policy))
             )
+        logger.info("Using routing policy: %s", routing_policy)
 
         self._sessions = SessionManager(
             self._config,
@@ -222,7 +223,9 @@ class BradServer(BradInterface):
             # 2. Select an engine for the query.
             query_rep = QueryRep(query)
             engine_to_use = self._router.engine_for(query_rep)
-            logger.debug("Routing '%s' to %s", query, engine_to_use)
+            logger.debug(
+                "[S%d] Routing '%s' to %s", session_id.value(), query, engine_to_use
+            )
             debug_info["executor"] = engine_to_use
 
             # 3. Actually execute the query.

@@ -278,7 +278,8 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         debug_values = best_candidate.to_debug_values()
         logger.debug(
-            "Selected blueprint details: %s", json.dumps(debug_values, indent=2)
+            "Selected blueprint details: %s",
+            json.dumps(debug_values, indent=2, default=str),
         )
 
         await self._notify_new_blueprint(best_blueprint)
