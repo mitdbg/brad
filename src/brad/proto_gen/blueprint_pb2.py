@@ -13,25 +13,27 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0f\x62lueprint.proto\x12\x04\x62rad\"\xac\x01\n\tBlueprint\x12\x13\n\x0bschema_name\x18\x01 \x01(\t\x12\x1b\n\x06tables\x18\x02 \x03(\x0b\x32\x0b.brad.Table\x12\"\n\x06\x61urora\x18\x03 \x01(\x0b\x32\x12.brad.Provisioning\x12$\n\x08redshift\x18\x04 \x01(\x0b\x32\x12.brad.Provisioning\x12#\n\x06policy\x18\x05 \x01(\x0b\x32\x13.brad.RoutingPolicy\"\x8d\x01\n\x05Table\x12\x12\n\ntable_name\x18\x01 \x01(\t\x12\"\n\x07\x63olumns\x18\x02 \x03(\x0b\x32\x11.brad.TableColumn\x12\x1f\n\tlocations\x18\x03 \x03(\x0e\x32\x0c.brad.Engine\x12+\n\x0c\x64\x65pendencies\x18\x04 \x01(\x0b\x32\x15.brad.TableDependency\"B\n\x0bTableColumn\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\tdata_type\x18\x02 \x01(\t\x12\x12\n\nis_primary\x18\x03 \x01(\x08\"@\n\x0fTableDependency\x12\x1a\n\x12source_table_names\x18\x02 \x03(\t\x12\x11\n\ttransform\x18\x03 \x01(\t\"8\n\x0cProvisioning\x12\x15\n\rinstance_type\x18\x01 \x01(\t\x12\x11\n\tnum_nodes\x18\x02 \x01(\r\"\x1f\n\rRoutingPolicy\x12\x0e\n\x06policy\x18\x01 \x01(\x0c*;\n\x06\x45ngine\x12\x0b\n\x07UNKNOWN\x10\x00\x12\n\n\x06\x41URORA\x10\x01\x12\x0c\n\x08REDSHIFT\x10\x02\x12\n\n\x06\x41THENA\x10\x03\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0f\x62lueprint.proto\x12\x04\x62rad\"\xac\x01\n\tBlueprint\x12\x13\n\x0bschema_name\x18\x01 \x01(\t\x12\x1b\n\x06tables\x18\x02 \x03(\x0b\x32\x0b.brad.Table\x12\"\n\x06\x61urora\x18\x03 \x01(\x0b\x32\x12.brad.Provisioning\x12$\n\x08redshift\x18\x04 \x01(\x0b\x32\x12.brad.Provisioning\x12#\n\x06policy\x18\x05 \x01(\x0b\x32\x13.brad.RoutingPolicy\"\xab\x01\n\x05Table\x12\x12\n\ntable_name\x18\x01 \x01(\t\x12\"\n\x07\x63olumns\x18\x02 \x03(\x0b\x32\x11.brad.TableColumn\x12\x1f\n\tlocations\x18\x03 \x03(\x0e\x32\x0c.brad.Engine\x12+\n\x0c\x64\x65pendencies\x18\x04 \x01(\x0b\x32\x15.brad.TableDependency\x12\x1c\n\x07indexes\x18\x05 \x03(\x0b\x32\x0b.brad.Index\"B\n\x0bTableColumn\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\tdata_type\x18\x02 \x01(\t\x12\x12\n\nis_primary\x18\x03 \x01(\x08\"@\n\x0fTableDependency\x12\x1a\n\x12source_table_names\x18\x02 \x03(\t\x12\x11\n\ttransform\x18\x03 \x01(\t\"8\n\x0cProvisioning\x12\x15\n\rinstance_type\x18\x01 \x01(\t\x12\x11\n\tnum_nodes\x18\x02 \x01(\r\"\x1f\n\rRoutingPolicy\x12\x0e\n\x06policy\x18\x01 \x01(\x0c\"\x1c\n\x05Index\x12\x13\n\x0b\x63olumn_name\x18\x01 \x03(\t*;\n\x06\x45ngine\x12\x0b\n\x07UNKNOWN\x10\x00\x12\n\n\x06\x41URORA\x10\x01\x12\x0c\n\x08REDSHIFT\x10\x02\x12\n\n\x06\x41THENA\x10\x03\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'blueprint_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _ENGINE._serialized_start=569
-  _ENGINE._serialized_end=628
+  _ENGINE._serialized_start=629
+  _ENGINE._serialized_end=688
   _BLUEPRINT._serialized_start=26
   _BLUEPRINT._serialized_end=198
   _TABLE._serialized_start=201
-  _TABLE._serialized_end=342
-  _TABLECOLUMN._serialized_start=344
-  _TABLECOLUMN._serialized_end=410
-  _TABLEDEPENDENCY._serialized_start=412
-  _TABLEDEPENDENCY._serialized_end=476
-  _PROVISIONING._serialized_start=478
-  _PROVISIONING._serialized_end=534
-  _ROUTINGPOLICY._serialized_start=536
-  _ROUTINGPOLICY._serialized_end=567
+  _TABLE._serialized_end=372
+  _TABLECOLUMN._serialized_start=374
+  _TABLECOLUMN._serialized_end=440
+  _TABLEDEPENDENCY._serialized_start=442
+  _TABLEDEPENDENCY._serialized_end=506
+  _PROVISIONING._serialized_start=508
+  _PROVISIONING._serialized_end=564
+  _ROUTINGPOLICY._serialized_start=566
+  _ROUTINGPOLICY._serialized_end=597
+  _INDEX._serialized_start=599
+  _INDEX._serialized_end=627
 # @@protoc_insertion_point(module_scope)
