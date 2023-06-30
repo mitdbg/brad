@@ -3,7 +3,7 @@ from itertools import product
 QUERIES = list(range(25))
 QUERIES.remove(16)
 
-CLIENTS = [1, 2, 4, 8]
+CLIENTS = [1, 2, 4, 6, 8]
 
 CSTR_VAR = "AURORA_CSTR"
 QUERY_FILE = "../queries.sql"
@@ -30,6 +30,6 @@ for inst in INSTANCES:
           "wait_before_start": 30,
         },
       )
-      for clients, qidx in product(CLIENTS, QUERIES[:3])
+      for clients, qidx in product(CLIENTS, QUERIES[:10])
     ],
   )
