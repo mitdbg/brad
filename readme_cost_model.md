@@ -57,6 +57,7 @@ python run_cost_model.py --run_workload
               --database redshift
               --db_name imdb
               --query_timeout 200
+              --repetitions_per_query 4
               --host xxxx
               --port 5439
               --user xxx
@@ -80,9 +81,11 @@ python run_cost_model.py --run_workload
 # Parse the queries
 
 ## For Aurora:
+Set flag --is_brad since brad has different table names
 ```angular2html
-python run_cost_model.py --database aurora --parse_queries --db_name imdb --include_zero_card --workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json --target ../data/imdb/parsed_queries/
+python run_cost_model.py --database aurora --parse_queries --db_name imdb --include_zero_card --workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json --target ../data/imdb/parsed_queries/ --is_brad
 ```
+
 
 Argment dataset if needed (highly recommended for aurora):
 ```angular2html
@@ -92,12 +95,12 @@ python run_cost_model.py --argment_dataset --workload_runs ../data/imdb/parsed_q
 
 ## On Redshift
 ```angular2html
-python run_cost_model.py --database redshift --parse_queries --db_name imdb --include_zero_card --workload_runs ../data/imdb/raw/redshift_IMDB_10k_10_6.json --aurora_workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json --target ../data/imdb/parsed_queries/
+python run_cost_model.py --database redshift --parse_queries --db_name imdb --include_zero_card --workload_runs ../data/imdb/raw/redshift_IMDB_10k_10_6.json --aurora_workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json --target ../data/imdb/parsed_queries/ --is_brad
 ```
 
 ## On Athena
 ```angular2html
-python run_cost_model.py --database athena --parse_queries --db_name imdb --include_zero_card --workload_runs ../data/imdb/raw/athena_IMDB_10k_10_6.json --aurora_workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json --target ../data/imdb/parsed_queries/
+python run_cost_model.py --database athena --parse_queries --db_name imdb --include_zero_card --workload_runs ../data/imdb/raw/athena_IMDB_10k_10_6.json --aurora_workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json --target ../data/imdb/parsed_queries/ --is_brad
 ```
 
 # Training the cost model

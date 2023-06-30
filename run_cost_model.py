@@ -36,7 +36,7 @@ class StoreDictKeyPair(argparse.Action):
 
 
 def parse_queries_wrapper(
-    database, source, source_aurora, target, cap_queries, db_name
+    database, source, source_aurora, target, cap_queries, db_name, is_brad
 ):
     raw_plans = load_json(source)
     if source_aurora is None or not os.path.exists(source_aurora):
@@ -58,6 +58,7 @@ def parse_queries_wrapper(
         max_runtime=args.max_runtime,
         zero_card_min_runtime=args.min_query_ms * 5,
         target_path=target,
+        is_brad=is_brad
     )
     with open(target, "w") as outfile:
         json.dump(parsed_runs, outfile, default=dumper)
@@ -123,6 +124,7 @@ if __name__ == "__main__":
     parser.add_argument("--explain_only", action="store_true")
     parser.add_argument("--aurora_workload_runs", default=None, nargs="+")
     parser.add_argument("--argment_dataset", action="store_true")
+    parser.add_argument("--is_brad", action="store_true")
 
     # Training cost model command
     parser.add_argument("--workload_runs", default=None, nargs="+")
@@ -292,6 +294,7 @@ if __name__ == "__main__":
                 target,
                 cap_queries,
                 args.db_name,
+                args.is_brad
             )
 
     if args.argment_dataset:

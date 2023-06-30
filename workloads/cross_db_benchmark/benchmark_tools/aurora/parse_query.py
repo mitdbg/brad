@@ -316,8 +316,9 @@ def refine_db_stats(database_stats, db_conn=None, cursor=None):
         cursor.execute(index_sql)
         indexes = cursor.fetchall()
     elif db_conn:
-        # TODO: make it work for db_conn class
-        return database_stats
+        _, cursor = db_conn.get_cursor(db_created=True)
+        cursor.execute(index_sql)
+        indexes = cursor.fetchall()
     else:
         return database_stats
 
@@ -380,6 +381,7 @@ def parse_plans_with_query_aurora(
     save_cache=False,
     cap_queries=None,
     target_path=None,
+    is_brad=True,
 ):
     # keep track of column statistics
     if zero_card_min_runtime is None:
@@ -493,7 +495,7 @@ def parse_plans_with_query_aurora(
 
             # parse information contained in operator nodes (different information in verbose and analyze plan)
             analyze_plan.parse_lines_recursively(
-                alias_dict=alias_dict, parse_baseline=False, parse_join_conds=False
+                alias_dict=alias_dict, parse_baseline=False, parse_join_conds=False, is_brad=is_brad
             )
 
         elif is_timeout:
@@ -505,7 +507,7 @@ def parse_plans_with_query_aurora(
         # only explain plan (not executed)
         verbose_plan, _, _ = parse_plan(q.verbose_plan, analyze=False, parse=True)
         verbose_plan.parse_lines_recursively(
-            alias_dict=alias_dict, parse_baseline=False, parse_join_conds=False
+            alias_dict=alias_dict, parse_baseline=False, parse_join_conds=False, is_brad=is_brad
         )
         # raw_info_plan = copy.deepcopy(verbose_plan)
 
@@ -566,12 +568,14 @@ def parse_plans_with_query_aurora(
             q.sql,
             column_id_mapping,
             table_id_mapping,
-            curr_explain_only,
-            use_true_card,
-            db_conn,
-            cursor,
-            timeout_ms,
-            cache,
+            is_explain_only=curr_explain_only,
+            use_true_card=use_true_card,
+            db_conn=db_conn,
+            cursor=cursor,
+            timeout_ms=timeout_ms,
+            return_namespace=False,
+            is_brad=is_brad,
+            cache=cache
         )
         if "tables" in analyze_plan:
             analyze_plan["tables"] = list(analyze_plan["tables"])

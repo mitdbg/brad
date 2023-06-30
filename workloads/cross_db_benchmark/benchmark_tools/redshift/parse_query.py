@@ -32,6 +32,7 @@ def parse_queries_redshift(
     save_cache=False,
     cap_queries=None,
     target_path=None,
+    is_brad=False,
 ):
     assert len(run_stats.query_list) == len(aurora_run_stats.query_list)
     db_conn = None
@@ -128,7 +129,7 @@ def parse_queries_redshift(
             aurora_q.verbose_plan, analyze=False, parse=True
         )
         verbose_plan.parse_lines_recursively(
-            alias_dict=alias_dict, parse_baseline=False, parse_join_conds=False
+            alias_dict=alias_dict, parse_baseline=False, parse_join_conds=False, is_brad=is_brad
         )
 
         tables, filter_columns, operators = plan_statistics(verbose_plan)
@@ -171,12 +172,14 @@ def parse_queries_redshift(
             q.sql,
             column_id_mapping,
             table_id_mapping,
-            False,
-            use_true_card,
-            db_conn,
-            cursor,
-            timeout_ms,
-            cache,
+            is_explain_only=True,
+            use_true_card=use_true_card,
+            db_conn=db_conn,
+            cursor=cursor,
+            timeout_ms=timeout_ms,
+            return_namespace=False,
+            is_brad=is_brad,
+            cache=cache,
         )
         if "tables" in verbose_plan:
             verbose_plan["tables"] = list(verbose_plan["tables"])
