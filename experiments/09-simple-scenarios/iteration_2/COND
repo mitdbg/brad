@@ -1,0 +1,60 @@
+run_experiment(
+  name="initial_low_before_opt",
+  run="python3 ../olap_batch_runner.py",
+  args=["--run_ordered"],
+  options={
+    "num_clients": 1,
+    "avg_gap_s": 5,
+  },
+)
+
+run_experiment(
+  name="initial_low_after_opt",
+  run="python3 ../olap_batch_runner.py",
+  args=["--run_ordered"],
+  options={
+    "num_clients": 1,
+    "avg_gap_s": 5,
+  },
+)
+
+run_experiment(
+  name="medium_before_opt",
+  run="python3 ../olap_batch_runner.py",
+  args=["--run_ordered"],
+  options={
+    "num_clients": 5,
+    "avg_gap_s": 5,
+  },
+)
+
+run_experiment(
+  name="high_before_opt",
+  run="python3 ../olap_batch_runner.py",
+  args=["--run_ordered"],
+  options={
+    "num_clients": 10,
+    "avg_gap_s": 5,
+  },
+)
+
+run_experiment(
+  name="high_after_opt",
+  run="python3 ../olap_batch_runner.py",
+  args=["--run_ordered"],
+  options={
+    "num_clients": 10,
+    "avg_gap_s": 5,
+  },
+)
+
+combine(
+  name="all",
+  deps=[
+    ":initial_low_before_opt",
+    ":initial_low_after_opt",
+    ":medium_before_opt",
+    ":high_before_opt",
+    ":high_after_opt",
+  ],
+)

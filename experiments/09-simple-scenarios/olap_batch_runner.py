@@ -39,6 +39,10 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
     ) as file:
         print("query_idx,run_time_s,engine", file=file, flush=True)
 
+        qidx_list = list(range(len(queries)))
+        qidx_idx = -1
+        prng.shuffle(qidx_list)
+
         # Signal that we're ready to start and wait for the controller.
         start_queue.put_nowait("")
         _ = stop_queue.get()
@@ -50,7 +54,12 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                     wait_for_s = 0.0
                 time.sleep(wait_for_s)
 
-                if args.specific_query_idx is None:
+                if args.run_ordered:
+                    qidx_idx += 1
+                    if qidx_idx >= len(qidx_list):
+                        break
+                    next_query_idx = qidx_list[qidx_idx]
+                elif args.specific_query_idx is None:
                     next_query_idx = prng.randrange(len(queries))
                 else:
                     next_query_idx = args.specific_query_idx
@@ -150,6 +159,7 @@ def main():
     parser.add_argument("--specific_query_idx", type=int)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--run_warmup", action="store_true")
+    parser.add_argument("--run_ordered", action="store_true")
     # Controls how the clients submit queries to the underlying engine.
     parser.add_argument("--num_clients", type=int, default=1)
     parser.add_argument("--avg_gap_s", type=float, default=1.0)
@@ -179,30 +189,32 @@ def main():
         stop_queue.put("")
 
     if args.run_all_times is None:
-        if args.run_for_s is not None:
-            print(
-                "Letting the experiment run for {} seconds...".format(args.run_for_s),
-                flush=True,
-            )
-            time.sleep(args.run_for_s)
+        if not args.run_ordered:
+            if args.run_for_s is not None:
+                print(
+                    "Letting the experiment run for {} seconds...".format(args.run_for_s),
+                    flush=True,
+                )
+                time.sleep(args.run_for_s)
 
-        else:
-            print("Waiting until requested to stop... (hit Ctrl-C)")
-            should_shutdown = threading.Event()
+            else:
+                print("Waiting until requested to stop... (hit Ctrl-C)")
+                should_shutdown = threading.Event()
 
-            def signal_handler(signal, frame):
-                should_shutdown.set()
+                def signal_handler(signal, frame):
+                    should_shutdown.set()
 
-            signal.signal(signal.SIGINT, signal_handler)
-            signal.signal(signal.SIGTERM, signal_handler)
+                signal.signal(signal.SIGINT, signal_handler)
+                signal.signal(signal.SIGTERM, signal_handler)
 
-            should_shutdown.wait()
+                should_shutdown.wait()
 
-        print("Stopping clients...")
-        for _ in range(args.num_clients):
-            stop_queue.put("")
+            print("Stopping clients...")
+            for _ in range(args.num_clients):
+                stop_queue.put("")
 
     # Wait for the experiment to finish.
+    print("Waiting for the experiment to finish...", flush=True)
     for p in processes:
         p.join()
 
