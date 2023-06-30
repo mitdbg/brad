@@ -1,4 +1,4 @@
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 
 from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning
@@ -56,6 +56,7 @@ def _tables_with_locations_to_proto(
             source_table_names=table.table_dependencies,
             transform=table.transform_text,
         ),
+        indexes=map(_indexed_columns_to_proto, table.secondary_indexed_columns),
     )
 
 
@@ -83,15 +84,24 @@ def _provisioning_to_proto(prov: Provisioning) -> b.Provisioning:
     )
 
 
+def _indexed_columns_to_proto(indexed_columns: Tuple[Column, ...]) -> b.Index:
+    return b.Index(column_name=map(lambda col: col.name, indexed_columns))
+
+
 # Deserialization
 
 
 def _table_from_proto(table: b.Table) -> Table:
+    col_list = list(map(_table_column_from_proto, table.columns))
+    col_map = {col.name: col for col in col_list}
     return Table(
         name=table.table_name,
-        columns=list(map(_table_column_from_proto, table.columns)),
+        columns=col_list,
         table_dependencies=list(table.dependencies.source_table_names),
         transform_text=table.dependencies.transform,
+        secondary_indexed_columns=list(
+            map(lambda idx: _indexed_columns_from_proto(col_map, idx), table.indexes)
+        ),
     )
 
 
@@ -120,3 +130,12 @@ def _provisioning_from_proto(prov: b.Provisioning) -> Provisioning:
         instance_type=prov.instance_type,
         num_nodes=prov.num_nodes,
     )
+
+
+def _indexed_columns_from_proto(
+    col_map: Dict[str, Column], indexed_columns: b.Index
+) -> Tuple[Column, ...]:
+    col_list = []
+    for col_name in indexed_columns.column_name:
+        col_list.append(col_map[col_name])
+    return tuple(col_list)
