@@ -59,9 +59,6 @@ class ForestRouter(Router):
             self._table_placement_bitmap = self._blueprint.table_locations_bitmap()
 
     def engine_for(self, query: QueryRep) -> Engine:
-        if query.is_data_modification_query():
-            return Engine.Aurora
-
         # Compute valid locations.
         assert self._table_placement_bitmap is not None
         valid_locations, only_location = self._run_location_routing(

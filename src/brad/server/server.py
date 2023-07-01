@@ -1,11 +1,10 @@
 import asyncio
 import io
 import logging
-import queue
-from datetime import datetime, timezone
+import random
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
-import random
+from datetime import datetime, timezone
 
 import grpc
 import pyodbc
@@ -19,7 +18,7 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
 from brad.daemon.monitor import Monitor
-from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel, ReceivedQuery
+from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
@@ -222,7 +221,14 @@ class BradServer(BradInterface):
 
             # 2. Select an engine for the query.
             query_rep = QueryRep(query)
-            engine_to_use = self._router.engine_for(query_rep)
+            transactional_query = (
+                session.in_transaction or query_rep.is_data_modification_query()
+            )
+            if transactional_query:
+                engine_to_use = Engine.Aurora
+            else:
+                engine_to_use = self._router.engine_for(query_rep)
+
             logger.debug(
                 "[S%d] Routing '%s' to %s", session_id.value(), query, engine_to_use
             )
@@ -239,12 +245,18 @@ class BradServer(BradInterface):
                 # Error when executing the query.
                 raise QueryError.from_exception(ex)
 
+            # We keep track of transactional state after executing the query in
+            # case the query failed.
+            if query_rep.is_transaction_start():
+                session.set_in_transaction(in_txn=True)
+
+            if query_rep.is_transaction_end():
+                session.set_in_transaction(in_txn=False)
+
             # Decide whether to log the query.
-            if query_rep.is_analytical_query() or (
-                random.random() < self._config.txn_log_prob
-            ):
+            if not transactional_query or (random.random() < self._config.txn_log_prob):
                 self._qlogger.info(
-                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {end-start}s IsTransaction: {query_rep.is_transactional_query()}"
+                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {end-start}s IsTransaction: {transactional_query}"
                 )
 
             # Extract and return the results, if any.
@@ -259,16 +271,6 @@ class BradServer(BradInterface):
                 logger.debug("Responded with %d rows.", num_rows)
             except pyodbc.ProgrammingError:
                 logger.debug("No rows produced.")
-
-            if self._daemon_input_queue is not None:
-                try:
-                    # Send the query to the daemon. Note that the daemon needs to
-                    # consume these queries quickly enough to avoid an overflow.
-                    self._daemon_input_queue.put(ReceivedQuery(query), block=False)
-                except queue.Full:
-                    logger.warning(
-                        "Daemon input queue is full. Not sending query '%s'", query
-                    )
 
         except QueryError:
             # This is an expected exception. We catch and re-raise it here to

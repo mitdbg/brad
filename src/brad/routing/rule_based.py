@@ -187,9 +187,6 @@ class RuleBased(Router):
         return not_overloaded
 
     def engine_for(self, query: QueryRep) -> Engine:
-        if query.is_data_modification_query():
-            return Engine.Aurora
-
         if self._table_placement_bitmap is None:
             if self._blueprint is not None:
                 blueprint = self._blueprint
