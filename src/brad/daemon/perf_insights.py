@@ -79,7 +79,7 @@ class AwsPerformanceInsightsClient:
         results = []
         batch_size = 10
         for i in range(0, len(metrics_list), batch_size):
-            df = fetch_batch(metrics_list[i:i + batch_size])
+            df = fetch_batch(metrics_list[i : i + batch_size])
             results.append(df)
 
         return pd.concat(results, axis=1)
