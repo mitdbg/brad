@@ -44,8 +44,10 @@ AURORA_TRIGGER_TEMPLATE = """
 """
 
 AURORA_CREATE_BTREE_INDEX_TEMPLATE = (
-    "CREATE INDEX {index_name} ON {table_name} USING btree ({columns});"
+    "CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} USING btree ({columns});"
 )
+
+AURORA_DROP_INDEX_TEMPLATE = "DROP INDEX IF EXISTS {index_name}"
 
 AURORA_SEQ_COL_INDEX_TEMPLATE = (
     "CREATE INDEX {index_name} ON {table_name} USING btree (" + AURORA_SEQ_COLUMN + ");"

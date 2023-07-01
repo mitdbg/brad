@@ -85,6 +85,10 @@ class Table:
     def secondary_indexed_columns(self) -> List[Tuple[Column, ...]]:
         return self._secondary_indexed_columns
 
+    def set_secondary_indexed_columns(self, indexes: List[Tuple[Column, ...]]) -> None:
+        self._secondary_indexed_columns.clear()
+        self._secondary_indexed_columns.extend(indexes)
+
     def clone(self) -> "Table":
         return Table(
             self._name,

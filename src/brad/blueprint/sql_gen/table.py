@@ -17,6 +17,7 @@ from brad.config.strings import (
 )
 from ._table_templates import (
     AURORA_CREATE_BTREE_INDEX_TEMPLATE,
+    AURORA_DROP_INDEX_TEMPLATE,
     AURORA_SEQ_COL_INDEX_TEMPLATE,
     AURORA_SEQ_CREATE_TABLE_TEMPLATE,
     AURORA_CREATE_SOURCE_VIEW_TEMPLATE,
@@ -208,6 +209,36 @@ class TableSqlGenerator:
             queries.append(initialize_template.format(table_name=base_table_name))
 
         return (queries, Engine.Aurora)
+
+
+def generate_create_index_sql(
+    table: Table, indexes: List[Tuple[Column, ...]]
+) -> List[str]:
+    create_indexes = []
+    for index_cols in indexes:
+        col_names = list(map(lambda col: col.name, index_cols))
+        create_indexes.append(
+            AURORA_CREATE_BTREE_INDEX_TEMPLATE.format(
+                index_name="{}_{}_index".format(table.name, "_".join(col_names)),
+                table_name=source_table_name(table),
+                columns=", ".join(col_names),
+            )
+        )
+    return create_indexes
+
+
+def generate_drop_index_sql(
+    table: Table, indexes: List[Tuple[Column, ...]]
+) -> List[str]:
+    drop_indexes = []
+    for index_cols in indexes:
+        col_names = list(map(lambda col: col.name, index_cols))
+        drop_indexes.append(
+            AURORA_DROP_INDEX_TEMPLATE.format(
+                index_name="{}_{}_index".format(table.name, "_".join(col_names)),
+            )
+        )
+    return drop_indexes
 
 
 def comma_separated_column_names(cols: List[Column]) -> str:
