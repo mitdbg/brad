@@ -30,6 +30,6 @@ for inst in INSTANCES:
           "wait_before_start": 30,
         },
       )
-      for clients, qidx in product(CLIENTS, QUERIES[:3])
+      for clients, qidx in product(CLIENTS, QUERIES[:10])
     ],
   )
