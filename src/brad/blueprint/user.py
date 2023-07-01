@@ -45,7 +45,7 @@ class UserProvidedBlueprint:
             transform = raw_table["transform"] if "transform" in raw_table else None
 
             secondary_indexed_columns = []
-            if "indexes" in raw_table["indexes"]:
+            if "indexes" in raw_table:
                 column_map = {c.name: c for c in columns}
                 for indexed_cols in raw_table["indexes"]:
                     col_list = []
