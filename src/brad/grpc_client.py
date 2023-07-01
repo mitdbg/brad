@@ -43,7 +43,9 @@ class BradGrpcClient:
         self._impl.close()
         self._session_id = None
 
-    def run_query(self, query: str) -> Generator[Tuple[bytes, Engine], None, None]:
+    def run_query(
+        self, query: str
+    ) -> Generator[Tuple[bytes, Optional[Engine]], None, None]:
         """
         Send a query to BRAD. The query result will come back row-by-row in
         encoded form. For simplicity, each row is currently encoded as a UTF-8
@@ -111,7 +113,7 @@ class BradRawGrpcClient:
 
     def run_query(
         self, session_id: SessionId, query: str
-    ) -> Generator[Tuple[bytes, Engine], None, None]:
+    ) -> Generator[Tuple[bytes, Optional[Engine]], None, None]:
         """
         Send a query to BRAD. The query result will come back row-by-row in
         encoded form. For simplicity, each row is currently encoded as a UTF-8
@@ -137,7 +139,7 @@ class BradRawGrpcClient:
                     message="BRAD RPC error: Unknown result message kind."
                 )
 
-    def _convert_engine(self, engine: b.ExecutionEngine) -> Engine:
+    def _convert_engine(self, engine: b.ExecutionEngine) -> Optional[Engine]:
         if engine == b.ENG_AURORA:
             return Engine.Aurora
         elif engine == b.ENG_REDSHIFT:
@@ -145,7 +147,7 @@ class BradRawGrpcClient:
         elif engine == b.ENG_ATHENA:
             return Engine.Athena
         else:
-            raise ValueError("Unknown engine: {}".format(engine))
+            return None
 
 
 class BradClientError(Exception):

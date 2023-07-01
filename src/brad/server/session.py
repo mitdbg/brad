@@ -20,6 +20,7 @@ class Session:
     def __init__(self, session_id: SessionId, engines: EngineConnections):
         self._session_id = session_id
         self._engines = engines
+        self._in_txn = False
 
     @property
     def identifier(self) -> SessionId:
@@ -28,6 +29,13 @@ class Session:
     @property
     def engines(self) -> EngineConnections:
         return self._engines
+
+    @property
+    def in_transaction(self) -> bool:
+        return self._in_txn
+
+    def set_in_transaction(self, in_txn: bool) -> None:
+        self._in_txn = in_txn
 
     async def close(self):
         await self._engines.close()

@@ -14,6 +14,10 @@ class Router:
     def engine_for(self, query: QueryRep) -> Engine:
         """
         Selects an engine for the provided SQL query.
+
+        NOTE: Implementers currently do not need to consider DML queries. BRAD
+        routes all DML queries to Aurora before consulting the router. Thus the
+        query passed to this method will always be a read-only query.
         """
 
         raise NotImplementedError

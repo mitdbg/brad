@@ -15,9 +15,6 @@ class LocationAwareRoundRobin(Router):
         self._curr_idx = 0
 
     def engine_for(self, query: QueryRep) -> Engine:
-        if query.is_data_modification_query():
-            return Engine.Aurora
-
         blueprint = self._blueprint_mgr.get_blueprint()
         valid_locations, only_location = self._run_location_routing(
             query, blueprint.table_locations_bitmap()
