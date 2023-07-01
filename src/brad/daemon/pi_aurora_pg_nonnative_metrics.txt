@@ -1,0 +1,5 @@
+db.SQL.logical_reads
+db.Checkpoint.checkpoint_sync_latency
+db.Checkpoint.checkpoint_write_latency
+db.IO.read_latency
+db.Transactions.commit_latency
