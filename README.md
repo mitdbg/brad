@@ -79,6 +79,9 @@ files.
 
 - (06/22/2023) Rename the `s3_metadata_bucket` and `s3_metadata_path` keys in
   the configuration to `s3_assets_bucket` and `s3_assets_path` respectively.
+- (06/30/2023) If you have already created the IMDB schema, run `brad admin
+  modify_blueprint --add-indexes --schema-file config/schemas/imdb.yml
+  --config-file path/to/your/config.yml` to add indexes to your deployment.
 
 
 ### Generate IMDB workload

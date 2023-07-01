@@ -43,7 +43,26 @@ class UserProvidedBlueprint:
                 list(raw_table["dependencies"]) if "dependencies" in raw_table else []
             )
             transform = raw_table["transform"] if "transform" in raw_table else None
-            tables.append(Table(name, columns, table_deps, transform))
+
+            secondary_indexed_columns = []
+            if "indexes" in raw_table:
+                column_map = {c.name: c for c in columns}
+                for indexed_cols in raw_table["indexes"]:
+                    col_list = []
+                    for col_name in indexed_cols.split(","):
+                        try:
+                            col_list.append(column_map[col_name])
+                        except KeyError as ex:
+                            raise RuntimeError(
+                                "Invalid index column: '{}' is not a column of '{}'".format(
+                                    col_name, name
+                                )
+                            ) from ex
+                    secondary_indexed_columns.append(tuple(col_list))
+
+            tables.append(
+                Table(name, columns, table_deps, transform, secondary_indexed_columns)
+            )
 
         if "provisioning" in raw_yaml:
             aurora = raw_yaml["provisioning"]["aurora"]
