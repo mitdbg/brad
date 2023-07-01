@@ -8,7 +8,9 @@ from brad.config.file import ConfigFile
 
 
 class AwsPerformanceInsightsClient:
-    def __init__(self, instance_identifier: str, config: Optional[ConfigFile]) -> None:
+    def __init__(
+        self, instance_identifier: str, config: Optional[ConfigFile] = None
+    ) -> None:
         if config is not None:
             self._rds = boto3.client(
                 "rds",
