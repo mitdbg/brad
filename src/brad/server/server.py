@@ -210,8 +210,11 @@ class BradServer(BradInterface):
             raise QueryError("Invalid session id {}".format(str(session_id)))
 
         try:
-            # Remove any trailing or leading whitespace.
-            query = query.strip()
+            # Remove any trailing or leading whitespace. Remove the trailing
+            # semicolon if it exists.
+            # NOTE: BRAD does not yet support having multiple
+            # semicolon-separated queries in one request.
+            query = self._clean_query_str(query)
 
             # Handle internal commands separately.
             if query.startswith("BRAD_"):
@@ -285,9 +288,7 @@ class BradServer(BradInterface):
         This method is used to handle BRAD_ prefixed "queries" (i.e., commands
         to run custom functionality like syncing data across the engines).
         """
-        # Clean up the command. We remove the trailing semicolon (;), remove any
-        # whitespace, and capitalize the command.
-        command = command_raw[:-1].strip().upper()
+        command = command_raw.upper()
 
         if command == "BRAD_SYNC":
             logger.debug("Manually triggered a data sync.")
@@ -346,3 +347,9 @@ class BradServer(BradInterface):
 
         # - Provisioning changes handled here (if there are blueprint changes).
         # - Need to update the blueprint stored in the manager.
+
+    def _clean_query_str(self, raw_sql: str) -> str:
+        sql = raw_sql.strip()
+        if sql.endswith(";"):
+            sql = sql[:-1]
+        return sql.strip()
