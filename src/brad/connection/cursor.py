@@ -20,7 +20,7 @@ class Cursor:
     async def fetchall(self) -> List[Row]:
         raise NotImplementedError
 
-    async def __aiter__(self) -> AsyncIterator[Row]:
+    def __aiter__(self) -> AsyncIterator[Row]:
         async def do_iteration():
             while True:
                 next_row = await self.fetchone()
@@ -28,7 +28,7 @@ class Cursor:
                     break
                 yield next_row
 
-        return await do_iteration()
+        return do_iteration()
 
     async def commit(self) -> None:
         raise NotImplementedError
