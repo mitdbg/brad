@@ -24,9 +24,8 @@ class RedshiftConnection(Connection):
                 "host": host,
                 "user": user,
                 "password": password,
+                "database": schema_name if schema_name is not None else "dev",
             }
-            if schema_name is not None:
-                kwargs["database"] = schema_name
             return redshift_connector.connect(**kwargs)
 
         connection = await loop.run_in_executor(None, make_connection)
@@ -46,9 +45,8 @@ class RedshiftConnection(Connection):
             "host": host,
             "user": user,
             "password": password,
+            "database": schema_name if schema_name is not None else "dev",
         }
-        if schema_name is not None:
-            kwargs["database"] = schema_name
 
         connection = redshift_connector.connect(**kwargs)
         connection.autocommit = autocommit

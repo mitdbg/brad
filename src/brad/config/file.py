@@ -1,5 +1,5 @@
 import yaml
-from typing import Optional, Any, Dict
+from typing import Optional, Dict
 from datetime import timedelta
 
 from brad.config.engine import Engine
@@ -133,80 +133,13 @@ class ConfigFile:
     def txn_log_prob(self) -> float:
         return float(self._raw["txn_log_prob"])
 
-    def get_connection_info(self, engine: Engine) -> Dict[str, str]:
-        if engine != Engine.Redshift:
-            raise AssertionError
-        config = self._raw[engine]
-        return {
-            "host": config["host"],
-            "port": config["port"],
-            "user": config["user"],
-            "password": config["password"],
-        }
-
-    def get_odbc_connection_string(
-        self, db: Engine, schema_name: Optional[str], conn_info: Any = None
-    ) -> str:
-        if db not in self._raw:
-            raise AssertionError("Unhandled database type: " + str(db))
-
-        config = self._raw[db]
-        if db is Engine.Athena:
-            if conn_info is None:
-                _workgroup = None
-                s3_path = config["s3_output_path"]
-            else:
-                (_workgroup, s3_path) = conn_info
-            cstr = "Driver={{{}}};AwsRegion={};S3OutputLocation={};AuthenticationType=IAM Credentials;UID={};PWD={};".format(
-                config["odbc_driver"],
-                config["aws_region"],
-                s3_path,
-                config["access_key"],
-                config["access_key_secret"],
-            )
-            # TODO: Restrict connections to a workgroup.
-            # We do not do so right now because the bootstrap workflow does not
-            # set up an Athena workgroup.
-            if schema_name is not None:
-                cstr += "Schema={};".format(schema_name)
-        elif db is Engine.Aurora:
-            if conn_info is None:
-                host = config["host"]
-                port = config["port"]
-            else:
-                (read_only, conn_info) = conn_info
-                (writer_host, reader_host, port) = conn_info
-                if read_only:
-                    host = reader_host
-                else:
-                    host = writer_host
-            cstr = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};".format(
-                config["odbc_driver"],
-                host,
-                port,
-                config["user"],
-                config["password"],
-            )
-            if schema_name is not None:
-                cstr += "Database={};".format(schema_name)
-        elif db is Engine.Redshift:
-            if conn_info is None:
-                host = config["host"]
-                port = config["port"]
-            else:
-                (host, port) = conn_info
-            cstr = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};".format(
-                config["odbc_driver"],
-                host,
-                port,
-                config["user"],
-                config["password"],
-            )
-            if schema_name is not None:
-                cstr += "Database={};".format(schema_name)
-            else:
-                cstr += "Database=dev;"
-        return cstr
+    def get_connection_details(self, engine: Engine) -> Dict[str, str]:
+        """
+        Returns the raw configuration details provided for an engine.
+        """
+        if engine not in self._raw:
+            raise AssertionError("Unhandled engine: " + str(engine))
+        return self._raw[engine]
 
 
 def _ensure_slash_terminated(candidate: str) -> str:
