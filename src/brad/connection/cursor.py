@@ -1,4 +1,4 @@
-from typing import Any, Tuple, Optional, List
+from typing import Any, Tuple, Optional, List, Iterator, AsyncIterator
 
 
 Row = Tuple[Any, ...]
@@ -20,6 +20,16 @@ class Cursor:
     async def fetchall(self) -> List[Row]:
         raise NotImplementedError
 
+    async def __aiter__(self) -> AsyncIterator[Row]:
+        async def do_iteration():
+            while True:
+                next_row = await self.fetchone()
+                if next_row is None:
+                    break
+                yield next_row
+
+        return await do_iteration()
+
     async def commit(self) -> None:
         raise NotImplementedError
 
@@ -34,6 +44,16 @@ class Cursor:
 
     def fetchall_sync(self) -> List[Row]:
         raise NotImplementedError
+
+    def __iter__(self) -> Iterator[Row]:
+        def do_iteration():
+            while True:
+                next_row = self.fetchone_sync()
+                if next_row is None:
+                    break
+                yield next_row
+
+        return do_iteration()
 
     def commit_sync(self) -> None:
         raise NotImplementedError
