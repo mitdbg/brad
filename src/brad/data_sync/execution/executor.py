@@ -30,7 +30,11 @@ class DataSyncExecutor:
         self._engines = await EngineConnections.connect(
             self._config, self._blueprint_mgr.schema_name, autocommit=False
         )
-        await self._engines.get_connection(Engine.Aurora).execute(
+        # Reads/writes to the data sync metadata are handled by this Aurora connection.
+        # We need serializable isolation for correctness.
+        conn = self._engines.get_connection(Engine.Aurora)
+        cursor = await conn.cursor()
+        await cursor.execute(
             "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE"
         )
 

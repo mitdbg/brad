@@ -98,12 +98,7 @@ class BradServer(BradInterface):
             )
         logger.info("Using routing policy: %s", routing_policy)
 
-        self._sessions = SessionManager(
-            self._config,
-            self._schema_name,
-            # TODO: Better handling of connections to the underlying provisioning.
-            conn_info=dict(),
-        )
+        self._sessions = SessionManager(self._config, self._schema_name)
 
         self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
         self._timed_sync_task = None
@@ -194,8 +189,8 @@ class BradServer(BradInterface):
 
         await self._data_sync_executor.shutdown()
 
-    async def start_session(self, read_only: bool = False) -> SessionId:
-        session_id, _ = await self._sessions.create_new_session(read_only)
+    async def start_session(self) -> SessionId:
+        session_id, _ = await self._sessions.create_new_session()
         return session_id
 
     async def end_session(self, session_id: SessionId) -> None:

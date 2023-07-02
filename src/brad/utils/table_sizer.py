@@ -55,9 +55,10 @@ class TableSizer:
             conn = self._engines.get_connection(Engine.Redshift)
         elif location == Engine.Athena:
             conn = self._engines.get_connection(Engine.Athena)
-        cursor = conn.cursor()
-        cursor.execute(query)
-        row = cursor.fetchone()
+        cursor = conn.cursor_sync()
+        cursor.execute_sync(query)
+        row = cursor.fetchone_sync()
+        assert row is not None
         return int(row[0])
 
     def aurora_row_size_bytes(self, table_name: str) -> int:
@@ -67,9 +68,10 @@ class TableSizer:
 
         query = f"SELECT pg_column_size(t.*) FROM {table_name} t LIMIT 1"
         conn = self._engines.get_connection(Engine.Aurora)
-        cursor = conn.cursor()
-        cursor.execute(query)
-        row = cursor.fetchone()
+        cursor = conn.cursor_sync()
+        cursor.execute_sync(query)
+        row = cursor.fetchone_sync()
+        assert row is not None
         return int(row[0])
 
     def _table_size_mb_athena(self, table_name: str) -> int:
@@ -100,10 +102,11 @@ class TableSizer:
     def _table_size_bytes_aurora(self, table_name: str) -> int:
         query = "SELECT pg_table_size('{}')".format(source_table_name(table_name))
         aurora = self._engines.get_connection(Engine.Aurora)
-        cursor = aurora.cursor()
+        cursor = aurora.cursor_sync()
         logger.debug("Running on Aurora: %s", query)
-        cursor.execute(query)
-        result = cursor.fetchone()
+        cursor.execute_sync(query)
+        result = cursor.fetchone_sync()
+        assert result is not None
         # The result is in bytes.
         return int(result[0])
 
@@ -113,9 +116,10 @@ class TableSizer:
         )
         redshift = self._engines.get_connection(Engine.Redshift)
         logger.debug("Running on Redshift: %s", query)
-        cursor = redshift.cursor()
-        cursor.execute(query)
-        result = cursor.fetchone()
+        cursor = redshift.cursor_sync()
+        cursor.execute_sync(query)
+        result = cursor.fetchone_sync()
+        assert result is not None
         table_size_mb = int(result[0])
         return table_size_mb
 

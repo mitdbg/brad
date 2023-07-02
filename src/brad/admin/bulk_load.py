@@ -111,7 +111,7 @@ async def _ensure_empty(
                 cursor = await conn.cursor()
                 await cursor.execute("SELECT COUNT(*) FROM {}".format(table_name))
                 row = await cursor.fetchone()
-                if row[0] != 0:
+                if row is not None and row[0] != 0:
                     message = "Table {} on {} is non-empty ({} rows). You can only bulk load non-empty tables.".format(
                         table_name,
                         engine,
@@ -121,9 +121,13 @@ async def _ensure_empty(
                     raise RuntimeError(message)
     finally:
         if Engine.Aurora in engines_filter:
-            await engines.get_connection(Engine.Aurora).rollback()
+            conn = engines.get_connection(Engine.Aurora)
+            cursor = await conn.cursor()
+            await cursor.rollback()
         if Engine.Redshift in engines_filter:
-            await engines.get_connection(Engine.Redshift).rollback()
+            conn = engines.get_connection(Engine.Redshift)
+            cursor = await conn.cursor()
+            await cursor.rollback()
 
 
 async def _load_aurora(
@@ -389,9 +393,13 @@ async def bulk_load_impl(args, manifest) -> None:
                         _try_add_task(athena_loads, running)
 
         if Engine.Aurora in engines_filter:
-            await engines.get_connection(Engine.Aurora).commit()
+            conn = engines.get_connection(Engine.Aurora)
+            cursor = await conn.cursor()
+            await cursor.commit()
         if Engine.Redshift in engines_filter:
-            await engines.get_connection(Engine.Redshift).commit()
+            conn = engines.get_connection(Engine.Redshift)
+            cursor = await conn.cursor()
+            await cursor.commit()
         # Athena does not support transactions.
 
         # Update the sync tables.
