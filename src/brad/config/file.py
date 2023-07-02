@@ -133,6 +133,17 @@ class ConfigFile:
     def txn_log_prob(self) -> float:
         return float(self._raw["txn_log_prob"])
 
+    def get_connection_info(self, engine: Engine) -> Dict[str, str | int]:
+        if engine != Engine.Redshift:
+            raise AssertionError
+        config = self._raw[engine]
+        return {
+            "host": config["host"],
+            "port": config["port"],
+            "user": config["user"],
+            "password": config["password"],
+        }
+
     def get_odbc_connection_string(
         self, db: Engine, schema_name: Optional[str], conn_info: Any = None
     ) -> str:
