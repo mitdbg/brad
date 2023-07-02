@@ -85,7 +85,7 @@ def add_indexes(args, config: ConfigFile, mgr: BlueprintManager) -> None:
     )
     try:
         aurora = engines.get_connection(Engine.Aurora)
-        cursor = aurora.cursor()
+        cursor = aurora.cursor_sync()
 
         user = UserProvidedBlueprint.load_from_yaml_file(args.schema_file)
         user.validate()
@@ -113,18 +113,18 @@ def add_indexes(args, config: ConfigFile, mgr: BlueprintManager) -> None:
             sql_to_run = generate_create_index_sql(table, list(indexes_to_add))
             for sql in sql_to_run:
                 logger.debug("Running on Aurora: %s", sql)
-                cursor.execute(sql)
+                cursor.execute_sync(sql)
 
             sql_to_run = generate_drop_index_sql(table, list(indexes_to_remove))
             for sql in sql_to_run:
                 logger.debug("Running on Aurora: %s", sql)
-                cursor.execute(sql)
+                cursor.execute_sync(sql)
 
             table.set_secondary_indexed_columns(
                 tables_with_indexes[table.name].secondary_indexed_columns
             )
 
-        cursor.commit()
+        cursor.commit_sync()
         mgr.persist_sync()
         logger.info("Done!")
 

@@ -62,14 +62,14 @@ class Query(QueryRep):
         if source_engine == Engine.Aurora:
             query = "EXPLAIN VERBOSE {}".format(self.raw_query)
             aurora = connections.get_connection(Engine.Aurora)
-            cursor = aurora.cursor()
+            cursor = aurora.cursor_sync()
         else:
             assert source_engine == Engine.Redshift
             query = "EXPLAIN {}".format(self.raw_query)
             redshift = connections.get_connection(Engine.Redshift)
-            cursor = redshift.cursor()
+            cursor = redshift.cursor_sync()
 
-        cursor.execute(query)
+        cursor.execute_sync(query)
         plan_rows = [tuple(row) for row in cursor]
         plan = parse_explain_verbose(plan_rows)
         base_cardinalities = extract_base_cardinalities(plan)

@@ -110,12 +110,12 @@ class RuleBased(Router):
         )
         await cursor.execute(indexes_sql)
         all_indexes_raw = await cursor.fetchall()
-        all_indexes: MutableMapping[str, List[str]] = dict()
+        all_indexes: MutableMapping[str, List[List[str]]] = dict()
         for index in all_indexes_raw:
             brad_table_name = index[0]
             if brad_table_name not in all_indexes:
                 all_indexes[brad_table_name] = []
-            all_indexes[brad_table_name].append(index)
+            all_indexes[brad_table_name].append(list(index))
 
         for table_name in blueprint.table_locations():
             location = blueprint.table_locations()[table_name]
@@ -125,6 +125,7 @@ class RuleBased(Router):
                 nrow_sql = f"SELECT COUNT(*) FROM {table_name};"
                 await cursor.execute(nrow_sql)
                 nrow = await cursor.fetchone()
+                assert nrow is not None
                 ncol_sql = f"""SELECT COUNT(*)
                                   FROM INFORMATION_SCHEMA.COLUMNS
                                   WHERE table_catalog = '{blueprint.schema_name()}'
@@ -132,15 +133,16 @@ class RuleBased(Router):
                            """
                 await cursor.execute(ncol_sql)
                 ncol = await cursor.fetchone()
+                assert ncol is not None
 
                 brad_table_name = table_name + "_brad_source"
                 table_indexes = []
                 table_PKs = []
                 if brad_table_name in all_indexes:
-                    for index in all_indexes[brad_table_name]:
-                        column_name = index[-1].split("(")[-1].split(")")[0]
+                    for index_info in all_indexes[brad_table_name]:
+                        column_name = index_info[-1].split("(")[-1].split(")")[0]
                         table_indexes.append(column_name)
-                        if "_brad_source_pkey" in index[1]:
+                        if "_brad_source_pkey" in index_info[1]:
                             table_PKs.append(column_name)
                 self._catalog[table_name] = {
                     "nrow": nrow[0],

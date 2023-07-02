@@ -26,7 +26,6 @@ ENTRY_POINTS = {
 }
 
 INSTALL_REQUIRES = [
-    "aioodbc",
     "boto3",
     "grpcio",
     "pyodbc",
@@ -37,6 +36,7 @@ INSTALL_REQUIRES = [
     "types-pytz",
     "numpy",
     "imbalanced-learn",
+    "redshift_connector",
 ]
 
 DEV_REQUIRES = [

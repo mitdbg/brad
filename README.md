@@ -17,16 +17,16 @@ If you would like to install BRAD in a `virtualenv`, run
 Note that these instructions are written for a Debian based machine (e.g., Ubuntu).
 
 - Install unixODBC: `sudo apt install unixodbc-dev`
-- **Redshift**:
-  - Install the Redshift ODBC driver (you will want the 64-bit driver)
-    https://docs.aws.amazon.com/redshift/latest/mgmt/configure-odbc-connection.html#install-odbc-driver-linux
-  - You may need to add `.odbc.ini` and `.odbcinst.ini` to your home directory.
-    Follow the instructions here:
-    https://docs.aws.amazon.com/redshift/latest/mgmt/configure-odbc-connection.html#odbc-driver-configure-linux-mac
 - **PostgreSQL**:
   - Install `odbc-postgresql`: `sudo apt install odbc-postgresql`
   - The driver should be installed to `/usr/lib/x86_64-linux-gnu/odbc/psqlodbcw.so`
   - You will use this driver to connect to Aurora PostgreSQL
+  - Add the following snippet to `~/.odbcinst.ini`
+    ```ini
+    [PostgreSQL]
+    Description=PostgreSQL ODBC Driver
+    Driver=/usr/lib/x86_64-linux-gnu/odbc/psqlodbcw.so
+    ```
 - **Athena**
   - Download the 64-bit Linux driver: https://docs.aws.amazon.com/athena/latest/ug/connect-with-odbc.html
   - Install `alien`: `sudo apt install alien` (it converts `*.rpm` files into `*.deb` files for installation on Ubuntu)
@@ -37,6 +37,8 @@ Note that these instructions are written for a Debian based machine (e.g., Ubunt
     Description=Amazon Athena Driver
     Driver=/opt/simba/athenaodbc/lib/64/libathenaodbc_sb64.so
     ```
+
+We no longer depend on ODBC to connect to Redshift.
 
 ### Creating a Configuration File
 
@@ -82,6 +84,8 @@ files.
 - (06/30/2023) If you have already created the IMDB schema, run `brad admin
   modify_blueprint --add-indexes --schema-file config/schemas/imdb.yml
   --config-file path/to/your/config.yml` to add indexes to your deployment.
+- (07/02/2023) Re-run `./tools/install-dev.sh` to update your dependencies. We
+  removed `aioodbc` and added `redshift_connector`.
 
 
 ### Generate IMDB workload
