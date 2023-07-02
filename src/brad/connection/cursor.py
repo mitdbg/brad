@@ -11,17 +11,32 @@ class Cursor:
     with type checking.
     """
 
-    def execute(self, query: str) -> None:
+    async def execute(self, query: str) -> None:
         raise NotImplementedError
 
-    def fetchone(self) -> Optional[Row]:
+    async def fetchone(self) -> Optional[Row]:
         raise NotImplementedError
 
-    def fetchall(self) -> List[Row]:
+    async def fetchall(self) -> List[Row]:
         raise NotImplementedError
 
-    def commit(self) -> None:
+    async def commit(self) -> None:
         raise NotImplementedError
 
-    def rollback(self) -> None:
+    async def rollback(self) -> None:
+        raise NotImplementedError
+
+    def execute_sync(self, query: str) -> None:
+        raise NotImplementedError
+
+    def fetchone_sync(self) -> Optional[Row]:
+        raise NotImplementedError
+
+    def fetchall_sync(self) -> List[Row]:
+        raise NotImplementedError
+
+    def commit_sync(self) -> None:
+        raise NotImplementedError
+
+    def rollback_sync(self) -> None:
         raise NotImplementedError

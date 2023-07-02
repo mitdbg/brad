@@ -1,8 +1,8 @@
 from typing import Optional
 
 from .connection import Connection
-from .redshift_connection import SyncRedshiftConnection, AsyncRedshiftConnection
-from .odbc_connection import SyncOdbcConnection, AsyncOdbcConnection
+from .redshift_connection import RedshiftConnection
+from .odbc_connection import OdbcConnection
 from brad.config.file import ConfigFile
 from brad.config.engine import Engine
 
@@ -16,11 +16,11 @@ class ConnectionFactory:
         autocommit: bool = True,
     ) -> Connection:
         if engine == Engine.Redshift:
-            return await AsyncRedshiftConnection.connect(
+            return await RedshiftConnection.connect(
                 **config.get_connection_info(engine), autocommit=autocommit
             )
         else:
-            return await AsyncOdbcConnection.connect(
+            return await OdbcConnection.connect(
                 config.get_odbc_connection_string(engine, schema_name), autocommit
             )
 
@@ -32,10 +32,10 @@ class ConnectionFactory:
         autocommit: bool = True,
     ) -> Connection:
         if engine == Engine.Redshift:
-            return SyncRedshiftConnection.connect(
+            return RedshiftConnection.connect_sync(
                 **config.get_connection_info(engine), autocommit=autocommit
             )
         else:
-            return SyncOdbcConnection.connect(
+            return OdbcConnection.connect_sync(
                 config.get_odbc_connection_string(engine, schema_name), autocommit
             )

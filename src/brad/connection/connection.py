@@ -8,8 +8,14 @@ class Connection:
     with type checking.
     """
 
-    def cursor(self) -> Cursor:
+    async def cursor(self) -> Cursor:
         raise NotImplementedError
 
-    def close(self) -> None:
+    async def close(self) -> None:
+        raise NotImplementedError
+
+    def cursor_sync(self) -> Cursor:
+        raise NotImplementedError
+
+    def close_sync(self) -> None:
         raise NotImplementedError
