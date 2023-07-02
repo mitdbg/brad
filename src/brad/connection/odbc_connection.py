@@ -3,12 +3,13 @@ import pyodbc
 from typing import Any, Optional
 
 from .connection import Connection
-from brad.connection.cursor import Cursor
+from .cursor import Cursor
+from .odbc_cursor import SyncOdbcCursor, AsyncOdbcCursor
 
 
 class SyncOdbcConnection(Connection):
     @classmethod
-    def connect(cls, connection_str: str, autocommit: bool) -> None:
+    def connect(cls, connection_str: str, autocommit: bool) -> Connection:
         connection = pyodbc.connect(connection_str, autocommit=autocommit)
         return cls(connection)
 
@@ -19,7 +20,7 @@ class SyncOdbcConnection(Connection):
 
     def cursor(self) -> Cursor:
         if self._cursor is None:
-            self._cursor = Cursor(self._connection.cursor())
+            self._cursor = SyncOdbcCursor(self._connection.cursor())
         return self._cursor
 
     def close(self) -> None:
@@ -28,7 +29,7 @@ class SyncOdbcConnection(Connection):
 
 class AsyncOdbcConnection(Connection):
     @classmethod
-    async def connect(cls, connection_str: str, autocommit: bool) -> None:
+    async def connect(cls, connection_str: str, autocommit: bool) -> Connection:
         loop = asyncio.get_running_loop()
 
         def make_connection():
@@ -45,7 +46,7 @@ class AsyncOdbcConnection(Connection):
         if self._cursor is None:
             loop = asyncio.get_running_loop()
             cursor_impl = await loop.run_in_executor(None, self._connection.cursor)
-            self._cursor = Cursor(cursor_impl)
+            self._cursor = AsyncOdbcCursor(cursor_impl)
         return self._cursor
 
     async def close(self) -> None:

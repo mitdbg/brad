@@ -133,7 +133,7 @@ class ConfigFile:
     def txn_log_prob(self) -> float:
         return float(self._raw["txn_log_prob"])
 
-    def get_connection_info(self, engine: Engine) -> Dict[str, str | int]:
+    def get_connection_info(self, engine: Engine) -> Dict[str, str]:
         if engine != Engine.Redshift:
             raise AssertionError
         config = self._raw[engine]

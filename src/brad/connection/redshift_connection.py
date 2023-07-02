@@ -3,7 +3,8 @@ import redshift_connector
 from typing import Optional
 
 from .connection import Connection
-from brad.connection.cursor import Cursor
+from .cursor import Cursor
+from .redshift_cursor import SyncRedshiftCursor, AsyncRedshiftCursor
 
 
 class SyncRedshiftConnection(Connection):
@@ -11,21 +12,21 @@ class SyncRedshiftConnection(Connection):
     def connect(
         cls,
         host: str,
-        username: str,
+        user: str,
         password: str,
         schema_name: Optional[str],
         autocommit: bool,
-    ) -> None:
+    ) -> Connection:
         kwargs = {
             "host": host,
-            "username": username,
+            "user": user,
             "password": password,
-            "autocommit": autocommit,
         }
         if schema_name is not None:
-            kwargs["schema_name"] = schema_name
+            kwargs["database"] = schema_name
 
         connection = redshift_connector.connect(**kwargs)
+        connection.autocommit = autocommit
         return cls(connection)
 
     def __init__(self, connection_impl: redshift_connector.Connection) -> None:
@@ -35,7 +36,7 @@ class SyncRedshiftConnection(Connection):
 
     def cursor(self) -> Cursor:
         if self._cursor is None:
-            self._cursor = Cursor(self._connection.cursor())
+            self._cursor = SyncRedshiftCursor(self._connection.cursor())
         return self._cursor
 
     def close(self) -> None:
@@ -47,25 +48,25 @@ class AsyncRedshiftConnection(Connection):
     async def connect(
         cls,
         host: str,
-        username: str,
+        user: str,
         password: str,
         schema_name: Optional[str],
         autocommit: bool,
-    ) -> None:
+    ) -> Connection:
         loop = asyncio.get_running_loop()
 
         def make_connection():
             kwargs = {
                 "host": host,
-                "username": username,
+                "user": user,
                 "password": password,
-                "autocommit": autocommit,
             }
             if schema_name is not None:
-                kwargs["schema_name"] = schema_name
+                kwargs["database"] = schema_name
             return redshift_connector.connect(**kwargs)
 
         connection = await loop.run_in_executor(None, make_connection)
+        connection.autocommit = autocommit
         return cls(connection)
 
     def __init__(self, connection_impl: redshift_connector.Connection) -> None:
@@ -76,7 +77,7 @@ class AsyncRedshiftConnection(Connection):
         if self._cursor is None:
             loop = asyncio.get_running_loop()
             cursor_impl = await loop.run_in_executor(None, self._connection.cursor)
-            self._cursor = Cursor(cursor_impl)
+            self._cursor = AsyncRedshiftCursor(cursor_impl)
         return self._cursor
 
     async def close(self) -> None:
