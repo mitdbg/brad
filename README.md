@@ -82,6 +82,8 @@ files.
 - (06/30/2023) If you have already created the IMDB schema, run `brad admin
   modify_blueprint --add-indexes --schema-file config/schemas/imdb.yml
   --config-file path/to/your/config.yml` to add indexes to your deployment.
+- (07/02/2023) Re-run `./tools/install-dev.sh` to update your dependencies. We
+  removed `aioodbc` and added `redshift_connector`.
 
 
 ### Generate IMDB workload

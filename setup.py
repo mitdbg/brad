@@ -26,7 +26,6 @@ ENTRY_POINTS = {
 }
 
 INSTALL_REQUIRES = [
-    "aioodbc",
     "boto3",
     "grpcio",
     "pyodbc",
