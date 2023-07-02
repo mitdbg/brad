@@ -111,8 +111,8 @@ class BradServer(BradInterface):
         self._daemon_process: Optional[mp.Process] = None
 
     async def serve_forever(self):
+        await self.run_setup()
         try:
-            await self.run_setup()
             grpc_server = grpc.aio.server()
             brad_grpc.add_BradServicer_to_server(BradGrpc(self), grpc_server)
             grpc_server.add_insecure_port(
