@@ -115,7 +115,7 @@ python run_cost_model.py --gather_feature_statistics --workload_runs ../data/imd
 ## Train Aurora cost model
 
 ```angular2html
-python run_cost_model.py --database aurora --train_model --workload_runs ../data/imdb/parsed_queries/aurora_IMDB_10k_10_6_train.json --test_workload_runs ../data/imdb/parsed_queries/aurora_IMDB_10k_10_6_test.json --statistics_file ../data/imdb/parsed_queries/statistics_workload_combined.json --target ../data/imdb/evaluation/ --hyperparameter_path cost_model/setup/tuned_hyperparameters/aurora_tune_est_best_config.json --max_epoch_tuples 100000 --loss_class_name QLoss --device cpu --filename_model imdb_1_aurora --num_workers 16 --seed 0 --save_best
+python run_cost_model.py --database aurora --train_model --workload_runs ../data/imdb/parsed_queries/aurora_IMDB_10k_10_6_train.json --test_workload_runs ../data/imdb/parsed_queries/aurora_IMDB_10k_10_6_test.json --statistics_file ../data/imdb/parsed_queries/statistics_workload_combined.json --target ../data/imdb/evaluation/ --hyperparameter_path src/brad/cost_model/setup/tuned_hyperparameters/aurora_tune_est_best_config.json --max_epoch_tuples 100000 --loss_class_name QLoss --device cpu --filename_model imdb_1_aurora --num_workers 16 --seed 0 --save_best
 ```
 
 ## Train Redshift cost model

@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 from workloads.cross_db_benchmark.benchmark_tools.load_database import create_db_conn
 from workloads.cross_db_benchmark.benchmark_tools.utils import load_json
+from workloads.cross_db_benchmark.benchmark_tools.database import DatabaseSystem
 
 column_regex = re.compile('"(\S+)"."(\S+)"')
 
@@ -149,6 +150,30 @@ def run_aurora_workload(
     print(
         f"Executed workload {workload_path} in {time_offset + time.perf_counter() - start_t:.2f} secs"
     )
+
+
+def re_execute_query_with_no_result(
+    workload_path, database_conn_args, database_kwarg_dict
+):
+    # Due to connection error, sometimes we get queries with no results
+    n_query = 0
+    aurora_raw = load_json(workload_path)
+    db_conn = create_db_conn(
+        DatabaseSystem.AURORA, "imdb", database_conn_args, database_kwarg_dict
+    )
+    for i, q in enumerate(aurora_raw.query_list):
+        if q.verbose_plan is None:
+            print(f"executing query {i}")
+            curr_statistics = db_conn.run_query_collect_statistics(
+                q.sql, repetitions=1, prefix=""
+            )
+            curr_statistics.update(sql=q.sql)
+            curr_statistics.update(hint="")
+            aurora_raw.query_list[i] = curr_statistics
+            n_query += 1
+            if n_query % 20 == 0:
+                save_workload(aurora_raw, workload_path)
+    save_workload(aurora_raw, workload_path)
 
 
 def save_workload(run_stats, target_path):

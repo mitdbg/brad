@@ -112,6 +112,7 @@ if __name__ == "__main__":
     parser.add_argument("--cap_workload", default=10000, type=int)
     parser.add_argument("--with_indexes", action="store_true")
     parser.add_argument("--run_workload", action="store_true")
+    parser.add_argument("--re_execute_query_with_no_result", action="store_true")
 
     # Parse workload command
     parser.add_argument("--parse_plans", action="store_true")
@@ -251,6 +252,7 @@ if __name__ == "__main__":
             with_indexes=args.with_indexes,
             cap_workload=args.cap_workload,
             min_runtime=args.min_query_ms,
+            re_execute_query=args.re_execute_query_with_no_result
         )
 
     if args.parse_plans:
