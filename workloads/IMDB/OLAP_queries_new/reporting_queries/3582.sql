@@ -1,0 +1,1 @@
+SELECT SUM("name"."id") as agg_0, SUM("aka_name"."person_id") as agg_1 FROM "name" LEFT OUTER JOIN "person_info" ON "name"."id" = "person_info"."person_id" LEFT OUTER JOIN "aka_name" ON "name"."id" = "aka_name"."person_id"  WHERE "name"."id" BETWEEN 1255973 AND 3480867 AND "person_info"."info_type_id" >= 38 AND "person_info"."info" NOT LIKE '%(qv%)%';

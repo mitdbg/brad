@@ -1,0 +1,1 @@
+SELECT MAX("cast_info"."movie_id") as agg_0, MIN("cast_info"."person_role_id") as agg_1 FROM "char_name" LEFT OUTER JOIN "cast_info" ON "char_name"."id" = "cast_info"."person_role_id" LEFT OUTER JOIN "title" ON "cast_info"."movie_id" = "title"."id"  WHERE "char_name"."imdb_index" != '%M%' AND "char_name"."id" >= 2582206 AND "title"."title" NOT LIKE '%o%f%';

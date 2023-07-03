@@ -1,0 +1,1 @@
+SELECT COUNT(*) as agg_0 FROM "movie_info_idx" LEFT OUTER JOIN "info_type" ON "movie_info_idx"."info_type_id" = "info_type"."id" LEFT OUTER JOIN "title" ON "movie_info_idx"."movie_id" = "title"."id"  WHERE "movie_info_idx"."info" LIKE '%7.2%' AND "title"."title" NOT LIKE '%in%' AND "info_type"."info" NOT LIKE '%notes%';
