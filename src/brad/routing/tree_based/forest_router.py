@@ -59,7 +59,9 @@ class ForestRouter(Router):
         if self._model is None:
             assert self._assets is not None
             serialized_model = await self._assets.load(
-                _SERIALIZED_KEY.format(schema_name=self._schema_name)
+                _SERIALIZED_KEY.format(
+                    schema_name=self._schema_name, policy=self._policy.value
+                )
             )
             self._model = ModelWrap.from_pickle_bytes(serialized_model)
 

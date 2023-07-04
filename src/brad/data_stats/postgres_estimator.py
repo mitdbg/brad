@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, List, Optional
 
 from .estimator import Estimator
@@ -14,6 +15,8 @@ from brad.data_stats.plan_parsing import (
     extract_base_cardinalities,
 )
 from brad.query_rep import QueryRep
+
+logger = logging.getLogger(__name__)
 
 
 class PostgresEstimator(Estimator):
@@ -61,7 +64,9 @@ class PostgresEstimator(Estimator):
         table_counts = {}
 
         for table in self._blueprint.tables():
-            await self._cursor.execute(f"SELECT COUNT(*) FROM {table.name}")
+            query = f"SELECT COUNT(*) FROM {table.name}"
+            logger.debug("PostgresEstimator running: %s", query)
+            await self._cursor.execute(query)
             row = await self._cursor.fetchone()
             assert row is not None
             table_counts[table.name] = int(row[0])

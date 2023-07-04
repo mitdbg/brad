@@ -117,8 +117,15 @@ class ForestTrainer:
         if not train_full:
             return model_for_eval, quality
 
+        if self._policy == RoutingPolicy.ForestTablePresence:
+            input_features = self._f_table_presence
+        elif self._policy == RoutingPolicy.ForestTableSelectivity:
+            input_features = self._f_table_selectivity
+        else:
+            assert False
+
         X, y, qidx = self._resample_data(
-            self._f_table_presence,
+            input_features,
             self._oracle_routing,
             np.array(range(len(self._valid_queries))),
         )

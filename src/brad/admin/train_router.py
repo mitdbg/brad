@@ -4,11 +4,14 @@ import logging
 import yaml
 
 from brad.asset_manager import AssetManager
+from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
+from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.forest_router import ForestRouter
 from brad.routing.tree_based.trainer import ForestTrainer
+from brad.server.blueprint_manager import BlueprintManager
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +93,14 @@ def extract_schema_name(schema_file: str) -> str:
     return raw_schema["schema_name"]
 
 
+async def set_up_estimator(
+    schema_name: str, blueprint: Blueprint, config: ConfigFile
+) -> Estimator:
+    estimator = await PostgresEstimator.connect(schema_name, config)
+    await estimator.analyze(blueprint)
+    return estimator
+
+
 # This method is called by `brad.exec.admin.main`.
 def train_router(args):
     schema_name = extract_schema_name(args.schema_file)
@@ -105,7 +116,11 @@ def train_router(args):
         athena_run_times=args.data_athena_rt,
     )
     if policy == RoutingPolicy.ForestTableSelectivity:
-        estimator = asyncio.run(PostgresEstimator.connect(schema_name, config))
+        asset_mgr = AssetManager(config)
+        mgr = BlueprintManager(asset_mgr, schema_name)
+        mgr.load_sync()
+        blueprint = mgr.get_blueprint()
+        estimator = asyncio.run(set_up_estimator(schema_name, blueprint, config))
     else:
         estimator = None
     trainer.compute_features(estimator)
