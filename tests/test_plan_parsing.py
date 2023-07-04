@@ -1,4 +1,7 @@
-from brad.planner.plan_parsing import parse_explain_verbose, extract_base_cardinalities
+from brad.query_stats.plan_parsing import (
+    parse_explain_verbose,
+    extract_base_cardinalities,
+)
 
 
 def get_rows():

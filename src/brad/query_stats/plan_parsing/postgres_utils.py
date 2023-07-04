@@ -1,5 +1,8 @@
 import numpy as np
-from brad.planner.plan_parsing.simple_sql_parser import _GetJoinConds, _FormatJoinCond
+from brad.query_stats.plan_parsing.simple_sql_parser import (
+    _GetJoinConds,
+    _FormatJoinCond,
+)
 
 
 def plan_statistics(

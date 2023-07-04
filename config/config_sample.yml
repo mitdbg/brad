@@ -77,3 +77,10 @@ redshift:
   user: awsuser
   password: awsuser_password
   s3_iam_role: arn:aws:iam:123
+
+sidecar_db:
+  odbc_driver: PostgreSQL
+  host: aurora.us-east-1.amazonaws.com
+  port: 5432
+  user: postgres
+  password: postgres_password

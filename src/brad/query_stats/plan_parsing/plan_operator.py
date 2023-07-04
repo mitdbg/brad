@@ -2,13 +2,13 @@ import math
 import re
 import copy
 
-from brad.planner.plan_parsing.generate_workload import (
+from brad.query_stats.plan_parsing.generate_workload import (
     Aggregator,
     ExtendedAggregator,
     LogicalOperator,
 )
-from brad.planner.plan_parsing.parse_filter import parse_filter, PredicateNode
-from brad.planner.plan_parsing.postgres_utils import child_prod
+from brad.query_stats.plan_parsing.parse_filter import parse_filter, PredicateNode
+from brad.query_stats.plan_parsing.postgres_utils import child_prod
 
 estimated_regex = re.compile(
     r"\(cost=(?P<est_startup_cost>\d+.\d+)..(?P<est_cost>\d+.\d+) rows=(?P<est_card>\d+) width=(?P<est_width>\d+)\)"

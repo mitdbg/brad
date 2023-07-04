@@ -1,7 +1,7 @@
 import re
 import copy
 
-from brad.planner.plan_parsing.generate_workload import Operator, LogicalOperator
+from brad.query_stats.plan_parsing.generate_workload import Operator, LogicalOperator
 
 
 class PredicateNode:

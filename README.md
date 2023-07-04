@@ -86,6 +86,9 @@ files.
   --config-file path/to/your/config.yml` to add indexes to your deployment.
 - (07/02/2023) Re-run `./tools/install-dev.sh` to update your dependencies. We
   removed `aioodbc` and added `redshift_connector`.
+- (07/04/2023) Update your local `config.yml` file; add an entry for
+  `sidecar_db`, which should point to a PostgreSQL-compatible DBMS that holds
+  the entire dataset (used for supporting purposes).
 
 
 ### Generate IMDB workload
