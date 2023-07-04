@@ -14,6 +14,7 @@ from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.performance.load_factor import (
     scale_redshift_run_time_by_load,
     scale_aurora_run_time_by_load,
+    compute_next_aurora_load,
 )
 from brad.planner.scoring.performance.cpu import (
     compute_next_aurora_cpu,
@@ -109,6 +110,7 @@ class BlueprintCandidate(ComparableBlueprint):
         self.feasibility = BlueprintFeasibility.Unchecked
         self.scaled_query_latencies: Dict[Engine, npt.NDArray] = {}
         self.aurora_cpu = np.nan
+        self.aurora_load = np.nan
         self.redshift_cpu = np.nan
 
         # Used during comparisons.
@@ -154,6 +156,7 @@ class BlueprintCandidate(ComparableBlueprint):
         values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
 
         values["aurora_cpu"] = self.aurora_cpu
+        values["aurora_load"] = self.aurora_load
         values["redshift_cpu"] = self.redshift_cpu
 
         return values
@@ -385,15 +388,19 @@ class BlueprintCandidate(ComparableBlueprint):
             ctx.current_blueprint.aurora_provisioning().num_nodes() > 0
             and self.aurora_provisioning.num_nodes() > 0
         ):
+            total_next_latency = self.scaled_query_latencies[Engine.Aurora].sum()
             self.aurora_cpu = compute_next_aurora_cpu(
                 ctx.metrics.aurora_cpu_avg,
                 ctx.current_blueprint.aurora_provisioning(),
                 self.aurora_provisioning,
-                self.scaled_query_latencies[Engine.Aurora].sum(),
+                total_next_latency,
                 ctx,
             )
+            self.aurora_load = compute_next_aurora_load(
+                ctx.metrics.aurora_load_minute_avg, total_next_latency, ctx
+            )
             self.scaled_query_latencies[Engine.Aurora] = scale_aurora_run_time_by_load(
-                self.scaled_query_latencies[Engine.Aurora], self.aurora_cpu, ctx
+                self.scaled_query_latencies[Engine.Aurora], self.aurora_load, ctx
             )
 
         if (

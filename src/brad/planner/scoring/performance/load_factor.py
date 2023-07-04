@@ -1,5 +1,6 @@
 import numpy.typing as npt
 
+from brad.config.engine import Engine
 from brad.planner.scoring.context import ScoringContext
 
 
@@ -19,18 +20,29 @@ def scale_redshift_run_time_by_load(
 
 
 def scale_aurora_run_time_by_load(
-    base_run_times: npt.NDArray, next_cpu_avg: float, ctx: ScoringContext
+    base_run_times: npt.NDArray, next_load: float, ctx: ScoringContext
 ) -> npt.NDArray:
     """
-    `curr_cpu_avg` should be in the range [0, 100].
+    `next_load` is a unit-less number that should be above 0.
     """
-    scaled = base_run_times * ctx.planner_config.aurora_load_cpu_gamma()
-    scaled *= next_cpu_avg * ctx.planner_config.aurora_load_cpu_alpha()
+    return base_run_times * ctx.planner_config.aurora_load_alpha() * next_load
 
-    static_pct = 1.0 - ctx.planner_config.aurora_load_cpu_gamma()
-    static = base_run_times * static_pct
 
-    return scaled + static
+def compute_next_aurora_load(
+    curr_load: float, total_next_latency: float, ctx: ScoringContext
+) -> float:
+    if Engine.Aurora not in ctx.current_latency_weights:
+        # Special case. We cannot reweigh the queries because nothing in the
+        # current workload ran on Aurora.
+        query_factor = 1.0
+    else:
+        # Query movement scaling factor.
+        # Captures change in queries routed to this engine.
+        base_latency = ctx.current_latency_weights[Engine.Aurora]
+        assert base_latency != 0.0
+        query_factor = total_next_latency / base_latency
+
+    return curr_load * query_factor
 
 
 def compute_existing_redshift_load_factor(
@@ -40,7 +52,7 @@ def compute_existing_redshift_load_factor(
 ) -> float:
     """
     This is used when Redshift is already running and we are changing its
-    provisioning.
+    provisioning. This scaling factor is based on expected CPU changes.
     """
     if (
         curr_cpu_avg <= ctx.planner_config.redshift_load_min_scaling_cpu()
@@ -64,7 +76,7 @@ def compute_existing_aurora_load_factor(
 ) -> float:
     """
     This is used when Aurora is already running and we are changing its
-    provisioning.
+    provisioning. This scaling factor is based on expected CPU changes.
     """
     if (
         curr_cpu_avg <= ctx.planner_config.aurora_load_min_scaling_cpu()

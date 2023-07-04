@@ -132,10 +132,12 @@ redshift_load_factor:
   min_scaling_cpu: 30
 
 aurora_load_factor:
+  # Proportionality factor for cross-provisioning CPU changes.
   resource_alpha: 1.0
-  # p = [alpha * base * gamma * CPU] + [(1 - gamma) * base]
-  cpu_alpha: 0.04416129
-  cpu_gamma: 1.0
+
+  # Proportionality factor for the load metric's effect on query latency.
+  # p = alpha * base * load
+  load_alpha: 0.53865956
 
   # Legacy factors.
   cpu_to_load_alpha: 0.8761541
