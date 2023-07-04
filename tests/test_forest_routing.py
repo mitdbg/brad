@@ -30,11 +30,11 @@ def test_location_constraints():
     )
 
     query1 = QueryRep("SELECT * FROM test1")
-    loc = router.engine_for(query1)
+    loc = router.engine_for_sync(query1)
     assert loc == Engine.Aurora
 
     query2 = QueryRep("SELECT * FROM test1, test2")
-    loc = router.engine_for(query2)
+    loc = router.engine_for_sync(query2)
     assert loc == Engine.Aurora
 
 
@@ -51,7 +51,7 @@ def test_model_codepath_partial():
     )
 
     query = QueryRep("SELECT * FROM test1, test2")
-    loc = router.engine_for(query)
+    loc = router.engine_for_sync(query)
     assert loc == Engine.Aurora or loc == Engine.Redshift
 
 
@@ -67,5 +67,5 @@ def test_model_codepath_all():
     )
 
     query = QueryRep("SELECT * FROM test1")
-    loc = router.engine_for(query)
+    loc = router.engine_for_sync(query)
     assert loc == Engine.Aurora or loc == Engine.Redshift or loc == Engine.Athena
