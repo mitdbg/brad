@@ -1,5 +1,5 @@
 import numpy as np
-from brad.query_stats.plan_parsing.simple_sql_parser import (
+from brad.data_stats.plan_parsing.simple_sql_parser import (
     _GetJoinConds,
     _FormatJoinCond,
 )

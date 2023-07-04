@@ -1,4 +1,4 @@
-from brad.query_stats.plan_parsing import (
+from brad.data_stats.plan_parsing import (
     parse_explain_verbose,
     extract_base_cardinalities,
 )

@@ -4,7 +4,7 @@ from typing import Dict
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.query_rep import QueryRep
-from brad.query_stats.plan_parsing import (
+from brad.data_stats.plan_parsing import (
     parse_explain_verbose,
     extract_base_cardinalities,
 )
