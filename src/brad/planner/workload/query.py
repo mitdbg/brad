@@ -4,8 +4,11 @@ from typing import Dict
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.query_rep import QueryRep
+from brad.data_stats.plan_parsing import (
+    parse_explain_verbose,
+    extract_base_cardinalities,
+)
 from brad.server.engine_connections import EngineConnections
-from brad.planner.plan_parsing import parse_explain_verbose, extract_base_cardinalities
 
 logger = logging.getLogger(__name__)
 

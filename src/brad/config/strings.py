@@ -17,6 +17,12 @@ def shadow_table_name(table: str | Table) -> str:
     return "{}_brad_shadow".format(str_name)
 
 
+def base_table_name_from_source(table: str) -> str:
+    suffix = "_brad_source"
+    suffix_len = len(suffix)
+    return table[:-suffix_len]
+
+
 def delete_trigger_function_name(table: Table) -> str:
     return "{}_brad_delete_trigger_fn".format(table.name)
 

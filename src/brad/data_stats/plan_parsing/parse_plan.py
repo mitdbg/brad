@@ -1,8 +1,8 @@
 import collections
 import re
 
-from brad.planner.plan_parsing.plan_operator import PlanOperator
-from brad.planner.plan_parsing.postgres_utils import plan_statistics
+from brad.data_stats.plan_parsing.plan_operator import PlanOperator
+from brad.data_stats.plan_parsing.postgres_utils import plan_statistics
 
 planning_time_regex = re.compile(r"planning time: (?P<planning_time>\d+.\d+) ms")
 ex_time_regex = re.compile(r"execution time: (?P<execution_time>\d+.\d+) ms")
