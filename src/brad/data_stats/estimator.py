@@ -1,8 +1,11 @@
 from collections import namedtuple
-from typing import List
+from typing import List, TYPE_CHECKING
 
-from brad.blueprint import Blueprint
 from brad.query_rep import QueryRep
+
+# Needed to avoid a circular import.
+if TYPE_CHECKING:
+    from brad.blueprint.blueprint import Blueprint
 
 
 AccessInfo = namedtuple(
@@ -18,12 +21,18 @@ class Estimator:
     select, based on the filter predicates applied to the base table).
     """
 
-    async def analyze(self, blueprint: Blueprint) -> None:
+    async def analyze(self, blueprint: "Blueprint") -> None:
         """
         Gathers any statistics needed by the estimator.
         """
 
     async def get_access_info(self, query: QueryRep) -> List[AccessInfo]:
+        """
+        Estimates statistics about the provided query.
+        """
+        raise NotImplementedError
+
+    def get_access_info_sync(self, query: QueryRep) -> List[AccessInfo]:
         """
         Estimates statistics about the provided query.
         """

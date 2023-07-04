@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from brad.blueprint import Blueprint
+from brad.blueprint.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
 

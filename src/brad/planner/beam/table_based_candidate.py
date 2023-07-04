@@ -38,7 +38,7 @@ from brad.planner.scoring.table_placement import (
     compute_single_athena_table_cost,
     compute_single_table_movement_time_and_cost,
 )
-from brad.routing import Router
+from brad.routing.router import Router
 
 
 class BlueprintCandidate(ComparableBlueprint):
@@ -244,7 +244,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
         for qidx in queries:
             q = all_queries[qidx]
-            eng = router.engine_for(q)
+            eng = router.engine_for_sync(q)
             dests[eng].append(qidx)
 
         aurora_queries = [all_queries[qidx] for qidx in dests[Engine.Aurora]]

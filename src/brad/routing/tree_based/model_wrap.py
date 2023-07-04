@@ -1,12 +1,14 @@
 import pickle
 import numpy as np
 import numpy.typing as npt
-from typing import List
+from typing import List, Optional
 from sklearn.ensemble import RandomForestClassifier
 
 from . import ENGINE_LABELS
 from brad.config.engine import Engine
+from brad.data_stats.estimator import Estimator
 from brad.query_rep import QueryRep
+from brad.routing.policy import RoutingPolicy
 
 
 class ModelWrap:
@@ -20,16 +22,27 @@ class ModelWrap:
     def from_pickle_bytes(cls, serialized: bytes) -> "ModelWrap":
         return pickle.loads(serialized)
 
-    def __init__(self, table_order: List[str], model: RandomForestClassifier) -> None:
+    def __init__(
+        self,
+        policy: RoutingPolicy,
+        table_order: List[str],
+        model: RandomForestClassifier,
+    ) -> None:
+        self._policy = policy
         self._table_order = table_order
         self._model = model
 
-    def engine_for(self, query: QueryRep) -> List[Engine]:
+    def policy(self) -> RoutingPolicy:
+        return self._policy
+
+    async def engine_for(
+        self, query: QueryRep, estimator: Optional[Estimator]
+    ) -> List[Engine]:
         """
         Produces a ranking of the engines for the query. The first engine in the
         list is the most preferable, followed by the second, and so on.
         """
-        features = self._featurize_query(query)
+        features = await self._featurize_query(query, estimator)
         features = np.expand_dims(features, axis=0)
         preds = self._model.predict_proba(features)
         preds = np.squeeze(preds)
@@ -40,12 +53,27 @@ class ModelWrap:
         # TODO: Pickling might not be the best option.
         return pickle.dumps(self)
 
-    def _featurize_query(self, query: QueryRep) -> npt.NDArray:
-        one_hot_table_presence = np.zeros(len(self._table_order))
-        for table in query.tables():
-            try:
-                table_idx = self._table_order.index(table)
-                one_hot_table_presence[table_idx] = 1
-            except ValueError:
-                pass
-        return one_hot_table_presence
+    async def _featurize_query(
+        self, query: QueryRep, estimator: Optional[Estimator]
+    ) -> npt.NDArray:
+        if self._policy == RoutingPolicy.ForestTableSelectivity:
+            assert estimator is not None
+            table_selectivity = np.zeros(len(self._table_order))
+            access_infos = await estimator.get_access_info(query)
+            for ai in access_infos:
+                tidx = self._table_order.index(ai.table_name)
+                table_selectivity[tidx] = max(table_selectivity[tidx], ai.selectivity)
+            return table_selectivity
+
+        elif self._policy == RoutingPolicy.ForestTablePresence:
+            one_hot_table_presence = np.zeros(len(self._table_order))
+            for table in query.tables():
+                try:
+                    table_idx = self._table_order.index(table)
+                    one_hot_table_presence[table_idx] = 1
+                except ValueError:
+                    pass
+            return one_hot_table_presence
+
+        else:
+            assert False

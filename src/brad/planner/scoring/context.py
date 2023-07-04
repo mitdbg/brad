@@ -5,7 +5,7 @@ from brad.blueprint import Blueprint
 from brad.config.planner import PlannerConfig
 from brad.planner.metrics import Metrics
 from brad.planner.workload import Workload
-from brad.routing import Router
+from brad.routing.router import Router
 
 
 class ScoringContext:
@@ -43,7 +43,7 @@ class ScoringContext:
 
         all_queries = self.current_workload.analytical_queries()
         for qidx, query in enumerate(all_queries):
-            eng = router.engine_for(query)
+            eng = router.engine_for_sync(query)
             self.current_query_locations[eng].append(qidx)
 
     def compute_engine_latency_weights(self) -> None:

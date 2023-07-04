@@ -4,12 +4,12 @@ import logging
 from typing import List, Optional, Mapping, MutableMapping, Any, Dict
 from importlib.resources import files, as_file
 
+import brad.routing
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.server.blueprint_manager import BlueprintManager
 from brad.daemon.monitor import Monitor
-import brad.routing
-from brad.routing import Router
+from brad.routing.router import Router
 from brad.query_rep import QueryRep
 from brad.server.session import SessionManager
 
@@ -188,7 +188,7 @@ class RuleBased(Router):
             return True
         return not_overloaded
 
-    def engine_for(self, query: QueryRep) -> Engine:
+    def engine_for_sync(self, query: QueryRep) -> Engine:
         if self._table_placement_bitmap is None:
             if self._blueprint is not None:
                 blueprint = self._blueprint

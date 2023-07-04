@@ -61,7 +61,7 @@ class ScalingScorer(Scorer):
 
         # See where each analytical query gets routed.
         for q in ctx.next_workload.analytical_queries():
-            next_engine = router.engine_for(q)
+            next_engine = router.engine_for_sync(q)
             ctx.next_dest[next_engine].append(q)
             q.populate_data_accessed_mb(next_engine, ctx.engines, ctx.current_blueprint)
 
