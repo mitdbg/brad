@@ -26,13 +26,18 @@ class RouterProvider:
         self._model: Optional[ModelWrap] = None
 
     def get_router(self, table_bitmap: Dict[str, int]) -> Router:
-        if self._routing_policy == RoutingPolicy.DecisionForest:
+        if (
+            self._routing_policy == RoutingPolicy.ForestTablePresence
+            or self._routing_policy == RoutingPolicy.ForestTableSelectivity
+        ):
             if self._model is None:
                 self._model = ForestRouter.static_load_model_sync(
-                    self._schema_name, self._assets
+                    self._schema_name,
+                    self._routing_policy,
+                    self._assets,
                 )
             return ForestRouter.for_planner(
-                self._schema_name, self._model, table_bitmap
+                self._routing_policy, self._schema_name, self._model, table_bitmap
             )
 
         elif self._routing_policy == RoutingPolicy.RuleBased:

@@ -7,7 +7,8 @@ class RoutingPolicy(str, enum.Enum):
     AlwaysAurora = "always_aurora"
     AlwaysRedshift = "always_redshift"
     RuleBased = "rule_based"
-    DecisionForest = "decision_forest"
+    ForestTablePresence = "df_table_presence"
+    ForestTableSelectivity = "df_table_selectivity"
 
     @staticmethod
     def from_str(candidate: str) -> "RoutingPolicy":
@@ -21,7 +22,9 @@ class RoutingPolicy(str, enum.Enum):
             return RoutingPolicy.AlwaysRedshift
         elif candidate == RoutingPolicy.RuleBased.value:
             return RoutingPolicy.RuleBased
-        elif candidate == RoutingPolicy.DecisionForest.value:
-            return RoutingPolicy.DecisionForest
+        elif candidate == RoutingPolicy.ForestTablePresence.value:
+            return RoutingPolicy.ForestTablePresence
+        elif candidate == RoutingPolicy.ForestTableSelectivity.value:
+            return RoutingPolicy.ForestTableSelectivity
         else:
             raise ValueError("Unrecognized DB type {}".format(candidate))

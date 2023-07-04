@@ -29,6 +29,12 @@ class Estimator:
         """
         raise NotImplementedError
 
+    def get_access_info_sync(self, query: QueryRep) -> List[AccessInfo]:
+        """
+        Estimates statistics about the provided query.
+        """
+        raise NotImplementedError
+
     async def close(self) -> None:
         """
         Performs any cleanup tasks when shutting down the estimator.

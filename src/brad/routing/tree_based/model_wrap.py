@@ -7,6 +7,7 @@ from sklearn.ensemble import RandomForestClassifier
 from . import ENGINE_LABELS
 from brad.config.engine import Engine
 from brad.query_rep import QueryRep
+from brad.routing.policy import RoutingPolicy
 
 
 class ModelWrap:
@@ -20,9 +21,18 @@ class ModelWrap:
     def from_pickle_bytes(cls, serialized: bytes) -> "ModelWrap":
         return pickle.loads(serialized)
 
-    def __init__(self, table_order: List[str], model: RandomForestClassifier) -> None:
+    def __init__(
+        self,
+        policy: RoutingPolicy,
+        table_order: List[str],
+        model: RandomForestClassifier,
+    ) -> None:
+        self._policy = policy
         self._table_order = table_order
         self._model = model
+
+    def policy(self) -> RoutingPolicy:
+        return self._policy
 
     def engine_for(self, query: QueryRep) -> List[Engine]:
         """

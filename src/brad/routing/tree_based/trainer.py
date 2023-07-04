@@ -3,16 +3,18 @@ import pathlib
 import numpy as np
 import numpy.typing as npt
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import RandomOverSampler
 
 from . import ORDERED_ENGINES
 from .model_wrap import ModelWrap
-from brad.query_rep import QueryRep
 from brad.blueprint.table import Table
 from brad.blueprint.user import UserProvidedBlueprint
+from brad.data_stats.estimator import Estimator
+from brad.query_rep import QueryRep
+from brad.routing.policy import RoutingPolicy
 
 
 ModelQuality = Dict[str, Dict[str, float]]
@@ -24,7 +26,13 @@ class ForestTrainer:
     m = 1
     TIMEOUT_VALUE_S = 210
 
-    def __init__(self, schema: List[Table], queries: List[str], run_times: npt.NDArray):
+    def __init__(
+        self,
+        policy: RoutingPolicy,
+        schema: List[Table],
+        queries: List[str],
+        run_times: npt.NDArray,
+    ):
         """
         `queries` is expected to be a list of valid SQL queries.
 
@@ -37,18 +45,24 @@ class ForestTrainer:
         assert num_engines == len(ORDERED_ENGINES)
         assert num_samples == len(queries)
 
+        self._policy = policy
         self._schema = schema
 
         # Raw data.
         self._raw_queries = queries
         self._raw_run_times = run_times
 
+        # Features.
+        self._table_order: List[str] = []
+        self._f_table_presence = np.array([])
+        self._f_table_selectivity = np.array([])
+
         self._preprocess_training_data()
-        self._compute_features()
 
     @classmethod
     def load_saved_data(
         cls,
+        policy: RoutingPolicy,
         schema_file: str | pathlib.Path,
         queries_file: str | pathlib.Path,
         aurora_run_times: str | pathlib.Path,
@@ -66,7 +80,7 @@ class ForestTrainer:
 
         stacked = np.stack([aurora_rt, redshift_rt, athena_rt], axis=cls.m)
 
-        return cls(bp.tables, raw_queries, stacked)
+        return cls(policy, bp.tables, raw_queries, stacked)
 
     def train(
         self,
@@ -112,7 +126,7 @@ class ForestTrainer:
         train_pred = model.predict(X)
         train_quality = self._compute_routing_quality(train_pred, qidx)
 
-        return ModelWrap(self._table_order, model), {
+        return ModelWrap(self._policy, self._table_order, model), {
             "train": train_quality,
             # This is an estimated test quality (since it is based on the model
             # trained with held out data).
@@ -155,21 +169,45 @@ class ForestTrainer:
         self._oracle_routing = oracle_routing
         self._oracle_times = oracle_times
 
-    def _compute_features(self) -> None:
-        # Compute query features.
-        table_order = [table.name for table in self._schema]
+    def compute_features(self, estimator: Optional[Estimator] = None) -> None:
+        """
+        An estimator must be provided for table selectivity features.
+        """
+        self._table_order = [table.name for table in self._schema]
+        if self._policy == RoutingPolicy.ForestTablePresence:
+            self._compute_presence_features()
+        elif self._policy == RoutingPolicy.ForestTableSelectivity:
+            assert estimator is not None
+            self._compute_selectivity_features(estimator)
+        else:
+            raise RuntimeError("Unsupported routing policy: {}".format(self._policy))
+
+    def _compute_selectivity_features(self, estimator: Estimator) -> None:
+        f_table_selectivity = []
+        for q in self._valid_queries:
+            features = np.zeros(len(self._table_order))
+            access_infos = estimator.get_access_info_sync(q)
+
+            for ai in access_infos:
+                tidx = self._table_order.index(ai.table_name)
+                features[tidx] = max(features[tidx], ai.selectivity)
+
+            f_table_selectivity.append(features)
+
+        self._f_table_selectivity = np.array(f_table_selectivity)
+
+    def _compute_presence_features(self) -> None:
         f_table_presence = []
         for q in self._valid_queries:
-            features = np.zeros(len(table_order))
+            features = np.zeros(len(self._table_order))
             for t in q.tables():
                 try:
-                    tbl_idx = table_order.index(t)
+                    tbl_idx = self._table_order.index(t)
                     features[tbl_idx] = 1
                 except ValueError:
                     pass
             f_table_presence.append(features)
 
-        self._table_order = table_order
         self._f_table_presence = np.array(f_table_presence)
 
     def _compute_routing_quality(
@@ -202,6 +240,13 @@ class ForestTrainer:
     def _split_dataset(
         self, test_frac: float = 0.2, random_state: int = 0
     ) -> Dict[str, npt.NDArray]:
+        if self._policy == RoutingPolicy.ForestTablePresence:
+            features = self._f_table_presence
+        elif self._policy == RoutingPolicy.ForestTableSelectivity:
+            features = self._f_table_selectivity
+        else:
+            assert False
+
         (
             X_train,
             X_test,
@@ -210,7 +255,7 @@ class ForestTrainer:
             qidx_train,
             qidx_test,
         ) = train_test_split(
-            self._f_table_presence,  # Input features
+            features,
             self._oracle_routing,  # Labels
             np.array(range(len(self._valid_queries))),  # Queries in the dataset
             stratify=self._oracle_routing,

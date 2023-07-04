@@ -4,26 +4,38 @@ from .model_wrap import ModelWrap
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine, EngineBitmapValues
-from brad.routing import Router
-from brad.server.blueprint_manager import BlueprintManager
 from brad.query_rep import QueryRep
+from brad.routing import Router
+from brad.routing.policy import RoutingPolicy
+from brad.server.blueprint_manager import BlueprintManager
 
 
 class ForestRouter(Router):
     @classmethod
     def for_server(
-        cls, schema_name: str, assets: AssetManager, blueprint_mgr: BlueprintManager
+        cls,
+        policy: RoutingPolicy,
+        schema_name: str,
+        assets: AssetManager,
+        blueprint_mgr: BlueprintManager,
     ) -> "ForestRouter":
-        return cls(schema_name, assets=assets, blueprint_mgr=blueprint_mgr)
+        return cls(policy, schema_name, assets=assets, blueprint_mgr=blueprint_mgr)
 
     @classmethod
     def for_planner(
-        cls, schema_name: str, model: ModelWrap, table_bitmap: Dict[str, int]
+        cls,
+        policy: RoutingPolicy,
+        schema_name: str,
+        model: ModelWrap,
+        table_bitmap: Dict[str, int],
     ) -> "ForestRouter":
-        return cls(schema_name, model=model, table_placement_bitmap=table_bitmap)
+        return cls(
+            policy, schema_name, model=model, table_placement_bitmap=table_bitmap
+        )
 
     def __init__(
         self,
+        policy: RoutingPolicy,
         schema_name: str,
         # One of `assets` and `model` most not be `None`.
         assets: Optional[AssetManager] = None,
@@ -33,6 +45,7 @@ class ForestRouter(Router):
         blueprint: Optional[Blueprint] = None,
         table_placement_bitmap: Optional[Dict[str, int]] = None,
     ) -> None:
+        self._policy = policy
         self._schema_name = schema_name
         self._model = model
         self._assets = assets
@@ -88,15 +101,19 @@ class ForestRouter(Router):
     def static_persist_sync(
         model: ModelWrap, schema_name: str, assets: AssetManager
     ) -> None:
-        key = _SERIALIZED_KEY.format(schema_name=schema_name)
+        key = _SERIALIZED_KEY.format(
+            schema_name=schema_name, policy=model.policy().value
+        )
         serialized = model.to_pickle()
         assets.persist_sync(key, serialized)
 
     @staticmethod
-    def static_load_model_sync(schema_name: str, assets: AssetManager) -> ModelWrap:
-        key = _SERIALIZED_KEY.format(schema_name=schema_name)
+    def static_load_model_sync(
+        schema_name: str, policy: RoutingPolicy, assets: AssetManager
+    ) -> ModelWrap:
+        key = _SERIALIZED_KEY.format(schema_name=schema_name, policy=policy.value)
         serialized = assets.load_sync(key)
         return ModelWrap.from_pickle_bytes(serialized)
 
 
-_SERIALIZED_KEY = "{schema_name}/forest_router.pickle"
+_SERIALIZED_KEY = "{schema_name}/{policy}-router.pickle"

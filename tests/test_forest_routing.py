@@ -5,6 +5,7 @@ from sklearn.ensemble import RandomForestClassifier
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.routing.tree_based.forest_router import ForestRouter
 from brad.routing.tree_based.model_wrap import ModelWrap
+from brad.routing.policy import RoutingPolicy
 from brad.query_rep import QueryRep
 
 
@@ -14,7 +15,7 @@ def get_dummy_router():
     y = np.array([0, 1, 2])
     clf = RandomForestClassifier(n_estimators=2, criterion="entropy")
     model = clf.fit(X, y)
-    return ModelWrap(["test1", "test2"], model)
+    return ModelWrap(RoutingPolicy.ForestTablePresence, ["test1", "test2"], model)
 
 
 def test_location_constraints():
@@ -24,7 +25,9 @@ def test_location_constraints():
         "test2": EngineBitmapValues[Engine.Aurora]
         | EngineBitmapValues[Engine.Redshift],
     }
-    router = ForestRouter.for_planner("test_schema", model, bitmap)
+    router = ForestRouter.for_planner(
+        RoutingPolicy.ForestTablePresence, "test_schema", model, bitmap
+    )
 
     query1 = QueryRep("SELECT * FROM test1")
     loc = router.engine_for(query1)
@@ -43,7 +46,9 @@ def test_model_codepath_partial():
         "test2": EngineBitmapValues[Engine.Aurora]
         | EngineBitmapValues[Engine.Redshift],
     }
-    router = ForestRouter.for_planner("test_schema", model, bitmap)
+    router = ForestRouter.for_planner(
+        RoutingPolicy.ForestTablePresence, "test_schema", model, bitmap
+    )
 
     query = QueryRep("SELECT * FROM test1, test2")
     loc = router.engine_for(query)
@@ -57,7 +62,9 @@ def test_model_codepath_all():
         "test2": EngineBitmapValues[Engine.Aurora]
         | EngineBitmapValues[Engine.Redshift],
     }
-    router = ForestRouter.for_planner("test_schema", model, bitmap)
+    router = ForestRouter.for_planner(
+        RoutingPolicy.ForestTablePresence, "test_schema", model, bitmap
+    )
 
     query = QueryRep("SELECT * FROM test1")
     loc = router.engine_for(query)

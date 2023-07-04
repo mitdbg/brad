@@ -88,9 +88,12 @@ class BradServer(BradInterface):
             self._router = RuleBased(
                 blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
             )
-        elif routing_policy == RoutingPolicy.DecisionForest:
+        elif (
+            routing_policy == RoutingPolicy.ForestTablePresence
+            or routing_policy == RoutingPolicy.ForestTableSelectivity
+        ):
             self._router = ForestRouter.for_server(
-                self._schema_name, self._assets, self._blueprint_mgr
+                routing_policy, self._schema_name, self._assets, self._blueprint_mgr
             )
         else:
             raise RuntimeError(

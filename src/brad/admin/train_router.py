@@ -1,9 +1,12 @@
+import asyncio
 import json
 import logging
 import yaml
 
 from brad.asset_manager import AssetManager
 from brad.config.file import ConfigFile
+from brad.data_stats.postgres_estimator import PostgresEstimator
+from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.forest_router import ForestRouter
 from brad.routing.tree_based.trainer import ForestTrainer
 
@@ -71,6 +74,13 @@ def register_admin_action(subparser) -> None:
         default=25,
         help="Used to specify the number of trees in the forest.",
     )
+    parser.add_argument(
+        "--policy",
+        type=str,
+        default=RoutingPolicy.ForestTableSelectivity.value,
+        help="The type of query router to train. Only the forest-based models "
+        "are trainable.",
+    )
     parser.set_defaults(admin_action=train_router)
 
 
@@ -83,19 +93,30 @@ def extract_schema_name(schema_file: str) -> str:
 # This method is called by `brad.exec.admin.main`.
 def train_router(args):
     schema_name = extract_schema_name(args.schema_file)
+    config = ConfigFile(args.config_file)
+    policy = RoutingPolicy.from_str(args.policy)
+
     trainer = ForestTrainer.load_saved_data(
+        policy=policy,
         schema_file=args.schema_file,
         queries_file=args.data_queries,
         aurora_run_times=args.data_aurora_rt,
         redshift_run_times=args.data_redshift_rt,
         athena_run_times=args.data_athena_rt,
     )
+    if policy == RoutingPolicy.ForestTableSelectivity:
+        estimator = asyncio.run(PostgresEstimator.connect(schema_name, config))
+    else:
+        estimator = None
+    trainer.compute_features(estimator)
+
+    logger.info("Routing policy: %s", policy)
     model, quality = trainer.train(num_trees=args.num_trees)
     logger.info("Model quality: %s", json.dumps(quality, indent=2))
 
     if args.persist_local:
         serialized = model.to_pickle()
-        file_name = "{}-forest_router.pickle".format(schema_name)
+        file_name = "{}-{}-router.pickle".format(schema_name, policy.value)
         with open(file_name, "wb") as file:
             file.write(serialized)
         logger.info("Model persisted locally.")
@@ -104,7 +125,6 @@ def train_router(args):
         while True:
             response = input("Do you want to persist this model? (y/n): ").lower()
             if response == "y":
-                config = ConfigFile(args.config_file)
                 assets = AssetManager(config)
                 ForestRouter.static_persist_sync(model, schema_name, assets)
                 logger.info("Model persisted successfully.")
