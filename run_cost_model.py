@@ -252,7 +252,7 @@ if __name__ == "__main__":
             with_indexes=args.with_indexes,
             cap_workload=args.cap_workload,
             min_runtime=args.min_query_ms,
-            re_execute_query=args.re_execute_query_with_no_result
+            re_execute_query=args.re_execute_query_with_no_result,
         )
 
     if args.parse_plans:
