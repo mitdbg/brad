@@ -5,7 +5,7 @@ from brad.blueprint import Blueprint
 from brad.config.planner import PlannerConfig
 from brad.planner.metrics import Metrics
 from brad.planner.workload import Workload
-from brad.routing import Router
+from brad.routing.router import Router
 
 
 class ScoringContext:

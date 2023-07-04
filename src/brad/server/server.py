@@ -19,13 +19,15 @@ from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
 from brad.daemon.monitor import Monitor
 from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel
+from brad.data_stats.estimator import Estimator
+from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
-from brad.routing import Router
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.rule_based import RuleBased
 from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
-from brad.routing.tree_based.forest_router import ForestRouter
 from brad.routing.policy import RoutingPolicy
+from brad.routing.router import Router
+from brad.routing.tree_based.forest_router import ForestRouter
 from brad.server.brad_interface import BradInterface
 from brad.server.blueprint_manager import BlueprintManager
 from brad.server.epoch_file_handler import EpochFileHandler
@@ -74,7 +76,7 @@ class BradServer(BradInterface):
         # We have different routing policies for performance evaluation and
         # testing purposes.
         routing_policy = self._config.routing_policy
-        self.routing_policy = routing_policy
+        self._routing_policy = routing_policy
         if routing_policy == RoutingPolicy.Default:
             self._router: Router = LocationAwareRoundRobin(self._blueprint_mgr)
         elif routing_policy == RoutingPolicy.AlwaysAthena:
@@ -107,6 +109,8 @@ class BradServer(BradInterface):
         self._timed_sync_task = None
         self._daemon_messages_task = None
 
+        self._estimator: Optional[Estimator] = None
+
         # Used for managing the daemon process.
         self._daemon_mp_manager: Optional[mp.managers.SyncManager] = None
         self._daemon_input_queue: Optional[mp.Queue] = None
@@ -125,7 +129,7 @@ class BradServer(BradInterface):
             logger.info("The BRAD server has successfully started.")
             logger.info("Listening on port %d.", self._config.server_port)
 
-            if self.routing_policy == RoutingPolicy.RuleBased:
+            if self._routing_policy == RoutingPolicy.RuleBased:
                 assert (
                     self._monitor is not None
                 ), "require monitor running for rule-based router"
@@ -145,10 +149,17 @@ class BradServer(BradInterface):
     async def run_setup(self):
         await self._blueprint_mgr.load()
         logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
+
         if self._config.data_sync_period_seconds > 0:
             self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
         await self._data_sync_executor.establish_connections()
-        await self._router.run_setup()
+
+        if self._routing_policy == RoutingPolicy.ForestTableSelectivity:
+            estimator = await PostgresEstimator.connect(self._schema_name, self._config)
+            await estimator.analyze(self._blueprint_mgr.get_blueprint())
+        else:
+            estimator = None
+        await self._router.run_setup(estimator)
 
         # Launch the daemon process.
         self._daemon_mp_manager = mp.Manager()

@@ -2,8 +2,8 @@ from typing import Dict, Optional
 
 from brad.asset_manager import AssetManager
 from brad.config.file import ConfigFile
-from brad.routing import Router
 from brad.routing.policy import RoutingPolicy
+from brad.routing.router import Router
 from brad.routing.rule_based import RuleBased
 from brad.routing.tree_based.forest_router import ForestRouter
 from brad.routing.tree_based.model_wrap import ModelWrap

@@ -3,7 +3,7 @@ from typing import Callable, Dict, List, Set, Optional, Tuple, Any
 from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.table import Table
 from brad.config.engine import Engine
-from brad.routing import Router
+from brad.routing.router import Router
 
 RouterProvider = Callable[[], Router]
 

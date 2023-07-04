@@ -1,6 +1,6 @@
-from brad.routing import Router
 from brad.config.engine import Engine
 from brad.query_rep import QueryRep
+from brad.routing.router import Router
 
 
 class AlwaysOneRouter(Router):

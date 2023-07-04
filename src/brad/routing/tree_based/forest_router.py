@@ -7,8 +7,8 @@ from brad.blueprint import Blueprint
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.data_stats.estimator import Estimator
 from brad.query_rep import QueryRep
-from brad.routing import Router
 from brad.routing.policy import RoutingPolicy
+from brad.routing.router import Router
 from brad.server.blueprint_manager import BlueprintManager
 
 

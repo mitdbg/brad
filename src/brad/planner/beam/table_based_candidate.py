@@ -38,7 +38,7 @@ from brad.planner.scoring.table_placement import (
     compute_single_athena_table_cost,
     compute_single_table_movement_time_and_cost,
 )
-from brad.routing import Router
+from brad.routing.router import Router
 
 
 class BlueprintCandidate(ComparableBlueprint):

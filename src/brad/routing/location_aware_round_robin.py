@@ -1,6 +1,6 @@
 from brad.config.engine import Engine
 from brad.server.blueprint_manager import BlueprintManager
-from brad.routing import Router
+from brad.routing.router import Router
 from brad.query_rep import QueryRep
 
 
