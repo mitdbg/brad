@@ -43,7 +43,7 @@ class ScoringContext:
 
         all_queries = self.current_workload.analytical_queries()
         for qidx, query in enumerate(all_queries):
-            eng = router.engine_for(query)
+            eng = router.engine_for_sync(query)
             self.current_query_locations[eng].append(qidx)
 
     def compute_engine_latency_weights(self) -> None:

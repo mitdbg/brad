@@ -244,7 +244,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
         for qidx in queries:
             q = all_queries[qidx]
-            eng = router.engine_for(q)
+            eng = router.engine_for_sync(q)
             dests[eng].append(qidx)
 
         aurora_queries = [all_queries[qidx] for qidx in dests[Engine.Aurora]]

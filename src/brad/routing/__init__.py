@@ -1,17 +1,33 @@
 from typing import Dict, Tuple, Optional
 
+from brad.data_stats.estimator import Estimator
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.query_rep import QueryRep
 
 
 class Router:
-    async def run_setup(self) -> None:
+    async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
         """
         Should be called before using the router. This is used to set up any
         dynamic state.
+
+        If the routing policy needs an estimator, one should be provided here.
         """
 
-    def engine_for(self, query: QueryRep) -> Engine:
+    async def engine_for(self, query: QueryRep) -> Engine:
+        """
+        Selects an engine for the provided SQL query.
+
+        NOTE: Implementers currently do not need to consider DML queries. BRAD
+        routes all DML queries to Aurora before consulting the router. Thus the
+        query passed to this method will always be a read-only query.
+
+        You should override this method if the routing policy needs to depend on
+        any asynchronous methods.
+        """
+        return self.engine_for_sync(query)
+
+    def engine_for_sync(self, query: QueryRep) -> Engine:
         """
         Selects an engine for the provided SQL query.
 
@@ -19,7 +35,6 @@ class Router:
         routes all DML queries to Aurora before consulting the router. Thus the
         query passed to this method will always be a read-only query.
         """
-
         raise NotImplementedError
 
     def _run_location_routing(

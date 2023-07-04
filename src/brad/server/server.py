@@ -228,7 +228,7 @@ class BradServer(BradInterface):
             if transactional_query:
                 engine_to_use = Engine.Aurora
             else:
-                engine_to_use = self._router.engine_for(query_rep)
+                engine_to_use = await self._router.engine_for(query_rep)
 
             logger.debug(
                 "[S%d] Routing '%s' to %s", session_id.value(), query, engine_to_use

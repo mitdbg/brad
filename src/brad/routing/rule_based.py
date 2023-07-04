@@ -188,7 +188,7 @@ class RuleBased(Router):
             return True
         return not_overloaded
 
-    def engine_for(self, query: QueryRep) -> Engine:
+    def engine_for_sync(self, query: QueryRep) -> Engine:
         if self._table_placement_bitmap is None:
             if self._blueprint is not None:
                 blueprint = self._blueprint

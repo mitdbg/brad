@@ -1,9 +1,11 @@
+import asyncio
 from typing import Optional, Dict
 
 from .model_wrap import ModelWrap
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine, EngineBitmapValues
+from brad.data_stats.estimator import Estimator
 from brad.query_rep import QueryRep
 from brad.routing import Router
 from brad.routing.policy import RoutingPolicy
@@ -53,8 +55,11 @@ class ForestRouter(Router):
         self._blueprint_mgr = blueprint_mgr
         self._blueprint = blueprint
         self._table_placement_bitmap = table_placement_bitmap
+        self._estimator: Optional[Estimator] = None
 
-    async def run_setup(self) -> None:
+    async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
+        self._estimator = estimator
+
         # Load the model.
         if self._model is None:
             assert self._assets is not None
@@ -73,7 +78,7 @@ class ForestRouter(Router):
 
             self._table_placement_bitmap = self._blueprint.table_locations_bitmap()
 
-    def engine_for(self, query: QueryRep) -> Engine:
+    async def engine_for(self, query: QueryRep) -> Engine:
         # Compute valid locations.
         assert self._table_placement_bitmap is not None
         valid_locations, only_location = self._run_location_routing(
@@ -84,7 +89,7 @@ class ForestRouter(Router):
 
         # Multiple locations possible. Use the model to figure out which location to use.
         assert self._model is not None
-        preferred_locations = self._model.engine_for(query)
+        preferred_locations = await self._model.engine_for(query, self._estimator)
 
         for loc in preferred_locations:
             if (EngineBitmapValues[loc] & valid_locations) != 0:
@@ -93,6 +98,9 @@ class ForestRouter(Router):
         # This should be unreachable. The model must rank all engines, and we
         # know >= 2 engines can support this query.
         raise AssertionError
+
+    def engine_for_sync(self, query: QueryRep) -> Engine:
+        return asyncio.run(self.engine_for(query))
 
     def persist_sync(self) -> None:
         assert self._assets is not None
