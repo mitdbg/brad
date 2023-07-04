@@ -7,7 +7,10 @@ import shutil
 import pathlib
 from typing import Any, Dict, List
 
-from brad.planner.plan_parsing import parse_explain_verbose, extract_base_cardinalities
+from brad.data_stats.plan_parsing import (
+    parse_explain_verbose,
+    extract_base_cardinalities,
+)
 
 
 def load_all_queries(queries_file: str) -> List[str]:

@@ -27,7 +27,7 @@ class ConnectionFactory:
             )
         else:
             if engine == Engine.Aurora:
-                cstr = cls._aurora_odbc_connection_string(
+                cstr = cls._pg_aurora_odbc_connection_string(
                     connection_details, schema_name
                 )
             elif engine == Engine.Athena:
@@ -58,7 +58,7 @@ class ConnectionFactory:
             )
         else:
             if engine == Engine.Aurora:
-                cstr = cls._aurora_odbc_connection_string(
+                cstr = cls._pg_aurora_odbc_connection_string(
                     connection_details, schema_name
                 )
             elif engine == Engine.Athena:
@@ -70,10 +70,21 @@ class ConnectionFactory:
 
             return OdbcConnection.connect_sync(cstr, autocommit)
 
+    @classmethod
+    async def connect_to_sidecar(
+        cls, schema_name: str, config: ConfigFile
+    ) -> Connection:
+        connection_details = config.get_sidecar_db_details()
+        cstr = cls._pg_aurora_odbc_connection_string(connection_details, schema_name)
+        return await OdbcConnection.connect(cstr, autocommit=True)
+
     @staticmethod
-    def _aurora_odbc_connection_string(
+    def _pg_aurora_odbc_connection_string(
         connection_details: Dict[str, str], schema_name: Optional[str]
     ) -> str:
+        """
+        PostgreSQL-compatible Aurora connection string.
+        """
         cstr = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};".format(
             connection_details["odbc_driver"],
             connection_details["host"],

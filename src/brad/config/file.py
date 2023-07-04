@@ -141,6 +141,11 @@ class ConfigFile:
             raise AssertionError("Unhandled engine: " + str(engine))
         return self._raw[engine]
 
+    def get_sidecar_db_details(self) -> Dict[str, str]:
+        if "sidecar_db" not in self._raw:
+            raise RuntimeError("Missing connection details for the Sidecar DBMS.")
+        return self._raw["sidecar_db"]
+
 
 def _ensure_slash_terminated(candidate: str) -> str:
     if not candidate.endswith("/"):
