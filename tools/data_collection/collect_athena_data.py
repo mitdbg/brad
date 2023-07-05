@@ -6,6 +6,7 @@ import logging
 import shutil
 import pathlib
 import datetime
+import numpy as np
 
 from typing import Any, Dict, List
 
@@ -155,6 +156,16 @@ def main():
         default=50,
         help="Checkpoint the gathered data every X queries.",
     )
+    parser.add_argument(
+        "--existing-run-times",
+        type=str,
+        help="Path to existing recorded Athena run times (to skip timed out queries).",
+    )
+    parser.add_argument(
+        "--resume-from-index",
+        type=int,
+        help="If set, resume collection from the specified index.",
+    )
     # Used for parallelizing the data collection.
     parser.add_argument("--world-size", type=int, default=1)
     parser.add_argument("--rank", type=int, default=0)
@@ -164,6 +175,11 @@ def main():
 
     if args.rank >= args.world_size:
         raise RuntimeError("Rank must be less than the world size.")
+
+    if args.existing_run_times is not None:
+        existing_run_times = np.load(args.existing_run_times)
+    else:
+        existing_run_times = None
 
     # Compute start/end offsets.
     queries = load_all_queries(args.queries_file)
@@ -201,6 +217,19 @@ def main():
             continue
         if query_idx >= query_end_offset:
             break
+
+        if existing_run_times is not None and np.isinf(existing_run_times[query_idx]):
+            logger.info(
+                "Skipping query index %d because it will cause a timeout.", query_idx
+            )
+            recorded_results.append(
+                {
+                    "query_index": query_idx,
+                    "status": "TIMEOUT",
+                    "exec_info": {},
+                    "runtime_stats": {},
+                }
+            )
 
         try:
             recorded_results.append(
