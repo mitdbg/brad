@@ -11,6 +11,7 @@ from brad.blueprint.sql_gen.table import (
     comma_separated_column_names_and_types,
     comma_separated_column_names,
 )
+from brad.connection.connection import Connection
 from brad.config.file import ConfigFile
 from brad.config.engine import Engine
 from brad.config.strings import (
@@ -134,7 +135,7 @@ async def _load_aurora(
     ctx: _LoadContext,
     table_name: str,
     table_options,
-    aurora_connection,
+    aurora_connection: Connection,
 ) -> Engine:
     logger.info("Loading %s on Aurora...", table_name)
     table = ctx.blueprint.get_table(table_name)
@@ -180,7 +181,7 @@ async def _load_redshift(
     ctx: _LoadContext,
     table_name: str,
     table_options,
-    redshift_connection,
+    redshift_connection: Connection,
 ) -> Engine:
     logger.info("Loading %s on Redshift...", table_name)
     load_query = _REDSHIFT_LOAD_TEMPLATE.format(
@@ -195,7 +196,8 @@ async def _load_redshift(
         s3_iam_role=ctx.config.redshift_s3_iam_role,
     )
     logger.debug("Running on Redshift %s", load_query)
-    await redshift_connection.execute(load_query)
+    cursor = await redshift_connection.cursor()
+    await cursor.execute(load_query)
     logger.info("Done loading %s on Redshift!", table_name)
     return Engine.Redshift
 
@@ -204,7 +206,7 @@ async def _load_athena(
     ctx: _LoadContext,
     table_name: str,
     table_options,
-    athena_connection,
+    athena_connection: Connection,
 ) -> Engine:
     logger.info("Loading %s on Athena...", table_name)
     table = ctx.blueprint.get_table(table_name)
@@ -232,19 +234,20 @@ async def _load_athena(
         ),
     )
     logger.debug("Running on Athena %s", q)
-    await athena_connection.execute(q)
+    cursor = await athena_connection.cursor()
+    await cursor.execute(q)
 
     # 2. Actually run the load.
     q = "INSERT INTO {table_name} SELECT * FROM {table_name}_brad_loading".format(
         table_name=table_name
     )
     logger.debug("Running on Athena %s", q)
-    await athena_connection.execute(q)
+    await cursor.execute(q)
 
     # 3. Remove the loading table.
     q = "DROP TABLE {}_brad_loading".format(table_name)
     logger.debug("Running on Athena %s", q)
-    await athena_connection.execute(q)
+    await cursor.execute(q)
 
     logger.info("Done loading %s on Athena!", table_name)
     return Engine.Athena
