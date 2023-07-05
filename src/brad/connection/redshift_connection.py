@@ -61,7 +61,7 @@ class RedshiftConnection(Connection):
         if self._cursor is None:
             loop = asyncio.get_running_loop()
             cursor_impl = await loop.run_in_executor(None, self._connection.cursor)
-            self._cursor = RedshiftCursor(cursor_impl)
+            self._cursor = RedshiftCursor(cursor_impl, self._connection)
         return self._cursor
 
     async def close(self) -> None:
@@ -70,7 +70,7 @@ class RedshiftConnection(Connection):
 
     def cursor_sync(self) -> Cursor:
         if self._cursor is None:
-            self._cursor = RedshiftCursor(self._connection.cursor())
+            self._cursor = RedshiftCursor(self._connection.cursor(), self._connection)
         return self._cursor
 
     def close_sync(self) -> None:

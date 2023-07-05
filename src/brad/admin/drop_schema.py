@@ -38,15 +38,15 @@ def drop_schema(args):
 
     # 3. Connect to the underlying engines without an explicit database.
     cxns = EngineConnections.connect_sync(config, autocommit=True)
-    redshift = cxns.get_connection(Engine.Redshift).cursor()
-    aurora = cxns.get_connection(Engine.Aurora).cursor()
-    athena = cxns.get_connection(Engine.Athena).cursor()
+    redshift = cxns.get_connection(Engine.Redshift).cursor_sync()
+    aurora = cxns.get_connection(Engine.Aurora).cursor_sync()
+    athena = cxns.get_connection(Engine.Athena).cursor_sync()
 
     # 4. Drop the underlying "databases" if they exist.
-    athena.execute("DROP DATABASE IF EXISTS {} CASCADE".format(args.schema_name))
-    aurora.execute("DROP DATABASE IF EXISTS {}".format(args.schema_name))
+    athena.execute_sync("DROP DATABASE IF EXISTS {} CASCADE".format(args.schema_name))
+    aurora.execute_sync("DROP DATABASE IF EXISTS {}".format(args.schema_name))
     try:
-        redshift.execute("DROP DATABASE {}".format(args.schema_name))
+        redshift.execute_sync("DROP DATABASE {}".format(args.schema_name))
     except pyodbc.Error:
         # Ignore the error if a database does not exist.
         logger.exception("Exception when dropping Redshift database.")

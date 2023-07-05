@@ -6,9 +6,12 @@ from .cursor import Cursor, Row
 
 
 class RedshiftCursor(Cursor):
-    def __init__(self, impl: redshift_connector.Cursor) -> None:
+    def __init__(
+        self, impl: redshift_connector.Cursor, conn: redshift_connector.Connection
+    ) -> None:
         super().__init__()
         self._impl = impl
+        self._conn = conn
 
     async def execute(self, query: str) -> None:
         loop = asyncio.get_running_loop()
@@ -24,11 +27,11 @@ class RedshiftCursor(Cursor):
 
     async def commit(self) -> None:
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self._impl.commit)
+        await loop.run_in_executor(None, self._conn.commit)
 
     async def rollback(self) -> None:
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self._impl.rollback)
+        await loop.run_in_executor(None, self._conn.rollback)
 
     def execute_sync(self, query: str) -> None:
         self._impl.execute(query)
@@ -40,7 +43,7 @@ class RedshiftCursor(Cursor):
         return self._impl.fetchall()
 
     def commit_sync(self) -> None:
-        self._impl.commit()
+        self._conn.commit()
 
     def rollback_sync(self) -> None:
-        self._impl.rollback()
+        self._conn.rollback()

@@ -47,9 +47,9 @@ def bootstrap_schema(args):
     # schema.
     cxns = EngineConnections.connect_sync(config, autocommit=True)
     create_schema = "CREATE DATABASE {}".format(blueprint.schema_name())
-    cxns.get_connection(Engine.Aurora).cursor().execute(create_schema)
-    cxns.get_connection(Engine.Athena).cursor().execute(create_schema)
-    cxns.get_connection(Engine.Redshift).cursor().execute(create_schema)
+    cxns.get_connection(Engine.Aurora).cursor_sync().execute_sync(create_schema)
+    cxns.get_connection(Engine.Athena).cursor_sync().execute_sync(create_schema)
+    cxns.get_connection(Engine.Redshift).cursor_sync().execute_sync(create_schema)
     cxns.close_sync()
     del cxns
 
@@ -57,8 +57,8 @@ def bootstrap_schema(args):
     cxns = EngineConnections.connect_sync(
         config, schema_name=blueprint.schema_name(), autocommit=False
     )
-    redshift = cxns.get_connection(Engine.Redshift).cursor()
-    aurora = cxns.get_connection(Engine.Aurora).cursor()
+    redshift = cxns.get_connection(Engine.Redshift).cursor_sync()
+    aurora = cxns.get_connection(Engine.Aurora).cursor_sync()
 
     # 6. Set up the underlying tables.
     sql_gen = TableSqlGenerator(config, blueprint)
@@ -73,27 +73,27 @@ def bootstrap_schema(args):
             )
             queries, db_type = sql_gen.generate_create_table_sql(table, location)
             conn = cxns.get_connection(db_type)
-            cursor = conn.cursor()
+            cursor = conn.cursor_sync()
             for q in queries:
                 logger.debug("Running on %s: %s", str(db_type), q)
-                cursor.execute(q)
+                cursor.execute_sync(q)
 
     # 7. Create and set up the extraction progress table.
     queries, db_type = sql_gen.generate_extraction_progress_set_up_table_sql()
     conn = cxns.get_connection(db_type)
-    cursor = conn.cursor()
+    cursor = conn.cursor_sync()
     for q in queries:
         logger.debug("Running on %s: %s", str(db_type), q)
-        cursor.execute(q)
+        cursor.execute_sync(q)
 
     # 9. Commit the changes.
-    aurora.commit()
-    redshift.commit()
+    aurora.commit_sync()
+    redshift.commit_sync()
     # Athena does not support the notion of committing a transaction.
 
     # 10. Install the `aws_s3` extension (needed for data extraction).
-    aurora.execute("CREATE EXTENSION IF NOT EXISTS aws_s3 CASCADE")
-    aurora.commit()
+    aurora.execute_sync("CREATE EXTENSION IF NOT EXISTS aws_s3 CASCADE")
+    aurora.commit_sync()
 
     # 11. Persist the data blueprint.
     assets = AssetManager(config)
