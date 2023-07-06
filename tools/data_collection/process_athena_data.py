@@ -12,7 +12,7 @@ def extract_relevant(raw_json: Dict[Any, Any]) -> pd.DataFrame:
     for item in raw_json:
         query_idx = item["query_index"]
         if item["status"] != "SUCCEEDED":
-            rows.append((query_idx, -1, -1, -1, -1))
+            rows.append((query_idx, -1, -1, -1))
             continue
 
         stats = item["exec_info"]["Statistics"]
@@ -31,6 +31,23 @@ def extract_relevant(raw_json: Dict[Any, Any]) -> pd.DataFrame:
             )
         )
 
+    # Deduplicate. We had to restart the data collection a few times.
+    dedup_dict = {}
+
+    for row in rows:
+        qidx = row[0]
+        if qidx not in dedup_dict:
+            dedup_dict[qidx] = row
+        else:
+            # Replace the row we have stored if the current data point did not
+            # time out.
+            curr = dedup_dict[qidx]
+            if curr[2] == -1 and row[2] != -1:
+                dedup_dict[qidx] = row
+
+    deduped = list(dedup_dict.values())
+    deduped.sort(key=lambda tup: tup[0])
+
     return pd.DataFrame.from_records(
         rows, columns=["query_index", "run_time_ms", "scanned_bytes", "input_rows"]
     )
@@ -46,7 +63,9 @@ def load_all_data(data_path: str, prefix: str) -> pd.DataFrame:
             raw = json.load(f)
         dfs.append(extract_relevant(raw))
 
-    return pd.concat(dfs, ignore_index=True).sort_values(by=["query_index"])
+    all_data = pd.concat(dfs, ignore_index=True).sort_values(by=["query_index"])
+    deduped = all_data.groupby("query_index").max().reset_index()
+    return deduped
 
 
 def main():
@@ -56,7 +75,7 @@ def main():
     args = parser.parse_args()
 
     df = load_all_data(args.data_path, args.prefix)
-    assert len(df[df["scanned_bytes"] < 0]) == 0
+    print("Dataset size:", len(df))
 
     as_np = np.array(df["scanned_bytes"])
     np.save("all_queries_athena_scanned_bytes.npy", as_np)
