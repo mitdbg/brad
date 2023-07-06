@@ -5,6 +5,7 @@ import asyncio
 import numpy as np
 import pytz
 import time
+import logging
 from importlib.resources import files, as_file
 from typing import List, Dict
 from datetime import datetime, timedelta, timezone
@@ -19,6 +20,8 @@ from brad.forecasting.moving_average_forecaster import MovingAverageForecaster
 from brad.forecasting.linear_forecaster import LinearForecaster
 from brad.forecasting import Forecaster
 from brad.utils.counter import Counter
+
+logger = logging.getLogger(__name__)
 
 
 # Return the id of a metric in the dataframe.
@@ -116,6 +119,10 @@ class Monitor:
             self._txn_end_counter.value() / elapsed_time_s
         )
         self._txn_end_counter.reset()
+
+        logger.debug("Updated front end metrics:")
+        for metric, value in self._front_end_metrics.items():
+            logger.debug("%s: %.2f", metric, value)
 
     ############
     # The following functions, prefixed by `read_`, provide different ways to query the monitor for
