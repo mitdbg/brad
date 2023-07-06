@@ -378,6 +378,9 @@ class BradServer(BradInterface):
             self._daemon_input_queue.put_nowait(metrics_report)
 
             period_start = time.time()
+
+            # NOTE: Once we add multiple front end servers, we should stagger
+            # the sleep period.
             await asyncio.sleep(self._config.front_end_metrics_reporting_period_seconds)
 
     async def _handle_new_blueprint(self, new_blueprint: Blueprint) -> None:
