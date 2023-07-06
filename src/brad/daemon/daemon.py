@@ -102,6 +102,7 @@ class BradDaemon:
                     message.txn_end_value,
                     message.elapsed_time_s,
                 )
+                self._monitor.handle_metric_report(message)
 
             else:
                 logger.debug("Received message %s", str(message))
