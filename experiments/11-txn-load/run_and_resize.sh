@@ -1,6 +1,6 @@
 #! /bin/bash
 
-db_instance="aurora-secondary-cluster"
+db_instance="aurora-secondary-instance-1"
 
 function modify_instance_sync() {
     local instance=$1

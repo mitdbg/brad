@@ -12,7 +12,7 @@ combine(
   name="all",
   deps=[
     ":{}".format(instance)
-    for instance in AURORA_INSTANCE_TYPES
+    for instance in INSTANCES
   ],
 )
 

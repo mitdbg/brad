@@ -46,6 +46,12 @@ Make a copy of `config/config_sample.yml` and fill in the configurations using
 your values. Make sure you **do not** check in your configuration file, as it
 will contain your AWS access keys.
 
+#### Extra notes about creating instances
+
+- (Aurora) Enable performance insights and enhanced monitoring
+- (Aurora) Enable public access
+- (Redshift) Enable public access
+
 ### Creating Tables
 
 BRAD expects to be given your schema up front. You must also use the BRAD

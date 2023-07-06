@@ -121,10 +121,8 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
         )
     )
 
-    txn_list = load_txns(args.txn_dir, idx)
     prng = random.Random(args.seed ^ idx)
-
-    txn_list = load_txns(args.transaction_path, idx)
+    txn_list = load_txns(args.txn_dir, idx)
     next_txn_idx = 0
 
     # Returns the transaction latency.
@@ -160,46 +158,50 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
     start_queue.put_nowait("")
     _ = stop_queue.get()
 
-    overall_start = time.time()
-    while True:
-        if args.add_wait:
-            wait_for_s = prng.gauss(args.avg_gap_s, args.std_gap_s)
-            if wait_for_s < 0.0:
-                wait_for_s = 0.0
-            time.sleep(wait_for_s)
+    try:
+        overall_start = time.time()
+        while True:
+            if args.add_wait:
+                wait_for_s = prng.gauss(args.avg_gap_s, args.std_gap_s)
+                if wait_for_s < 0.0:
+                    wait_for_s = 0.0
+                time.sleep(wait_for_s)
 
-        lat, aborts = run_txn(next_txn_idx)
-        latencies.append(lat)
-        total_aborts += aborts
-        next_txn_idx += 1
-        next_txn_idx %= len(txn_list)
-        num_txn_commits += 1
+            lat, aborts = run_txn(next_txn_idx)
+            latencies.append(lat)
+            total_aborts += aborts
+            next_txn_idx += 1
+            next_txn_idx %= len(txn_list)
+            num_txn_commits += 1
 
-        try:
-            _ = stop_queue.get_nowait()
-            break
-        except queue.Empty:
-            pass
-    overall_end = time.time()
+            try:
+                _ = stop_queue.get_nowait()
+                break
+            except queue.Empty:
+                pass
+    finally:
+        overall_end = time.time()
 
-    # For printing out results.
-    if "COND_OUT" in os.environ:
-        import conductor.lib as cond
+        # For printing out results.
+        if "COND_OUT" in os.environ:
+            import conductor.lib as cond
 
-        out_dir = cond.get_output_path()
-    else:
-        out_dir = pathlib.Path(".")
+            out_dir = cond.get_output_path()
+        else:
+            out_dir = pathlib.Path(".")
 
-    with open(out_dir / "oltp_latency_{}.csv".format(idx), "w") as file:
-        print("txn_idx,run_time_s", file=file)
-        for tidx, lat in enumerate(latencies):
-            print("{},{}".format(tidx, lat), file=file)
+        with open(out_dir / "oltp_latency_{}.csv".format(idx), "w") as file:
+            print("txn_idx,run_time_s", file=file)
+            for tidx, lat in enumerate(latencies):
+                print("{},{}".format(tidx, lat), file=file)
 
-    with open(out_dir / "oltp_stats_{}.csv".format(idx), "w") as file:
-        print("stat,value", file=file)
-        print("num_commits,{}".format(num_txn_commits), file=file)
-        print("overall_run_time_s,{}".format(overall_end - overall_start), file=file)
-        print("num_aborts,{}".format(total_aborts), file=file)
+        with open(out_dir / "oltp_stats_{}.csv".format(idx), "w") as file:
+            print("stat,value", file=file)
+            print("num_commits,{}".format(num_txn_commits), file=file)
+            print(
+                "overall_run_time_s,{}".format(overall_end - overall_start), file=file
+            )
+            print("num_aborts,{}".format(total_aborts), file=file)
 
 
 def run_warmup(args):
@@ -207,7 +209,7 @@ def run_warmup(args):
     conn = pyodbc.connect(cstr, autocommit=True)
     cursor = conn.cursor()
 
-    queries = load_queries(args.warmup_File)
+    queries = load_queries(args.warmup_query_file)
     with open("warmup.csv", "w") as file:
         print("query_idx,run_time_s", file=file)
         for idx, q in enumerate(queries):
@@ -262,6 +264,7 @@ def main():
     parser.add_argument(
         "--txn_dir", type=str, default="../../workloads/IMDB/OLTP_queries/"
     )
+    parser.add_argument("--add_wait", action="store_true")
     parser.add_argument("--warmup_query_file", type=str, default="warmup.sql")
     parser.add_argument("--isolation_level", type=str, default="REPEATABLE READ")
     parser.add_argument("--seed", type=int, default=42)
@@ -275,7 +278,7 @@ def main():
         "--aurora_cluster", type=str, default="aurora-secondary-cluster"
     )
     parser.add_argument(
-        "--aurora_instance", type=str, default="aurora-secondary-cluster"
+        "--aurora_instance", type=str, default="aurora-secondary-instance-1"
     )
     parser.add_argument("--wait_before_start", type=int)
     args = parser.parse_args()
@@ -289,6 +292,10 @@ def main():
         return
 
     pi_client = AwsPerformanceInsightsClient(args.aurora_instance)
+    # Sanity check
+    _ = pi_client.fetch_metrics(
+        ALL_METRICS, period=timedelta(seconds=60), num_prev_points=10
+    )
 
     if args.wait_before_start is not None:
         print(
@@ -315,29 +322,28 @@ def main():
     for _ in range(args.num_clients):
         stop_queue.put("")
 
-    if args.run_all_times is None:
-        if args.run_for_s is not None:
-            print(
-                "Letting the experiment run for {} seconds...".format(args.run_for_s),
-                flush=True,
-            )
-            time.sleep(args.run_for_s)
+    if args.run_for_s is not None:
+        print(
+            "Letting the experiment run for {} seconds...".format(args.run_for_s),
+            flush=True,
+        )
+        time.sleep(args.run_for_s)
 
-        else:
-            print("Waiting until requested to stop... (hit Ctrl-C)")
-            should_shutdown = threading.Event()
+    else:
+        print("Waiting until requested to stop... (hit Ctrl-C)")
+        should_shutdown = threading.Event()
 
-            def signal_handler(signal, frame):
-                should_shutdown.set()
+        def signal_handler(signal, frame):
+            should_shutdown.set()
 
-            signal.signal(signal.SIGINT, signal_handler)
-            signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
 
-            should_shutdown.wait()
+        should_shutdown.wait()
 
-        print("Stopping clients...")
-        for _ in range(args.num_clients):
-            stop_queue.put("")
+    print("Stopping clients...")
+    for _ in range(args.num_clients):
+        stop_queue.put("")
 
     # For printing out results.
     if "COND_OUT" in os.environ:
