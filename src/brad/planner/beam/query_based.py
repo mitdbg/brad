@@ -25,7 +25,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
     async def run_forever(self) -> None:
         while True:
-            await asyncio.sleep(3)
+            await asyncio.sleep(30)
             logger.debug("Planner is checking if a replan is needed...")
             if self._check_if_metrics_warrant_replanning():
                 await self.run_replan()

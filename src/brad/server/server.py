@@ -369,6 +369,11 @@ class BradServer(BradInterface):
 
             # If the input queue is full, we just drop this message.
             metrics_report = MetricsReport(txn_value, elapsed_time_s)
+            logger.debug(
+                "Sending metrics report: txn_end_count: %d, elapsed_time_s: %.2f",
+                txn_value,
+                elapsed_time_s,
+            )
             assert self._daemon_input_queue is not None
             self._daemon_input_queue.put_nowait(metrics_report)
 

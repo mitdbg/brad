@@ -88,7 +88,7 @@ class Monitor:
     @classmethod
     def from_config_file(cls, config: ConfigFile):
         cluster_ids = config.get_cluster_ids()
-        return cls(cluster_ids)
+        return cls(cluster_ids, forecasting_epoch=config.epoch_length)
 
     # Create from schema name.
     @classmethod
@@ -115,9 +115,13 @@ class Monitor:
         self._txn_end_counter.bump(report.txn_end_value)
 
     def _update_front_end_metrics(self, elapsed_time_s: float) -> None:
-        self._front_end_metrics[FrontEndMetric.TxnEndPerSecond] = (
-            self._txn_end_counter.value() / elapsed_time_s
-        )
+        if elapsed_time_s > 0.0:
+            self._front_end_metrics[FrontEndMetric.TxnEndPerSecond] = (
+                self._txn_end_counter.value() / elapsed_time_s
+            )
+        else:
+            self._front_end_metrics[FrontEndMetric.TxnEndPerSecond] = 0.0
+
         self._txn_end_counter.reset()
 
         logger.debug("Updated front end metrics:")
