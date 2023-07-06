@@ -3,7 +3,7 @@ RUN_FOR_S = 2 * 60 + 30  # 2 minutes 30 seconds
 NUM_CLIENTS = {
   "r6g_large": [1, 2, 4, 8],
   "r6g_xlarge": [1, 4, 8, 16],
-  "r6g_2xlarge": [1, 8, 16, 32],
+  "r6g_2xlarge": [1, 4, 8, 16],
 }
 
 INSTANCES = ["r6g_large", "r6g_xlarge", "r6g_2xlarge"]
