@@ -95,6 +95,8 @@ files.
 - (07/04/2023) Update your local `config.yml` file; add an entry for
   `sidecar_db`, which should point to a PostgreSQL-compatible DBMS that holds
   the entire dataset (used for supporting purposes).
+- (07/06/2023) Update your local `config.yml` and add an entry for
+  `front_end_metrics_reporting_period_seconds`.
 
 
 ### Generate IMDB workload

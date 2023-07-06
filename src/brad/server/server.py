@@ -2,6 +2,7 @@ import asyncio
 import io
 import logging
 import random
+import time
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import datetime, timezone
@@ -18,10 +19,11 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
 from brad.daemon.monitor import Monitor
-from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel
+from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel, MetricsReport
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
+from brad.query_rep import QueryRep
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.rule_based import RuleBased
 from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
@@ -34,7 +36,7 @@ from brad.server.epoch_file_handler import EpochFileHandler
 from brad.server.errors import QueryError
 from brad.server.grpc import BradGrpc
 from brad.server.session import SessionManager, SessionId
-from brad.query_rep import QueryRep
+from brad.utils.counter import Counter
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +119,10 @@ class BradServer(BradInterface):
         self._daemon_output_queue: Optional[mp.Queue] = None
         self._daemon_process: Optional[mp.Process] = None
 
+        # Number of transactions that completed.
+        self._transaction_end_counter = Counter()
+        self._brad_metrics_reporting_task = None
+
     async def serve_forever(self):
         await self.run_setup()
         try:
@@ -181,6 +187,11 @@ class BradServer(BradInterface):
 
         self._daemon_process.start()
         logger.info("The BRAD daemon process has been started.")
+
+        # Start the metrics reporting task.
+        self._brad_metrics_reporting_task = asyncio.create_task(
+            self._report_metrics_to_daemon()
+        )
 
     async def run_teardown(self):
         await self._sessions.end_all_sessions()
@@ -264,6 +275,7 @@ class BradServer(BradInterface):
 
             if query_rep.is_transaction_end():
                 session.set_in_transaction(in_txn=False)
+                self._transaction_end_counter.bump()
 
             # Decide whether to log the query.
             if not transactional_query or (random.random() < self._config.txn_log_prob):
@@ -332,7 +344,7 @@ class BradServer(BradInterface):
         else:
             yield "Unknown internal command: {}".format(command).encode()
 
-    async def _run_sync_periodically(self):
+    async def _run_sync_periodically(self) -> None:
         while True:
             await asyncio.sleep(self._config.data_sync_period_seconds)
             logger.debug("Starting an auto data sync.")
@@ -346,6 +358,30 @@ class BradServer(BradInterface):
 
             if isinstance(message, NewBlueprint):
                 await self._handle_new_blueprint(message.blueprint)
+
+    async def _report_metrics_to_daemon(self) -> None:
+        period_start = time.time()
+        while True:
+            txn_value = self._transaction_end_counter.value()
+            period_end = time.time()
+            self._transaction_end_counter.reset()
+            elapsed_time_s = period_end - period_start
+
+            # If the input queue is full, we just drop this message.
+            metrics_report = MetricsReport(txn_value, elapsed_time_s)
+            logger.debug(
+                "Sending metrics report: txn_end_count: %d, elapsed_time_s: %.2f",
+                txn_value,
+                elapsed_time_s,
+            )
+            assert self._daemon_input_queue is not None
+            self._daemon_input_queue.put_nowait(metrics_report)
+
+            period_start = time.time()
+
+            # NOTE: Once we add multiple front end servers, we should stagger
+            # the sleep period.
+            await asyncio.sleep(self._config.front_end_metrics_reporting_period_seconds)
 
     async def _handle_new_blueprint(self, new_blueprint: Blueprint) -> None:
         # This is where we launch any reconfigurations needed to realize

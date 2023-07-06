@@ -1,19 +1,27 @@
-from brad.config.file import ConfigFile
-from importlib.resources import files, as_file
-from typing import List, Dict
-import json
-from brad.config.engine import Engine
-import brad.daemon as daemon
-from datetime import datetime, timedelta, timezone
 import boto3
+import json
 import pandas as pd
 import asyncio
 import numpy as np
 import pytz
+import time
+import logging
+from importlib.resources import files, as_file
+from typing import List, Dict
+from datetime import datetime, timedelta, timezone
+
+import brad.daemon as daemon
+from brad.config.engine import Engine
+from brad.config.file import ConfigFile
+from brad.config.metrics import FrontEndMetric
+from brad.daemon.messages import MetricsReport
 from brad.forecasting.constant_forecaster import ConstantForecaster
 from brad.forecasting.moving_average_forecaster import MovingAverageForecaster
 from brad.forecasting.linear_forecaster import LinearForecaster
 from brad.forecasting import Forecaster
+from brad.utils.counter import Counter
+
+logger = logging.getLogger(__name__)
 
 
 # Return the id of a metric in the dataframe.
@@ -22,6 +30,9 @@ def get_metric_id(engine: str, metric_name: str, stat: str, role: str = ""):
     if role != "":
         metric_id = f"{engine}_{role}_{metric_name}_{stat}"
     return metric_id
+
+
+FrontEndMetricDict = Dict[FrontEndMetric, int | float]
 
 
 # Monitor
@@ -62,6 +73,13 @@ class Monitor:
                 self._values, self._epoch_length, forecasting_window_size
             )
 
+        # These are BRAD-defined metrics that are collected by the front end
+        # servers.
+        self._txn_end_counter = Counter()
+        self._front_end_metrics: FrontEndMetricDict = {
+            FrontEndMetric.TxnEndPerSecond: 0.0,
+        }
+
     # Forcibly read metrics. Use to avoid `run_forever()`.
     def force_read_metrics(self) -> None:
         self._add_metrics()
@@ -70,7 +88,7 @@ class Monitor:
     @classmethod
     def from_config_file(cls, config: ConfigFile):
         cluster_ids = config.get_cluster_ids()
-        return cls(cluster_ids)
+        return cls(cluster_ids, forecasting_epoch=config.epoch_length)
 
     # Create from schema name.
     @classmethod
@@ -85,9 +103,30 @@ class Monitor:
     async def run_forever(self) -> None:
         # Flesh out the monitor - maintain running averages of the underlying
         # engines' metrics.
+        period_start = time.time()
         while True:
+            elapsed_time_s = time.time() - period_start
+            self._update_front_end_metrics(elapsed_time_s)
             self._add_metrics()
+            period_start = time.time()
             await asyncio.sleep(self._epoch_length.total_seconds())  # Read every epoch
+
+    def handle_metric_report(self, report: MetricsReport) -> None:
+        self._txn_end_counter.bump(report.txn_end_value)
+
+    def _update_front_end_metrics(self, elapsed_time_s: float) -> None:
+        if elapsed_time_s > 0.0:
+            self._front_end_metrics[FrontEndMetric.TxnEndPerSecond] = (
+                self._txn_end_counter.value() / elapsed_time_s
+            )
+        else:
+            self._front_end_metrics[FrontEndMetric.TxnEndPerSecond] = 0.0
+
+        self._txn_end_counter.reset()
+
+        logger.debug("Updated front end metrics:")
+        for metric, value in self._front_end_metrics.items():
+            logger.debug("%s: %.2f", metric, value)
 
     ############
     # The following functions, prefixed by `read_`, provide different ways to query the monitor for
@@ -177,6 +216,15 @@ class Monitor:
         )
 
         return pd.concat([past, future], axis=0)
+
+    # We should have a unified way to retrieve all metrics. That will come later
+    # when we re-organize the metrics pipeline and also gather per-instance
+    # metrics. We now have three metrics sources:
+    # - AWS Cloudwatch (Redshift, Aurora)
+    # - AWS Performance Insights (Aurora)
+    # - BRAD front end metrics
+    def read_front_end_metrics(self) -> FrontEndMetricDict:
+        return self._front_end_metrics
 
     ############
 
