@@ -10,13 +10,14 @@ class NewBlueprint:
         self.blueprint = blueprint
 
 
-class ReceivedQuery:
+class MetricsReport:
     """
-    Sent from the server to the daemon with a query that it received.
+    Sent from the server to the daemon to report BRAD's client-side metrics.
     """
 
-    def __init__(self, query_str: str) -> None:
-        self.query_str = query_str
+    def __init__(self, txn_end_value: int, elapsed_time_s: float) -> None:
+        self.txn_end_value = txn_end_value
+        self.elapsed_time_s = elapsed_time_s
 
 
 class ShutdownDaemon:

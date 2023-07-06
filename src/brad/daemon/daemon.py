@@ -6,7 +6,7 @@ import multiprocessing as mp
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
-from brad.daemon.messages import ShutdownDaemon, NewBlueprint, ReceivedQuery
+from brad.daemon.messages import ShutdownDaemon, NewBlueprint, MetricsReport
 from brad.daemon.monitor import Monitor
 from brad.planner.compare.cost import best_cost_under_geomean_latency
 from brad.planner.factory import BlueprintPlannerFactory
@@ -96,11 +96,12 @@ class BradDaemon:
                 self._event_loop.create_task(self._shutdown())
                 break
 
-            elif isinstance(message, ReceivedQuery):
-                # Might be a good idea to record this query string for offline
-                # processing (it's a query trace).
-                query_str = message.query_str
-                logger.debug("Received query %s", query_str)
+            elif isinstance(message, MetricsReport):
+                logger.debug(
+                    "Received metrics report. Txn value: %d, Elapsed time: %.2f",
+                    message.txn_end_value,
+                    message.elapsed_time_s,
+                )
 
             else:
                 logger.debug("Received message %s", str(message))

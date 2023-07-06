@@ -50,6 +50,9 @@ txn_log_prob: 0.5
 # automatic syncing is disabled.
 data_sync_period_seconds: 0
 
+# BRAD's front end servers will report their metrics at regular intervals.
+front_end_metrics_reporting_period_seconds: 30
+
 # Set to always_{aurora, athena, redshift} to force BRAD to route all queries
 # to the specified engine. The `default` routing policy uses a predictor to
 # select the most suitable engine.

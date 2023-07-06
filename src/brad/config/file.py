@@ -108,6 +108,10 @@ class ConfigFile:
         return float(self._raw["data_sync_period_seconds"])
 
     @property
+    def front_end_metrics_reporting_period_seconds(self) -> float:
+        return float(self._raw["front_end_metrics_reporting_period_seconds"])
+
+    @property
     def routing_policy(self) -> RoutingPolicy:
         return RoutingPolicy.from_str(self._raw["routing_policy"])
 
