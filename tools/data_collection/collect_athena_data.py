@@ -198,6 +198,13 @@ def main():
         query_end_offset,
     )
 
+    if args.resume_from_index is not None:
+        query_start_offset = args.resume_from_index
+        logger.info(
+            "Actually starting from index %d",
+            query_start_offset,
+        )
+
     config = ConfigFile(args.config_file)
     client = boto3.client(
         "athena",
@@ -230,6 +237,7 @@ def main():
                     "runtime_stats": {},
                 }
             )
+            continue
 
         try:
             recorded_results.append(
