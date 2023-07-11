@@ -44,3 +44,12 @@ python3 runner.py --cstr_var AURORA_CSTR --run_trim
 >&2 echo "Warming up..."
 python3 runner.py --cstr_var AURORA_CSTR --run_warmup
 cond run 11-txn-load/:r6g_2xlarge
+
+# db.r6g.4xlarge
+>&2 echo "r6g.4xlarge"
+modify_instance_sync $db_instance "db.r6g.4xlarge"
+>&2 echo "Trimming..."
+python3 runner.py --cstr_var AURORA_CSTR --run_trim
+>&2 echo "Warming up..."
+python3 runner.py --cstr_var AURORA_CSTR --run_warmup
+cond run 11-txn-load/:r6g_4xlarge

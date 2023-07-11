@@ -4,9 +4,10 @@ NUM_CLIENTS = {
   "r6g_large": [1, 2, 4, 8],
   "r6g_xlarge": [1, 2, 4, 8, 16, 32],
   "r6g_2xlarge": [1, 2, 4, 8, 16, 32],
+  "r6g_4xlarge": [1, 2, 4, 8, 16, 32, 64],
 }
 
-INSTANCES = ["r6g_large", "r6g_xlarge", "r6g_2xlarge"]
+INSTANCES = ["r6g_large", "r6g_xlarge", "r6g_2xlarge", "r6g_4xlarge"]
 
 combine(
   name="all",

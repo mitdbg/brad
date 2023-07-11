@@ -30,7 +30,9 @@ def main():
         # We shuffle the values but preserve the keys.
         shuffled = shuffle_workload(txns, prng)
 
-        with open(workload_dir / file_template.format(idx + args.stop_idx), "w") as file:
+        with open(
+            workload_dir / file_template.format(idx + args.stop_idx), "w"
+        ) as file:
             json.dump(shuffled, file)
 
 
