@@ -1,0 +1,39 @@
+CSTR_VAR = "AURORA_CSTR"
+RUN_FOR_S = 2 * 60 + 30  # 2 minutes 30 seconds
+NUM_CLIENTS = {
+  "r6g_large": [1, 2, 4, 8, 16],
+  "r6g_xlarge": [1, 2, 4, 8, 16, 32],
+  "r6g_2xlarge": [1, 2, 4, 8, 16, 32, 64],
+  "r6g_4xlarge": [1, 2, 4, 8, 16, 32, 64],
+}
+TXN_DIR = "../../../workloads/IMDB/OLTP_queries/"
+WARMUP_FILE = "../warmup.sql"
+
+INSTANCES = ["r6g_large", "r6g_xlarge", "r6g_2xlarge", "r6g_4xlarge"]
+
+combine(
+  name="all",
+  deps=[
+    ":{}".format(instance)
+    for instance in INSTANCES
+  ],
+)
+
+for instance in INSTANCES:
+  run_experiment_group(
+    name=instance,
+    run="python3 ../runner.py",
+    experiments=[
+      ExperimentInstance(
+        name="{}-{}".format(instance, clients),
+        options={
+          "run_for_s": RUN_FOR_S,
+          "cstr_var": CSTR_VAR,
+          "txn_dir": TXN_DIR,
+          "warmup_query_file": WARMUP_FILE,
+          "num_clients": clients,
+        },
+      )
+      for clients in NUM_CLIENTS[instance]
+    ],
+  )

@@ -53,6 +53,17 @@ BASE_METRICS = [
     "db.Transactions.duration_commits",
     "db.Transactions.xact_commit",
     "db.Transactions.xact_rollback",
+    # NOTE: Aurora has specific storage metrics (probably because they use a custom storage engine)
+    # https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_PerfInsights_Counters.html#USER_PerfInsights_Counters.Aurora_PostgreSQL
+    "os.diskIO.auroraStorage.auroraStorageBytesRx",
+    "os.diskIO.auroraStorage.auroraStorageBytesTx",
+    "os.diskIO.auroraStorage.diskQueueDepth",
+    "os.diskIO.auroraStorage.readThroughput",
+    "os.diskIO.auroraStorage.writeThroughput",
+    "os.diskIO.auroraStorage.readLatency",
+    "os.diskIO.auroraStorage.writeLatency",
+    "os.diskIO.auroraStorage.readIOsPS",
+    "os.diskIO.auroraStorage.writeIOsPS",
 ]
 
 ALL_METRICS = []
@@ -112,6 +123,12 @@ def load_queries(file_path: str) -> List[str]:
 
 
 def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
+    # Ignore Ctrl-C (we use a different mechanism to shut down.)
+    def noop_signal_handler(signal, frame):
+        pass
+
+    signal.signal(signal.SIGINT, noop_signal_handler)
+
     cstr = os.environ[args.cstr_var]
     conn = pyodbc.connect(cstr, autocommit=True)
     cursor = conn.cursor()

@@ -8,7 +8,7 @@ function modify_instance_sync() {
 
     >&2 echo "Switching $instance to $new_type"
     aws rds modify-db-instance --db-instance-identifier $instance --db-instance-class $new_type --apply-immediately > /dev/null
-    sleep 20
+    sleep 45
 
     while [[ "$(aws rds describe-db-instances --db-instance-identifier $instance --query 'DBInstances[0].DBInstanceStatus')" == "\"modifying\"" ]]; do
         >&2 echo "Waiting for the change to $instance to complete..."
