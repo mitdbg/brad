@@ -1,5 +1,5 @@
 import yaml
-from typing import Dict
+from typing import Dict, Tuple
 from brad.planner.strategy import PlanningStrategy
 
 
@@ -77,6 +77,9 @@ class PlannerConfig:
     def sample_set_size(self) -> int:
         return int(self._raw["sample_set_size"])
 
+    ###
+    ### Provisioning scaling
+    ###
     def aurora_alpha(self) -> float:
         return float(self._raw["aurora_alpha"])
 
@@ -89,7 +92,9 @@ class PlannerConfig:
     def redshift_gamma(self) -> float:
         return float(self._raw["redshift_gamma"])
 
-    # Redshift load scaling
+    ###
+    ### Redshift load scaling
+    ###
     def redshift_load_resource_alpha(self) -> float:
         return float(self._raw["redshift_load_factor"]["resource_alpha"])
 
@@ -106,7 +111,9 @@ class PlannerConfig:
     def redshift_load_min_scaling_cpu(self) -> float:
         return float(self._raw["redshift_load_factor"]["min_scaling_cpu"])
 
-    # Aurora load scaling
+    ###
+    ### Aurora load scaling
+    ###
     def aurora_load_resource_alpha(self) -> float:
         return float(self._raw["aurora_load_factor"]["resource_alpha"])
 
@@ -123,6 +130,16 @@ class PlannerConfig:
     def max_feasible_cpu(self) -> float:
         return float(self._raw["max_feasible_cpu"])
 
-    # Extraction: Bytes per row
+    ###
+    ### Extraction: Bytes per row
+    ###
     def extract_table_bytes_per_row(self, schema_name: str, table_name: str) -> float:
         return float(self._raw["table_extract_bytes_per_row"][schema_name][table_name])
+
+    ###
+    ### Transactions
+    ###
+    def client_txn_thpt_model(self) -> Tuple[float, float]:
+        """Coefficient and intercept."""
+        raw = self._raw["aurora_txns"]
+        return float(raw["client_thpt_coef"]), float(raw["client_thpt_intercept"])

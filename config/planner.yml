@@ -142,3 +142,12 @@ aurora_load_factor:
   # Legacy factors.
   cpu_to_load_alpha: 0.8761541
   min_scaling_cpu: 30
+
+
+###
+### Transactional workload modifiers.
+###
+
+aurora_txns:
+  client_thpt_coef: 0.07766606
+  client_thpt_intercept: -0.1421904812785577
