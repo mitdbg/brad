@@ -12,19 +12,12 @@ from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
-from brad.planner.scoring.performance.load_factor import (
-    scale_aurora_run_time_by_load,
-    scale_redshift_run_time_by_load,
-    compute_next_aurora_load,
-)
-from brad.planner.scoring.performance.cpu import (
-    compute_next_aurora_cpu,
-    compute_next_redshift_cpu,
-)
+from brad.planner.scoring.performance.load_factor import scale_redshift_run_time_by_load
+from brad.planner.scoring.performance.cpu import compute_next_redshift_cpu
 from brad.planner.scoring.performance.provisioning_scaling import (
-    scale_aurora_predicted_latency,
     scale_redshift_predicted_latency,
 )
+from brad.planner.scoring.performance.unified_aurora import AuroraProvisioningScore
 from brad.planner.scoring.provisioning import (
     compute_aurora_hourly_operational_cost,
     compute_redshift_hourly_operational_cost,
@@ -106,8 +99,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
         # Used during comparisons.
         self._memoized: Dict[str, Any] = {}
-        self.aurora_cpu = np.nan
-        self.aurora_load = np.nan
+        self.aurora_score: Optional[AuroraProvisioningScore] = None
         self.redshift_cpu = np.nan
 
     def to_blueprint(self) -> Blueprint:
@@ -149,9 +141,15 @@ class BlueprintCandidate(ComparableBlueprint):
         values["table_movement_trans_time_s"] = self.table_movement_trans_time_s
         values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
 
-        values["aurora_cpu"] = self.aurora_cpu
-        values["aurora_load"] = self.aurora_load
         values["redshift_cpu"] = self.redshift_cpu
+
+        if self.aurora_score is not None:
+            values["aurora_load"] = self.aurora_score.overall_system_load
+            values["aurora_cpu_denorm"] = self.aurora_score.overall_cpu_denorm
+            values[
+                "pred_txn_peak_cpu_denorm"
+            ] = self.aurora_score.pred_txn_peak_cpu_denorm
+            values.update(self.aurora_score.debug_values)
 
         return values
 
@@ -351,15 +349,18 @@ class BlueprintCandidate(ComparableBlueprint):
             aurora_transition_time_s + redshift_transition_time_s
         )
 
-        # Predicted query performance.
-        self.scaled_query_latencies.clear()
-        self.scaled_query_latencies[Engine.Aurora] = scale_aurora_predicted_latency(
+        self.aurora_score = AuroraProvisioningScore.compute(
             ctx.next_workload.get_predicted_analytical_latency_batch(
                 self.query_locations[Engine.Aurora], Engine.Aurora
             ),
+            ctx.current_blueprint.aurora_provisioning(),
             self.aurora_provisioning,
             ctx,
         )
+
+        # Predicted query performance.
+        self.scaled_query_latencies.clear()
+        self.scaled_query_latencies[Engine.Aurora] = self.aurora_score.scaled_run_times
         self.scaled_query_latencies[Engine.Redshift] = scale_redshift_predicted_latency(
             ctx.next_workload.get_predicted_analytical_latency_batch(
                 self.query_locations[Engine.Redshift], Engine.Redshift
@@ -374,25 +375,6 @@ class BlueprintCandidate(ComparableBlueprint):
         )
 
         # Account for load.
-        if (
-            ctx.current_blueprint.aurora_provisioning().num_nodes() > 0
-            and self.aurora_provisioning.num_nodes() > 0
-        ):
-            total_next_latency = self.scaled_query_latencies[Engine.Aurora].sum()
-            self.aurora_cpu = compute_next_aurora_cpu(
-                ctx.metrics.aurora_cpu_avg,
-                ctx.current_blueprint.aurora_provisioning(),
-                self.aurora_provisioning,
-                total_next_latency,
-                ctx,
-            )
-            self.aurora_load = compute_next_aurora_load(
-                ctx.metrics.aurora_load_minute_avg, total_next_latency, ctx
-            )
-            self.scaled_query_latencies[Engine.Aurora] = scale_aurora_run_time_by_load(
-                self.scaled_query_latencies[Engine.Aurora], self.aurora_load, ctx
-            )
-
         if (
             ctx.current_blueprint.redshift_provisioning().num_nodes() > 0
             and self.redshift_provisioning.num_nodes() > 0
@@ -525,11 +507,13 @@ class BlueprintCandidate(ComparableBlueprint):
             # Already ran.
             return
 
-        if (
-            not math.isnan(self.aurora_cpu)
-            and self.aurora_cpu >= ctx.planner_config.max_feasible_cpu()
-        ):
-            self.feasibility = BlueprintFeasibility.Infeasible
+        if self.aurora_score is not None:
+            # TODO: Check whether there are transactions or not.
+            if (
+                self.aurora_score.overall_cpu_denorm
+                >= self.aurora_score.pred_txn_peak_cpu_denorm
+            ):
+                self.feasibility = BlueprintFeasibility.Infeasible
             return
 
         if (
@@ -538,8 +522,6 @@ class BlueprintCandidate(ComparableBlueprint):
         ):
             self.feasibility = BlueprintFeasibility.Infeasible
             return
-
-        # TODO: Add checks for transaction feasibility.
 
         self.feasibility = BlueprintFeasibility.Feasible
 
@@ -582,6 +564,10 @@ class BlueprintCandidate(ComparableBlueprint):
         cloned.explored_provisionings = self.explored_provisionings
         cloned.feasibility = self.feasibility
         cloned.scaled_query_latencies = self.scaled_query_latencies.copy()
+        cloned.redshift_cpu = self.redshift_cpu
+        cloned.aurora_score = (
+            self.aurora_score.copy() if self.aurora_score is not None else None
+        )
         # pylint: disable-next=protected-access
         cloned._memoized = self._memoized.copy()
 

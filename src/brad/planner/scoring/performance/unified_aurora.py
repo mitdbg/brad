@@ -161,37 +161,15 @@ class AuroraProvisioningScore:
 
         return np.dot(lat_vals, coefs)
 
-    ###
-    ### The methods below are our "legacy" scaling methods. They will be
-    ### adjusted in a future commit.
-    ###
-
-    @staticmethod
-    def _scale_aurora_predicted_latency(
-        base_predicted_latency: npt.NDArray, to_prov: Provisioning, ctx: ScoringContext
-    ) -> npt.NDArray:
-        # predicted = (measured * gamma) * (s/d) * (alpha) + (measured * (1 - gamma))
-        # s/d is the ratio
-        if to_prov.num_nodes() > 0:
-            aurora_predicted = (
-                base_predicted_latency
-                * ctx.planner_config.aurora_gamma()
-                * ctx.planner_config.aurora_alpha()
-                * _AURORA_BASE_RESOURCE_VALUE
-                / aurora_resource_value(to_prov)
-            ) + (base_predicted_latency * (1.0 - ctx.planner_config.aurora_gamma()))
-            return aurora_predicted
-        else:
-            return np.full(base_predicted_latency.shape, np.inf)
-
-    @staticmethod
-    def _scale_aurora_run_time_by_load(
-        base_run_times: npt.NDArray, next_load: float, ctx: ScoringContext
-    ) -> npt.NDArray:
-        """
-        `next_load` is a unit-less number that should be above 0.
-        """
-        return base_run_times * ctx.planner_config.aurora_load_alpha() * next_load
+    def copy(self) -> "AuroraProvisioningScore":
+        return AuroraProvisioningScore(
+            self.scaled_run_times,
+            self.overall_system_load,
+            self.overall_cpu_denorm,
+            self.pred_txn_peak_cpu_denorm,
+            self.for_next_prov,
+            self.debug_values.copy(),
+        )
 
 
 _AURORA_BASE_RESOURCE_VALUE = aurora_resource_value(Provisioning("db.r6g.large", 1))
