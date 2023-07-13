@@ -198,7 +198,7 @@ class BlueprintCandidate(ComparableBlueprint):
                 dests,
                 aurora_accessed_pages,
                 athena_scanned_bytes,
-            ) = self._route_queries_compute_scan_stats(self.queries, router, ctx)
+            ) = await self._route_queries_compute_scan_stats(self.queries, router, ctx)
             for eng, query_indices in dests.items():
                 self.query_locations[eng].extend(query_indices)
 
@@ -209,7 +209,7 @@ class BlueprintCandidate(ComparableBlueprint):
             cluster_dests,
             incr_aurora_accessed_pages,
             incr_athena_scanned_bytes,
-        ) = self._route_queries_compute_scan_stats(query_cluster, router, ctx)
+        ) = await self._route_queries_compute_scan_stats(query_cluster, router, ctx)
         for eng, query_indices in cluster_dests.items():
             self.query_locations[eng].extend(query_indices)
 
@@ -230,7 +230,7 @@ class BlueprintCandidate(ComparableBlueprint):
         self.explored_provisionings = False
         self._memoized.clear()
 
-    def _route_queries_compute_scan_stats(
+    async def _route_queries_compute_scan_stats(
         self,
         queries: List[int],
         router: Router,
@@ -245,7 +245,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
         for qidx in queries:
             q = all_queries[qidx]
-            eng = router.engine_for_sync(q)
+            eng = await router.engine_for(q)
             dests[eng].append(qidx)
 
         aurora_queries = [all_queries[qidx] for qidx in dests[Engine.Aurora]]

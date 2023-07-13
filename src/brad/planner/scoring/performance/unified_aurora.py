@@ -157,7 +157,7 @@ class AuroraProvisioningScore:
         num_coefs = coefs.shape[0]
 
         lat_vals = np.expand_dims(base_predicted_latency, axis=1)
-        lat_vals = np.repeat(lat_vals, num_coefs, axis=2)
+        lat_vals = np.repeat(lat_vals, num_coefs, axis=1)
 
         return np.dot(lat_vals, coefs)
 

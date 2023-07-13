@@ -197,7 +197,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             router = await self._router_provider.get_router(candidate.table_placements)
             for qidx in query_indices:
                 query = analytical_queries[qidx]
-                routing_engine = router.engine_for_sync(query)
+                routing_engine = await router.engine_for(query)
                 candidate.add_query_last_step(
                     qidx,
                     query,
