@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 from .parse_plan import parse_plans
 
@@ -28,7 +28,7 @@ def extract_base_cardinalities(plan: ParsedPlan) -> List[BaseCardinality]:
     returned by EXPLAIN.
     """
     base_cardinalities = []
-    ops = [(plan, None, 0)]
+    ops: List[Tuple[ParsedPlan, Optional[ParsedPlan], int]] = [(plan, None, 0)]
     while len(ops) > 0:
         op, parent, visit_count = ops.pop()
         if visit_count != 0:
