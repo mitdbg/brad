@@ -125,5 +125,12 @@ class ForestRouter(Router):
         serialized = assets.load_sync(key)
         return ModelWrap.from_pickle_bytes(serialized)
 
+    @staticmethod
+    def static_drop_model_sync(
+        schema_name: str, policy: RoutingPolicy, assets: AssetManager
+    ) -> None:
+        key = _SERIALIZED_KEY.format(schema_name=schema_name, policy=policy.value)
+        assets.delete_sync(key)
+
 
 _SERIALIZED_KEY = "{schema_name}/{policy}-router.pickle"

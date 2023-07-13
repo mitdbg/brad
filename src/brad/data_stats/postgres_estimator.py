@@ -80,6 +80,12 @@ class PostgresEstimator(Estimator):
         access_infos = []
         for bc in base_cards:
             table_name = base_table_name_from_source(bc.table_name)
+            if table_name not in self._table_sizes:
+                logger.warning(
+                    "Missing table in the table sizes cache: %s (raw name)",
+                    bc.table_name,
+                )
+                continue
             access_infos.append(
                 AccessInfo(
                     table_name,

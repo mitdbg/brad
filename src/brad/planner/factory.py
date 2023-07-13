@@ -4,6 +4,7 @@ from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.planner import BlueprintPlanner
 from brad.planner.compare.function import BlueprintComparator
+from brad.planner.estimator import EstimatorProvider
 from brad.planner.neighborhood.neighborhood import NeighborhoodSearchPlanner
 from brad.planner.beam.query_based import QueryBasedBeamPlanner
 from brad.planner.beam.table_based import TableBasedBeamPlanner
@@ -29,6 +30,7 @@ class BlueprintPlannerFactory:
         comparator: BlueprintComparator,
         metrics_provider: MetricsProvider,
         data_access_provider: DataAccessProvider,
+        estimator_provider: EstimatorProvider,
     ) -> BlueprintPlanner:
         strategy = planner_config.strategy()
         if (
@@ -47,6 +49,7 @@ class BlueprintPlannerFactory:
                 comparator=comparator,
                 metrics_provider=metrics_provider,
                 data_access_provider=data_access_provider,
+                estimator_provider=estimator_provider,
             )
 
         elif strategy == PlanningStrategy.QueryBasedBeam:
@@ -62,6 +65,7 @@ class BlueprintPlannerFactory:
                 comparator=comparator,
                 metrics_provider=metrics_provider,
                 data_access_provider=data_access_provider,
+                estimator_provider=estimator_provider,
             )
 
         elif strategy == PlanningStrategy.TableBasedBeam:
@@ -77,6 +81,7 @@ class BlueprintPlannerFactory:
                 comparator=comparator,
                 metrics_provider=metrics_provider,
                 data_access_provider=data_access_provider,
+                estimator_provider=estimator_provider,
             )
 
         else:

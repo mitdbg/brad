@@ -128,7 +128,9 @@ class TableSqlGenerator:
                     col_names = list(map(lambda col: col.name, index_cols))
                     create_indexes.append(
                         AURORA_CREATE_BTREE_INDEX_TEMPLATE.format(
-                            index_name="{}_index".format("_".join(col_names)),
+                            index_name="index_{}_{}".format(
+                                table.name, "_".join(col_names)
+                            ),
                             table_name=source_table_name(table),
                             columns=", ".join(col_names),
                         )
@@ -178,7 +180,11 @@ class TableSqlGenerator:
                 columns=comma_separated_column_names_and_types(
                     table.columns, Engine.Athena
                 ),
-                s3_path="{}{}".format(self._config.athena_s3_data_path, table.name),
+                s3_path="{}{}/{}".format(
+                    self._config.athena_s3_data_path,
+                    self._blueprint.schema_name(),
+                    table.name,
+                ),
             )
             return ([sql], Engine.Athena)
 

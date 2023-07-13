@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 from .parse_plan import parse_plans
 
@@ -28,10 +28,40 @@ def extract_base_cardinalities(plan: ParsedPlan) -> List[BaseCardinality]:
     returned by EXPLAIN.
     """
     base_cardinalities = []
-    ops = [plan]
+    ops: List[Tuple[ParsedPlan, Optional[ParsedPlan], int]] = [(plan, None, 0)]
     while len(ops) > 0:
-        op = ops.pop()
+        op, parent, visit_count = ops.pop()
+        if visit_count != 0:
+            if (
+                "child_is_index_scan" in op
+                and "Scan" in op["plan_parameters"]["op_name"]
+            ):
+                # This is a somewhat hacky way to handle the case of a bitmap
+                # scan executed using an index (which is two operators, with the
+                # index scan being the base op). This logic will only work where
+                # the index scan is a direct descendant.
+                base_cardinalities.append(
+                    BaseCardinality(
+                        op["plan_parameters"]["table"],
+                        op["plan_parameters"]["est_card"],
+                        op["plan_parameters"]["est_width"],
+                        op["plan_parameters"]["op_name"],
+                    )
+                )
+
+            # Regardless, stop processing this op.
+            continue
+
         if len(op["children"]) == 0:
+            if (
+                op["plan_parameters"]["table"].startswith("index_")
+                and parent is not None
+            ):
+                # This is a straight scan of the index. We do not get table
+                # cardinality information from this operator.
+                parent["child_is_index_scan"] = True
+                continue
+
             # This is a base operator.
             base_cardinalities.append(
                 BaseCardinality(
@@ -42,6 +72,8 @@ def extract_base_cardinalities(plan: ParsedPlan) -> List[BaseCardinality]:
                 )
             )
         else:
+            ops.append((op, parent, 1))
             for child in op["children"]:
-                ops.append(child)
+                # node, parent, visit count
+                ops.append((child, op, 0))
     return base_cardinalities

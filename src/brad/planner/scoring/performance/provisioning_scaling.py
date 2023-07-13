@@ -43,5 +43,5 @@ def scale_redshift_predicted_latency(
         return np.full(base_predicted_latency.shape, np.inf)
 
 
-_AURORA_BASE_RESOURCE_VALUE = aurora_resource_value(Provisioning("db.r6i.large", 1))
+_AURORA_BASE_RESOURCE_VALUE = aurora_resource_value(Provisioning("db.r6g.large", 1))
 _REDSHIFT_BASE_RESOURCE_VALUE = redshift_resource_value(Provisioning("dc2.large", 1))

@@ -2,6 +2,7 @@ from typing import Dict, Optional
 
 from brad.asset_manager import AssetManager
 from brad.config.file import ConfigFile
+from brad.planner.estimator import EstimatorProvider
 from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
 from brad.routing.rule_based import RuleBased
@@ -16,16 +17,22 @@ class RouterProvider:
     blueprint itself.
     """
 
-    def __init__(self, schema_name: str, config: ConfigFile) -> None:
+    def __init__(
+        self,
+        schema_name: str,
+        config: ConfigFile,
+        estimator_provider: EstimatorProvider,
+    ) -> None:
         self._schema_name = schema_name
         self._config = config
         self._assets = AssetManager(self._config)
         self._routing_policy = self._config.routing_policy
+        self._estimator_provider = estimator_provider
 
         # We cache this model to avoid loading it from S3 repeatedly.
         self._model: Optional[ModelWrap] = None
 
-    def get_router(self, table_bitmap: Dict[str, int]) -> Router:
+    async def get_router(self, table_bitmap: Dict[str, int]) -> Router:
         if (
             self._routing_policy == RoutingPolicy.ForestTablePresence
             or self._routing_policy == RoutingPolicy.ForestTableSelectivity
@@ -36,9 +43,11 @@ class RouterProvider:
                     self._routing_policy,
                     self._assets,
                 )
-            return ForestRouter.for_planner(
+            router = ForestRouter.for_planner(
                 self._routing_policy, self._schema_name, self._model, table_bitmap
             )
+            await router.run_setup(self._estimator_provider.get_estimator())
+            return router
 
         elif self._routing_policy == RoutingPolicy.RuleBased:
             return RuleBased(table_placement_bitmap=table_bitmap)

@@ -8,6 +8,7 @@ Metrics = namedtuple(
         "aurora_cpu_avg",
         "buffer_hit_pct_avg",
         "aurora_load_minute_avg",
+        "client_txn_completions_per_s_avg",
     ],
 )
 
@@ -50,14 +51,21 @@ class MetricsFromMonitor(MetricsProvider):
             )
 
         if metrics.empty:
-            return Metrics(1.0, 1.0, 100.0, 1.0)
+            return Metrics(1.0, 1.0, 100.0, 1.0, 1.0)
 
         redshift_cpu = metrics[_RELEVANT_METRICS["redshift_cpu_avg"]].iloc[0]
         aurora_cpu = metrics[_RELEVANT_METRICS["aurora_cpu_avg"]].iloc[0]
         hit_pct = metrics[_RELEVANT_METRICS["buffer_hit_pct_avg"]].iloc[0]
 
         # TODO: Retrieve performance insights metrics.
-        return Metrics(redshift_cpu, aurora_cpu, hit_pct, aurora_load_minute_avg=1.0)
+        # TODO: Retrieve client-side metrics.
+        return Metrics(
+            redshift_cpu,
+            aurora_cpu,
+            hit_pct,
+            aurora_load_minute_avg=1.0,
+            client_txn_completions_per_s_avg=1.0,
+        )
 
 
 _RELEVANT_METRICS = {

@@ -1,5 +1,7 @@
 import yaml
-from typing import Dict
+import numpy as np
+import numpy.typing as npt
+from typing import Dict, Optional
 from brad.planner.strategy import PlanningStrategy
 
 
@@ -13,6 +15,8 @@ class PlannerConfig:
         self._raw_path = path
         with open(path, "r", encoding="UTF-8") as file:
             self._raw = yaml.load(file, Loader=yaml.Loader)
+
+        self._aurora_scaling_coefs: Optional[npt.NDArray] = None
 
     def strategy(self) -> PlanningStrategy:
         return PlanningStrategy.from_str(self._raw["strategy"])
@@ -77,6 +81,9 @@ class PlannerConfig:
     def sample_set_size(self) -> int:
         return int(self._raw["sample_set_size"])
 
+    ###
+    ### Provisioning scaling
+    ###
     def aurora_alpha(self) -> float:
         return float(self._raw["aurora_alpha"])
 
@@ -89,7 +96,9 @@ class PlannerConfig:
     def redshift_gamma(self) -> float:
         return float(self._raw["redshift_gamma"])
 
-    # Redshift load scaling
+    ###
+    ### Redshift load scaling
+    ###
     def redshift_load_resource_alpha(self) -> float:
         return float(self._raw["redshift_load_factor"]["resource_alpha"])
 
@@ -106,7 +115,9 @@ class PlannerConfig:
     def redshift_load_min_scaling_cpu(self) -> float:
         return float(self._raw["redshift_load_factor"]["min_scaling_cpu"])
 
-    # Aurora load scaling
+    ###
+    ### Aurora load scaling
+    ###
     def aurora_load_resource_alpha(self) -> float:
         return float(self._raw["aurora_load_factor"]["resource_alpha"])
 
@@ -123,6 +134,31 @@ class PlannerConfig:
     def max_feasible_cpu(self) -> float:
         return float(self._raw["max_feasible_cpu"])
 
-    # Extraction: Bytes per row
+    ###
+    ### Extraction: Bytes per row
+    ###
     def extract_table_bytes_per_row(self, schema_name: str, table_name: str) -> float:
         return float(self._raw["table_extract_bytes_per_row"][schema_name][table_name])
+
+    ###
+    ### Transactions
+    ###
+    def client_txn_to_load(self) -> float:
+        return self._raw["aurora_txns"]["client_thpt_to_load"]
+
+    def client_txn_to_cpu_denorm(self) -> float:
+        return self._raw["aurora_txns"]["client_thpt_to_cpu_denorm"]
+
+    def aurora_prov_to_peak_cpu_denorm(self) -> float:
+        return self._raw["aurora_txns"]["prov_to_peak_cpu_denorm"]
+
+    ###
+    ### Unified Aurora scaling
+    ###
+    def aurora_scaling_coefs(self) -> npt.NDArray:
+        if self._aurora_scaling_coefs is None:
+            coefs = self._raw["aurora_scaling"]
+            self._aurora_scaling_coefs = np.array(
+                [coefs["coef1"], coefs["coef2"], coefs["coef3"], coefs["coef4"]]
+            )
+        return self._aurora_scaling_coefs
