@@ -134,3 +134,8 @@ def aurora_resource_value(prov: Provisioning) -> float:
 def redshift_resource_value(prov: Provisioning) -> float:
     specs = RedshiftSpecs[prov.instance_type()]
     return math.sqrt(specs.vcpus * specs.mem_mib) * prov.num_nodes()
+
+
+def aurora_num_cpus(prov: Provisioning) -> int:
+    specs = AuroraSpecs[prov.instance_type()]
+    return specs.vcpus

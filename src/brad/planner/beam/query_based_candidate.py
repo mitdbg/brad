@@ -155,7 +155,10 @@ class BlueprintCandidate(ComparableBlueprint):
 
         if self.aurora_score is not None:
             values["aurora_load"] = self.aurora_score.overall_system_load
-            values["pred_txn_peak"] = self.aurora_score.pred_txn_peak_load
+            values["aurora_cpu_denorm"] = self.aurora_score.overall_cpu_denorm
+            values[
+                "pred_txn_peak_cpu_denorm"
+            ] = self.aurora_score.pred_txn_peak_cpu_denorm
             values.update(self.aurora_score.debug_values)
 
         return values
@@ -372,6 +375,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
         self.aurora_score = AuroraProvisioningScore.compute(
             np.array(self.base_query_latencies[Engine.Aurora]),
+            ctx.current_blueprint.aurora_provisioning(),
             self.aurora_provisioning,
             ctx,
         )
@@ -518,12 +522,13 @@ class BlueprintCandidate(ComparableBlueprint):
             # Already ran.
             return
 
-        if (
-            self.aurora_score is not None
-            and self.aurora_score.overall_system_load
-            >= self.aurora_score.pred_txn_peak_load
-        ):
-            self.feasibility = BlueprintFeasibility.Infeasible
+        if self.aurora_score is not None:
+            # TODO: Check whether there are transactions or not.
+            if (
+                self.aurora_score.overall_cpu_denorm
+                >= self.aurora_score.pred_txn_peak_cpu_denorm
+            ):
+                self.feasibility = BlueprintFeasibility.Infeasible
             return
 
         if (
@@ -532,8 +537,6 @@ class BlueprintCandidate(ComparableBlueprint):
         ):
             self.feasibility = BlueprintFeasibility.Infeasible
             return
-
-        # TODO: Add checks for transaction feasibility.
 
         self.feasibility = BlueprintFeasibility.Feasible
 

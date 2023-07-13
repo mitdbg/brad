@@ -1,5 +1,7 @@
 import yaml
-from typing import Dict, Tuple
+import numpy as np
+import numpy.typing as npt
+from typing import Dict, Optional
 from brad.planner.strategy import PlanningStrategy
 
 
@@ -13,6 +15,8 @@ class PlannerConfig:
         self._raw_path = path
         with open(path, "r", encoding="UTF-8") as file:
             self._raw = yaml.load(file, Loader=yaml.Loader)
+
+        self._aurora_scaling_coefs: Optional[npt.NDArray] = None
 
     def strategy(self) -> PlanningStrategy:
         return PlanningStrategy.from_str(self._raw["strategy"])
@@ -139,7 +143,22 @@ class PlannerConfig:
     ###
     ### Transactions
     ###
-    def client_txn_thpt_model(self) -> Tuple[float, float]:
-        """Coefficient and intercept."""
-        raw = self._raw["aurora_txns"]
-        return float(raw["client_thpt_coef"]), float(raw["client_thpt_intercept"])
+    def client_txn_to_load(self) -> float:
+        return self._raw["aurora_txns"]["client_thpt_to_load"]
+
+    def client_txn_to_cpu_denorm(self) -> float:
+        return self._raw["aurora_txns"]["client_thpt_to_cpu_denorm"]
+
+    def aurora_prov_to_peak_cpu_denorm(self) -> float:
+        return self._raw["aurora_txns"]["prov_to_peak_cpu_denorm"]
+
+    ###
+    ### Unified Aurora scaling
+    ###
+    def aurora_scaling_coefs(self) -> npt.NDArray:
+        if self._aurora_scaling_coefs is None:
+            coefs = self._raw["aurora_scaling"]
+            self._aurora_scaling_coefs = np.array(
+                [coefs["coef1"], coefs["coef2"], coefs["coef3"], coefs["coef4"]]
+            )
+        return self._aurora_scaling_coefs
