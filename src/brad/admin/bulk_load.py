@@ -291,10 +291,12 @@ async def _update_sync_progress(
 
 def _try_add_task(
     generator: Iterator[Coroutine[Any, Any, Engine]],
-    dest: List[asyncio.Task[Engine] | Coroutine[Any, Any, Engine]],
+    dest: List[asyncio.Task[Engine]],
 ) -> None:
     try:
-        dest.append(next(generator))
+        coro = next(generator)
+        task = asyncio.create_task(coro)
+        dest.append(task)
     except StopIteration:
         pass
 
@@ -313,7 +315,7 @@ async def bulk_load_impl(args, manifest) -> None:
         engines_filter = {Engine.Aurora, Engine.Athena, Engine.Redshift}
 
     try:
-        running: List[asyncio.Task[Engine] | Coroutine[Any, Any, Engine]] = []
+        running: List[asyncio.Task[Engine]] = []
         engines = await EngineConnections.connect(
             config, manifest["schema_name"], specific_engines=engines_filter
         )
