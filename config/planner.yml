@@ -149,5 +149,15 @@ aurora_load_factor:
 ###
 
 aurora_txns:
-  client_thpt_coef: 0.07766606
-  client_thpt_intercept: -0.1421904812785577
+  client_thpt_to_load: 0.06493011
+  client_thpt_to_cpu_denorm: 0.04584762
+  # We used the number of CPUs as the "resource score".
+  # Should be a bit more precise.
+  prov_to_peak_cpu_denorm: 0.56730588
+
+aurora_scaling:
+  # [coef1(load)^2(resource)^2 + coef2(load)^2 + coef3(resource)^2 + coef4] * base
+  coef1: 0.2454489
+  coef2: 0.00841046
+  coef3: 0.27845245
+  coef4: 0.56823644
