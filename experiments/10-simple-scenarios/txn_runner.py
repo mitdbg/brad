@@ -184,7 +184,7 @@ def runner(idx: int, start_queue: mp.Queue, stop_queue: mp.Queue, args):
                     wait_for_s = 0.0
                 time.sleep(wait_for_s)
 
-            lat, aborts = run_txn(next_txn_idx)
+            lat, aborts = run_txn(brad_client, next_txn_idx)
             latencies.append(lat)
             total_aborts += aborts
             next_txn_idx += 1
@@ -278,7 +278,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default="localhost")
     parser.add_argument("--port", type=int, default=6583)
-    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--run_for_s",
         type=int,
@@ -304,7 +303,7 @@ def main():
         "--aurora_instance", type=str, default="aurora-secondary-instance-1"
     )
     parser.add_argument("--wait_before_start", type=int)
-    args = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
 
     if args.run_trim:
         trim_tables(args)
@@ -332,17 +331,17 @@ def main():
     stop_queue = mgr.Queue()
 
     processes = []
-    for idx in range(args.num_clients):
+    for idx in range(args.txn_num_clients):
         p = mp.Process(target=runner, args=(idx, start_queue, stop_queue, args))
         p.start()
         processes.append(p)
 
     print("Waiting for startup...", flush=True)
-    for _ in range(args.num_clients):
+    for _ in range(args.txn_num_clients):
         start_queue.get()
 
-    print("Telling {} clients to start.".format(args.num_clients), flush=True)
-    for _ in range(args.num_clients):
+    print("Telling {} clients to start.".format(args.txn_num_clients), flush=True)
+    for _ in range(args.txn_num_clients):
         stop_queue.put("")
 
     if args.run_for_s is not None:
@@ -365,7 +364,7 @@ def main():
         should_shutdown.wait()
 
     print("Stopping clients...")
-    for _ in range(args.num_clients):
+    for _ in range(args.txn_num_clients):
         stop_queue.put("")
 
     # For printing out results.
