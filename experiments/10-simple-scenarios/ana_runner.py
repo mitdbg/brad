@@ -139,8 +139,8 @@ def main():
     parser.add_argument("--run_warmup", action="store_true")
     parser.add_argument("--query_bank_file", type=str)
     parser.add_argument("--query_counts_file", type=str)
-    parser.add_argument("--num_clients", type=int, default=1)
-    args = parser.parse_args()
+    parser.add_argument("--ana_num_clients", type=int, default=1)
+    args = parser.parse_known_args()
 
     workload = (
         WorkloadBuilder()
