@@ -263,15 +263,15 @@ def run_warmup(args):
 
 def trim_tables(args):
     # Used to drop extraneous rows from the tables (inserted by prior transactions).
-    cstr = os.environ[args.cstr_var]
-    conn = pyodbc.connect(cstr)
-    cursor = conn.cursor()
-
-    for table, max_orig_id in TABLE_MAX_IDS.items():
-        print("Trimming {}...".format(table))
-        cursor.execute("DELETE FROM {} WHERE id > {}".format(table, max_orig_id))
-
-    cursor.commit()
+    with BradGrpcClient(args.host, args.port) as client:
+        client.run_query_ignore_results("BEGIN")
+        for table, max_orig_id in TABLE_MAX_IDS.items():
+            print("Trimming {}...".format(table))
+            client.run_query_ignore_results("DELETE FROM {} WHERE id > {}".format(table, max_orig_id))
+        print("Committing...")
+        client.run_query_ignore_results("COMMIT")
+        print("Running vacuum...")
+        client.run_query_ignore_results("VACUUM")
 
 
 def main():
@@ -297,10 +297,10 @@ def main():
     parser.add_argument("--avg_gap_s", type=float, default=1.0)
     parser.add_argument("--std_gap_s", type=float, default=0.5)
     parser.add_argument(
-        "--aurora_cluster", type=str, default="aurora-secondary-cluster"
+        "--aurora_cluster", type=str, default="aurora-2"
     )
     parser.add_argument(
-        "--aurora_instance", type=str, default="aurora-secondary-instance-1"
+        "--aurora_instance", type=str, default="aurora-2-instance-1"
     )
     parser.add_argument("--wait_before_start", type=int)
     args, _ = parser.parse_known_args()
