@@ -270,8 +270,6 @@ def trim_tables(args):
             client.run_query_ignore_results("DELETE FROM {} WHERE id > {}".format(table, max_orig_id))
         print("Committing...")
         client.run_query_ignore_results("COMMIT")
-        print("Running vacuum...")
-        client.run_query_ignore_results("VACUUM")
 
 
 def main():
