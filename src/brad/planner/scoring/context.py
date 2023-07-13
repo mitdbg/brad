@@ -36,14 +36,14 @@ class ScoringContext:
 
         self.current_latency_weights: Dict[Engine, float] = {}
 
-    def simulate_current_workload_routing(self, router: Router) -> None:
+    async def simulate_current_workload_routing(self, router: Router) -> None:
         self.current_query_locations[Engine.Aurora].clear()
         self.current_query_locations[Engine.Redshift].clear()
         self.current_query_locations[Engine.Athena].clear()
 
         all_queries = self.current_workload.analytical_queries()
         for qidx, query in enumerate(all_queries):
-            eng = router.engine_for_sync(query)
+            eng = await router.engine_for(query)
             self.current_query_locations[eng].append(qidx)
 
     def compute_engine_latency_weights(self) -> None:

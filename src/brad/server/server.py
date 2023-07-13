@@ -161,11 +161,13 @@ class BradServer(BradInterface):
         await self._data_sync_executor.establish_connections()
 
         if self._routing_policy == RoutingPolicy.ForestTableSelectivity:
-            estimator = await PostgresEstimator.connect(self._schema_name, self._config)
-            await estimator.analyze(self._blueprint_mgr.get_blueprint())
+            self._estimator = await PostgresEstimator.connect(
+                self._schema_name, self._config
+            )
+            await self._estimator.analyze(self._blueprint_mgr.get_blueprint())
         else:
-            estimator = None
-        await self._router.run_setup(estimator)
+            self._estimator = None
+        await self._router.run_setup(self._estimator)
 
         # Launch the daemon process.
         self._daemon_mp_manager = mp.Manager()
@@ -213,6 +215,14 @@ class BradServer(BradInterface):
             self._timed_sync_task = None
 
         await self._data_sync_executor.shutdown()
+
+        if self._brad_metrics_reporting_task is not None:
+            self._brad_metrics_reporting_task.cancel()
+            self._brad_metrics_reporting_task = None
+
+        if self._estimator is not None:
+            await self._estimator.close()
+            self._estimator = None
 
     async def start_session(self) -> SessionId:
         session_id, _ = await self._sessions.create_new_session()

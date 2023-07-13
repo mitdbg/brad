@@ -9,9 +9,11 @@ from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
+from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.planner.compare.cost import (
     best_cost_under_p99_latency,
 )
+from brad.planner.estimator import EstimatorProvider, FixedEstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.scoring.data_access.precomputed_values import (
     PrecomputedDataAccessProvider,
@@ -28,6 +30,7 @@ from brad.planner.metrics import (
 from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import FixedWorkloadProvider
+from brad.routing.policy import RoutingPolicy
 from brad.server.blueprint_manager import BlueprintManager
 from brad.server.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
@@ -221,6 +224,13 @@ def run_planner(args) -> None:
     else:
         metrics_provider = MetricsFromMonitor(monitor, forecasted=True)
 
+    if config.routing_policy == RoutingPolicy.ForestTableSelectivity:
+        pe = asyncio.run(PostgresEstimator.connect(args.schema_name, config))
+        asyncio.run(pe.analyze(blueprint_mgr.get_blueprint()))
+        estimator_provider: EstimatorProvider = FixedEstimatorProvider(pe)
+    else:
+        estimator_provider = EstimatorProvider()
+
     planner = BlueprintPlannerFactory.create(
         current_blueprint=blueprint_mgr.get_blueprint(),
         current_workload=workload,
@@ -238,6 +248,7 @@ def run_planner(args) -> None:
         ),
         metrics_provider=metrics_provider,
         data_access_provider=data_access_provider,
+        estimator_provider=estimator_provider,
     )
     monitor.force_read_metrics()
 

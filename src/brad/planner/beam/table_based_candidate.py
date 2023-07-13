@@ -180,14 +180,14 @@ class BlueprintCandidate(ComparableBlueprint):
 
         return changed
 
-    def add_query_cluster(
+    async def add_query_cluster(
         self,
         router_provider: RouterProvider,
         query_cluster: List[int],
         reroute_prev: bool,
         ctx: ScoringContext,
     ) -> None:
-        router: Router = router_provider.get_router(self.table_placements)
+        router: Router = await router_provider.get_router(self.table_placements)
 
         if reroute_prev:
             self.query_locations[Engine.Aurora].clear()

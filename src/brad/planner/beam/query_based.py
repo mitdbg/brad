@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 class QueryBasedBeamPlanner(BlueprintPlanner):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._router_provider = RouterProvider(self._schema_name, self._config)
+        self._router_provider = RouterProvider(
+            self._schema_name, self._config, self._estimator_provider
+        )
 
     async def run_forever(self) -> None:
         while True:
@@ -65,8 +67,8 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             self._metrics_provider.get_metrics(),
             self._planner_config,
         )
-        ctx.simulate_current_workload_routing(
-            self._router_provider.get_router(
+        await ctx.simulate_current_workload_routing(
+            await self._router_provider.get_router(
                 self._current_blueprint.table_locations_bitmap()
             )
         )
@@ -192,7 +194,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         for candidate in current_top_k:
             query_indices = candidate.get_all_query_indices()
             candidate.reset_routing()
-            router = self._router_provider.get_router(candidate.table_placements)
+            router = await self._router_provider.get_router(candidate.table_placements)
             for qidx in query_indices:
                 query = analytical_queries[qidx]
                 routing_engine = router.engine_for_sync(query)

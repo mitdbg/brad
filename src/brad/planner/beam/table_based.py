@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 class TableBasedBeamPlanner(BlueprintPlanner):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._router_provider = RouterProvider(self._schema_name, self._config)
+        self._router_provider = RouterProvider(
+            self._schema_name, self._config, self._estimator_provider
+        )
 
     async def run_forever(self) -> None:
         while True:
@@ -62,9 +64,9 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             self._metrics_provider.get_metrics(),
             self._planner_config,
         )
-        ctx.simulate_current_workload_routing(
-            self._router_provider.get_router(
-                self._current_blueprint.table_locations_bitmap()
+        await ctx.simulate_current_workload_routing(
+            await self._router_provider.get_router(
+                self._current_blueprint.table_locations_bitmap(),
             )
         )
         ctx.compute_engine_latency_weights()
@@ -86,7 +88,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             candidate.add_transactional_tables(ctx)
             tables, queries, _ = first_cluster
             placement_changed = candidate.add_placement(placement_bitmap, tables, ctx)
-            candidate.add_query_cluster(
+            await candidate.add_query_cluster(
                 self._router_provider,
                 queries,
                 reroute_prev=placement_changed,
@@ -134,7 +136,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                         # table placement that includes this query cluster.
                         continue
 
-                    next_candidate.add_query_cluster(
+                    await next_candidate.add_query_cluster(
                         self._router_provider,
                         queries,
                         reroute_prev=placement_changed,
