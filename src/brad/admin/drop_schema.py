@@ -22,6 +22,7 @@ def register_admin_action(subparser) -> None:
     parser.add_argument(
         "--schema-name",
         type=str,
+        required=True,
         help="The name of the schema to drop.",
     )
     parser.set_defaults(admin_action=drop_schema)

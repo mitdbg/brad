@@ -178,7 +178,11 @@ class TableSqlGenerator:
                 columns=comma_separated_column_names_and_types(
                     table.columns, Engine.Athena
                 ),
-                s3_path="{}{}".format(self._config.athena_s3_data_path, table.name),
+                s3_path="{}{}/{}".format(
+                    self._config.athena_s3_data_path,
+                    self._blueprint.schema_name(),
+                    table.name,
+                ),
             )
             return ([sql], Engine.Athena)
 
