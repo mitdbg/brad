@@ -128,7 +128,9 @@ class TableSqlGenerator:
                     col_names = list(map(lambda col: col.name, index_cols))
                     create_indexes.append(
                         AURORA_CREATE_BTREE_INDEX_TEMPLATE.format(
-                            index_name="{}_index".format("_".join(col_names)),
+                            index_name="index_{}_{}".format(
+                                table.name, "_".join(col_names)
+                            ),
                             table_name=source_table_name(table),
                             columns=", ".join(col_names),
                         )
