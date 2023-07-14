@@ -5,7 +5,7 @@ from pathlib import Path
 
 from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
-from brad.planner import BlueprintPlanner
+from brad.planner.abstract import BlueprintPlanner
 from brad.planner.enumeration.neighborhood import NeighborhoodBlueprintEnumerator
 from brad.planner.neighborhood.filters import Filter
 from brad.planner.neighborhood.filters.aurora_transactions import AuroraTransactions

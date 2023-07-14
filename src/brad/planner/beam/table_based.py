@@ -6,7 +6,7 @@ import logging
 from typing import List, Tuple, Dict
 
 from brad.config.engine import Engine, EngineBitmapValues
-from brad.planner import BlueprintPlanner
+from brad.planner.abstract import BlueprintPlanner
 from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.router_provider import RouterProvider
 from brad.planner.beam.table_based_candidate import BlueprintCandidate
