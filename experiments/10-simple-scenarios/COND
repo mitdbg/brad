@@ -1,0 +1,9 @@
+run_experiment(
+  name="initial_low_before_opt_3",
+  run="python3 runner.py",
+  options={
+    "txn_num_clients": 1,
+    "ana_num_clients": 1,
+    "query_counts_file": "1-small-3.csv",
+  },
+)
