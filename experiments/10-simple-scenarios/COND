@@ -45,9 +45,9 @@ run_experiment(
 combine(
   name="relevant",
   deps=[
-    ":initial_low_before_opt3",
-    ":initial_low_after_opt3",
-    ":initial2_low_before_opt3",
-    ":initial2_low_after_opt3",
+    ":initial_low_before_opt_3",
+    ":initial_low_after_opt_3",
+    ":initial2_low_before_opt_3",
+    ":initial2_low_after_opt_3",
   ],
 )
