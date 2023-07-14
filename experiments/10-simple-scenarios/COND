@@ -4,6 +4,7 @@ run_experiment(
   options={
     "txn_num_clients": 1,
     "ana_num_clients": 1,
+    "ana_avg_gap_s": 2.0,
     "query_counts_file": "1-small-3.csv",
   },
 )

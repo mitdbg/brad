@@ -71,10 +71,11 @@ def runner(
                     flush=True,
                 )
 
-            wait_for_s = prng.gauss(1.0, 0.5)
-            if wait_for_s < 0.0:
-                wait_for_s = 0.0
-            time.sleep(wait_for_s)
+            if args.ana_avg_gap_s is not None:
+                wait_for_s = prng.gauss(args.ana_avg_gap_s, 0.5)
+                if wait_for_s < 0.0:
+                    wait_for_s = 0.0
+                time.sleep(wait_for_s)
 
             idx += 1
             q, count = queries_to_run.popleft()
@@ -144,6 +145,7 @@ def main():
     )
     parser.add_argument("--query_counts_file", type=str)
     parser.add_argument("--ana_num_clients", type=int, default=1)
+    parser.add_argument("--ana_avg_gap_s", type=float)
     args, _ = parser.parse_known_args()
 
     workload = (

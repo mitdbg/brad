@@ -267,7 +267,9 @@ def trim_tables(args):
         client.run_query_ignore_results("BEGIN")
         for table, max_orig_id in TABLE_MAX_IDS.items():
             print("Trimming {}...".format(table))
-            client.run_query_ignore_results("DELETE FROM {} WHERE id > {}".format(table, max_orig_id))
+            client.run_query_ignore_results(
+                "DELETE FROM {} WHERE id > {}".format(table, max_orig_id)
+            )
         print("Committing...")
         client.run_query_ignore_results("COMMIT")
 
@@ -294,12 +296,8 @@ def main():
     parser.add_argument("--txn_num_clients", type=int, default=1)
     parser.add_argument("--avg_gap_s", type=float, default=1.0)
     parser.add_argument("--std_gap_s", type=float, default=0.5)
-    parser.add_argument(
-        "--aurora_cluster", type=str, default="aurora-2"
-    )
-    parser.add_argument(
-        "--aurora_instance", type=str, default="aurora-2-instance-1"
-    )
+    parser.add_argument("--aurora_cluster", type=str, default="aurora-2")
+    parser.add_argument("--aurora_instance", type=str, default="aurora-2-instance-1")
     parser.add_argument("--wait_before_start", type=int)
     args, _ = parser.parse_known_args()
 
