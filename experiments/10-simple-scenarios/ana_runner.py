@@ -71,10 +71,11 @@ def runner(
                     flush=True,
                 )
 
-            wait_for_s = prng.gauss(1.0, 0.5)
-            if wait_for_s < 0.0:
-                wait_for_s = 0.0
-            time.sleep(wait_for_s)
+            if args.ana_avg_gap_s is not None:
+                wait_for_s = prng.gauss(args.ana_avg_gap_s, 0.5)
+                if wait_for_s < 0.0:
+                    wait_for_s = 0.0
+                time.sleep(wait_for_s)
 
             idx += 1
             q, count = queries_to_run.popleft()
@@ -137,10 +138,15 @@ def main():
     parser.add_argument("--port", type=int, default=6583)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--run_warmup", action="store_true")
-    parser.add_argument("--query_bank_file", type=str)
+    parser.add_argument(
+        "--query_bank_file",
+        type=str,
+        default="../../workloads/IMDB/OLAP_queries/all_queries.sql",
+    )
     parser.add_argument("--query_counts_file", type=str)
-    parser.add_argument("--num_clients", type=int, default=1)
-    args = parser.parse_args()
+    parser.add_argument("--ana_num_clients", type=int, default=1)
+    parser.add_argument("--ana_avg_gap_s", type=float)
+    args, _ = parser.parse_known_args()
 
     workload = (
         WorkloadBuilder()
@@ -160,7 +166,7 @@ def main():
     stop_queue = mgr.Queue()
 
     processes = []
-    for idx in range(args.num_clients):
+    for idx in range(args.ana_num_clients):
         p = mp.Process(
             target=runner, args=(idx, start_queue, stop_queue, args, workload)
         )
@@ -168,11 +174,11 @@ def main():
         processes.append(p)
 
     print("Waiting for startup...", flush=True)
-    for _ in range(args.num_clients):
+    for _ in range(args.ana_num_clients):
         start_queue.get()
 
-    print("Telling {} clients to start.".format(args.num_clients), flush=True)
-    for _ in range(args.num_clients):
+    print("Telling {} clients to start.".format(args.ana_num_clients), flush=True)
+    for _ in range(args.ana_num_clients):
         stop_queue.put("")
 
     # Wait for the experiment to finish.
