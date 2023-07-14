@@ -14,6 +14,7 @@ class RedshiftProvisioning:
         cluster_name="brad-cluster0",
         initial_instance_type=None,
         initial_cluster_size=None,
+        always_classic=False,
     ):
         self.cluster_name = cluster_name
         self.instance_type = initial_instance_type
@@ -21,8 +22,9 @@ class RedshiftProvisioning:
         self.paused = None
         self.address = None
         self.port = None
+        self.always_classic = always_classic
         self.redshift = boto3.client("redshift")
-        self.redeploy()
+        self.redeploy(False)
 
     # String representation.
     def __str__(self) -> str:
@@ -45,23 +47,38 @@ class RedshiftProvisioning:
     def rescale(self, new_instance_type=None, new_cluster_size=None, new_paused=None):
         if new_instance_type is not None:
             self.instance_type = new_instance_type
+        old_cluster_size = self.cluster_size
         if new_cluster_size is not None:
-            if (
-                new_cluster_size == self.cluster_size
-                or new_cluster_size == self.cluster_size / 2
-                or new_cluster_size == self.cluster_size * 2
-            ):
-                self.cluster_size = new_cluster_size
-            else:
-                raise RuntimeError(
-                    "Passed in impossible cluster size. Check Reshift Docs."
-                )
+            self.cluster_size = new_cluster_size
         if new_paused is not None:
             self.paused = new_paused
-        self.redeploy()
+        is_classic = self.get_resize_type(old_cluster_size)
+        self.redeploy(is_classic=is_classic)
+
+    # Resize depends on target instance type, and old instance count, and the new instance count.
+    def get_resize_type(self, old_cluster_size) -> bool:
+        if self.always_classic:
+            return True
+        if old_cluster_size == 1 or self.cluster_size == 1:
+            return True
+        if self.instance_type in ["ra3.16xlarge", "ra3.4xlarge"]:
+            return (
+                self.cluster_size < old_cluster_size / 4
+                or self.cluster_size > 4 * old_cluster_size
+            )
+        if self.instance_type in ["ra3.xlplus"]:
+            return (
+                self.cluster_size < old_cluster_size / 4
+                or self.cluster_size > 2 * old_cluster_size
+            )
+        # For all other types, must be within double or half.
+        return (
+            self.cluster_size < old_cluster_size / 2
+            or self.cluster_size > 2 * old_cluster_size
+        )
 
     # Redeploy. Used for initialization and rescaling.
-    def redeploy(self):
+    def redeploy(self, is_classic: bool):
         # Iterate until cluster is in right state.
         while True:
             try:
@@ -131,11 +148,24 @@ class RedshiftProvisioning:
                 logging.info(
                     f"Redshift Cluster {self.cluster_name}. Resizing to ({self.instance_type}, {self.cluster_size})..."
                 )
-                self.redshift.resize_cluster(
-                    ClusterIdentifier=self.cluster_name,
-                    NodeType=self.instance_type,
-                    NumberOfNodes=self.cluster_size,
-                )
+                print(f"IsClassic: {is_classic}")
+                if is_classic:
+                    cluster_type = (
+                        "multi-node" if self.cluster_size > 1 else "single-node"
+                    )
+                    self.redshift.modify_cluster(
+                        ClusterIdentifier=self.cluster_name,
+                        ClusterType=cluster_type,
+                        NodeType=self.instance_type,
+                        NumberOfNodes=self.cluster_size,
+                    )
+                else:
+                    self.redshift.resize_cluster(
+                        ClusterIdentifier=self.cluster_name,
+                        NodeType=self.instance_type,
+                        NumberOfNodes=self.cluster_size,
+                        Classic=is_classic,
+                    )
                 # Next iteration of the loop will wait for availability.
                 time.sleep(5.0)
                 continue
@@ -153,28 +183,41 @@ class RedshiftProvisioning:
                         PubliclyAccessible=True,
                     )
                 else:
-                    print("RERAISING BRAD ERROR: {e}")
+                    print(f"RERAISING BRAD ERROR: {e}")
                     raise e
 
 
 if __name__ == "__main__":
     # Get or create cluster.
+    start_time = time.time()
     try:
         rd = RedshiftProvisioning(cluster_name="brad-cluster0")
     except Exception as _e:
         rd = RedshiftProvisioning(
             cluster_name="brad-cluster0",
             initial_instance_type="ra3.xlplus",
-            initial_cluster_size=2,
+            initial_cluster_size=1,
+            always_classic=False,
         )
+    end_time = time.time()
+    create_duration = start_time - end_time
     # Change cluster size.
     cluster_size = rd.cluster_size
-    if cluster_size == 2:
-        cluster_size = 4
-    else:
+    if cluster_size == 1:
         cluster_size = 2
+    else:
+        cluster_size = 1
+    start_time = time.time()
     rd.rescale(new_cluster_size=cluster_size, new_paused=False)
+    end_time = time.time()
+    rescale_duration = start_time - end_time
     print(rd)
     # Pause.
+    start_time = time.time()
     rd.rescale(new_paused=True)
+    end_time = time.time()
+    pause_duration = start_time - end_time
     print(rd)
+    print(
+        f"CreateDur={create_duration:.2f}. RescaleDur={rescale_duration:.2f}. PauseDur={pause_duration:.2f}"
+    )

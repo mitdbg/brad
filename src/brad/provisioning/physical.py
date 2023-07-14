@@ -84,6 +84,7 @@ class PhysicalProvisioning:
     def update_blueprint(self, new_blueprint: Blueprint):
         aurora_instance_type = new_blueprint.aurora_provisioning().instance_type()
         aurora_paused = new_blueprint.aurora_provisioning().is_paused()
+        aurora_instance_count = new_blueprint.aurora_provisioning().num_nodes()
         redshift_instance_type = new_blueprint.redshift_provisioning().instance_type()
         redshift_instance_count = new_blueprint.redshift_provisioning().num_nodes()
         redshift_paused = new_blueprint.redshift_provisioning().is_paused()
@@ -91,6 +92,7 @@ class PhysicalProvisioning:
         self._rds_provisioning.rescale(
             immediate=True,
             new_instance_type=aurora_instance_type,
+            new_num_nodes=aurora_instance_count,
             new_paused=aurora_paused,
         )
         print("Rescaling Redshift...")
