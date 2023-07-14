@@ -1,4 +1,5 @@
 import math
+import logging
 import numpy as np
 import numpy.typing as npt
 from typing import Any, Dict, List, Optional
@@ -36,6 +37,8 @@ from brad.planner.scoring.table_placement import (
     compute_single_table_movement_time_and_cost,
 )
 from brad.planner.workload.query import Query
+
+logger = logging.getLogger(__name__)
 
 
 class BlueprintCandidate(ComparableBlueprint):
@@ -528,6 +531,12 @@ class BlueprintCandidate(ComparableBlueprint):
                 self.aurora_score.overall_cpu_denorm
                 >= self.aurora_score.pred_txn_peak_cpu_denorm
             ):
+                logger.debug(
+                    "Txn not feasible. %s, pred denorm %.2f, peak denorm %.2f",
+                    self.aurora_provisioning,
+                    self.aurora_score.overall_cpu_denorm,
+                    self.aurora_score.pred_txn_peak_cpu_denorm,
+                )
                 self.feasibility = BlueprintFeasibility.Infeasible
             return
 
