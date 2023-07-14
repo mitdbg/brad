@@ -1,6 +1,6 @@
 run_experiment(
   name="initial_low_before_opt_3",
-  run="python3 runner.py",
+  run="./run_workload.sh",
   options={
     "txn_num_clients": 1,
     "ana_num_clients": 1,
