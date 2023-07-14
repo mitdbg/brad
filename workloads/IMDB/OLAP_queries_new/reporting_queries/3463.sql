@@ -1,1 +1,0 @@
-SELECT SUM("title"."id") as agg_0 FROM "title" LEFT OUTER JOIN "cast_info" ON "title"."id" = "cast_info"."movie_id" LEFT OUTER JOIN "movie_info_idx" ON "title"."id" = "movie_info_idx"."movie_id"  WHERE "cast_info"."note" LIKE '%foota%ge)%' AND ("movie_info_idx"."movie_id" >= 1922150 OR "movie_info_idx"."movie_id" <= 1864668) AND "cast_info"."movie_id" BETWEEN 991265 AND 2418754;

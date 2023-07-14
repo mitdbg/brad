@@ -1,1 +1,0 @@
-SELECT SUM("cast_info"."movie_id") as agg_0, AVG("movie_info"."movie_id") as agg_1 FROM "movie_info" LEFT OUTER JOIN "title" ON "movie_info"."movie_id" = "title"."id" LEFT OUTER JOIN "cast_info" ON "title"."id" = "cast_info"."movie_id"  WHERE "cast_info"."note" NOT LIKE '%Ad%ler)%' AND "movie_info"."info" LIKE '%Portugue%se%' AND "title"."title" NOT LIKE '%t%o%';

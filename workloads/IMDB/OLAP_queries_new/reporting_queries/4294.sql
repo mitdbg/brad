@@ -1,1 +1,0 @@
-SELECT MAX("movie_keyword"."keyword_id") as agg_0 FROM "movie_keyword" LEFT OUTER JOIN "keyword" ON "movie_keyword"."keyword_id" = "keyword"."id" LEFT OUTER JOIN "title" ON "movie_keyword"."movie_id" = "title"."id"  WHERE "title"."id" BETWEEN 617063 AND 1706827 AND "title"."episode_of_id" <= 1168307.6152805528 AND "title"."season_nr" IS NOT NULL AND "keyword"."id" IS NOT NULL;

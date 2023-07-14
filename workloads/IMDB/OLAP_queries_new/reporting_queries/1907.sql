@@ -1,1 +1,0 @@
-SELECT MAX("person_info"."info_type_id") as agg_0 FROM "name" LEFT OUTER JOIN "person_info" ON "name"."id" = "person_info"."person_id" LEFT OUTER JOIN "aka_name" ON "name"."id" = "aka_name"."person_id"  WHERE "aka_name"."surname_pcode" LIKE '%B65%' AND "aka_name"."surname_pcode" NOT LIKE '%B%4%' AND "name"."name" NOT LIKE '%Davi%d%' AND "person_info"."info" NOT LIKE '%after%';

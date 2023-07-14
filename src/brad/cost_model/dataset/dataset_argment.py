@@ -2,7 +2,7 @@ import json
 from workloads.cross_db_benchmark.benchmark_tools.utils import load_json, dumper
 
 
-DATA_ARG_DIST = {10: 1, 20: 4, 50: 20, 200: 40}
+DATA_ARG_DIST = {10: 1, 20: 4, 50: 10, 100: 20, 500: 40}
 
 
 def argment_dataset(source, target):

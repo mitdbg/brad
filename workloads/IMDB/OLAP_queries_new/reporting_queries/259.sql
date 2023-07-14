@@ -1,1 +1,0 @@
-SELECT COUNT(*) as agg_0, SUM("cast_info"."role_id") as agg_1 FROM "char_name" LEFT OUTER JOIN "cast_info" ON "char_name"."id" = "cast_info"."person_role_id" LEFT OUTER JOIN "aka_name" ON "cast_info"."person_id" = "aka_name"."id"  WHERE "char_name"."name" LIKE '%the%' AND "cast_info"."note" NOT LIKE '%Adler)%' AND "aka_name"."name_pcode_cf" NOT LIKE '%A5362%';

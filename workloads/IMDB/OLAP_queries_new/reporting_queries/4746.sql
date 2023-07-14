@@ -1,1 +1,0 @@
-SELECT SUM("aka_name"."person_id") as agg_0, MIN("cast_info"."nr_order") as agg_1 FROM "aka_name" LEFT OUTER JOIN "cast_info" ON "aka_name"."id" = "cast_info"."person_id" LEFT OUTER JOIN "name" ON "aka_name"."person_id" = "name"."id"  WHERE "aka_name"."name_pcode_cf" NOT LIKE '%A5%362%' AND "cast_info"."note" LIKE '%(arc%hive%' AND "name"."imdb_index" NOT LIKE '%II%I%';
