@@ -11,7 +11,10 @@ _DATA_MODIFICATION_PREFIXES = [
     "COMMIT",
     "ROLLBACK",
     # HACK: Used to set the session's isolation level on Aurora/PostgreSQL.
+    # A better way is to provide a special debug API that will let us force
+    # commands on specific engines.
     "SET SESSION",
+    "TRUNCATE",
 ]
 
 

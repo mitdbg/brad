@@ -270,6 +270,10 @@ def trim_tables(args):
             client.run_query_ignore_results(
                 "DELETE FROM {} WHERE id > {}".format(table, max_orig_id)
             )
+            print("Truncating {}'s shadow table...".format(table))
+            client.run_query_ignore_results(
+                "TRUNCATE {}_brad_shadow".format(table)
+            )
         print("Committing...")
         client.run_query_ignore_results("COMMIT")
 
