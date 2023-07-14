@@ -124,9 +124,10 @@ class Monitor:
 
         self._txn_end_counter.reset()
 
-        logger.debug("Updated front end metrics:")
+        # TODO: Switch these to debug after we set up client metrics ingestion.
+        logger.info("Updated front end metrics:")
         for metric, value in self._front_end_metrics.items():
-            logger.debug("%s: %.2f", metric, value)
+            logger.info("%s: %.2f", metric, value)
 
     ############
     # The following functions, prefixed by `read_`, provide different ways to query the monitor for
