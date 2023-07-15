@@ -61,16 +61,16 @@ def main() -> None:
         "Tool used to measure query execution times on specific engines under load."
     )
     parser.add_argument(
-        "--config-file",
+        "--config-file-var",
         type=str,
-        required=True,
-        help="Path to BRAD's configuration file.",
+        default="BRAD_CONFIG",
+        help="Environment variable holding a path to BRAD's configuration file.",
     )
     parser.add_argument(
-        "--schema-name",
+        "--schema-name-var",
         type=str,
-        required=True,
-        help="The schema to run queries against.",
+        default="BRAD_SCHEMA",
+        help="Environment variable holding the schema to run queries against.",
     )
     parser.add_argument(
         "--engine", type=str, required=True, help="The engine to run against."
@@ -130,13 +130,14 @@ def main() -> None:
         print("Athena is not supported.", file=sys.stderr, flush=True)
         return
 
-    config = ConfigFile(args.config_file)
+    schema_name = os.environ[args.schema_name_var]
+    config = ConfigFile(os.environ[args.config_file])
     queries = load_queries(args.query_file)
 
     if args.run_warmup:
         ec = EngineConnections.connect_sync(
             config,
-            args.schema_name,
+            schema_name,
             autocommit=True,
             specific_engines={engine},
         )
@@ -181,7 +182,7 @@ def main() -> None:
             out_dir / f"runner_{idx}.csv",
             config,
             engine,
-            args.schema_name,
+            schema_name,
         )
         if engine == Engine.Redshift:
             options.disable_redshift_cache = True

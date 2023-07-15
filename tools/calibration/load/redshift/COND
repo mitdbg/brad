@@ -41,6 +41,9 @@ for instance in INSTANCE_TYPES:
           "specific-query-idx": query_idx,
           "run-for-s": RUN_FOR_S,
           "avg-gap-s": AVG_GAP_S,
+          "wait-before-start": WAIT_BEFORE_START,
+          "query-file": "../query_bank.sql",
+          "engine": "redshift",
         },
       )
       for nodes, clients, query_idx in product(NUM_NODES, NUM_CLIENTS, range(NUM_QUERIES))
