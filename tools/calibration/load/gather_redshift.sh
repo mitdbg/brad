@@ -17,13 +17,15 @@ cluster_identifier=$4
 
 function run_warm_up() {
   >&2 echo "Running warm up..."
-  python3 -m brad.calibration.measure_load --run-warmup --engine redshift --query-file query_bank.sql
+  pushd redshift
+  python3 -m brad.calibration.measure_load --run-warmup --engine redshift --query-file ../query_bank.sql
+  popd
 }
 
 function sync_redshift_resize() {
-  $raw_instance=$1
-  $target_instance_type=${raw_instance//_/.}
-  $target_node_count=$2
+  raw_instance=$1
+  target_instance_type=${raw_instance//_/.}
+  target_node_count=$2
 
   # Try an elastic resize first.
   >&2 echo "Resizing Redshift cluster to $target_instance_type with $target_node_count nodes (attempt elastic)"
