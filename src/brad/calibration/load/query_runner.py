@@ -54,6 +54,17 @@ class Context:
 RunQueryCallable = Callable[[Context], None]
 
 
+def run_specific_query_until_signalled(
+    query_idx: int,
+    query: str,
+    options: Options,
+    start_queue: mp.Queue,
+    stop_queue: mp.Queue,
+) -> None:
+    runner = get_run_specific_query(query_idx, query)
+    run_until_signalled(runner, options, start_queue, stop_queue)
+
+
 def run_until_signalled(
     run_query: RunQueryCallable,
     options: Options,

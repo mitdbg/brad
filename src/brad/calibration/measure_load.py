@@ -10,8 +10,7 @@ from datetime import timedelta
 from typing import List, Optional
 
 from brad.calibration.load.query_runner import (
-    run_until_signalled,
-    get_run_specific_query,
+    run_specific_query_until_signalled,
     Options,
 )
 from brad.calibration.load.metrics import (
@@ -175,10 +174,6 @@ def main() -> None:
         cw = None
         pi = AwsPerformanceInsightsClient(config.aurora_cluster_id, config)
 
-    qrunner = get_run_specific_query(
-        args.specific_query_idx, queries[args.specific_query_idx]
-    )
-
     processes = []
     for idx in range(args.num_clients):
         options = Options(
@@ -193,7 +188,14 @@ def main() -> None:
         options.avg_gap_s = args.avg_gap_s
         options.std_gap_s = args.std_gap_s
         p = mp.Process(
-            target=run_until_signalled, args=(qrunner, options, start_queue, stop_queue)
+            target=run_specific_query_until_signalled,
+            args=(
+                args.specific_query_idx,
+                queries[args.specific_query_idx],
+                options,
+                start_queue,
+                stop_queue,
+            ),
         )
         p.start()
         processes.append(p)
