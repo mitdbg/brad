@@ -25,31 +25,41 @@ function sync_redshift_resize() {
   $target_instance_type=${raw_instance//_/.}
   $target_node_count=$2
 
+  # Try an elastic resize first.
+  >&2 echo "Resizing Redshift cluster to $target_instance_type with $target_node_count nodes (attempt elastic)"
+  aws redshift resize-cluster --cluster-identifier "$cluster_identifier" --cluster-type multi-node --node-type "$target_instance_type" --number-of-nodes "$target_node_count" --no-classic —region us-east-1
+  result=$?
+
   # Resize Redshift cluster
-  >&2 echo "Resizing Redshift cluster to $target_instance_type with $target_node_count nodes"
-  aws redshift modify-cluster --cluster-identifier "$cluster_identifier" --node-type "$target_instance_type" --number-of-nodes "$target_node_count"
+  if [ $result -ne 0 ]; then
+    >&2 echo "Classic resizing Redshift cluster to $target_instance_type with $target_node_count nodes"
+    aws redshift modify-cluster --cluster-identifier "$cluster_identifier" --node-type "$target_instance_type" --number-of-nodes "$target_node_count"
+  fi
+
   sleep 60
 
   # Wait for resize to complete
-  >&2 echo "Waiting for resize to complete..."
-
   while true; do
       cluster_status=$(aws redshift describe-clusters --cluster-identifier "$cluster_identifier" --query 'Clusters[0].ClusterStatus' --output text)
-      if [[ $cluster_status != "modifying" ]]; then
+      if [[ $cluster_status == "available" ]]; then
           break
       fi
+      >&2 echo "Waiting for resize to complete..."
       sleep 10
   done
 }
 
 >&2 echo "$instance 1x ($group of 2)"
+sync_redshift_resize $instance 1
 run_warm_up
 cond run "//redshift:${instance}-1-${group}-of-2"
 
 >&2 echo "$instance 2x ($group of 2)"
+sync_redshift_resize $instance 2
 run_warm_up
 cond run "//redshift:${instance}-2-${group}-of-2"
 
 >&2 echo "$instance 4x ($group of 2)"
+sync_redshift_resize $instance 4
 run_warm_up
 cond run "//redshift:${instance}-4-${group}-of-2"

@@ -241,7 +241,10 @@ def main() -> None:
         flush=True,
         file=sys.stderr,
     )
-    time.sleep(20)
+    if engine == Engine.Redshift:
+        time.sleep(30)
+    elif engine == Engine.Aurora:
+        time.sleep(10)
 
     if engine == Engine.Redshift:
         assert cw is not None
