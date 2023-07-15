@@ -32,7 +32,7 @@ for instance in INSTANCE_TYPES:
 
   run_experiment_group(
     name=instance,
-    run="python3 -m brad.calibrate.measure_load",
+    run="python3 -m brad.calibration.measure_load",
     experiments=[
       ExperimentInstance(
         name="{}-{}-{}-q{}".format(instance, nodes, clients, query_idx),

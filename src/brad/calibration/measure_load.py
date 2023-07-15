@@ -24,6 +24,7 @@ from brad.daemon.cloudwatch import CloudwatchClient
 from brad.daemon.perf_insights import AwsPerformanceInsightsClient
 from brad.server.engine_connections import EngineConnections
 from brad.connection.connection import Connection
+from brad.utils import set_up_logging
 
 
 def load_queries(file_path: str) -> List[str]:
@@ -123,7 +124,10 @@ def main() -> None:
         default=0.5,
         help="Std. dev. for the amount of time to wait between issuing queries.",
     )
+    parser.add_argument("--debug", action="store_true", help="Set to enable debugging.")
     args = parser.parse_args()
+
+    set_up_logging(debug_mode=args.debug)
 
     engine = Engine.from_str(args.engine)
     if engine == Engine.Athena:
@@ -131,7 +135,7 @@ def main() -> None:
         return
 
     schema_name = os.environ[args.schema_name_var]
-    config = ConfigFile(os.environ[args.config_file])
+    config = ConfigFile(os.environ[args.config_file_var])
     queries = load_queries(args.query_file)
 
     if args.run_warmup:
