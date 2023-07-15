@@ -7,17 +7,21 @@ import threading
 import os
 import pathlib
 from datetime import timedelta
-from typing import List
+from typing import List, Optional
 
-from brad.calibration.query_runner import (
+from brad.calibration.load.query_runner import (
     run_until_signalled,
     get_run_specific_query,
     Options,
 )
-from brad.calibration.metrics import CLOUDWATCH_LOAD_METRICS
+from brad.calibration.load.metrics import (
+    CLOUDWATCH_LOAD_METRICS,
+    PERF_INSIGHTS_LOAD_METRICS,
+)
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.cloudwatch import CloudwatchClient
+from brad.daemon.perf_insights import AwsPerformanceInsightsClient
 from brad.server.engine_connections import EngineConnections
 from brad.connection.connection import Connection
 
@@ -41,7 +45,7 @@ def run_warmup(connection: Connection, query_list: List[str]) -> None:
         )
 
 
-def get_output_dir() -> None:
+def get_output_dir() -> pathlib.Path:
     # For printing out results.
     if "COND_OUT" in os.environ:
         import conductor.lib as cond
@@ -52,25 +56,79 @@ def get_output_dir() -> None:
     return out_dir
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config-file", type=str, required=True)
-    parser.add_argument("--schema-name", type=str, required=True)
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        "Tool used to measure query execution times on specific engines under load."
+    )
     parser.add_argument(
-        "--run_for_s",
+        "--config-file",
+        type=str,
+        required=True,
+        help="Path to BRAD's configuration file.",
+    )
+    parser.add_argument(
+        "--schema-name",
+        type=str,
+        required=True,
+        help="The schema to run queries against.",
+    )
+    parser.add_argument(
+        "--engine", type=str, required=True, help="The engine to run against."
+    )
+    parser.add_argument(
+        "--run-for-s",
         type=int,
         help="How long to run the experiment for. If unset, the experiment will run until Ctrl-C.",
     )
-    parser.add_argument("--query_file", type=str, required=True)
-    parser.add_argument("--specific_query_idx", type=int)
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--run_warmup", action="store_true")
+    parser.add_argument(
+        "--query-file",
+        type=str,
+        required=True,
+        help="Path to a file containing queries to run.",
+    )
+    parser.add_argument(
+        "--specific-query-idx",
+        type=int,
+        help="A specific query to run (by index in the query file).",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=42, help="Random seed for reproducibility."
+    )
+    parser.add_argument(
+        "--run-warmup",
+        action="store_true",
+        help="If set, run the queries in the query file once to warm up the engine.",
+    )
+    parser.add_argument(
+        "--wait-before-start",
+        type=int,
+        help="If set, wait this many seconds before starting to issue queries.",
+    )
     # Controls how the clients submit queries to the underlying engine.
-    parser.add_argument("--num_clients", type=int, default=1)
-    parser.add_argument("--avg_gap_s", type=float, default=1.0)
-    parser.add_argument("--std_gap_s", type=float, default=0.5)
-    parser.add_argument("--wait_before_start", type=int)
+    parser.add_argument(
+        "--num-clients",
+        type=int,
+        default=1,
+        help="The number of clients issuing queries (used to increase load).",
+    )
+    parser.add_argument(
+        "--avg-gap-s",
+        type=float,
+        default=1.0,
+        help="Average amount of time to wait between issuing queries.",
+    )
+    parser.add_argument(
+        "--std-gap-s",
+        type=float,
+        default=0.5,
+        help="Std. dev. for the amount of time to wait between issuing queries.",
+    )
     args = parser.parse_args()
+
+    engine = Engine.from_str(args.engine)
+    if engine == Engine.Athena:
+        print("Athena is not supported.", file=sys.stderr, flush=True)
+        return
 
     config = ConfigFile(args.config_file)
     queries = load_queries(args.query_file)
@@ -80,9 +138,9 @@ def main():
             config,
             args.schema_name,
             autocommit=True,
-            specific_engines={Engine.Redshift},
+            specific_engines={engine},
         )
-        run_warmup(ec.get_connection(Engine.Redshift), queries)
+        run_warmup(ec.get_connection(engine), queries)
         ec.close_sync()
         return
 
@@ -103,7 +161,15 @@ def main():
 
     out_dir = get_output_dir()
 
-    cw = CloudwatchClient(Engine.Redshift, config.redshift_cluster_id, config)
+    if engine == Engine.Redshift:
+        cw: Optional[CloudwatchClient] = CloudwatchClient(
+            Engine.Redshift, config.redshift_cluster_id, config
+        )
+        pi: Optional[AwsPerformanceInsightsClient] = None
+    else:
+        cw = None
+        pi = AwsPerformanceInsightsClient(config.aurora_cluster_id, config)
+
     qrunner = get_run_specific_query(
         args.specific_query_idx, queries[args.specific_query_idx]
     )
@@ -112,12 +178,13 @@ def main():
     for idx in range(args.num_clients):
         options = Options(
             idx,
-            out_dir / f"redshift_runner_{idx}.csv",
+            out_dir / f"runner_{idx}.csv",
             config,
-            Engine.Redshift,
+            engine,
             args.schema_name,
         )
-        options.disable_redshift_cache = True
+        if engine == Engine.Redshift:
+            options.disable_redshift_cache = True
         options.avg_gap_s = args.avg_gap_s
         options.std_gap_s = args.std_gap_s
         p = mp.Process(
@@ -169,11 +236,19 @@ def main():
     )
     time.sleep(20)
 
-    # Fetch Cloudwatch metrics for the duration of this workload.
-    metrics = cw.fetch_metrics(
-        CLOUDWATCH_LOAD_METRICS, period=timedelta(seconds=60), num_prev_points=10
-    )
-    metrics.to_csv(out_dir / "metrics.json", index=False)
+    if engine == Engine.Redshift:
+        assert cw is not None
+        # Fetch Cloudwatch metrics for the duration of this workload.
+        metrics = cw.fetch_metrics(
+            CLOUDWATCH_LOAD_METRICS, period=timedelta(seconds=60), num_prev_points=10
+        )
+        metrics.to_csv(out_dir / "metrics.csv", index=False)
+    elif engine == Engine.Aurora:
+        assert pi is not None
+        metrics = pi.fetch_metrics(
+            PERF_INSIGHTS_LOAD_METRICS, period=timedelta(seconds=60), num_prev_points=10
+        )
+        metrics.to_csv(out_dir / "metrics.csv", index=False)
 
     # Wait for the experiment to finish.
     for p in processes:
