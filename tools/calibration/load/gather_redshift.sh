@@ -17,7 +17,7 @@ cluster_identifier=$4
 
 function run_warm_up() {
   >&2 echo "Running warm up..."
-  python3 -m brad.calibrate.measure_load --run-warmup --engine redshift --query-file query_bank.sql
+  python3 -m brad.calibration.measure_load --run-warmup --engine redshift --query-file query_bank.sql
 }
 
 function sync_redshift_resize() {
@@ -27,7 +27,7 @@ function sync_redshift_resize() {
 
   # Try an elastic resize first.
   >&2 echo "Resizing Redshift cluster to $target_instance_type with $target_node_count nodes (attempt elastic)"
-  aws redshift resize-cluster --cluster-identifier "$cluster_identifier" --cluster-type multi-node --node-type "$target_instance_type" --number-of-nodes "$target_node_count" --no-classic —region us-east-1
+  aws redshift resize-cluster --cluster-identifier "$cluster_identifier" --cluster-type multi-node --node-type "$target_instance_type" --number-of-nodes "$target_node_count" --no-classic --region us-east-1
   result=$?
 
   # Resize Redshift cluster
