@@ -249,13 +249,13 @@ def main() -> None:
         metrics = cw.fetch_metrics(
             CLOUDWATCH_LOAD_METRICS, period=timedelta(seconds=60), num_prev_points=10
         )
-        metrics.to_csv(out_dir / "metrics.csv", index=False)
+        metrics.to_csv(out_dir / "metrics.csv")
     elif engine == Engine.Aurora:
         assert pi is not None
         metrics = pi.fetch_metrics(
             PERF_INSIGHTS_LOAD_METRICS, period=timedelta(seconds=60), num_prev_points=10
         )
-        metrics.to_csv(out_dir / "metrics.csv", index=False)
+        metrics.to_csv(out_dir / "metrics.csv")
 
     # Wait for the experiment to finish.
     for p in processes:
