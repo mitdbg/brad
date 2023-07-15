@@ -241,16 +241,16 @@ def main() -> None:
         flush=True,
         file=sys.stderr,
     )
-    if engine == Engine.Redshift:
+    if cw is not None:
         time.sleep(30)
-    elif engine == Engine.Aurora:
-        time.sleep(10)
+    elif pi is not None:
+        time.sleep(20)
 
     if engine == Engine.Redshift:
         assert cw is not None
         # Fetch Cloudwatch metrics for the duration of this workload.
         metrics = cw.fetch_metrics(
-            CLOUDWATCH_LOAD_METRICS, period=timedelta(seconds=60), num_prev_points=10
+            CLOUDWATCH_LOAD_METRICS, period=timedelta(seconds=60), num_prev_points=30
         )
         metrics.to_csv(out_dir / "metrics.csv")
     elif engine == Engine.Aurora:
