@@ -67,7 +67,7 @@ class CloudwatchClient:
             for metric, stat in metrics_list:
                 queries.append(
                     {
-                        "Id": f"{metric}_{stat}",
+                        "Id": f"{self._engine.value}_{metric}_{stat}",
                         "MetricStat": {
                             "Metric": {
                                 "Namespace": self._namespace,
