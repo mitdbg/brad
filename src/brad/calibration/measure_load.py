@@ -48,7 +48,7 @@ def run_warmup(connection: Connection, query_list: List[str]) -> None:
 def get_output_dir() -> pathlib.Path:
     # For printing out results.
     if "COND_OUT" in os.environ:
-        import conductor.lib as cond
+        import conductor.lib as cond  # pylint: disable=import-error
 
         out_dir = cond.get_output_path()
     else:
