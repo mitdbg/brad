@@ -1,0 +1,4 @@
+AVG_GAP_S = 3
+RUN_FOR_S = 3 * 60 + 10  # 3 minutes, 10 seconds
+NUM_CLIENTS = [1, 2, 4, 6]
+NUM_QUERIES = 60
