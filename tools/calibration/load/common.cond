@@ -1,0 +1,5 @@
+AVG_GAP_S = 3
+RUN_FOR_S = 4 * 60  # 4 minutes
+NUM_CLIENTS = [1, 2, 4, 6]
+NUM_QUERIES = 40  # We have 60 in the query bank, but they will take too long to run.
+WAIT_BEFORE_START = 10

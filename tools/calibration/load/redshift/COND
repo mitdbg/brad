@@ -1,0 +1,51 @@
+from itertools import product
+
+include("../common.cond")
+
+INSTANCE_TYPES = [
+  "dc2_large",
+  "ra3_xlplus",
+]
+
+NUM_NODES = [1, 2, 4]
+
+for instance in INSTANCE_TYPES:
+
+  for nodes in NUM_NODES:
+    inner_configs = list(product(NUM_CLIENTS, range(NUM_QUERIES)))
+    group(
+      name="{}-{}-1-of-2".format(instance, nodes),
+      deps=[
+        ":{}-{}-{}-q{}".format(instance, nodes, *config)
+        for idx, config in enumerate(inner_configs) if idx % 2 == 0
+      ],
+    )
+
+    group(
+      name="{}-{}-2-of-2".format(instance, nodes),
+      deps=[
+        ":{}-{}-{}-q{}".format(instance, nodes, *config)
+        for idx, config in enumerate(inner_configs) if idx % 2 == 1
+      ],
+    )
+
+
+  run_experiment_group(
+    name=instance,
+    run="python3 -m brad.calibration.measure_load",
+    experiments=[
+      ExperimentInstance(
+        name="{}-{}-{}-q{}".format(instance, nodes, clients, query_idx),
+        options={
+          "num-clients": clients,
+          "specific-query-idx": query_idx,
+          "run-for-s": RUN_FOR_S,
+          "avg-gap-s": AVG_GAP_S,
+          "wait-before-start": WAIT_BEFORE_START,
+          "query-file": "../query_bank.sql",
+          "engine": "redshift",
+        },
+      )
+      for nodes, clients, query_idx in product(NUM_NODES, NUM_CLIENTS, range(NUM_QUERIES))
+    ],
+  )

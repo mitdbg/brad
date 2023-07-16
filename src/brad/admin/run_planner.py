@@ -164,7 +164,6 @@ def run_planner(args) -> None:
             builder.add_analytical_queries_and_counts_from_file(
                 args.query_bank_file,
                 args.query_counts_file,
-                args.query_counts_multiplier,
             )
             .add_transactional_queries_from_file(workload_dir / "oltp.sql")
             .uniform_total_transaction_rate(

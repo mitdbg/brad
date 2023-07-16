@@ -55,6 +55,14 @@ class BradGrpcClient:
         for row in self._impl.run_query(self._session_id, query):
             yield row
 
+    def run_query_ignore_results(self, query: str) -> None:
+        """
+        Sends a query to BRAD and pulls out the results without returning them.
+        """
+        assert self._session_id is not None
+        for _ in self._impl.run_query(self._session_id, query):
+            pass
+
 
 class BradRawGrpcClient:
     """
