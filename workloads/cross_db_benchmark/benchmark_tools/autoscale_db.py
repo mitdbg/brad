@@ -1,4 +1,5 @@
 import os
+import copy
 import numpy as np
 import pandas as pd
 
@@ -6,20 +7,28 @@ from workloads.cross_db_benchmark.benchmark_tools.utils import load_schema_json
 
 
 def duplicate_data(
-    df_table,
-    table_name,
-    scaled_data_dir,
-    factor,
-    equivalent_key,
-    all_PK_val,
-    all_PK_mappings,
+        schema,
+        source_table_dir,
+        table_name,
+        scaled_data_dir,
+        factor,
+        equivalent_key,
+        all_PK_val,
+        all_PK_mappings,
+        PK_randomness=False
 ):
     # converting string type FKs to int type according to their corresponding PKs
+    df_table = pd.read_csv(source_table_dir, sep="|", header=0, escapechar="\\")
+
+    target_file = os.path.join(scaled_data_dir, table_name + "_0.csv")
+    df_table.to_csv(target_file, index=False, sep="|", escapechar="\\", header=True)
+
     for key in equivalent_key:
         t_key = key.split(".")[-1]
         assert table_name == key.split(".")[0]
         e_key = equivalent_key[key]
         if e_key in all_PK_mappings:
+            # dealing with non-int type keys
             col = df_table[t_key].values.astype(str)
             col = np.char.strip(col)
             mapping = all_PK_mappings[e_key]
@@ -34,32 +43,50 @@ def duplicate_data(
     factor = int(factor)
     assert factor >= 2
     old_len = len(df_table)
-    df_table = pd.concat([df_table] * factor, ignore_index=True)
-    assert len(df_table) == old_len * factor
-
+    old_key_data = dict()
     for key in equivalent_key:
         t_key = key.split(".")[-1]
-        e_key = equivalent_key[key]
-        if key in all_PK_val:
-            # duplicating a primary key
-            max_val = all_PK_val[key]
-            col = df_table[key.split(".")[-1]].values
-            for i in range(1, factor):
-                start = old_len * i
-                end = old_len * (i + 1)
-                col[start:end] += max_val * i
-            df_table[t_key] = col
-            df_table[t_key] = df_table[t_key].astype(pd.Int64Dtype())
+        old_key_data[t_key] = copy.deepcopy(df_table[t_key].values)
 
-        elif e_key in all_PK_val:
-            col = df_table[t_key].values
-            added_col_len = len(col[old_len:])
-            col[old_len:] += (
-                np.random.randint(0, factor, size=added_col_len) * all_PK_val[e_key]
-            )
-            df_table[t_key] = col
-            df_table[t_key] = df_table[t_key].astype(pd.Int64Dtype())
-    df_table.to_csv(scaled_data_dir + table_name + ".csv", index=False)
+    for i in range(1, factor):
+        # save them as seperate file and combine them later to for memory efficiency
+        target_file = os.path.join(scaled_data_dir, table_name + f"_{i}.csv")
+        for key in equivalent_key:
+            t_key = key.split(".")[-1]
+            e_key = equivalent_key[key]
+            if key in all_PK_val:
+                # if a key is primary key, we add it with a offset
+                offset = all_PK_val[key]
+                col = old_key_data[t_key] + offset * i
+                df_table[t_key] = col
+                df_table[t_key] = df_table[t_key].astype(pd.Int64Dtype())
+            elif e_key in all_PK_val:
+                offset = all_PK_val[e_key]
+                if PK_randomness:
+                    col = old_key_data[t_key] + np.random.randint(0, factor, size=old_len) * offset
+                else:
+                    col = old_key_data[t_key] + offset * i
+                df_table[t_key] = col
+                df_table[t_key] = df_table[t_key].astype(pd.Int64Dtype())
+            else:
+                continue
+        df_table.to_csv(target_file, index=False, sep="|", escapechar="\\", header=False)
+
+    target_file = os.path.join(scaled_data_dir, table_name + ".csv")
+    with open(target_file, 'w') as write_f:
+        for i in range(0, factor):
+            # panda will treat int column with Nan as float, need to remove ".0" for those value to avoid
+            # errors in loading
+            temp_target_file = os.path.join(scaled_data_dir, table_name + f"_{i}.csv")
+            with open(temp_target_file, "r") as f:
+                text = f.read()
+            text = text.strip()
+            text = text.replace(".0|", "|")
+            if i != 0:
+                text = "\n" + text
+            write_f.write(text)
+            del text
+            os.remove(temp_target_file)
 
 
 def detect_PK(df_table, t, pkey):
@@ -68,7 +95,7 @@ def detect_PK(df_table, t, pkey):
     key_name = t + "." + pkey
     col = df_table[pkey].values
     if col.dtype == int:
-        new_PK_val[key_name] = np.nanmax(col) - np.nanmin(col) + 1
+        new_PK_val[key_name] = np.nanmax(col) + 1
     else:
         col = col.astype(str)
         col = np.char.strip(col)
@@ -89,14 +116,12 @@ def detect_PK(df_table, t, pkey):
     return new_PK_val, PK_mappings
 
 
-def auto_scale(data_dir, dataset, factor=1):
+def auto_scale(data_dir, target_dir, dataset, factor=2, PK_randomness=False):
     schema = load_schema_json(dataset)
-    data_path = data_dir + dataset + "/data/"
-    scaled_data_dir = data_dir + dataset + "/scaled_data/"
-    if not os.path.exists(scaled_data_dir):
-        os.mkdir(scaled_data_dir)
+    data_path = data_dir
+    if not os.path.exists(target_dir):
+        os.mkdir(target_dir)
 
-    all_data = dict()
     all_PK_val = dict()
     all_keys = dict()
     all_PK_mappings = dict()
@@ -111,14 +136,14 @@ def auto_scale(data_dir, dataset, factor=1):
     for t in all_keys:
         table_dir = os.path.join(data_path, f"{t}.csv")
         assert os.path.exists(table_dir), f"Could not find table csv {table_dir}"
-        df_table = pd.read_csv(table_dir, **vars(schema.csv_kwargs))
-        all_data[t] = df_table
         if hasattr(schema.primary_key, t):
+            df_table = pd.read_csv(table_dir, **vars(schema.csv_kwargs))
             new_PK_val, PK_mappings = detect_PK(
                 df_table, t, getattr(schema.primary_key, t)
             )
             all_PK_val.update(new_PK_val)
             all_PK_mappings.update(PK_mappings)
+            del df_table
 
     for t in all_keys:
         equivalent_key = dict()
@@ -130,11 +155,13 @@ def auto_scale(data_dir, dataset, factor=1):
                 key = t + "." + r[3]
                 equivalent_key[key] = r[0] + "." + r[1]
         duplicate_data(
-            all_data[t],
+            schema,
+            os.path.join(data_path, f"{t}.csv"),
             t,
-            scaled_data_dir,
+            target_dir,
             factor,
             equivalent_key,
             all_PK_val,
             all_PK_mappings,
+            PK_randomness
         )

@@ -7,6 +7,7 @@ from brad.cost_model.preprocessing.feature_statistics import gather_feature_stat
 from brad.cost_model.training.train import train_default, train_readout_hyperparams
 from brad.cost_model.dataset.dataset_argment import argment_dataset
 from brad.cost_model.training.infer_brad import online_inference_brad
+from workloads.cross_db_benchmark.benchmark_tools.autoscale_db import auto_scale
 from workloads.cross_db_benchmark.benchmark_tools.database import DatabaseSystem
 from workloads.cross_db_benchmark.benchmark_tools.run_workload import run_workload
 from workloads.cross_db_benchmark.benchmark_tools.utils import load_json, dumper
@@ -66,6 +67,11 @@ def parse_queries_wrapper(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    # Scaling a dataset
+    parser.add_argument("--scale_dataset", action="store_true")
+    parser.add_argument("--scale_factor", default=2, type=int)
+    parser.add_argument("--PK_randomness", action="store_true")
+
     # Generate workload
     parser.add_argument("--generate_workloads", action="store_true")
     parser.add_argument("--no_joins_dist_path", default=None, type=str)
@@ -195,6 +201,9 @@ if __name__ == "__main__":
 
     if args.run_kwarg_dict is None:
         args.run_kwarg_dict = dict()
+
+    if args.scale_dataset:
+        auto_scale(args.source, args.target, args.db_name, args.scale_factor, args.PK_randomness)
 
     if args.generate_workloads:
         workload_defs = {

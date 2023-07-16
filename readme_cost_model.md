@@ -131,3 +131,8 @@ python run_cost_model.py --database athena --train_model --workload_runs ../data
 ```
 
 
+# Auto-scaling dataset
+
+```angular2html
+python run_cost_model.py --scale_dataset --db_name imdb --source ../data/imdb/data --target ../data/imdb/scaled_data --scale_factor 10
+```
