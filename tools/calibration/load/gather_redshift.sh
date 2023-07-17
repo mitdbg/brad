@@ -29,13 +29,13 @@ function sync_redshift_resize() {
 
   # Try an elastic resize first.
   >&2 echo "Resizing Redshift cluster to $target_instance_type with $target_node_count nodes (attempt elastic)"
-  aws redshift resize-cluster --cluster-identifier "$cluster_identifier" --cluster-type multi-node --node-type "$target_instance_type" --number-of-nodes "$target_node_count" --no-classic --region us-east-1
+  aws redshift resize-cluster --cluster-identifier "$cluster_identifier" --cluster-type multi-node --node-type "$target_instance_type" --number-of-nodes "$target_node_count" --no-classic --region us-east-1 > /dev/null
   result=$?
 
   # Resize Redshift cluster
   if [ $result -ne 0 ]; then
     >&2 echo "Classic resizing Redshift cluster to $target_instance_type with $target_node_count nodes"
-    aws redshift modify-cluster --cluster-identifier "$cluster_identifier" --node-type "$target_instance_type" --number-of-nodes "$target_node_count"
+    aws redshift modify-cluster --cluster-identifier "$cluster_identifier" --node-type "$target_instance_type" --number-of-nodes "$target_node_count" > /dev/null
   fi
 
   sleep 60
