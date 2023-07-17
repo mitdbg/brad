@@ -17,5 +17,15 @@ class BradInterface:
         """
         raise NotImplementedError
 
+    async def run_query_json(
+        self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
+    ) -> str:
+        """
+        Returns query results encoded as a JSON string.
+
+        This method may throw an error to indicate a problem with the query.
+        """
+        raise NotImplementedError
+
     async def end_session(self, _session_id: SessionId) -> None:
         raise NotImplementedError

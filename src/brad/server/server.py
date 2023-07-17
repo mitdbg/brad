@@ -1,10 +1,10 @@
 import asyncio
-import io
+import json
 import logging
 import random
 import time
 import multiprocessing as mp
-from typing import AsyncIterable, Optional, Dict, Any
+from typing import AsyncIterable, Optional, Dict, Any, List, Tuple
 from datetime import datetime, timezone
 
 import grpc
@@ -41,6 +41,8 @@ from brad.utils.counter import Counter
 logger = logging.getLogger(__name__)
 
 LINESEP = "\n".encode()
+
+RowList = List[Tuple[Any, ...]]
 
 
 class BradServer(BradInterface):
@@ -235,6 +237,19 @@ class BradServer(BradInterface):
     async def run_query(
         self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
     ) -> AsyncIterable[bytes]:
+        results = await self._run_query_impl(session_id, query, debug_info)
+        for row in results:
+            yield (" | ".join(map(str, row))).encode()
+
+    async def run_query_json(
+        self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
+    ) -> str:
+        results = await self._run_query_impl(session_id, query, debug_info)
+        return json.dumps(results)
+
+    async def _run_query_impl(
+        self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
+    ) -> RowList:
         session = self._sessions.get_session(session_id)
         if session is None:
             raise QueryError("Invalid session id {}".format(str(session_id)))
@@ -248,9 +263,7 @@ class BradServer(BradInterface):
 
             # Handle internal commands separately.
             if query.startswith("BRAD_"):
-                async for output in self._handle_internal_command(query):
-                    yield output
-                return
+                return await self._handle_internal_command(query)
 
             # 2. Select an engine for the query.
             query_rep = QueryRep(query)
@@ -295,16 +308,17 @@ class BradServer(BradInterface):
 
             # Extract and return the results, if any.
             try:
-                num_rows = 0
+                results = []
                 while True:
                     row = await cursor.fetchone()
                     if row is None:
                         break
-                    num_rows += 1
-                    yield " | ".join(map(str, row)).encode()
-                logger.debug("Responded with %d rows.", num_rows)
+                    results.append(tuple(row))
+                logger.debug("Responded with %d rows.", len(results))
+                return results
             except pyodbc.ProgrammingError:
                 logger.debug("No rows produced.")
+                return []
 
         except QueryError:
             # This is an expected exception. We catch and re-raise it here to
@@ -314,7 +328,7 @@ class BradServer(BradInterface):
             logger.exception("Encountered unexpected exception when handling request.")
             raise QueryError.from_exception(ex)
 
-    async def _handle_internal_command(self, command_raw: str) -> AsyncIterable[bytes]:
+    async def _handle_internal_command(self, command_raw: str) -> RowList:
         """
         This method is used to handle BRAD_ prefixed "queries" (i.e., commands
         to run custom functionality like syncing data across the engines).
@@ -327,32 +341,33 @@ class BradServer(BradInterface):
                 self._blueprint_mgr.get_blueprint()
             )
             if ran_sync:
-                yield "Sync succeeded.".encode()
+                return [("Sync succeeded.",)]
             else:
-                yield "Sync skipped. No new writes to sync.".encode()
+                return [("Sync skipped. No new writes to sync.",)]
 
         elif command == "BRAD_EXPLAIN_SYNC_STATIC":
             logical_plan = self._data_sync_executor.get_static_logical_plan(
                 self._blueprint_mgr.get_blueprint()
             )
-            out = io.StringIO()
-            logical_plan.print_plan_sequentially(file=out)
-            yield out.getvalue().encode()
+            to_return: RowList = [("Logical Data Sync Plan:",)]
+            for str_op in logical_plan.traverse_plan_sequentially():
+                to_return.append((str_op,))
+            return to_return
 
         elif command == "BRAD_EXPLAIN_SYNC":
             logical, physical = await self._data_sync_executor.get_processed_plans(
                 self._blueprint_mgr.get_blueprint()
             )
-            out = io.StringIO()
-            logical.print_plan_sequentially(file=out)
-            yield out.getvalue().encode()
-
-            out = io.StringIO()
-            physical.print_plan_sequentially(file=out)
-            yield out.getvalue().encode()
+            to_return = [("Logical Data Sync Plan:",)]
+            for str_op in logical.traverse_plan_sequentially():
+                to_return.append((str_op,))
+            to_return.append(("Physical Data Sync Plan:",))
+            for str_op in physical.traverse_plan_sequentially():
+                to_return.append((str_op,))
+            return to_return
 
         else:
-            yield "Unknown internal command: {}".format(command).encode()
+            return [("Unknown internal command: {}".format(command),)]
 
     async def _run_sync_periodically(self) -> None:
         while True:
