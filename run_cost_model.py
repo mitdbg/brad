@@ -203,7 +203,13 @@ if __name__ == "__main__":
         args.run_kwarg_dict = dict()
 
     if args.scale_dataset:
-        auto_scale(args.source, args.target, args.db_name, args.scale_factor, args.PK_randomness)
+        auto_scale(
+            args.source,
+            args.target,
+            args.db_name,
+            args.scale_factor,
+            args.PK_randomness,
+        )
 
     if args.generate_workloads:
         workload_defs = {

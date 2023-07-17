@@ -7,15 +7,15 @@ from workloads.cross_db_benchmark.benchmark_tools.utils import load_schema_json
 
 
 def duplicate_data(
-        schema,
-        source_table_dir,
-        table_name,
-        scaled_data_dir,
-        factor,
-        equivalent_key,
-        all_PK_val,
-        all_PK_mappings,
-        PK_randomness=False
+    schema,
+    source_table_dir,
+    table_name,
+    scaled_data_dir,
+    factor,
+    equivalent_key,
+    all_PK_val,
+    all_PK_mappings,
+    PK_randomness=False,
 ):
     # converting string type FKs to int type according to their corresponding PKs
     df_table = pd.read_csv(source_table_dir, sep="|", header=0, escapechar="\\")
@@ -63,17 +63,22 @@ def duplicate_data(
             elif e_key in all_PK_val:
                 offset = all_PK_val[e_key]
                 if PK_randomness:
-                    col = old_key_data[t_key] + np.random.randint(0, factor, size=old_len) * offset
+                    col = (
+                        old_key_data[t_key]
+                        + np.random.randint(0, factor, size=old_len) * offset
+                    )
                 else:
                     col = old_key_data[t_key] + offset * i
                 df_table[t_key] = col
                 df_table[t_key] = df_table[t_key].astype(pd.Int64Dtype())
             else:
                 continue
-        df_table.to_csv(target_file, index=False, sep="|", escapechar="\\", header=False)
+        df_table.to_csv(
+            target_file, index=False, sep="|", escapechar="\\", header=False
+        )
 
     target_file = os.path.join(scaled_data_dir, table_name + ".csv")
-    with open(target_file, 'w') as write_f:
+    with open(target_file, "w") as write_f:
         for i in range(0, factor):
             # panda will treat int column with Nan as float, need to remove ".0" for those value to avoid
             # errors in loading
@@ -163,5 +168,5 @@ def auto_scale(data_dir, target_dir, dataset, factor=2, PK_randomness=False):
             equivalent_key,
             all_PK_val,
             all_PK_mappings,
-            PK_randomness
+            PK_randomness,
         )
