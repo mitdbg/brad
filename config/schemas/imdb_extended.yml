@@ -1,6 +1,58 @@
-schema_name: imdb
+schema_name: imdb_extended
 
 tables:
+- table_name: theatre
+  columns:
+  - name: id
+    data_type: SERIAL
+    primary_key: true
+  - name: name
+    data_type: TEXT
+  - name: location_x
+    data_type: DECIMAL(10)
+  - name: location_y
+    data_type: DECIMAL(10)
+
+- table_name: showings
+  columns:
+  - name: id
+    data_type: SERIAL
+    primary_key: true
+  - name: theatre_id
+    data_type: BIGINT
+  - name: movie_id
+    data_type: BIGINT
+  - name: date_time
+    data_type: TIMESTAMP
+  - name: total_capacity
+    data_type: INT
+  - name: seats_left
+    data_type: INT
+  indexes:
+  - theatre_id
+  - movie_id
+  - theatre_id, date_time
+
+- table_name: ticket_orders
+  columns:
+  - name: id
+    data_type: SERIAL
+    primary_key: true
+  - name: showing_id
+    data_type: BIGINT
+  - name: quantity
+    data_type: INT
+  - name: contact_name
+    data_type: TEXT
+  - name: location_x
+    data_type: DECIMAL(10)
+  - name: location_y
+    data_type: DECIMAL(10)
+  indexes:
+  - showing_id
+
+# The tables below are from the original IMDB dataset.
+
 - table_name: aka_name
   columns:
   - data_type: SERIAL

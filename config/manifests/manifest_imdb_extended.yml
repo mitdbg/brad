@@ -1,8 +1,31 @@
 s3_bucket: imdb-data-brad
 s3_bucket_region: us-east-1
-schema_name: imdb
+schema_name: imdb_extended
 
 tables:
+  - table_name: theatre
+    s3_path: theatre/theatre.csv
+    aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
+
+  - table_name: showings
+    s3_path: showings/showings.csv
+    aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
+
+  - table_name: ticket_orders
+    s3_path: ticket_orders/ticket_orders.csv
+    aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
+
+  # The tables below are from the original IMDB dataset.
+
   - table_name: aka_name
     s3_path: aka_name/aka_name.csv
     aurora_options: FORMAT csv, HEADER true, ESCAPE ''\'', DELIMITER ''|''
