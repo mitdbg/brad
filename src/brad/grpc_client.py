@@ -1,5 +1,6 @@
 import grpc
-from typing import Generator, Optional, Tuple
+import json
+from typing import Generator, Optional, Tuple, List, Any
 
 import brad.proto_gen.brad_pb2 as b
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
@@ -8,6 +9,8 @@ from brad.config.session import SessionId
 
 # pylint: disable=no-member
 # See https://github.com/protocolbuffers/protobuf/issues/10372
+
+RowList = List[Tuple[Any, ...]]
 
 
 class BradGrpcClient:
@@ -55,13 +58,16 @@ class BradGrpcClient:
         for row in self._impl.run_query(self._session_id, query):
             yield row
 
+    def run_query_json(self, query: str) -> Tuple[RowList, Optional[Engine]]:
+        assert self._session_id is not None
+        return self._impl.run_query_json(self._session_id, query)
+
     def run_query_ignore_results(self, query: str) -> None:
         """
         Sends a query to BRAD and pulls out the results without returning them.
         """
         assert self._session_id is not None
-        for _ in self._impl.run_query(self._session_id, query):
-            pass
+        self._impl.run_query_json(self._session_id, query, ignore_results=True)
 
 
 class BradRawGrpcClient:
@@ -146,6 +152,32 @@ class BradRawGrpcClient:
                 raise BradClientError(
                     message="BRAD RPC error: Unknown result message kind."
                 )
+
+    def run_query_json(
+        self, session_id: SessionId, query: str, ignore_results: bool = False
+    ) -> Tuple[RowList, Optional[Engine]]:
+        assert self._stub is not None
+        response = self._stub.RunQueryJson(
+            b.RunQueryRequest(id=b.SessionId(id_value=session_id.value()), query=query)
+        )
+        msg_kind = response.WhichOneOf("result")
+        if msg_kind is None:
+            raise BradClientError(message="BRAD RPC error: Unspecified query result.")
+        elif msg_kind == "error":
+            raise BradClientError(message=response.error.error_msg)
+        elif msg_kind == "results":
+            executor = response.results.executor
+            if ignore_results:
+                return ([], executor)
+            else:
+                return (
+                    json.loads(response.results.results_json),
+                    self._convert_engine(executor),
+                )
+        else:
+            raise BradClientError(
+                message="BRAD RPC error: Unknown result message kind."
+            )
 
     def _convert_engine(self, engine: b.ExecutionEngine) -> Optional[Engine]:
         if engine == b.ENG_AURORA:
