@@ -45,7 +45,8 @@ class BradDatabase(Database):
         self._brad = brad_client
 
     def execute_sync(self, query: str) -> RowList:
-        return self._brad.run_query_json(query)
+        rows, _ = self._brad.run_query_json(query)
+        return rows
 
     def commit_sync(self) -> None:
         self._brad.run_query_ignore_results("COMMIT")

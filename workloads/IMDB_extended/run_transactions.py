@@ -53,7 +53,9 @@ def runner(
         if args.cstr is not None:
             db: Database = PyodbcDatabase(pyodbc.connect(args.cstr, autocommit=True))
         else:
-            db = BradDatabase(BradGrpcClient(args.brad_host, args.brad_port))
+            brad = BradGrpcClient(args.brad_host, args.brad_port)
+            brad.connect()
+            db = BradDatabase(brad)
 
         # Signal that we are ready to start and wait for other clients.
         start_queue.put("")
@@ -61,7 +63,7 @@ def runner(
 
         overall_start = time.time()
         while True:
-            txn_idx = txn_prng.choices(txn_indexes, weights=transaction_weights, k=1)
+            txn_idx = txn_prng.choices(txn_indexes, weights=transaction_weights, k=1)[0]
             txn = transactions[txn_idx]
 
             txn_start = time.time()
@@ -73,7 +75,7 @@ def runner(
                 commits[txn_idx] += 1
             else:
                 aborts[txn_idx] += 1
-            latencies.append(txn_end - txn_start)
+            latencies[txn_idx].append(txn_end - txn_start)
 
             try:
                 _ = stop_queue.get_nowait()
@@ -81,10 +83,9 @@ def runner(
             except queue.Empty:
                 pass
         overall_end = time.time()
+        print(f"[{worker_idx}] Done running transactions.", flush=True, file=sys.stderr)
 
     finally:
-        db.close_sync()
-
         # For printing out results.
         if "COND_OUT" in os.environ:
             import conductor.lib as cond
@@ -109,6 +110,8 @@ def runner(
             print(f"add_showing_aborts,{aborts[1]}", file=file)
             print(f"edit_note_aborts,{aborts[2]}", file=file)
 
+        db.close_sync()
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -125,11 +128,19 @@ def main():
         default=1,
         help="The number of transactional clients.",
     )
-    parser.add_argument("--seed", type=int, help="Random seed for reproducibility.")
+    parser.add_argument(
+        "--seed", type=int, default=42, help="Random seed for reproducibility."
+    )
     parser.add_argument(
         "--cstr",
         type=str,
         help="ODBC connection string. Set to connect directly (i.e., not through BRAD)",
+    )
+    parser.add_argument(
+        "--scale-factor",
+        type=int,
+        default=1,
+        help="The scale factor used to generate the dataset.",
     )
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)

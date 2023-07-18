@@ -1,8 +1,11 @@
 import random
+import logging
 from datetime import datetime, timedelta
 
 from brad.grpc_client import RowList
 from .database import Database
+
+logger = logging.getLogger(__name__)
 
 
 class TransactionWorker:
@@ -73,6 +76,7 @@ class TransactionWorker:
             return True
 
         except:
+            logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
 
@@ -90,7 +94,7 @@ class TransactionWorker:
         # 2. Select a random movie id.
         movie_id = self.prng.randint(self.min_movie_id, self.max_movie_id)
 
-        showings_to_add = self.prng.randint(*showings_to_add)
+        showings_to_add = self.prng.randint(*self.showings_to_add)
 
         try:
             # Start the transaction.
@@ -115,13 +119,14 @@ class TransactionWorker:
                 formatted_date_time = date_time.strftime("%Y-%m-%d %H:%M:%S")
                 db.execute_sync(
                     "INSERT INTO showings (theatre_id, movie_id, date_time, total_capacity, seats_left) "
-                    f"VALUES ({theatre_id}, {movie_id}, {formatted_date_time}, {capacity}, {capacity})"
+                    f"VALUES ({theatre_id}, {movie_id}, '{formatted_date_time}', {capacity}, {capacity})"
                 )
 
             db.commit_sync()
             return True
 
         except:
+            logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
 
@@ -179,13 +184,14 @@ class TransactionWorker:
             return True
 
         except:
+            logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
 
     def _make_note_edits(self, rows: RowList) -> RowList:
         to_edit = []
         for row in rows:
-            if row[1].endswith(_EDIT_NOTE_SUFFIX):
+            if row[1] is not None and row[1].endswith(_EDIT_NOTE_SUFFIX):
                 # Bump the number in the suffix.
                 suffix_start_idx = row[1].rindex("$")
                 edit_num_end_idx = row[1].rindex("[")
@@ -197,7 +203,8 @@ class TransactionWorker:
                 )
                 pass
             else:
-                to_edit.append((row[0], row[1] + _EDIT_NOTE_FORMAT.format(1)))
+                existing = row[1] if row[1] is not None else ""
+                to_edit.append((row[0], existing + _EDIT_NOTE_FORMAT.format(1)))
         return to_edit
 
 
