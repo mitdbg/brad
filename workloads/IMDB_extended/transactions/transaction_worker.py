@@ -198,14 +198,20 @@ class TransactionWorker:
                 orig = row[1][:suffix_start_idx]
                 edit_num_str = row[1][suffix_start_idx + 1 : edit_num_end_idx]
                 curr_edit_num = int(edit_num_str)
-                to_edit.append(
-                    (row[0], orig + _EDIT_NOTE_FORMAT.format(curr_edit_num + 1))
-                )
-                pass
+                updated = orig + _EDIT_NOTE_FORMAT.format(curr_edit_num + 1)
             else:
-                existing = row[1] if row[1] is not None else ""
-                to_edit.append((row[0], existing + _EDIT_NOTE_FORMAT.format(1)))
+                if row[1] is None:
+                    updated = _EDIT_NOTE_FORMAT.format(1)
+                else:
+                    updated = row[1] + _EDIT_NOTE_FORMAT.format(1)
+            to_edit.append((row[0], self._quote_escape(updated)))
         return to_edit
+
+    def _quote_escape(self, val: str) -> str:
+        # N.B. It's better to rely on the DB connection library to do string
+        # escaping. But we might be running against BRAD, which does not provide
+        # these utilities baked in.
+        return val.replace("'", "''")
 
 
 _EDIT_NOTE_SUFFIX = "[BRAD]"

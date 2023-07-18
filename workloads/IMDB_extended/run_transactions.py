@@ -196,6 +196,10 @@ def main():
     for _ in range(args.num_clients):
         stop_queue.put("")
 
+    print("Waiting for clients to terminate...", flush=True, file=sys.stderr)
+    for c in clients:
+        c.join()
+
 
 if __name__ == "__main__":
     # On Unix platforms, the default way to start a process is by forking, which
