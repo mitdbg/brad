@@ -37,6 +37,7 @@ from brad.server.errors import QueryError
 from brad.server.grpc import BradGrpc
 from brad.server.session import SessionManager, SessionId
 from brad.utils.counter import Counter
+from brad.utils.json_decimal_encoder import DecimalEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +246,7 @@ class BradServer(BradInterface):
         self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
     ) -> str:
         results = await self._run_query_impl(session_id, query, debug_info)
-        return json.dumps(results)
+        return json.dumps(results, cls=DecimalEncoder, default=str)
 
     async def _run_query_impl(
         self, session_id: SessionId, query: str, debug_info: Dict[str, Any]

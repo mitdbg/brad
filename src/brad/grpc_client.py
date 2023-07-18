@@ -160,7 +160,7 @@ class BradRawGrpcClient:
         response = self._stub.RunQueryJson(
             b.RunQueryRequest(id=b.SessionId(id_value=session_id.value()), query=query)
         )
-        msg_kind = response.WhichOneOf("result")
+        msg_kind = response.WhichOneof("result")
         if msg_kind is None:
             raise BradClientError(message="BRAD RPC error: Unspecified query result.")
         elif msg_kind == "error":
