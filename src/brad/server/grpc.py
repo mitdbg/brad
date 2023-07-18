@@ -44,6 +44,25 @@ class BradGrpc(rpc.BradServicer):
         except QueryError as ex:
             yield b.RunQueryResponse(error=b.QueryError(error_msg=str(ex)))
 
+    async def RunQueryJson(
+        self, request: b.RunQueryRequest, _context
+    ) -> b.RunQueryJsonResponse:
+        session_id = SessionId(request.id.id_value)
+        debug_info: Dict[str, Any] = {}
+        try:
+            result = await self._brad.run_query_json(
+                session_id, request.query, debug_info
+            )
+            return b.RunQueryJsonResponse(
+                results=b.QueryJsonResponse(
+                    results_json=result,
+                    executor=self._convert_engine(debug_info["executor"]),
+                )
+            )
+
+        except QueryError as ex:
+            return b.RunQueryJsonResponse(error=b.QueryError(error_msg=str(ex)))
+
     async def EndSession(
         self, request: b.EndSessionRequest, _context
     ) -> b.EndSessionResponse:

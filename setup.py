@@ -37,6 +37,7 @@ INSTALL_REQUIRES = [
     "numpy",
     "imbalanced-learn",
     "redshift_connector",
+    "tabulate",
 ]
 
 DEV_REQUIRES = [
@@ -52,6 +53,7 @@ DEV_REQUIRES = [
     "immutables",
     "attrs",
     "typing-extensions",
+    "types-tabulate",
 ]
 
 KEYWORDS = []
