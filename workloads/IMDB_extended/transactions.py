@@ -1,13 +1,18 @@
 import random
+from datetime import datetime, timedelta
 
 from brad.grpc_client import RowList
 
 
 class Context:
-    def __init__(self, seed: int) -> None:
-        self._prng = random.Random(seed)
-        self._min_movie_id = 1
-        self._max_movie_id = 3870547
+    def __init__(self, worker_id: int, seed: int) -> None:
+        self.worker_id = worker_id
+        self.prng = random.Random(seed)
+        self.min_movie_id = 1
+        self.max_movie_id = 3870547
+        self.min_theatre_id = 1
+        self.max_theatre_id = 100000
+        self.offset_date = datetime(year=2023, month=7, day=18)
 
 
 class Database:
@@ -35,7 +40,7 @@ def edit_movie_note(db: Database, ctx: Context) -> bool:
     """
 
     # 1. Select a random movie id.
-    movie_id = ctx._prng.randint(ctx._min_movie_id, ctx._max_movie_id)
+    movie_id = ctx.prng.randint(ctx.min_movie_id, ctx.max_movie_id)
 
     try:
         # Start the transaction.
@@ -67,6 +72,112 @@ def edit_movie_note(db: Database, ctx: Context) -> bool:
             )
 
         # 5. Commit changes.
+        db.commit_sync()
+        return True
+
+    except:
+        db.rollback_sync()
+        return False
+
+
+def add_new_showing(db: Database, ctx: Context) -> bool:
+    """
+    Represents a theatre employee adding new showings.
+
+    - Select theatre by id
+    - Select movie by id
+    - Insert into showing
+    """
+    # 1. Select a random theatre id.
+    theatre_id = ctx.prng.randint(ctx.min_theatre_id, ctx.max_theatre_id)
+
+    # 2. Select a random movie id.
+    movie_id = ctx.prng.randint(ctx.min_movie_id, ctx.max_movie_id)
+
+    showings_to_add = ctx.prng.randint(1, 3)
+
+    try:
+        # Start the transaction.
+        db.execute_sync("BEGIN")
+
+        # 3. Verify that the movie actually exists.
+        rows = db.execute_sync(f"SELECT id FROM title WHERE id = {movie_id}")
+        if len(rows) == 0:
+            # We chose an invalid movie. But we still consider this transaction
+            # to be a "success" and return true.
+            db.commit_sync()
+            return True
+
+        # 4. Insert the showing.
+        for _ in range(showings_to_add):
+            capacity = ctx.prng.randint(200, 400)
+            day_offset = ctx.prng.randint(1, 365 * 2)
+            hour_offset = ctx.prng.randint(0, 23)
+            date_time = ctx.offset_date + timedelta(days=day_offset, hours=hour_offset)
+            formatted_date_time = date_time.strftime("%Y-%m-%d %H:%M:%S")
+            db.execute_sync(
+                "INSERT INTO showings (theatre_id, movie_id, date_time, total_capacity, seats_left) "
+                f"VALUES ({theatre_id}, {movie_id}, {formatted_date_time}, {capacity}, {capacity})"
+            )
+
+        db.commit_sync()
+        return True
+
+    except:
+        db.rollback_sync()
+        return False
+
+
+def purchase_tickets(db: Database, ctx: Context) -> bool:
+    """
+    Represents a user buying tickets for a specific showing.
+
+    - Select theatre by id
+    - Select showing by theatre id and date
+    - Insert into `ticket_order`
+    - Update the `showing` entry
+    """
+
+    # 1. Select a random theatre id.
+    theatre_id = ctx.prng.randint(ctx.min_theatre_id, ctx.max_theatre_id)
+
+    try:
+        # Start the transaction.
+        db.execute_sync("BEGIN")
+
+        # 2. Look for a showing.
+        num_to_consider = ctx.prng.randint(1, 5)
+        showing_options = db.execute_sync(
+            f"SELECT id, seats_left FROM showings WHERE theatre_id = {theatre_id} "
+            f"AND seats_left > 0 ORDER BY date_time ASC LIMIT {num_to_consider}"
+        )
+        if len(showing_options) == 0:
+            # No options. We still consider this as a "success" and return true.
+            db.execute_sync("COMMIT")
+            return True
+
+        # 3. Choose a showing.
+        choice = ctx.prng.randint(0, len(showing_options) - 1)
+        showing = showing_options[choice]
+        showing_id = showing[0]
+        seats_left = showing[1]
+
+        # 4. Insert the ticket order.
+        quantity = min(ctx.prng.randint(1, 2), seats_left)
+        contact_name = "P{}".format(ctx.worker_id)
+        loc_x = ctx.prng.random() * 1000
+        loc_y = ctx.prng.random() * 1000
+        db.execute_sync(
+            "INSERT INTO ticket_orders (showing_id, quantity, contact_name, location_x, location_y) "
+            f"VALUES ({showing_id}, {quantity}, '{contact_name}', {loc_x:.4f}, {loc_y:.4f})"
+        )
+
+        # 5. Update the showing's seats left.
+        db.execute_sync(
+            f"UPDATE showings SET seats_left = {seats_left - quantity} WHERE id = {showing_id}"
+        )
+
+        # 6. Commit changes.
         db.commit_sync()
         return True
 
