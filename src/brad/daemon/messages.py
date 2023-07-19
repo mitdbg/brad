@@ -15,9 +15,9 @@ class MetricsReport:
     Sent from the server to the daemon to report BRAD's client-side metrics.
     """
 
-    def __init__(self, txn_end_value: int, elapsed_time_s: float) -> None:
-        self.txn_end_value = txn_end_value
-        self.elapsed_time_s = elapsed_time_s
+    def __init__(self, txn_completions_per_s: float) -> None:
+        # We will need to include a "worker id" once we have multiple front ends.
+        self.txn_completions_per_s = txn_completions_per_s
 
 
 class ShutdownDaemon:

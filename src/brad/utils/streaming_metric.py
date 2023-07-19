@@ -2,7 +2,7 @@ from datetime import datetime
 from collections import deque
 from typing import Deque, Tuple, TypeVar, Generic
 
-T = TypeVar("T")
+T = TypeVar("T", int, float)
 
 
 class StreamingMetric(Generic[T]):
@@ -15,7 +15,7 @@ class StreamingMetric(Generic[T]):
         self._metric_data: Deque[Tuple[T, datetime]] = deque()
         self._window_size = window_size
 
-    def add_sample(self, value: int, timestamp: datetime) -> None:
+    def add_sample(self, value: T, timestamp: datetime) -> None:
         self._metric_data.append((value, timestamp))
         self._trim_metric_data()
 
