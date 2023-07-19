@@ -416,6 +416,7 @@ class BlueprintCandidate(ComparableBlueprint):
             aurora_enumerator.scaling_to_distance(
                 ctx.current_blueprint.aurora_provisioning(),
                 ctx.planner_config.max_provisioning_multiplier(),
+                Engine.Aurora,
             ),
         )
 
@@ -431,6 +432,7 @@ class BlueprintCandidate(ComparableBlueprint):
                 redshift_enumerator.scaling_to_distance(
                     ctx.current_blueprint.redshift_provisioning(),
                     ctx.planner_config.max_provisioning_multiplier(),
+                    Engine.Redshift,
                 ),
             )
 
