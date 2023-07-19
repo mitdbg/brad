@@ -231,6 +231,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 aurora_enumerator.scaling_to_distance(
                     ctx.current_blueprint.aurora_provisioning(),
                     ctx.planner_config.max_provisioning_multiplier(),
+                    Engine.Aurora,
                 ),
             )
             for aurora in aurora_it:
@@ -239,6 +240,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     redshift_enumerator.scaling_to_distance(
                         ctx.current_blueprint.redshift_provisioning(),
                         ctx.planner_config.max_provisioning_multiplier(),
+                        Engine.Redshift,
                     ),
                 )
                 for redshift in redshift_it:

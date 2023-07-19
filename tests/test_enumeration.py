@@ -13,7 +13,7 @@ def test_provisioning_enumerate_aurora():
     aurora_nearby = [
         p.clone()
         for p in aurora.enumerate_nearby(
-            base_aurora, aurora.scaling_to_distance(base_aurora, 2)
+            base_aurora, aurora.scaling_to_distance(base_aurora, 2, Engine.Aurora)
         )
     ]
 
@@ -28,7 +28,8 @@ def test_provisioning_enumerate_redshift():
     redshift_nearby = [
         p.clone()
         for p in redshift.enumerate_nearby(
-            base_redshift, redshift.scaling_to_distance(base_redshift, 2)
+            base_redshift,
+            redshift.scaling_to_distance(base_redshift, 2, Engine.Redshift),
         )
     ]
 

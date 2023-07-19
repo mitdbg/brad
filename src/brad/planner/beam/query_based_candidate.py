@@ -433,6 +433,7 @@ class BlueprintCandidate(ComparableBlueprint):
             aurora_enumerator.scaling_to_distance(
                 ctx.current_blueprint.aurora_provisioning(),
                 ctx.planner_config.max_provisioning_multiplier(),
+                Engine.Aurora,
             ),
         )
 
@@ -448,6 +449,7 @@ class BlueprintCandidate(ComparableBlueprint):
                 redshift_enumerator.scaling_to_distance(
                     ctx.current_blueprint.redshift_provisioning(),
                     ctx.planner_config.max_provisioning_multiplier(),
+                    Engine.Redshift,
                 ),
             )
 
@@ -531,12 +533,12 @@ class BlueprintCandidate(ComparableBlueprint):
                 self.aurora_score.overall_cpu_denorm
                 >= self.aurora_score.pred_txn_peak_cpu_denorm
             ):
-                logger.debug(
-                    "Txn not feasible. %s, pred denorm %.2f, peak denorm %.2f",
-                    self.aurora_provisioning,
-                    self.aurora_score.overall_cpu_denorm,
-                    self.aurora_score.pred_txn_peak_cpu_denorm,
-                )
+                # logger.debug(
+                #     "Txn not feasible. %s, pred denorm %.2f, peak denorm %.2f",
+                #     self.aurora_provisioning,
+                #     self.aurora_score.overall_cpu_denorm,
+                #     self.aurora_score.pred_txn_peak_cpu_denorm,
+                # )
                 self.feasibility = BlueprintFeasibility.Infeasible
             return
 
