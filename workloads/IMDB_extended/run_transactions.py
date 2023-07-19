@@ -57,6 +57,11 @@ def runner(
             brad.connect()
             db = BradDatabase(brad)
 
+        # Set the isolation level.
+        db.execute_sync(
+            f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
+        )
+
         # Signal that we are ready to start and wait for other clients.
         start_queue.put("")
         _ = stop_queue.get()
@@ -141,6 +146,12 @@ def main():
         type=int,
         default=1,
         help="The scale factor used to generate the dataset.",
+    )
+    parser.add_argument(
+        "--isolation-level",
+        type=str,
+        default="REPEATABLE READ",
+        help="The isolation level to use when running the transactions.",
     )
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)
