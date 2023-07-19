@@ -169,4 +169,4 @@ _REDSHIFT_INSTANCES = _load_instance_resources("redshift_instances.json")
 _AURORA_INSTANCES = _load_instance_resources("aurora_postgresql_instances.json")
 
 _MIN_REDSHIFT = _find_min_instance(_REDSHIFT_INSTANCES)
-_MIN_AURORA = _find_min_instance(_REDSHIFT_INSTANCES)
+_MIN_AURORA = _find_min_instance(_AURORA_INSTANCES)
