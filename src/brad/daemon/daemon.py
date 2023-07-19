@@ -111,9 +111,8 @@ class BradDaemon:
 
             elif isinstance(message, MetricsReport):
                 logger.debug(
-                    "Received metrics report. Txn value: %d, Elapsed time: %.2f",
-                    message.txn_end_value,
-                    message.elapsed_time_s,
+                    "Received metrics report. txn_completions_per_s: %.2f",
+                    message.txn_completions_per_s,
                 )
                 self._monitor.handle_metric_report(message)
 

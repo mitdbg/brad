@@ -4,7 +4,6 @@ import pandas as pd
 import asyncio
 import numpy as np
 import pytz
-import time
 import logging
 from importlib.resources import files, as_file
 from typing import List, Dict
@@ -19,7 +18,7 @@ from brad.forecasting.constant_forecaster import ConstantForecaster
 from brad.forecasting.moving_average_forecaster import MovingAverageForecaster
 from brad.forecasting.linear_forecaster import LinearForecaster
 from brad.forecasting import Forecaster
-from brad.utils.counter import Counter
+from brad.utils.streaming_metric import StreamingMetric
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ def get_metric_id(engine: str, metric_name: str, stat: str, role: str = ""):
     return metric_id
 
 
-FrontEndMetricDict = Dict[FrontEndMetric, int | float]
+FrontEndMetricDict = Dict[FrontEndMetric, StreamingMetric]
 
 
 # Monitor
@@ -75,9 +74,8 @@ class Monitor:
 
         # These are BRAD-defined metrics that are collected by the front end
         # servers.
-        self._txn_end_counter = Counter()
         self._front_end_metrics: FrontEndMetricDict = {
-            FrontEndMetric.TxnEndPerSecond: 0.0,
+            FrontEndMetric.TxnEndPerSecond: StreamingMetric[float](),
         }
 
     # Forcibly read metrics. Use to avoid `run_forever()`.
@@ -103,31 +101,25 @@ class Monitor:
     async def run_forever(self) -> None:
         # Flesh out the monitor - maintain running averages of the underlying
         # engines' metrics.
-        period_start = time.time()
         while True:
-            elapsed_time_s = time.time() - period_start
-            self._update_front_end_metrics(elapsed_time_s)
+            self._update_front_end_metrics()
             self._add_metrics()
-            period_start = time.time()
             await asyncio.sleep(self._epoch_length.total_seconds())  # Read every epoch
 
     def handle_metric_report(self, report: MetricsReport) -> None:
-        self._txn_end_counter.bump(report.txn_end_value)
+        now = datetime.now(tz=timezone.utc)
+        self._front_end_metrics[FrontEndMetric.TxnEndPerSecond].add_sample(
+            report.txn_completions_per_s, now
+        )
 
-    def _update_front_end_metrics(self, elapsed_time_s: float) -> None:
-        if elapsed_time_s > 0.0:
-            self._front_end_metrics[FrontEndMetric.TxnEndPerSecond] = (
-                self._txn_end_counter.value() / elapsed_time_s
-            )
-        else:
-            self._front_end_metrics[FrontEndMetric.TxnEndPerSecond] = 0.0
-
-        self._txn_end_counter.reset()
-
-        # TODO: Switch these to debug after we set up client metrics ingestion.
-        logger.info("Updated front end metrics:")
+    def _update_front_end_metrics(self) -> None:
+        # TODO: This is just logged for debug purposes. We probably do not need
+        # this method.
+        now = datetime.now(tz=timezone.utc)
+        window_start = now - self._epoch_length
+        logger.info("Current front end metrics:")
         for metric, value in self._front_end_metrics.items():
-            logger.info("%s: %.2f", metric, value)
+            logger.info("%s: %.2f", metric, value.average_since(window_start))
 
     ############
     # The following functions, prefixed by `read_`, provide different ways to query the monitor for
