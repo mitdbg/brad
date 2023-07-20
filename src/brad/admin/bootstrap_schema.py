@@ -121,8 +121,9 @@ def bootstrap_schema(args):
     # 10. Install the `aws_s3` extension (needed for data extraction).
     if Engine.Aurora in engines_filter:
         aurora = cxns.get_connection(Engine.Aurora)
-        aurora.execute_sync("CREATE EXTENSION IF NOT EXISTS aws_s3 CASCADE")
-        aurora.commit_sync()
+        cursor = aurora.cursor_sync()
+        cursor.execute_sync("CREATE EXTENSION IF NOT EXISTS aws_s3 CASCADE")
+        cursor.commit_sync()
 
     # 11. Persist the data blueprint.
     if not args.skip_persisting_blueprint:
