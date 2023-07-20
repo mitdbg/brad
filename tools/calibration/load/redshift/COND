@@ -9,7 +9,30 @@ INSTANCE_TYPES = [
 
 NUM_NODES = [1, 2, 4]
 
+combine(
+  name="all",
+  deps=[
+    ":dc2_large",
+    ":ra3_xlplus",
+  ],
+)
+
 for instance in INSTANCE_TYPES:
+  group(
+    name="{}-1-of-2".format(instance),
+    deps=[
+      ":{}-{}-1-of-2".format(instance, nodes)
+      for nodes in NUM_NODES
+    ],
+  )
+
+  group(
+    name="{}-2-of-2".format(instance),
+    deps=[
+      ":{}-{}-2-of-2".format(instance, nodes)
+      for nodes in NUM_NODES
+    ],
+  )
 
   for nodes in NUM_NODES:
     inner_configs = list(product(NUM_CLIENTS, range(NUM_QUERIES)))

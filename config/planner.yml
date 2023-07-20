@@ -181,8 +181,17 @@ aurora_txns:
   prov_to_peak_cpu_denorm: 0.56730588
 
 aurora_scaling:
-  # [coef1(load)^2(resource)^2 + coef2(load)^2 + coef3(resource)^2 + coef4] * base
+  # [coef1(load)^2(resource ratio)^2 + coef2(load)^2 + coef3(resource ratio)^2 + coef4] * base
   coef1: 0.2454489
   coef2: 0.00841046
   coef3: 0.27845245
   coef4: 0.56823644
+
+redshift_scaling:
+  # Same model as above.
+  # [coef1(load)^2(resource ratio)^2 + coef2(load)^2 + coef3(resource ratio)^2 + coef4] * base
+  # Load is denormalized CPU usage.
+  coef1: 0.63933825
+  coef2: 0.00370447
+  coef3: 0.49948713
+  coef4: 0.36256359
