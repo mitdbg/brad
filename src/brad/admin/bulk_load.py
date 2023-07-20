@@ -3,7 +3,7 @@ import logging
 import yaml
 from concurrent.futures import ThreadPoolExecutor
 from collections import namedtuple
-from typing import Any, Coroutine, Iterator, List, Set
+from typing import Any, Coroutine, Iterator, List, Set, Tuple
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -83,8 +83,13 @@ def register_admin_action(subparser) -> None:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Bulk load is normally only allowed when the table(s) are all empty. "
+        help="Bulk load is normally only performed on non-empty tables. "
         "Set this flag to override this restriction.",
+    )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="If set, abort the bulk load if any tables are non-empty.",
     )
     parser.set_defaults(admin_action=bulk_load)
 
@@ -94,10 +99,11 @@ async def _ensure_empty(
     blueprint: Blueprint,
     engines: EngineConnections,
     engines_filter: Set[Engine],
-) -> None:
+) -> List[Tuple[Engine, str]]:
     """
-    Verifies that the tables being loaded into are empty.
+    Checks if the tables being loaded into are empty. Returns non-empty tables.
     """
+    nonempty_tables = []
 
     try:
         for load_table in manifest["tables"]:
@@ -113,13 +119,8 @@ async def _ensure_empty(
                 await cursor.execute("SELECT COUNT(*) FROM {}".format(table_name))
                 row = await cursor.fetchone()
                 if row is not None and row[0] != 0:
-                    message = "Table {} on {} is non-empty ({} rows). You can only bulk load non-empty tables.".format(
-                        table_name,
-                        engine,
-                        row[0],
-                    )
-                    logger.error(message)
-                    raise RuntimeError(message)
+                    nonempty_tables.append((engine, table_name))
+        return nonempty_tables
     finally:
         if Engine.Aurora in engines_filter:
             conn = engines.get_connection(Engine.Aurora)
@@ -320,10 +321,16 @@ async def bulk_load_impl(args, manifest) -> None:
             config, manifest["schema_name"], specific_engines=engines_filter
         )
         if not args.force:
-            logger.info("Verifying that all tables are empty...")
-            await _ensure_empty(manifest, blueprint, engines, engines_filter)
+            logger.info("Checking for non-empty tables...")
+            nonempty_tables = await _ensure_empty(
+                manifest, blueprint, engines, engines_filter
+            )
         else:
-            logger.info("Not checking for empty tables.")
+            logger.info("Not checking for non-empty tables.")
+            nonempty_tables = []
+
+        if args.strict and len(nonempty_tables) > 0:
+            raise RuntimeError("There are non-empty tables and --strict is set.")
 
         ctx = _LoadContext(
             config, manifest["s3_bucket"], manifest["s3_bucket_region"], blueprint
@@ -338,21 +345,34 @@ async def bulk_load_impl(args, manifest) -> None:
             for table_options in manifest["tables"]:
                 table_name = table_options["table_name"]
                 table_locations = blueprint.get_table_locations(table_name)
-                if engine == Engine.Aurora and Engine.Aurora in table_locations:
+                table_tup = (engine, table_name)
+                if (
+                    engine == Engine.Aurora
+                    and Engine.Aurora in table_locations
+                    and table_tup not in nonempty_tables
+                ):
                     yield _load_aurora(
                         ctx,
                         table_name,
                         table_options,
                         engines.get_connection(Engine.Aurora),
                     )
-                elif engine == Engine.Redshift and Engine.Redshift in table_locations:
+                elif (
+                    engine == Engine.Redshift
+                    and Engine.Redshift in table_locations
+                    and table_tup not in nonempty_tables
+                ):
                     yield _load_redshift(
                         ctx,
                         table_name,
                         table_options,
                         engines.get_connection(Engine.Redshift),
                     )
-                elif engine == Engine.Athena and Engine.Athena in table_locations:
+                elif (
+                    engine == Engine.Athena
+                    and Engine.Athena in table_locations
+                    and table_tup not in nonempty_tables
+                ):
                     yield _load_athena(
                         ctx,
                         table_name,
