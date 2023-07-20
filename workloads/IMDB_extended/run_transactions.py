@@ -50,8 +50,10 @@ def runner(
 
     try:
         # Connect.
-        if args.cstr is not None:
-            db: Database = PyodbcDatabase(pyodbc.connect(args.cstr, autocommit=True))
+        if args.cstr_var is not None:
+            db: Database = PyodbcDatabase(
+                pyodbc.connect(os.environ[args.cstr_var], autocommit=True)
+            )
         else:
             brad = BradGrpcClient(args.brad_host, args.brad_port)
             brad.connect()
@@ -137,9 +139,9 @@ def main():
         "--seed", type=int, default=42, help="Random seed for reproducibility."
     )
     parser.add_argument(
-        "--cstr",
+        "--cstr-var",
         type=str,
-        help="ODBC connection string. Set to connect directly (i.e., not through BRAD)",
+        help="Environment variable that holds a ODBC connection string. Set to connect directly (i.e., not through BRAD)",
     )
     parser.add_argument(
         "--scale-factor",

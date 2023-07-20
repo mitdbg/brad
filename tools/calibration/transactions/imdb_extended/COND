@@ -1,0 +1,33 @@
+RUN_FOR_S = 2 * 60 + 30  # 2 minutes 30 seconds
+NUM_CLIENTS = {
+  "r6g_large": [1, 2, 4, 8, 16, 32],
+  "r6g_xlarge": [1, 2, 4, 8, 16, 32],
+  "r6g_2xlarge": [1, 2, 4, 8, 16, 32],
+  "r6g_4xlarge": [1, 2, 4, 8, 16, 32, 64],
+}
+
+INSTANCES = ["r6g_large", "r6g_xlarge", "r6g_2xlarge", "r6g_4xlarge"]
+
+combine(
+  name="all",
+  deps=[
+    ":{}".format(instance)
+    for instance in INSTANCES
+  ],
+)
+
+for instance in INSTANCES:
+  run_experiment_group(
+    name=instance,
+    run="./run_instance.sh",
+    experiments=[
+      ExperimentInstance(
+        name="{}-{}".format(instance, clients),
+        options={
+          "run-for-s": RUN_FOR_S,
+          "num-clients": clients,
+        },
+      )
+      for clients in NUM_CLIENTS[instance]
+    ],
+  )
