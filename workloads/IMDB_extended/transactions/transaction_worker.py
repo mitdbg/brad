@@ -198,7 +198,11 @@ class TransactionWorker:
                 orig = row[1][:suffix_start_idx]
                 edit_num_str = row[1][suffix_start_idx + 1 : edit_num_end_idx]
                 curr_edit_num = int(edit_num_str)
-                updated = orig + _EDIT_NOTE_FORMAT.format(curr_edit_num + 1)
+                if curr_edit_num > 100:
+                    diff = self.prng.randint(-1, 1)
+                else:
+                    diff = 1
+                updated = orig + _EDIT_NOTE_FORMAT.format(curr_edit_num + diff)
             else:
                 if row[1] is None:
                     updated = _EDIT_NOTE_FORMAT.format(1)

@@ -1,7 +1,7 @@
 #! /bin/bash
 
 >&2 echo "Running the transactional workload..."
-python3 ../../../workloads/IMDB_extended/run_transactions.py --cstr-var $BRAD_CSTR_VAR $@
+python3 ../../../../workloads/IMDB_extended/run_transactions.py --cstr-var $BRAD_CSTR_VAR $@
 
 >&2 echo "Waiting 10 seconds before retrieving metrics..."
 sleep 10
