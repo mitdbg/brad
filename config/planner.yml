@@ -182,11 +182,11 @@ aurora_txns:
   prov_to_peak_cpu_denorm: 0.56730588
 
   # N.B. These values are for the IMDB-extended transactions.
-  client_thpt_to_load: 0.00319109
-  client_thpt_to_cpu_denorm: 0.00191159
+  client_thpt_to_cpu_denorm: 0.0015366357203185784
+  client_thpt_to_load: 0.0037392906617191367
   # We used the number of CPUs as the "resource score".
   # Should be a bit more precise.
-  prov_to_peak_cpu_denorm: 0.58777059
+  prov_to_peak_cpu_denorm: 0.6800294117647058
 
 
 aurora_scaling:
