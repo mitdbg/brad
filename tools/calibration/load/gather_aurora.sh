@@ -1,7 +1,7 @@
 #! /bin/bash
 
-if [ -z $1 ]; then
-  >&2 echo "Usage: $0 <config_path>"
+if [ -z $2 ]; then
+  >&2 echo "Usage: $0 <config_path> <aurora instance id>"
   >&2 echo "The config path should be relative to the aurora/ subdirectory."
   exit 1
 fi
@@ -9,6 +9,7 @@ fi
 # N.B. Both "imdb" and "imdb_extended" should be fine.
 export BRAD_SCHEMA="imdb_extended"
 export BRAD_CONFIG=$1
+export BRAD_AURORA_INSTANCE_ID=$2
 
 function run_warm_up() {
   >&2 echo "Running warm up..."
