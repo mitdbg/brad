@@ -7,7 +7,7 @@ if [ -z $2 ]; then
 fi
 
 # N.B. Both "imdb" and "imdb_extended" should be fine.
-export BRAD_SCHEMA="imdb_extended"
+export BRAD_SCHEMA="imdb"
 export BRAD_CONFIG=$1
 export BRAD_AURORA_INSTANCE_ID=$2
 
