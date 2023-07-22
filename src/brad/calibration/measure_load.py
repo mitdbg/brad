@@ -265,8 +265,9 @@ def main() -> None:
         metrics.to_csv(out_dir / "metrics.csv")
     elif engine == Engine.Aurora:
         assert pi is not None
+        metrics_list = [metric + ".avg" for metric in PERF_INSIGHTS_LOAD_METRICS]
         metrics = pi.fetch_metrics(
-            PERF_INSIGHTS_LOAD_METRICS, period=timedelta(seconds=60), num_prev_points=10
+            metrics_list, period=timedelta(seconds=60), num_prev_points=10
         )
         metrics.to_csv(out_dir / "metrics.csv")
 

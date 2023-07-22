@@ -11,6 +11,8 @@ export BRAD_SCHEMA="imdb"
 export BRAD_CONFIG=$1
 export BRAD_AURORA_INSTANCE_ID=$2
 
+db_instance=$2
+
 function run_warm_up() {
   >&2 echo "Running warm up..."
   pushd aurora
