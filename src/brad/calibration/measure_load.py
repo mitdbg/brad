@@ -73,6 +73,12 @@ def main() -> None:
         help="Environment variable holding the schema to run queries against.",
     )
     parser.add_argument(
+        "--aurora-instance-var",
+        type=str,
+        default="BRAD_AURORA_INSTANCE_ID",
+        help="Environment variable holding the Aurora instance identifier (needed for metrics).",
+    )
+    parser.add_argument(
         "--engine", type=str, required=True, help="The engine to run against."
     )
     parser.add_argument(
@@ -172,7 +178,11 @@ def main() -> None:
         pi: Optional[AwsPerformanceInsightsClient] = None
     else:
         cw = None
-        pi = AwsPerformanceInsightsClient(config.aurora_cluster_id, config)
+        aurora_instance_id = os.environ[args.aurora_instance_var]
+        print(
+            "Using Aurora instance ID:", aurora_instance_id, file=sys.stderr, flush=True
+        )
+        pi = AwsPerformanceInsightsClient(aurora_instance_id, config)
 
     processes = []
     for idx in range(args.num_clients):
