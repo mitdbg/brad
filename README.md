@@ -97,6 +97,9 @@ files.
   the entire dataset (used for supporting purposes).
 - (07/06/2023) Update your local `config.yml` and add an entry for
   `front_end_metrics_reporting_period_seconds`.
+- (07/24/2023) Update your local `config.yml` and add entries for
+  `front_end_interface`, `front_end_port`, `num_front_ends`, and
+  `front_end_log_path`. Remove `server_interface` and `server_port`.
 
 
 ### Generate IMDB workload
