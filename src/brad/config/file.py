@@ -1,4 +1,5 @@
 import yaml
+import pathlib
 from typing import Optional, Dict
 from datetime import timedelta
 
@@ -27,21 +28,28 @@ class ConfigFile:
     def daemon_log_path(self) -> Optional[str]:
         return self._raw["daemon_log_file"] if "daemon_log_file" in self._raw else None
 
+    def front_end_log_file(self, worker_index: int) -> Optional[pathlib.Path]:
+        if "front_end_log_path" in self._raw:
+            prefix = pathlib.Path(self._raw["front_end_log_path"])
+            return prefix / f"brad_front_end_{worker_index}.log"
+        else:
+            return None
+
+    @property
+    def front_end_interface(self) -> str:
+        return self._raw["front_end_interface"]
+
+    @property
+    def front_end_port(self) -> int:
+        return int(self._raw["front_end_port"])
+
+    @property
+    def num_front_ends(self) -> int:
+        return int(self._raw["num_front_ends"])
+
     @property
     def planner_log_path(self) -> str:
         return self._raw["planner_log_path"] if "planner_log_path" in self._raw else "."
-
-    @property
-    def server_interface(self) -> str:
-        return self._raw["server_interface"]
-
-    @property
-    def server_port(self) -> int:
-        return int(self._raw["server_port"])
-
-    @property
-    def server_daemon_port(self) -> int:
-        return int(self._raw["server_daemon_port"])
 
     @property
     def athena_s3_data_path(self) -> str:
