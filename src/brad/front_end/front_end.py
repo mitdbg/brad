@@ -31,7 +31,7 @@ from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
 from brad.routing.tree_based.forest_router import ForestRouter
 from brad.front_end.brad_interface import BradInterface
-from brad.front_end.blueprint_manager import BlueprintManager
+from brad.blueprint_manager import BlueprintManager
 from brad.front_end.epoch_file_handler import EpochFileHandler
 from brad.front_end.errors import QueryError
 from brad.front_end.grpc import BradGrpc

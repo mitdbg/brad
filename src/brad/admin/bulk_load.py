@@ -19,7 +19,7 @@ from brad.config.strings import (
     AURORA_SEQ_COLUMN,
     source_table_name,
 )
-from brad.front_end.blueprint_manager import BlueprintManager
+from brad.blueprint_manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)

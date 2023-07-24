@@ -5,7 +5,7 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.forest_router import ForestRouter
-from brad.front_end.blueprint_manager import BlueprintManager
+from brad.blueprint_manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)

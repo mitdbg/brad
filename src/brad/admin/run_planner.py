@@ -31,7 +31,7 @@ from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import FixedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
-from brad.front_end.blueprint_manager import BlueprintManager
+from brad.blueprint_manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 

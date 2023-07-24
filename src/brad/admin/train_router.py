@@ -11,7 +11,7 @@ from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.forest_router import ForestRouter
 from brad.routing.tree_based.trainer import ForestTrainer
-from brad.front_end.blueprint_manager import BlueprintManager
+from brad.blueprint_manager import BlueprintManager
 
 logger = logging.getLogger(__name__)
 

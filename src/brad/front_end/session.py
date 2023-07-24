@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class Session:
     """
-    Stores session-specific state (on the server). Each session has its own
+    Stores session-specific state (on the front end). Each session has its own
     connections to the underlying engines. Create instances using
     `SessionManager`.
     """
