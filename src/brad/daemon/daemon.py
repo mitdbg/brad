@@ -109,14 +109,6 @@ class BradDaemon:
         )
         self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
 
-        if self._config.routing_policy == RoutingPolicy.ForestTableSelectivity:
-            logger.info("Setting up the cardinality estimator...")
-            estimator = await PostgresEstimator.connect(self._schema_name, self._config)
-            await estimator.analyze(self._blueprint_mgr.get_blueprint())
-            self._estimator_provider.set_estimator(estimator)
-
-        self._monitor.force_read_metrics()
-
         # Create and start the front end processes.
         logger.info(
             "Setting up and starting %d front ends...", self._config.num_front_ends
@@ -145,6 +137,14 @@ class BradDaemon:
         for fe in self._front_ends:
             fe.process.start()
 
+        if self._config.routing_policy == RoutingPolicy.ForestTableSelectivity:
+            logger.info("Setting up the cardinality estimator...")
+            estimator = await PostgresEstimator.connect(self._schema_name, self._config)
+            await estimator.analyze(self._blueprint_mgr.get_blueprint())
+            self._estimator_provider.set_estimator(estimator)
+
+        self._monitor.force_read_metrics()
+
     async def _run_teardown(self) -> None:
         # Shut down the front end processes.
         # 1. Send a message to tell them to shut down.
@@ -167,7 +167,6 @@ class BradDaemon:
         )
         for fe in self._front_ends:
             fe.process.join()
-
         self._front_ends.clear()
 
     async def _read_front_end_messages(self, front_end: "_FrontEndProcess") -> None:

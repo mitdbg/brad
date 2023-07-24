@@ -158,7 +158,7 @@ class BradFrontEnd(BradInterface):
             # this method.
             grpc_server.__del__()
             await self._run_teardown()
-            logger.info("BRAD front end tear down complete.")
+            logger.debug("BRAD front end _run_teardown() complete.")
 
     async def _run_setup(self) -> None:
         await self._blueprint_mgr.load()
@@ -186,6 +186,7 @@ class BradFrontEnd(BradInterface):
         self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
 
     async def _run_teardown(self):
+        logger.debug("Starting BRAD front end _run_teardown()")
         await self._sessions.end_all_sessions()
 
         # Important for unblocking our message reader thread.
@@ -363,12 +364,13 @@ class BradFrontEnd(BradInterface):
         loop = asyncio.get_running_loop()
         while True:
             message = await loop.run_in_executor(None, self._input_queue.get)
-            logger.info("Received message from the daemon: %s", message)
 
             if isinstance(message, ShutdownFrontEnd):
                 logger.debug("The BRAD front end is initiating a shut down...")
-                loop.create_task(self._trigger_shutdown())
+                loop.create_task(_orchestrate_shutdown())
                 break
+            else:
+                logger.info("Received message from the daemon: %s", message)
 
     async def _report_metrics_to_daemon(self) -> None:
         period_start = time.time()
@@ -398,8 +400,12 @@ class BradFrontEnd(BradInterface):
             sql = sql[:-1]
         return sql.strip()
 
-    async def _trigger_shutdown(self) -> None:
-        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+
+async def _orchestrate_shutdown() -> None:
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+    loop = asyncio.get_event_loop()
+    loop.stop()
