@@ -9,6 +9,7 @@ from brad.blueprint import Blueprint
 from brad.blueprint_manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
+from brad.daemon.messages import ShutdownFrontEnd, Sentinel
 from brad.daemon.monitor import Monitor
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
@@ -145,9 +146,29 @@ class BradDaemon:
             fe.process.start()
 
     async def _run_teardown(self) -> None:
+        # Shut down the front end processes.
+        # 1. Send a message to tell them to shut down.
+        # 2. Input sentinel messages to unblock our reader tasks.
+        # 3. Wait for the processes to shut down.
+        logger.info("Telling %d front end(s) to shut down...", len(self._front_ends))
+        for fe in self._front_ends:
+            fe.input_queue.put(ShutdownFrontEnd())
+            if fe.message_reader_task is not None:
+                fe.output_queue.put(Sentinel())
+
+        # Shut down the estimator.
         estimator = self._estimator_provider.get_estimator()
         if estimator is not None:
             await estimator.close()
+
+        # Now wait for the front end processes to shut down.
+        logger.info(
+            "Waiting for %d front end(s) to shut down...", len(self._front_ends)
+        )
+        for fe in self._front_ends:
+            fe.process.join()
+
+        self._front_ends.clear()
 
     async def _read_front_end_messages(self, front_end: "_FrontEndProcess") -> None:
         """

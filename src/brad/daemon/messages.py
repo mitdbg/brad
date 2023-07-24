@@ -20,9 +20,9 @@ class MetricsReport:
         self.txn_completions_per_s = txn_completions_per_s
 
 
-class ShutdownDaemon:
+class ShutdownFrontEnd:
     """
-    Sent from the server to the daemon indicating that it should shut down.
+    Sent from the daemon to the front end indicating that it should shut down.
     """
 
 

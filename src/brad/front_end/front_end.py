@@ -16,7 +16,7 @@ from brad.asset_manager import AssetManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.monitor import Monitor
-from brad.daemon.messages import Sentinel, MetricsReport
+from brad.daemon.messages import ShutdownFrontEnd, Sentinel, MetricsReport
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
@@ -131,7 +131,7 @@ class BradFrontEnd(BradInterface):
         self._brad_metrics_reporting_task: Optional[asyncio.Task[None]] = None
 
     async def serve_forever(self):
-        await self.run_setup()
+        await self._run_setup()
         try:
             grpc_server = grpc.aio.server()
             brad_grpc.add_BradServicer_to_server(BradGrpc(self), grpc_server)
@@ -157,10 +157,10 @@ class BradFrontEnd(BradInterface):
             # gRPC's internal shutdown process completes before we return from
             # this method.
             grpc_server.__del__()
-            await self.run_teardown()
-            logger.info("The BRAD front end has shut down.")
+            await self._run_teardown()
+            logger.info("BRAD front end tear down complete.")
 
-    async def run_setup(self) -> None:
+    async def _run_setup(self) -> None:
         await self._blueprint_mgr.load()
         logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
 
@@ -185,7 +185,7 @@ class BradFrontEnd(BradInterface):
         # Used to handle messages from the daemon.
         self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
 
-    async def run_teardown(self):
+    async def _run_teardown(self):
         await self._sessions.end_all_sessions()
 
         # Important for unblocking our message reader thread.
@@ -365,6 +365,11 @@ class BradFrontEnd(BradInterface):
             message = await loop.run_in_executor(None, self._input_queue.get)
             logger.info("Received message from the daemon: %s", message)
 
+            if isinstance(message, ShutdownFrontEnd):
+                logger.debug("The BRAD front end is initiating a shut down...")
+                loop.create_task(self._trigger_shutdown())
+                break
+
     async def _report_metrics_to_daemon(self) -> None:
         period_start = time.time()
         while True:
@@ -392,3 +397,9 @@ class BradFrontEnd(BradInterface):
         if sql.endswith(";"):
             sql = sql[:-1]
         return sql.strip()
+
+    async def _trigger_shutdown(self) -> None:
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
