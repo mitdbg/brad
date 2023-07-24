@@ -1,16 +1,19 @@
 import asyncio
-import signal
 import logging
+import queue
 import multiprocessing as mp
-from typing import Optional
+from typing import Optional, List
 
+from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
+from brad.blueprint_manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
-from brad.daemon.messages import ShutdownDaemon, NewBlueprint, MetricsReport
 from brad.daemon.monitor import Monitor
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
+from brad.front_end.start_front_end import start_front_end
+from brad.planner.abstract import BlueprintPlanner
 from brad.planner.compare.cost import best_cost_under_geomean_latency
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
@@ -20,14 +23,13 @@ from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyS
 from brad.planner.workload.provider import WorkloadProvider
 from brad.planner.workload import Workload
 from brad.routing.policy import RoutingPolicy
-from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)
 
 
 class BradDaemon:
     """
-    Represents BRAD's background process.
+    Represents BRAD's controller process.
 
     This code is written with the assumption that this daemon is spawned by the
     BRAD server. In the future, we may want the daemon to be launched
@@ -38,28 +40,56 @@ class BradDaemon:
         self,
         config: ConfigFile,
         schema_name: str,
-        current_blueprint: Blueprint,
-        planner_config: PlannerConfig,
-        event_loop: asyncio.AbstractEventLoop,
-        input_queue: mp.Queue,
-        output_queue: mp.Queue,
+        path_to_planner_config: str,
+        debug_mode: bool,
     ):
         self._config = config
         self._schema_name = schema_name
-        self._planner_config = planner_config
-        self._event_loop = event_loop
-        self._input_queue = input_queue
-        self._output_queue = output_queue
+        self._path_to_planner_config = path_to_planner_config
+        self._planner_config = PlannerConfig(path_to_planner_config)
+        self._debug_mode = debug_mode
 
-        self._current_blueprint = current_blueprint
+        self._assets = AssetManager(self._config)
+        self._blueprint_mgr = BlueprintManager(self._assets, self._schema_name)
         # TODO(Amadou): Determine how to pass in specific clusters.
         self._monitor = Monitor.from_config_file(config)
-
         self._estimator_provider = _EstimatorProvider()
+        self._planner: Optional[BlueprintPlanner] = None
+
+        self._process_manager: Optional[mp.managers.SyncManager] = None
+        self._front_ends: List[_FrontEndProcess] = []
+
+    async def run_forever(self) -> None:
+        """
+        Starts running the daemon.
+        """
+        try:
+            logger.info("Starting up the BRAD daemon...")
+            await self._run_setup()
+            assert self._planner is not None
+            message_reader_tasks = [
+                fe.message_reader_task
+                for fe in self._front_ends
+                if fe.message_reader_task is not None
+            ]
+            logger.info("The BRAD daemon is running.")
+            await asyncio.gather(
+                self._planner.run_forever(),
+                self._monitor.run_forever(),
+                *message_reader_tasks,
+            )
+        finally:
+            logger.info("The BRAD daemon is shutting down...")
+            await self._run_teardown()
+            logger.info("The BRAD daemon has shut down.")
+
+    async def _run_setup(self) -> None:
+        await self._blueprint_mgr.load()
+        logger.info("Current blueprint: %s", self._blueprint_mgr.get_blueprint())
 
         self._planner = BlueprintPlannerFactory.create(
-            planner_config=planner_config,
-            current_blueprint=self._current_blueprint,
+            planner_config=self._planner_config,
+            current_blueprint=self._blueprint_mgr.get_blueprint(),
             # N.B. This is a placeholder
             current_workload=Workload.empty(),
             monitor=self._monitor,
@@ -76,121 +106,69 @@ class BradDaemon:
             data_access_provider=_NoopDataAccessProvider(),
             estimator_provider=self._estimator_provider,
         )
+        self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
 
-    async def run_forever(self) -> None:
-        """
-        Starts running the daemon.
-        """
-        logger.info("The BRAD daemon is running.")
         if self._config.routing_policy == RoutingPolicy.ForestTableSelectivity:
+            logger.info("Setting up the cardinality estimator...")
             estimator = await PostgresEstimator.connect(self._schema_name, self._config)
-            await estimator.analyze(self._current_blueprint)
+            await estimator.analyze(self._blueprint_mgr.get_blueprint())
             self._estimator_provider.set_estimator(estimator)
 
-        self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
         self._monitor.force_read_metrics()
-        await asyncio.gather(
-            self._read_server_messages(),
-            self._planner.run_forever(),
-            self._monitor.run_forever(),
+
+        # Create and start the front end processes.
+        logger.info(
+            "Setting up and starting %d front ends...", self._config.num_front_ends
         )
-
-    async def _read_server_messages(self) -> None:
-        """
-        Waits for messages from the server and processes them.
-        """
-        while True:
-            message = await self._event_loop.run_in_executor(
-                None, self._input_queue.get
+        self._process_manager = mp.Manager()
+        for worker_index in range(self._config.num_front_ends):
+            input_queue = self._process_manager.Queue()
+            output_queue = self._process_manager.Queue()
+            process = mp.Process(
+                target=start_front_end,
+                args=(
+                    worker_index,
+                    self._config.raw_path,
+                    self._schema_name,
+                    self._path_to_planner_config,
+                    self._debug_mode,
+                    input_queue,
+                    output_queue,
+                ),
             )
+            wrapper = _FrontEndProcess(worker_index, process, input_queue, output_queue)
+            reader_task = asyncio.create_task(self._read_front_end_messages(wrapper))
+            wrapper.message_reader_task = reader_task
+            self._front_ends.append(wrapper)
 
-            if isinstance(message, ShutdownDaemon):
-                logger.debug("Daemon received shutdown message.")
-                self._event_loop.create_task(self._shutdown())
-                break
+        for fe in self._front_ends:
+            fe.process.start()
 
-            elif isinstance(message, MetricsReport):
-                logger.debug(
-                    "Received metrics report. txn_completions_per_s: %.2f",
-                    message.txn_completions_per_s,
-                )
-                self._monitor.handle_metric_report(message)
+    async def _run_teardown(self) -> None:
+        estimator = self._estimator_provider.get_estimator()
+        if estimator is not None:
+            await estimator.close()
 
-            else:
-                logger.debug("Received message %s", str(message))
+    async def _read_front_end_messages(self, front_end: "_FrontEndProcess") -> None:
+        """
+        Waits for messages from the specified front end process and processes them.
+        """
+        loop = asyncio.get_running_loop()
+        while True:
+            message = await loop.run_in_executor(None, front_end.output_queue.get)
+            logger.debug(
+                "Received message from front end %d: %s",
+                front_end.worker_index,
+                str(message),
+            )
 
     async def _handle_new_blueprint(self, blueprint: Blueprint) -> None:
         """
         Informs the server about a new blueprint.
         """
-        self._current_blueprint = blueprint
-        await self._event_loop.run_in_executor(
-            None, self._output_queue.put, NewBlueprint(blueprint)
-        )
-
-    async def _shutdown(self) -> None:
-        logger.info("The BRAD daemon is shutting down...")
-        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Shut down the estimator too.
-        estimator = self._estimator_provider.get_estimator()
-        if estimator is not None:
-            await estimator.close()
-
-        self._event_loop.stop()
-
-    @staticmethod
-    def launch_in_subprocess(
-        config_path: str,
-        schema_name: str,
-        current_blueprint: Blueprint,
-        path_to_planner_config: str,
-        debug_mode: bool,
-        input_queue: mp.Queue,
-        output_queue: mp.Queue,
-    ) -> None:
-        """
-        Schedule this method to run in a child process to launch the BRAD
-        daemon.
-        """
-        config = ConfigFile(config_path)
-        set_up_logging(filename=config.daemon_log_path, debug_mode=debug_mode)
-
-        planner_config = PlannerConfig(path_to_planner_config)
-
-        event_loop = asyncio.new_event_loop()
-        event_loop.set_debug(enabled=debug_mode)
-        asyncio.set_event_loop(event_loop)
-
-        # Signal handlers are inherited from the parent server process. We want
-        # to ignore these signals since we receive a shutdown signal from the
-        # server directly.
-        for sig in [signal.SIGTERM, signal.SIGINT]:
-            event_loop.add_signal_handler(sig, _noop)
-
-        try:
-            daemon = BradDaemon(
-                config,
-                schema_name,
-                current_blueprint,
-                planner_config,
-                event_loop,
-                input_queue,
-                output_queue,
-            )
-            event_loop.create_task(daemon.run_forever())
-            logger.info("The BRAD daemon is starting...")
-            event_loop.run_forever()
-        finally:
-            event_loop.close()
-            logger.info("The BRAD daemon has shut down.")
-
-
-def _noop():
-    pass
+        # TODO: Need to persist the blueprint and notify the front ends to
+        # transition.
+        logger.info("Planner selected new blueprint: %s", blueprint)
 
 
 class _EmptyWorkloadProvider(WorkloadProvider):
@@ -217,3 +195,22 @@ class _EstimatorProvider(EstimatorProvider):
 
     def get_estimator(self) -> Optional[Estimator]:
         return self._estimator
+
+
+class _FrontEndProcess:
+    """
+    Used to manage state associated with each front end process.
+    """
+
+    def __init__(
+        self,
+        worker_index: int,
+        process: mp.Process,
+        input_queue: queue.Queue,
+        output_queue: queue.Queue,
+    ) -> None:
+        self.worker_index = worker_index
+        self.process = process
+        self.input_queue = input_queue
+        self.output_queue = output_queue
+        self.message_reader_task: Optional[asyncio.Task] = None

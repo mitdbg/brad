@@ -15,7 +15,6 @@ import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.asset_manager import AssetManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
-from brad.daemon.daemon import BradDaemon
 from brad.daemon.monitor import Monitor
 from brad.daemon.messages import Sentinel, MetricsReport
 from brad.data_stats.estimator import Estimator
@@ -122,20 +121,14 @@ class BradFrontEnd(BradInterface):
         self._sessions = SessionManager(self._config, self._schema_name)
 
         self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
-        self._timed_sync_task = None
-        self._daemon_messages_task = None
+        self._timed_sync_task: Optional[asyncio.Task[None]] = None
+        self._daemon_messages_task: Optional[asyncio.Task[None]] = None
 
         self._estimator: Optional[Estimator] = None
 
-        # Used for managing the daemon process.
-        self._daemon_mp_manager: Optional[mp.managers.SyncManager] = None
-        self._daemon_input_queue: Optional[mp.Queue] = None
-        self._daemon_output_queue: Optional[mp.Queue] = None
-        self._daemon_process: Optional[mp.Process] = None
-
         # Number of transactions that completed.
         self._transaction_end_counter = Counter()
-        self._brad_metrics_reporting_task = None
+        self._brad_metrics_reporting_task: Optional[asyncio.Task[None]] = None
 
     async def serve_forever(self):
         await self.run_setup()
@@ -167,7 +160,7 @@ class BradFrontEnd(BradInterface):
             await self.run_teardown()
             logger.info("The BRAD front end has shut down.")
 
-    async def run_setup(self):
+    async def run_setup(self) -> None:
         await self._blueprint_mgr.load()
         logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
 
@@ -184,37 +177,23 @@ class BradFrontEnd(BradInterface):
             self._estimator = None
         await self._router.run_setup(self._estimator)
 
-        # Launch the daemon process.
-        self._daemon_mp_manager = mp.Manager()
-        self._daemon_input_queue = self._daemon_mp_manager.Queue()
-        self._daemon_output_queue = self._daemon_mp_manager.Queue()
-        self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
-        self._daemon_process = mp.Process(
-            target=BradDaemon.launch_in_subprocess,
-            args=(
-                self._config.raw_path,
-                self._schema_name,
-                self._blueprint_mgr.get_blueprint(),
-                self._path_to_planner_config,
-                self._debug_mode,
-                self._daemon_input_queue,
-                self._daemon_output_queue,
-            ),
-        )
-
-        self._daemon_process.start()
-        logger.info("The BRAD daemon process has been started.")
-
         # Start the metrics reporting task.
         self._brad_metrics_reporting_task = asyncio.create_task(
             self._report_metrics_to_daemon()
         )
+
+        # Used to handle messages from the daemon.
+        self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
 
     async def run_teardown(self):
         await self._sessions.end_all_sessions()
 
         # Important for unblocking our message reader thread.
         self._input_queue.put(Sentinel())
+
+        if self._daemon_messages_task is not None:
+            self._daemon_messages_task.cancel()
+            self._daemon_messages_task = None
 
         if self._timed_sync_task is not None:
             await self._timed_sync_task.close()

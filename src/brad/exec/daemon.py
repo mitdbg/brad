@@ -4,7 +4,7 @@ import signal
 import multiprocessing as mp
 
 from brad.config.file import ConfigFile
-from brad.front_end.front_end import BradFrontEnd
+from brad.daemon.daemon import BradDaemon
 from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ def register_command(subparsers):
     parser.set_defaults(func=main)
 
 
-async def shutdown_server(event_loop):
+async def shutdown_daemon(event_loop):
     logging.debug("Shutting down the event loop...")
     tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
     for task in tasks:
@@ -56,7 +56,7 @@ def handle_exception(event_loop, context):
     logging.error("%s", context)
     if event_loop.is_closed():
         return
-    event_loop.create_task(shutdown_server(event_loop))
+    event_loop.create_task(shutdown_daemon(event_loop))
 
 
 def main(args):
@@ -65,8 +65,10 @@ def main(args):
     # descriptors!).
     mp.set_start_method("spawn")
 
-    set_up_logging(debug_mode=args.debug)
     config = ConfigFile(args.config_file)
+    set_up_logging(
+        filename=config.daemon_log_path, debug_mode=args.debug, also_console=True
+    )
 
     event_loop = asyncio.new_event_loop()
     event_loop.set_debug(enabled=args.debug)
@@ -74,15 +76,15 @@ def main(args):
 
     for sig in [signal.SIGTERM, signal.SIGINT]:
         event_loop.add_signal_handler(
-            sig, lambda: asyncio.create_task(shutdown_server(event_loop))
+            sig, lambda: asyncio.create_task(shutdown_daemon(event_loop))
         )
     event_loop.set_exception_handler(handle_exception)
 
     try:
-        server = BradFrontEnd(
+        daemon = BradDaemon(
             config, args.schema_name, args.planner_config_file, args.debug
         )
-        event_loop.create_task(server.serve_forever())
+        event_loop.create_task(daemon.run_forever())
         event_loop.run_forever()
     finally:
         event_loop.close()
