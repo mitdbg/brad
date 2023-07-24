@@ -23,7 +23,7 @@ from brad.planner.neighborhood.sampled_neighborhood import (
 )
 from brad.planner.strategy import PlanningStrategy
 from brad.routing.rule_based import RuleBased
-from brad.server.engine_connections import EngineConnections
+from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 
 logger = logging.getLogger(__name__)

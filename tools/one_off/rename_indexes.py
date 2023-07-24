@@ -3,7 +3,7 @@ import argparse
 from brad.config.file import ConfigFile
 from brad.blueprint.user import UserProvidedBlueprint
 from brad.config.engine import Engine
-from brad.server.engine_connections import EngineConnections
+from brad.front_end.engine_connections import EngineConnections
 
 
 def main():

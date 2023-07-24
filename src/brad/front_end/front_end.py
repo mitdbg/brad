@@ -30,12 +30,12 @@ from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
 from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
 from brad.routing.tree_based.forest_router import ForestRouter
-from brad.server.brad_interface import BradInterface
-from brad.server.blueprint_manager import BlueprintManager
-from brad.server.epoch_file_handler import EpochFileHandler
-from brad.server.errors import QueryError
-from brad.server.grpc import BradGrpc
-from brad.server.session import SessionManager, SessionId
+from brad.front_end.brad_interface import BradInterface
+from brad.blueprint_manager import BlueprintManager
+from brad.front_end.epoch_file_handler import EpochFileHandler
+from brad.front_end.errors import QueryError
+from brad.front_end.grpc import BradGrpc
+from brad.front_end.session import SessionManager, SessionId
 from brad.utils.counter import Counter
 from brad.utils.json_decimal_encoder import DecimalEncoder
 
@@ -46,7 +46,7 @@ LINESEP = "\n".encode()
 RowList = List[Tuple[Any, ...]]
 
 
-class BradServer(BradInterface):
+class BradFrontEnd(BradInterface):
     def __init__(
         self,
         config: ConfigFile,

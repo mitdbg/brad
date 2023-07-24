@@ -11,7 +11,7 @@ from typing import Callable
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.connection.connection import Cursor
-from brad.server.engine_connections import EngineConnections
+from brad.front_end.engine_connections import EngineConnections
 
 
 class Options:

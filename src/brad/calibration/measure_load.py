@@ -21,7 +21,7 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.cloudwatch import CloudwatchClient
 from brad.daemon.perf_insights import AwsPerformanceInsightsClient
-from brad.server.engine_connections import EngineConnections
+from brad.front_end.engine_connections import EngineConnections
 from brad.connection.connection import Connection
 from brad.utils import set_up_logging
 
