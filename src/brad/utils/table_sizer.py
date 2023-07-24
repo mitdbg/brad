@@ -4,7 +4,7 @@ import logging
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.strings import source_table_name
-from brad.server.engine_connections import EngineConnections
+from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 

@@ -9,8 +9,8 @@ from brad.blueprint.sql_gen.table import (
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.planner.enumeration.blueprint import EnumeratedBlueprint
-from brad.server.blueprint_manager import BlueprintManager
-from brad.server.engine_connections import EngineConnections
+from brad.front_end.blueprint_manager import BlueprintManager
+from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 

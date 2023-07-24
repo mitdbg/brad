@@ -7,7 +7,7 @@ from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.config.engine import Engine
 from brad.planner.workload import Workload
 from brad.planner.workload.query import Query
-from brad.server.engine_connections import EngineConnections
+from brad.front_end.engine_connections import EngineConnections
 
 
 class Score:

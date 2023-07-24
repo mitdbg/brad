@@ -10,7 +10,7 @@ from brad.config.file import ConfigFile
 from brad.config.dbtype import DBType
 from brad.config.routing_policy import RoutingPolicy
 from brad.config.schema import Schema
-from brad.server.server import BradServer
+from brad.front_end.server import BradServer
 
 
 class ConfigFileOverride(ConfigFile):

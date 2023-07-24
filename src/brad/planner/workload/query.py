@@ -8,7 +8,7 @@ from brad.data_stats.plan_parsing import (
     parse_explain_verbose,
     extract_base_cardinalities,
 )
-from brad.server.engine_connections import EngineConnections
+from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 

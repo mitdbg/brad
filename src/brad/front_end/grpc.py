@@ -4,8 +4,8 @@ import brad.proto_gen.brad_pb2 as b
 import brad.proto_gen.brad_pb2_grpc as rpc
 from brad.config.engine import Engine
 from brad.config.session import SessionId
-from brad.server.brad_interface import BradInterface
-from brad.server.errors import QueryError
+from brad.front_end.brad_interface import BradInterface
+from brad.front_end.errors import QueryError
 
 # pylint: disable=no-member
 # See https://github.com/protocolbuffers/protobuf/issues/10372

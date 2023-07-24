@@ -4,7 +4,7 @@ import signal
 import multiprocessing as mp
 
 from brad.config.file import ConfigFile
-from brad.server.server import BradServer
+from brad.front_end.server import BradServer
 from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)

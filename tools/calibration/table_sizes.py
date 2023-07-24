@@ -10,8 +10,8 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.data_sync.execution.context import ExecutionContext
 from brad.data_sync.operators.unload_to_s3 import UnloadToS3
-from brad.server.blueprint_manager import BlueprintManager
-from brad.server.engine_connections import EngineConnections
+from brad.front_end.blueprint_manager import BlueprintManager
+from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 from brad.utils import set_up_logging
 
