@@ -31,7 +31,7 @@ def get_metric_id(engine: str, metric_name: str, stat: str, role: str = ""):
     return metric_id
 
 
-FrontEndMetricDict = Dict[FrontEndMetric, StreamingMetric]
+FrontEndMetricDict = Dict[FrontEndMetric, List[StreamingMetric]]
 
 
 # Monitor
@@ -49,6 +49,7 @@ class Monitor:
         forecasting_window_size: int = 5,  # (Up to) how many past samples to base the forecast on
         forecasting_epoch: timedelta = timedelta(hours=1),
         enable_cost_monitoring: bool = False,
+        num_front_ends: int = 1,
     ) -> None:
         self._cluster_ids = cluster_ids
         self._epoch_length = forecasting_epoch
@@ -75,7 +76,9 @@ class Monitor:
         # These are BRAD-defined metrics that are collected by the front end
         # servers.
         self._front_end_metrics: FrontEndMetricDict = {
-            FrontEndMetric.TxnEndPerSecond: StreamingMetric[float](),
+            FrontEndMetric.TxnEndPerSecond: [
+                StreamingMetric[float]() for _ in range(num_front_ends)
+            ],
         }
 
     # Forcibly read metrics. Use to avoid `run_forever()`.
@@ -86,17 +89,11 @@ class Monitor:
     @classmethod
     def from_config_file(cls, config: ConfigFile):
         cluster_ids = config.get_cluster_ids()
-        return cls(cluster_ids, forecasting_epoch=config.epoch_length)
-
-    # Create from schema name.
-    @classmethod
-    def from_schema_name(cls, schema_name: str):
-        cluster_ids = {
-            Engine.Redshift: f"brad-{schema_name}",
-            Engine.Aurora: f"brad-{schema_name}",
-            Engine.Athena: f"brad-{schema_name}",
-        }
-        return cls(cluster_ids)
+        return cls(
+            cluster_ids,
+            forecasting_epoch=config.epoch_length,
+            num_front_ends=config.num_front_ends,
+        )
 
     async def run_forever(self) -> None:
         # Flesh out the monitor - maintain running averages of the underlying
@@ -108,9 +105,11 @@ class Monitor:
 
     def handle_metric_report(self, report: MetricsReport) -> None:
         now = datetime.now(tz=timezone.utc)
-        self._front_end_metrics[FrontEndMetric.TxnEndPerSecond].add_sample(
-            report.txn_completions_per_s, now
-        )
+        # Each front end server reports this metric.
+        metric = self._front_end_metrics[FrontEndMetric.TxnEndPerSecond][
+            report.fe_index
+        ]
+        metric.add_sample(report.txn_completions_per_s, now)
 
     def _update_front_end_metrics(self) -> None:
         # TODO: This is just logged for debug purposes. We probably do not need
@@ -118,8 +117,9 @@ class Monitor:
         now = datetime.now(tz=timezone.utc)
         window_start = now - self._epoch_length
         logger.info("Current front end metrics:")
-        for metric, value in self._front_end_metrics.items():
-            logger.info("%s: %.2f", metric, value.average_since(window_start))
+        for metric, values in self._front_end_metrics.items():
+            total = sum(map(lambda val: val.average_since(window_start), values))
+            logger.info("%s: %.2f", metric, total)
 
     ############
     # The following functions, prefixed by `read_`, provide different ways to query the monitor for

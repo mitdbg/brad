@@ -9,7 +9,7 @@ from brad.blueprint import Blueprint
 from brad.blueprint_manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
-from brad.daemon.messages import ShutdownFrontEnd, Sentinel
+from brad.daemon.messages import ShutdownFrontEnd, Sentinel, MetricsReport
 from brad.daemon.monitor import Monitor
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
@@ -114,13 +114,13 @@ class BradDaemon:
             "Setting up and starting %d front ends...", self._config.num_front_ends
         )
         self._process_manager = mp.Manager()
-        for worker_index in range(self._config.num_front_ends):
+        for fe_index in range(self._config.num_front_ends):
             input_queue = self._process_manager.Queue()
             output_queue = self._process_manager.Queue()
             process = mp.Process(
                 target=start_front_end,
                 args=(
-                    worker_index,
+                    fe_index,
                     self._config.raw_path,
                     self._schema_name,
                     self._path_to_planner_config,
@@ -129,7 +129,7 @@ class BradDaemon:
                     output_queue,
                 ),
             )
-            wrapper = _FrontEndProcess(worker_index, process, input_queue, output_queue)
+            wrapper = _FrontEndProcess(fe_index, process, input_queue, output_queue)
             reader_task = asyncio.create_task(self._read_front_end_messages(wrapper))
             wrapper.message_reader_task = reader_task
             self._front_ends.append(wrapper)
@@ -176,11 +176,21 @@ class BradDaemon:
         loop = asyncio.get_running_loop()
         while True:
             message = await loop.run_in_executor(None, front_end.output_queue.get)
-            logger.debug(
-                "Received message from front end %d: %s",
-                front_end.worker_index,
-                str(message),
-            )
+            if isinstance(message, MetricsReport):
+                if message.fe_index != front_end.fe_index:
+                    logger.warning(
+                        "Received message with invalid front end index. Expected %d. Received %d.",
+                        front_end.fe_index,
+                        message.fe_index,
+                    )
+                    continue
+                self._monitor.handle_metric_report(message)
+            else:
+                logger.debug(
+                    "Received unexpected message from front end %d: %s",
+                    front_end.fe_index,
+                    str(message),
+                )
 
     async def _handle_new_blueprint(self, blueprint: Blueprint) -> None:
         """
@@ -224,12 +234,12 @@ class _FrontEndProcess:
 
     def __init__(
         self,
-        worker_index: int,
+        fe_index: int,
         process: mp.Process,
         input_queue: queue.Queue,
         output_queue: queue.Queue,
     ) -> None:
-        self.worker_index = worker_index
+        self.fe_index = fe_index
         self.process = process
         self.input_queue = input_queue
         self.output_queue = output_queue
