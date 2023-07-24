@@ -13,13 +13,11 @@ import pyodbc
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
 
 from brad.asset_manager import AssetManager
-from brad.blueprint import Blueprint
-from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.daemon import BradDaemon
 from brad.daemon.monitor import Monitor
-from brad.daemon.messages import ShutdownDaemon, NewBlueprint, Sentinel, MetricsReport
+from brad.daemon.messages import Sentinel, MetricsReport
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
@@ -49,14 +47,27 @@ RowList = List[Tuple[Any, ...]]
 class BradFrontEnd(BradInterface):
     def __init__(
         self,
+        worker_index: int,
         config: ConfigFile,
         schema_name: str,
         path_to_planner_config: str,
         debug_mode: bool,
+        input_queue: mp.Queue,
+        output_queue: mp.Queue,
     ):
+        self._worker_index = worker_index
         self._config = config
         self._schema_name = schema_name
         self._debug_mode = debug_mode
+
+        # Used for IPC with the daemon. Eventually we will use RPC to
+        # communicate with the daemon. But there's currently no need for
+        # something fancy here.
+        # Used for messages sent from the daemon to this front end server.
+        self._input_queue = input_queue
+        # Used for messages sent from this front end server to the daemon.
+        self._output_queue = output_queue
+
         self._assets = AssetManager(self._config)
         self._blueprint_mgr = BlueprintManager(self._assets, self._schema_name)
         self._path_to_planner_config = path_to_planner_config
@@ -131,12 +142,13 @@ class BradFrontEnd(BradInterface):
         try:
             grpc_server = grpc.aio.server()
             brad_grpc.add_BradServicer_to_server(BradGrpc(self), grpc_server)
+            port_to_use = self._config.front_end_port + self._worker_index
             grpc_server.add_insecure_port(
-                "{}:{}".format(self._config.server_interface, self._config.server_port)
+                "{}:{}".format(self._config.front_end_interface, port_to_use)
             )
             await grpc_server.start()
-            logger.info("The BRAD server has successfully started.")
-            logger.info("Listening on port %d.", self._config.server_port)
+            logger.info("The BRAD front end has successfully started.")
+            logger.info("Listening on port %d.", port_to_use)
 
             if self._routing_policy == RoutingPolicy.RuleBased:
                 assert (
@@ -153,7 +165,7 @@ class BradFrontEnd(BradInterface):
             # this method.
             grpc_server.__del__()
             await self.run_teardown()
-            logger.info("The BRAD server has shut down.")
+            logger.info("The BRAD front end has shut down.")
 
     async def run_setup(self):
         await self._blueprint_mgr.load()
@@ -201,17 +213,8 @@ class BradFrontEnd(BradInterface):
     async def run_teardown(self):
         await self._sessions.end_all_sessions()
 
-        loop = asyncio.get_event_loop()
-        assert self._daemon_input_queue is not None
-        assert self._daemon_output_queue is not None
-        assert self._daemon_process is not None
-
-        # Tell the daemon process to shut down and wait for it to do so.
-        await loop.run_in_executor(None, self._daemon_input_queue.put, ShutdownDaemon())
-        await loop.run_in_executor(None, self._daemon_process.join)
-
         # Important for unblocking our message reader thread.
-        self._daemon_output_queue.put(Sentinel())
+        self._input_queue.put(Sentinel())
 
         if self._timed_sync_task is not None:
             await self._timed_sync_task.close()
@@ -377,13 +380,11 @@ class BradFrontEnd(BradInterface):
             await self._data_sync_executor.run_sync(self._blueprint_mgr.get_blueprint())
 
     async def _read_daemon_messages(self) -> None:
-        assert self._daemon_output_queue is not None
+        assert self._input_queue is not None
         loop = asyncio.get_running_loop()
         while True:
-            message = await loop.run_in_executor(None, self._daemon_output_queue.get)
-
-            if isinstance(message, NewBlueprint):
-                await self._handle_new_blueprint(message.blueprint)
+            message = await loop.run_in_executor(None, self._input_queue.get)
+            logger.info("Received message from the daemon: %s", message)
 
     async def _report_metrics_to_daemon(self) -> None:
         period_start = time.time()
@@ -399,24 +400,13 @@ class BradFrontEnd(BradInterface):
             logger.debug(
                 "Sending metrics report: txn_completions_per_s: %.2f", sampled_thpt
             )
-            assert self._daemon_input_queue is not None
-            self._daemon_input_queue.put_nowait(metrics_report)
+            self._output_queue.put_nowait(metrics_report)
 
             period_start = time.time()
 
             # NOTE: Once we add multiple front end servers, we should stagger
             # the sleep period.
             await asyncio.sleep(self._config.front_end_metrics_reporting_period_seconds)
-
-    async def _handle_new_blueprint(self, new_blueprint: Blueprint) -> None:
-        # This is where we launch any reconfigurations needed to realize
-        # the new blueprint.
-        logger.debug("Received new blueprint: %s", new_blueprint)
-        curr_blueprint = self._blueprint_mgr.get_blueprint()
-        _diff = BlueprintDiff.of(curr_blueprint, new_blueprint)
-
-        # - Provisioning changes handled here (if there are blueprint changes).
-        # - Need to update the blueprint stored in the manager.
 
     def _clean_query_str(self, raw_sql: str) -> str:
         sql = raw_sql.strip()
