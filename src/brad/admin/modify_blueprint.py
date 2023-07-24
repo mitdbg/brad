@@ -110,6 +110,14 @@ def add_indexes(args, config: ConfigFile, mgr: BlueprintManager) -> None:
             indexes_to_remove = curr_indexes.difference(next_indexes)
             indexes_to_add = next_indexes.difference(curr_indexes)
 
+            if len(indexes_to_remove) == 0 and len(indexes_to_add) == 0:
+                # Create indexes just to be safe.
+                sql_to_run = generate_create_index_sql(table, list(next_indexes))
+                for sql in sql_to_run:
+                    logger.debug("Running on Aurora: %s", sql)
+                    cursor.execute_sync(sql)
+                continue
+
             sql_to_run = generate_create_index_sql(table, list(indexes_to_add))
             for sql in sql_to_run:
                 logger.debug("Running on Aurora: %s", sql)

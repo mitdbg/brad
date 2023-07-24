@@ -35,6 +35,9 @@ class Column:
             and self.is_primary == other.is_primary
         )
 
+    def __hash__(self) -> int:
+        return hash((self.name, self.data_type))
+
 
 class Table:
     """
