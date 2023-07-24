@@ -46,7 +46,7 @@ LINESEP = "\n".encode()
 RowList = List[Tuple[Any, ...]]
 
 
-class BradServer(BradInterface):
+class BradFrontEnd(BradInterface):
     def __init__(
         self,
         config: ConfigFile,

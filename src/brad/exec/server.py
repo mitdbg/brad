@@ -4,7 +4,7 @@ import signal
 import multiprocessing as mp
 
 from brad.config.file import ConfigFile
-from brad.front_end.server import BradServer
+from brad.front_end.front_end import BradFrontEnd
 from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ def main(args):
     event_loop.set_exception_handler(handle_exception)
 
     try:
-        server = BradServer(
+        server = BradFrontEnd(
             config, args.schema_name, args.planner_config_file, args.debug
         )
         event_loop.create_task(server.serve_forever())

@@ -7,20 +7,19 @@ import time
 import conductor.lib as cond
 
 from brad.config.file import ConfigFile
-from brad.config.dbtype import DBType
-from brad.config.routing_policy import RoutingPolicy
-from brad.config.schema import Schema
-from brad.front_end.server import BradServer
+from brad.config.engine import Engine
+from brad.front_end.front_end import BradFrontEnd
+from brad.routing.policy import RoutingPolicy
 
 
 class ConfigFileOverride(ConfigFile):
-    def __init__(self, path: str, dbname: str):
+    def __init__(self, path: str, engine: Engine):
         super().__init__(path)
-        if dbname == DBType.Athena:
+        if engine == Engine.Athena:
             self._policy = RoutingPolicy.AlwaysAthena
-        elif dbname == DBType.Aurora:
+        elif engine == Engine.Aurora:
             self._policy = RoutingPolicy.AlwaysAurora
-        elif dbname == DBType.Redshift:
+        elif engine == Engine.Redshift:
             self._policy = RoutingPolicy.AlwaysRedshift
         else:
             raise RuntimeError
@@ -30,7 +29,7 @@ class ConfigFileOverride(ConfigFile):
         return self._policy
 
 
-async def run_brad_experiment(args, brad: BradServer, out_dir: pathlib.Path):
+async def run_brad_experiment(args, brad: BradFrontEnd, out_dir: pathlib.Path):
     await brad.run_setup()
     session_id = await brad.start_session()
     try:
@@ -51,22 +50,23 @@ async def run_brad_experiment(args, brad: BradServer, out_dir: pathlib.Path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dbname", type=str, required=True)
     parser.add_argument("--config-file", type=str, required=True)
-    parser.add_argument("--schema-file", type=str, required=True)
+    parser.add_argument("--planner-config", type=str, required=True)
+    parser.add_argument("--schema-name", type=str, required=True)
+    parser.add_argument("--engine", type=str, required=True)
     parser.add_argument("--iters", type=int, default=50)
     parser.add_argument("--trials", type=int, default=5)
     args = parser.parse_args()
 
-    config = ConfigFileOverride(args.config_file, args.dbname)
-    schema = Schema.load(args.schema_file)
+    engine = Engine.from_str(args.engine)
+    config = ConfigFileOverride(args.config_file, engine)
 
     try:
         out_dir = cond.get_output_path()
     except RuntimeError:
         out_dir = pathlib.Path()  # The current working directory.
 
-    brad = BradServer(config, schema)
+    brad = BradFrontEnd(config, args.schema_name, args.planner_config, debug_mode=False)
     asyncio.run(run_brad_experiment(args, brad, out_dir))
 
 
