@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 def register_command(subparsers):
     parser = subparsers.add_parser(
-        "server",
-        help="Start the BRAD server.",
+        "daemon",
+        help="Start the BRAD daemon.",
     )
     parser.add_argument(
         "--config-file",
