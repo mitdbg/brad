@@ -10,16 +10,8 @@ from brad.utils import set_up_logging
 logger = logging.getLogger(__name__)
 
 
-def handle_exception(event_loop, context):
-    message = context.get("exception", context["message"])
-    logging.error("Encountered uncaught exception: %s", message)
-    logging.error("%s", context)
-    if event_loop.is_closed():
-        return
-
-
 def start_front_end(
-    worker_index: int,
+    fe_index: int,
     config_path: str,
     schema_name: str,
     path_to_planner_config: str,
@@ -32,9 +24,7 @@ def start_front_end(
     end server.
     """
     config = ConfigFile(config_path)
-    set_up_logging(
-        filename=config.front_end_log_file(worker_index), debug_mode=debug_mode
-    )
+    set_up_logging(filename=config.front_end_log_file(fe_index), debug_mode=debug_mode)
 
     event_loop = asyncio.new_event_loop()
     event_loop.set_debug(enabled=debug_mode)
@@ -45,11 +35,11 @@ def start_front_end(
     # daemon directly.
     for sig in [signal.SIGTERM, signal.SIGINT]:
         event_loop.add_signal_handler(sig, _noop)
-    event_loop.set_exception_handler(handle_exception)
+    event_loop.set_exception_handler(_handle_exception)
 
     try:
         front_end = BradFrontEnd(
-            worker_index,
+            fe_index,
             config,
             schema_name,
             path_to_planner_config,
@@ -58,11 +48,19 @@ def start_front_end(
             output_queue,
         )
         event_loop.create_task(front_end.serve_forever())
-        logger.info("BRAD front end #%d is starting...", worker_index)
+        logger.info("BRAD front end %d is starting...", fe_index)
         event_loop.run_forever()
     finally:
         event_loop.close()
-        logger.info("BRAD front end #%d has shut down.", worker_index)
+        logger.info("BRAD front end %d has shut down.", fe_index)
+
+
+def _handle_exception(event_loop, context):
+    message = context.get("exception", context["message"])
+    logging.error("Encountered uncaught exception: %s", message)
+    logging.error("%s", context)
+    if event_loop.is_closed():
+        return
 
 
 def _noop():

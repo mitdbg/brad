@@ -46,7 +46,7 @@ RowList = List[Tuple[Any, ...]]
 class BradFrontEnd(BradInterface):
     def __init__(
         self,
-        worker_index: int,
+        fe_index: int,
         config: ConfigFile,
         schema_name: str,
         path_to_planner_config: str,
@@ -54,7 +54,7 @@ class BradFrontEnd(BradInterface):
         input_queue: mp.Queue,
         output_queue: mp.Queue,
     ):
-        self._worker_index = worker_index
+        self._fe_index = fe_index
         self._config = config
         self._schema_name = schema_name
         self._debug_mode = debug_mode
@@ -135,7 +135,7 @@ class BradFrontEnd(BradInterface):
         try:
             grpc_server = grpc.aio.server()
             brad_grpc.add_BradServicer_to_server(BradGrpc(self), grpc_server)
-            port_to_use = self._config.front_end_port + self._worker_index
+            port_to_use = self._config.front_end_port + self._fe_index
             grpc_server.add_insecure_port(
                 "{}:{}".format(self._config.front_end_interface, port_to_use)
             )
@@ -382,7 +382,7 @@ class BradFrontEnd(BradInterface):
 
             # If the input queue is full, we just drop this message.
             sampled_thpt = txn_value / elapsed_time_s
-            metrics_report = MetricsReport(sampled_thpt)
+            metrics_report = MetricsReport(self._fe_index, sampled_thpt)
             logger.debug(
                 "Sending metrics report: txn_completions_per_s: %.2f", sampled_thpt
             )

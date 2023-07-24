@@ -12,11 +12,11 @@ class NewBlueprint:
 
 class MetricsReport:
     """
-    Sent from the server to the daemon to report BRAD's client-side metrics.
+    Sent from the front end to the daemon to report BRAD's client-side metrics.
     """
 
-    def __init__(self, txn_completions_per_s: float) -> None:
-        # We will need to include a "worker id" once we have multiple front ends.
+    def __init__(self, fe_index: int, txn_completions_per_s: float) -> None:
+        self.fe_index = fe_index
         self.txn_completions_per_s = txn_completions_per_s
 
 
