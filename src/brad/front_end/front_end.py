@@ -119,11 +119,7 @@ class BradFrontEnd(BradInterface):
         logger.info("Using routing policy: %s", routing_policy)
 
         self._sessions = SessionManager(self._config, self._schema_name)
-
-        self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
-        self._timed_sync_task: Optional[asyncio.Task[None]] = None
         self._daemon_messages_task: Optional[asyncio.Task[None]] = None
-
         self._estimator: Optional[Estimator] = None
 
         # Number of transactions that completed.
@@ -164,10 +160,6 @@ class BradFrontEnd(BradInterface):
         await self._blueprint_mgr.load()
         logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
 
-        if self._config.data_sync_period_seconds > 0:
-            self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
-        await self._data_sync_executor.establish_connections()
-
         if self._routing_policy == RoutingPolicy.ForestTableSelectivity:
             self._estimator = await PostgresEstimator.connect(
                 self._schema_name, self._config
@@ -195,12 +187,6 @@ class BradFrontEnd(BradInterface):
         if self._daemon_messages_task is not None:
             self._daemon_messages_task.cancel()
             self._daemon_messages_task = None
-
-        if self._timed_sync_task is not None:
-            await self._timed_sync_task.close()
-            self._timed_sync_task = None
-
-        await self._data_sync_executor.shutdown()
 
         if self._brad_metrics_reporting_task is not None:
             self._brad_metrics_reporting_task.cancel()
@@ -352,12 +338,6 @@ class BradFrontEnd(BradInterface):
 
         else:
             return [("Unknown internal command: {}".format(command),)]
-
-    async def _run_sync_periodically(self) -> None:
-        while True:
-            await asyncio.sleep(self._config.data_sync_period_seconds)
-            logger.debug("Starting an auto data sync.")
-            await self._data_sync_executor.run_sync(self._blueprint_mgr.get_blueprint())
 
     async def _read_daemon_messages(self) -> None:
         assert self._input_queue is not None
