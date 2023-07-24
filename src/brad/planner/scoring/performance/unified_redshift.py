@@ -36,6 +36,18 @@ class RedshiftProvisioningScore:
         Computes all of the Redshift provisioning-dependent scoring components in one
         place.
         """
+        # Special case: If we turn off Redshift (set the number of nodes to 0).
+        if next_prov.num_nodes() == 0:
+            return cls(
+                base_query_run_times,
+                0.0,
+                next_prov,
+                {
+                    "query_factor": 0.0,
+                    "adjusted_cpu_denorm": 0.0,
+                },
+            )
+
         overall_forecasted_cpu_util_pct = ctx.metrics.redshift_cpu_avg
         overall_cpu_util_denorm = (
             (overall_forecasted_cpu_util_pct / 100)
@@ -44,7 +56,10 @@ class RedshiftProvisioningScore:
         )
 
         # 1. Adjust the analytical portion of the system load for query movement.
-        if Engine.Redshift not in ctx.current_latency_weights:
+        if (
+            Engine.Redshift not in ctx.current_latency_weights
+            or curr_prov.num_nodes() == 0
+        ):
             # Special case. We cannot reweigh the queries because nothing in the
             # current workload ran on Redshift.
             query_factor = 1.0
