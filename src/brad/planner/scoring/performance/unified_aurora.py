@@ -6,7 +6,7 @@ from typing import Dict
 from brad.config.engine import Engine
 from brad.blueprint.provisioning import Provisioning
 from brad.planner.scoring.context import ScoringContext
-from brad.planner.scoring.provisioning import aurora_resource_value, aurora_num_cpus
+from brad.planner.scoring.provisioning import aurora_num_cpus
 
 logger = logging.getLogger(__name__)
 
@@ -88,15 +88,6 @@ class AuroraProvisioningScore:
             # current workload ran on Aurora.
             query_factor = 1.0
         else:
-            # We scale the predicted query execution times by a factor "l", which is
-            # meant to capture the load on the system (e.g., concurrently running
-            # queries). We model l as being proportional to the predicted change in CPU
-            # utilization across deployments.
-            #
-            # First we calculate the predicted CPU utilization on the next blueprint
-            # (Redshift provisioning and query placement). Then we compute the CPU
-            # utilization change and translate this value into l.
-
             # Query movement scaling factor.
             # Captures change in queries routed to this engine.
             base_latency = ctx.current_latency_weights[Engine.Aurora]
@@ -147,7 +138,7 @@ class AuroraProvisioningScore:
         overall_load: float,
         ctx: ScoringContext,
     ) -> npt.NDArray:
-        resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_resource_value(to_prov)
+        resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(to_prov)
         basis = np.array(
             [overall_load * resource_factor, overall_load, resource_factor, 1.0]
         )
@@ -172,4 +163,4 @@ class AuroraProvisioningScore:
         )
 
 
-_AURORA_BASE_RESOURCE_VALUE = aurora_resource_value(Provisioning("db.r6g.large", 1))
+_AURORA_BASE_RESOURCE_VALUE = aurora_num_cpus(Provisioning("db.r6g.large", 1))

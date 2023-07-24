@@ -139,3 +139,8 @@ def redshift_resource_value(prov: Provisioning) -> float:
 def aurora_num_cpus(prov: Provisioning) -> int:
     specs = AuroraSpecs[prov.instance_type()]
     return specs.vcpus
+
+
+def redshift_num_cpus(prov: Provisioning) -> int:
+    specs = RedshiftSpecs[prov.instance_type()]
+    return specs.vcpus
