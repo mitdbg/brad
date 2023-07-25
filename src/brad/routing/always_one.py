@@ -1,6 +1,6 @@
-from brad.routing import Router
 from brad.config.engine import Engine
 from brad.query_rep import QueryRep
+from brad.routing.router import Router
 
 
 class AlwaysOneRouter(Router):
@@ -13,5 +13,5 @@ class AlwaysOneRouter(Router):
         super().__init__()
         self._always_route_to = db_type
 
-    def engine_for(self, _query: QueryRep) -> Engine:
+    def engine_for_sync(self, _query: QueryRep) -> Engine:
         return self._always_route_to

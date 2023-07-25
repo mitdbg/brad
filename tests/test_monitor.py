@@ -1,9 +1,15 @@
 from brad.daemon.monitor import Monitor
-from brad.config.file import ConfigFile
+from brad.config.engine import Engine
 import asyncio
 from pandas.testing import assert_frame_equal
 
 # pylint: disable=protected-access
+
+cluster_ids = {
+    Engine.Aurora: "brad-aurora",
+    Engine.Redshift: "brad-redshift",
+    Engine.Athena: "primary",
+}
 
 
 def test_read_k_most_recent():
@@ -11,7 +17,7 @@ def test_read_k_most_recent():
 
 
 async def f1():
-    m = Monitor(ConfigFile("./config/config.yml"))
+    m = Monitor(cluster_ids=cluster_ids)
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
@@ -31,7 +37,7 @@ def test_read_k_upcoming():
 
 
 async def f2():
-    m = Monitor(ConfigFile("./config/config.yml"))
+    m = Monitor(cluster_ids=cluster_ids)
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
@@ -54,7 +60,7 @@ def test_read_upcoming_until():
 
 
 async def f3():
-    m = Monitor(ConfigFile("./config/config.yml"))
+    m = Monitor(cluster_ids=cluster_ids)
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
@@ -79,7 +85,7 @@ def test_read_between_times():
 
 
 async def f4():
-    m = Monitor(ConfigFile("./config/config.yml"))
+    m = Monitor(cluster_ids=cluster_ids)
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
@@ -107,7 +113,7 @@ def test_read_between_epochs():
 
 
 async def f5():
-    m = Monitor(ConfigFile("./config/config.yml"))
+    m = Monitor(cluster_ids=cluster_ids)
     task = asyncio.create_task(m.run_forever())
 
     while m._values.empty:
@@ -125,3 +131,23 @@ async def f5():
             df.head(i + 3).tail(1).reset_index(drop=True),
             t.tail(1).reset_index(drop=True),
         )
+
+
+def test_reading_cost_metrics():
+    asyncio.run(f6())
+
+
+async def f6():
+    m = Monitor(cluster_ids=cluster_ids)
+    task = asyncio.create_task(m.run_forever())
+
+    while m._values.empty:
+        await asyncio.sleep(1)
+
+    df = m.read_k_most_recent(3)
+    t = m._values.tail(3)
+    task.cancel()
+
+    assert df.shape[0] == 3
+    assert df.shape[1] == len(m._metric_ids)
+    assert_frame_equal(df, t)

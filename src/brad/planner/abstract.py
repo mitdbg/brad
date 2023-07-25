@@ -2,6 +2,16 @@ import asyncio
 from typing import Coroutine, Callable, List
 
 from brad.blueprint import Blueprint
+from brad.config.file import ConfigFile
+from brad.config.planner import PlannerConfig
+from brad.daemon.monitor import Monitor
+from brad.planner.compare.function import BlueprintComparator
+from brad.planner.estimator import EstimatorProvider
+from brad.planner.metrics import MetricsProvider
+from brad.planner.scoring.data_access.provider import DataAccessProvider
+from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
+from brad.planner.workload import Workload
+from brad.planner.workload.provider import WorkloadProvider
 
 NewBlueprintCallback = Callable[[Blueprint], Coroutine[None, None, None]]
 
@@ -13,13 +23,47 @@ class BlueprintPlanner:
     multiple Python threads from executing in parallel.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        planner_config: PlannerConfig,
+        current_blueprint: Blueprint,
+        current_workload: Workload,
+        monitor: Monitor,
+        config: ConfigFile,
+        schema_name: str,
+        workload_provider: WorkloadProvider,
+        analytics_latency_scorer: AnalyticsLatencyScorer,
+        comparator: BlueprintComparator,
+        metrics_provider: MetricsProvider,
+        data_access_provider: DataAccessProvider,
+        estimator_provider: EstimatorProvider,
+    ) -> None:
+        self._planner_config = planner_config
+        self._current_blueprint = current_blueprint
+        self._current_workload = current_workload
+        self._monitor = monitor
+        self._config = config
+        self._schema_name = schema_name
+
+        self._workload_provider = workload_provider
+        self._analytics_latency_scorer = analytics_latency_scorer
+        self._comparator = comparator
+        self._metrics_provider = metrics_provider
+        self._data_access_provider = data_access_provider
+        self._estimator_provider = estimator_provider
+
         self._callbacks: List[NewBlueprintCallback] = []
 
     async def run_forever(self) -> None:
         """
         Called to start the planner. The planner is meant to run until its task
         is cancelled.
+        """
+        raise NotImplementedError
+
+    async def run_replan(self) -> None:
+        """
+        Triggers a "forced" replan. Used for debugging.
         """
         raise NotImplementedError
 

@@ -1,9 +1,9 @@
-from typing import Callable, Dict, List, Set, Optional, Tuple
+from typing import Callable, Dict, List, Set, Optional, Tuple, Any
 
 from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.table import Table
 from brad.config.engine import Engine
-from brad.routing import Router
+from brad.routing.router import Router
 
 RouterProvider = Callable[[], Router]
 
@@ -29,6 +29,10 @@ class Blueprint:
         self._tables_by_name = {tbl.name: tbl for tbl in self._table_schemas}
         self._base_table_names = self._compute_base_tables()
 
+        self._table_locations_bitmap: Dict[str, int] = {
+            tbl: Engine.to_bitmap(locs) for tbl, locs in self._table_locations.items()
+        }
+
     def schema_name(self) -> str:
         return self._schema_name
 
@@ -37,6 +41,9 @@ class Blueprint:
 
     def table_locations(self) -> Dict[str, List[Engine]]:
         return self._table_locations
+
+    def table_locations_bitmap(self) -> Dict[str, int]:
+        return self._table_locations_bitmap
 
     def tables_with_locations(self) -> List[Tuple[Table, List[Engine]]]:
         result = []
@@ -120,3 +127,16 @@ class Blueprint:
             )
         )
         return "\n  ".join(["Blueprint:", tables, aurora, redshift])
+
+    def as_dict(self) -> Dict[str, Any]:
+        """
+        Useful for logging and debugging purposes.
+        """
+        provisioning = {
+            "aurora_instance_type": self.aurora_provisioning().instance_type(),
+            "aurora_num_nodes": self.aurora_provisioning().num_nodes(),
+            "redshift_instance_type": self.redshift_provisioning().instance_type(),
+            "redshift_num_nodes": self.redshift_provisioning().num_nodes(),
+        }
+        table_locations = self.table_locations_bitmap()
+        return {**provisioning, **table_locations}

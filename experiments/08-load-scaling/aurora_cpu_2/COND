@@ -1,0 +1,40 @@
+CSTR_VAR = "AURORA_CSTR"
+QUERY_FILE = "../queries.sql"
+AVG_GAP_S = 1
+RUN_FOR_S = 3 * 60 + 45  # 3 minutes, 45 seconds
+
+run_experiment_group(
+  name="r6i_large",
+  run="python3 ../olap_batch_runner.py",
+  experiments=[
+    ExperimentInstance(
+      name="r6i_large-{}".format(clients),
+      options={
+        "num_clients": clients,
+        "cstr_var": CSTR_VAR,
+        "query_file": QUERY_FILE,
+        "avg_gap_s": AVG_GAP_S,
+        "run_for_s": RUN_FOR_S,
+      },
+    )
+    for clients in [1, 2, 4, 8, 10]
+  ],
+)
+
+run_experiment_group(
+  name="r6i_xlarge",
+  run="python3 ../olap_batch_runner.py",
+  experiments=[
+    ExperimentInstance(
+      name="r6i_xlarge-{}".format(clients),
+      options={
+        "num_clients": clients,
+        "cstr_var": CSTR_VAR,
+        "query_file": QUERY_FILE,
+        "avg_gap_s": AVG_GAP_S,
+        "run_for_s": RUN_FOR_S,
+      },
+    )
+    for clients in [1, 2, 4, 8, 10]
+  ],
+)

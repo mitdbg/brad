@@ -1,27 +1,11 @@
 [
   {
-    "instance_type": "db.t3.medium",
-    "vcpus": 2,
-    "memory_mib": 4096,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 0.082
-  },
-  {
     "instance_type": "db.t4g.medium",
     "vcpus": 2,
     "memory_mib": 4096,
     "min_nodes": 1,
     "max_nodes": 15,
     "usd_per_hour": 0.073
-  },
-  {
-    "instance_type": "db.t3.large",
-    "vcpus": 2,
-    "memory_mib": 8192,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 0.164
   },
   {
     "instance_type": "db.t4g.large",
@@ -32,28 +16,12 @@
     "usd_per_hour": 0.146
   },
   {
-    "instance_type": "db.r5.large",
-    "vcpus": 2,
-    "memory_mib": 16384,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 0.29
-  },
-  {
     "instance_type": "db.r6g.large",
     "vcpus": 2,
     "memory_mib": 16384,
     "min_nodes": 1,
     "max_nodes": 15,
     "usd_per_hour": 0.26
-  },
-  {
-    "instance_type": "db.r6i.large",
-    "vcpus": 2,
-    "memory_mib": 16384,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 0.29
   },
   {
     "instance_type": "db.x2g.large",
@@ -64,28 +32,12 @@
     "usd_per_hour": 0.377
   },
   {
-    "instance_type": "db.r5.xlarge",
-    "vcpus": 4,
-    "memory_mib": 32768,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 0.58
-  },
-  {
     "instance_type": "db.r6g.xlarge",
     "vcpus": 4,
     "memory_mib": 32768,
     "min_nodes": 1,
     "max_nodes": 15,
     "usd_per_hour": 0.519
-  },
-  {
-    "instance_type": "db.r6i.xlarge",
-    "vcpus": 4,
-    "memory_mib": 32768,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 0.58
   },
   {
     "instance_type": "db.x2g.xlarge",
@@ -96,28 +48,12 @@
     "usd_per_hour": 0.754
   },
   {
-    "instance_type": "db.r5.2xlarge",
-    "vcpus": 8,
-    "memory_mib": 65536,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 1.16
-  },
-  {
     "instance_type": "db.r6g.2xlarge",
     "vcpus": 8,
     "memory_mib": 65536,
     "min_nodes": 1,
     "max_nodes": 15,
     "usd_per_hour": 1.038
-  },
-  {
-    "instance_type": "db.r6i.2xlarge",
-    "vcpus": 8,
-    "memory_mib": 65536,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 1.16
   },
   {
     "instance_type": "db.x2g.2xlarge",
@@ -128,28 +64,12 @@
     "usd_per_hour": 1.508
   },
   {
-    "instance_type": "db.r5.4xlarge",
-    "vcpus": 16,
-    "memory_mib": 131072,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 2.32
-  },
-  {
     "instance_type": "db.r6g.4xlarge",
     "vcpus": 16,
     "memory_mib": 131072,
     "min_nodes": 1,
     "max_nodes": 15,
     "usd_per_hour": 2.076
-  },
-  {
-    "instance_type": "db.r6i.4xlarge",
-    "vcpus": 16,
-    "memory_mib": 131072,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 2.32
   },
   {
     "instance_type": "db.x2g.4xlarge",
@@ -160,28 +80,12 @@
     "usd_per_hour": 3.016
   },
   {
-    "instance_type": "db.r5.8xlarge",
-    "vcpus": 32,
-    "memory_mib": 262144,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 4.64
-  },
-  {
     "instance_type": "db.r6g.8xlarge",
     "vcpus": 32,
     "memory_mib": 262144,
     "min_nodes": 1,
     "max_nodes": 15,
     "usd_per_hour": 4.153
-  },
-  {
-    "instance_type": "db.r6i.8xlarge",
-    "vcpus": 32,
-    "memory_mib": 262144,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 4.64
   },
   {
     "instance_type": "db.x2g.8xlarge",
@@ -192,28 +96,12 @@
     "usd_per_hour": 6.032
   },
   {
-    "instance_type": "db.r5.12xlarge",
-    "vcpus": 48,
-    "memory_mib": 393216,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 6.96
-  },
-  {
     "instance_type": "db.r6g.12xlarge",
     "vcpus": 48,
     "memory_mib": 393216,
     "min_nodes": 1,
     "max_nodes": 15,
     "usd_per_hour": 6.229
-  },
-  {
-    "instance_type": "db.r6i.12xlarge",
-    "vcpus": 48,
-    "memory_mib": 393216,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 6.96
   },
   {
     "instance_type": "db.x2g.12xlarge",
@@ -224,14 +112,6 @@
     "usd_per_hour": 9.048
   },
   {
-    "instance_type": "db.r5.16xlarge",
-    "vcpus": 64,
-    "memory_mib": 524288,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 9.28
-  },
-  {
     "instance_type": "db.r6g.16xlarge",
     "vcpus": 64,
     "memory_mib": 524288,
@@ -240,43 +120,11 @@
     "usd_per_hour": 8.306
   },
   {
-    "instance_type": "db.r6i.16xlarge",
-    "vcpus": 64,
-    "memory_mib": 524288,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 9.28
-  },
-  {
     "instance_type": "db.x2g.16xlarge",
     "vcpus": 64,
     "memory_mib": 1048576,
     "min_nodes": 1,
     "max_nodes": 15,
     "usd_per_hour": 12.064
-  },
-  {
-    "instance_type": "db.r5.24xlarge",
-    "vcpus": 96,
-    "memory_mib": 786432,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 13.92
-  },
-  {
-    "instance_type": "db.r6i.24xlarge",
-    "vcpus": 96,
-    "memory_mib": 786432,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 13.92
-  },
-  {
-    "instance_type": "db.r6i.32xlarge",
-    "vcpus": 128,
-    "memory_mib": 1048576,
-    "min_nodes": 1,
-    "max_nodes": 15,
-    "usd_per_hour": 18.56
   }
 ]

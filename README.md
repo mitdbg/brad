@@ -17,16 +17,16 @@ If you would like to install BRAD in a `virtualenv`, run
 Note that these instructions are written for a Debian based machine (e.g., Ubuntu).
 
 - Install unixODBC: `sudo apt install unixodbc-dev`
-- **Redshift**:
-  - Install the Redshift ODBC driver (you will want the 64-bit driver)
-    https://docs.aws.amazon.com/redshift/latest/mgmt/configure-odbc-connection.html#install-odbc-driver-linux
-  - You may need to add `.odbc.ini` and `.odbcinst.ini` to your home directory.
-    Follow the instructions here:
-    https://docs.aws.amazon.com/redshift/latest/mgmt/configure-odbc-connection.html#odbc-driver-configure-linux-mac
 - **PostgreSQL**:
   - Install `odbc-postgresql`: `sudo apt install odbc-postgresql`
   - The driver should be installed to `/usr/lib/x86_64-linux-gnu/odbc/psqlodbcw.so`
   - You will use this driver to connect to Aurora PostgreSQL
+  - Add the following snippet to `~/.odbcinst.ini`
+    ```ini
+    [PostgreSQL]
+    Description=PostgreSQL ODBC Driver
+    Driver=/usr/lib/x86_64-linux-gnu/odbc/psqlodbcw.so
+    ```
 - **Athena**
   - Download the 64-bit Linux driver: https://docs.aws.amazon.com/athena/latest/ug/connect-with-odbc.html
   - Install `alien`: `sudo apt install alien` (it converts `*.rpm` files into `*.deb` files for installation on Ubuntu)
@@ -38,11 +38,19 @@ Note that these instructions are written for a Debian based machine (e.g., Ubunt
     Driver=/opt/simba/athenaodbc/lib/64/libathenaodbc_sb64.so
     ```
 
+We no longer depend on ODBC to connect to Redshift.
+
 ### Creating a Configuration File
 
 Make a copy of `config/config_sample.yml` and fill in the configurations using
 your values. Make sure you **do not** check in your configuration file, as it
 will contain your AWS access keys.
+
+#### Extra notes about creating instances
+
+- (Aurora) Enable performance insights and enhanced monitoring
+- (Aurora) Enable public access
+- (Redshift) Enable public access
 
 ### Creating Tables
 
@@ -62,13 +70,36 @@ engines.
   path/to/manifest.yml` to execute the bulk load (this time may take some time,
   depending on how much data you are loading).
 - Start the BRAD server `brad server --config-file path/to/config.yml
-  --schema-name your_schema_name`.
+  --schema-name your_schema_name --planner-config-file path/to/planner.yml`.
 - Run queries through the CLI `brad cli`.
 
 To remove the tables, use `brad admin drop_schema` (e.g., `brad admin
 drop_schema --config-file path/to/config.yml --schema-name
 your_schema_name`). Note that this command will delete the data in the tables
 (and will drop the tables)!
+
+
+### Upgrade Steps
+
+This section documents manual update steps you will need to take if you were
+running an older version of BRAD and have existing configurations and legacy
+files.
+
+- (06/22/2023) Rename the `s3_metadata_bucket` and `s3_metadata_path` keys in
+  the configuration to `s3_assets_bucket` and `s3_assets_path` respectively.
+- (06/30/2023) If you have already created the IMDB schema, run `brad admin
+  modify_blueprint --add-indexes --schema-file config/schemas/imdb.yml
+  --config-file path/to/your/config.yml` to add indexes to your deployment.
+- (07/02/2023) Re-run `./tools/install-dev.sh` to update your dependencies. We
+  removed `aioodbc` and added `redshift_connector`.
+- (07/04/2023) Update your local `config.yml` file; add an entry for
+  `sidecar_db`, which should point to a PostgreSQL-compatible DBMS that holds
+  the entire dataset (used for supporting purposes).
+- (07/06/2023) Update your local `config.yml` and add an entry for
+  `front_end_metrics_reporting_period_seconds`.
+- (07/24/2023) Update your local `config.yml` and add entries for
+  `front_end_interface`, `front_end_port`, `num_front_ends`, and
+  `front_end_log_path`. Remove `server_interface` and `server_port`.
 
 
 ### Generate IMDB workload

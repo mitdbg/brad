@@ -1,0 +1,35 @@
+from itertools import product
+
+QUERIES = list(range(25))
+QUERIES.remove(16)
+
+CLIENTS = [1, 2, 4, 6, 8]
+
+CSTR_VAR = "AURORA_CSTR"
+QUERY_FILE = "../queries.sql"
+AVG_GAP_S = 3
+RUN_FOR_S = 3 * 60 + 45  # 3 minutes, 45 seconds
+
+INSTANCES = ["r6i_large", "r6i_xlarge"]
+
+for inst in INSTANCES:
+  run_experiment_group(
+    name=inst,
+    run="python3 ../olap_batch_runner.py",
+    experiments=[
+      ExperimentInstance(
+        name="{}-q{}-{}".format(inst, qidx, clients),
+        options={
+          "num_clients": clients,
+          "cstr_var": CSTR_VAR,
+          "query_file": QUERY_FILE,
+          "avg_gap_s": AVG_GAP_S,
+          "run_for_s": RUN_FOR_S,
+          "specific_query_idx": qidx,
+          # Pause 30 seconds before starting the experiment instance.
+          "wait_before_start": 30,
+        },
+      )
+      for clients, qidx in product(CLIENTS, QUERIES[:10])
+    ],
+  )

@@ -11,8 +11,8 @@ from brad.data_sync.execution.table_sync_bounds import TableSyncBounds
 from brad.data_sync.logical_plan import LogicalDataSyncPlan
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
 from brad.data_sync.planner import make_logical_data_sync_plan
-from brad.server.blueprint_manager import BlueprintManager
-from brad.server.engine_connections import EngineConnections
+from brad.blueprint_manager import BlueprintManager
+from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,11 @@ class DataSyncExecutor:
         self._engines = await EngineConnections.connect(
             self._config, self._blueprint_mgr.schema_name, autocommit=False
         )
-        await self._engines.get_connection(Engine.Aurora).execute(
+        # Reads/writes to the data sync metadata are handled by this Aurora connection.
+        # We need serializable isolation for correctness.
+        conn = self._engines.get_connection(Engine.Aurora)
+        cursor = await conn.cursor()
+        await cursor.execute(
             "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE"
         )
 

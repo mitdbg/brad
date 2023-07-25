@@ -3,13 +3,15 @@ import logging
 import yaml
 from concurrent.futures import ThreadPoolExecutor
 from collections import namedtuple
-from typing import Any, Coroutine, Iterator, List
+from typing import Any, Coroutine, Iterator, List, Set, Tuple
 
+from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
 from brad.blueprint.sql_gen.table import (
     comma_separated_column_names_and_types,
     comma_separated_column_names,
 )
+from brad.connection.connection import Connection
 from brad.config.file import ConfigFile
 from brad.config.engine import Engine
 from brad.config.strings import (
@@ -17,8 +19,8 @@ from brad.config.strings import (
     AURORA_SEQ_COLUMN,
     source_table_name,
 )
-from brad.server.blueprint_manager import BlueprintManager
-from brad.server.engine_connections import EngineConnections
+from brad.blueprint_manager import BlueprintManager
+from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
@@ -73,20 +75,35 @@ def register_admin_action(subparser) -> None:
         help="If set, this tool will load the tables one-by-one.",
     )
     parser.add_argument(
+        "--only-engines",
+        type=str,
+        nargs="+",
+        help="Use this flag to run bulk loads against a subset of the engines.",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
-        help="Bulk load is normally only allowed when the table(s) are all empty. "
+        help="Bulk load is normally only performed on non-empty tables. "
         "Set this flag to override this restriction.",
+    )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="If set, abort the bulk load if any tables are non-empty.",
     )
     parser.set_defaults(admin_action=bulk_load)
 
 
 async def _ensure_empty(
-    manifest, blueprint: Blueprint, engines: EngineConnections
-) -> None:
+    manifest,
+    blueprint: Blueprint,
+    engines: EngineConnections,
+    engines_filter: Set[Engine],
+) -> List[Tuple[Engine, str]]:
     """
-    Verifies that the tables being loaded into are empty.
+    Checks if the tables being loaded into are empty. Returns non-empty tables.
     """
+    nonempty_tables = []
 
     try:
         for load_table in manifest["tables"]:
@@ -94,28 +111,32 @@ async def _ensure_empty(
             table_locations = blueprint.get_table_locations(table_name)
 
             for engine in table_locations:
+                if engine not in engines_filter:
+                    continue
+
                 conn = engines.get_connection(engine)
                 cursor = await conn.cursor()
                 await cursor.execute("SELECT COUNT(*) FROM {}".format(table_name))
                 row = await cursor.fetchone()
-                if row[0] != 0:
-                    message = "Table {} on {} is non-empty ({} rows). You can only bulk load non-empty tables.".format(
-                        table_name,
-                        engine,
-                        row[0],
-                    )
-                    logger.error(message)
-                    raise RuntimeError(message)
+                if row is not None and row[0] != 0:
+                    nonempty_tables.append((engine, table_name))
+        return nonempty_tables
     finally:
-        await engines.get_connection(Engine.Aurora).rollback()
-        await engines.get_connection(Engine.Redshift).rollback()
+        if Engine.Aurora in engines_filter:
+            conn = engines.get_connection(Engine.Aurora)
+            cursor = await conn.cursor()
+            await cursor.rollback()
+        if Engine.Redshift in engines_filter:
+            conn = engines.get_connection(Engine.Redshift)
+            cursor = await conn.cursor()
+            await cursor.rollback()
 
 
 async def _load_aurora(
     ctx: _LoadContext,
     table_name: str,
     table_options,
-    aurora_connection,
+    aurora_connection: Connection,
 ) -> Engine:
     logger.info("Loading %s on Aurora...", table_name)
     table = ctx.blueprint.get_table(table_name)
@@ -161,7 +182,7 @@ async def _load_redshift(
     ctx: _LoadContext,
     table_name: str,
     table_options,
-    redshift_connection,
+    redshift_connection: Connection,
 ) -> Engine:
     logger.info("Loading %s on Redshift...", table_name)
     load_query = _REDSHIFT_LOAD_TEMPLATE.format(
@@ -176,7 +197,8 @@ async def _load_redshift(
         s3_iam_role=ctx.config.redshift_s3_iam_role,
     )
     logger.debug("Running on Redshift %s", load_query)
-    await redshift_connection.execute(load_query)
+    cursor = await redshift_connection.cursor()
+    await cursor.execute(load_query)
     logger.info("Done loading %s on Redshift!", table_name)
     return Engine.Redshift
 
@@ -185,7 +207,7 @@ async def _load_athena(
     ctx: _LoadContext,
     table_name: str,
     table_options,
-    athena_connection,
+    athena_connection: Connection,
 ) -> Engine:
     logger.info("Loading %s on Athena...", table_name)
     table = ctx.blueprint.get_table(table_name)
@@ -213,19 +235,20 @@ async def _load_athena(
         ),
     )
     logger.debug("Running on Athena %s", q)
-    await athena_connection.execute(q)
+    cursor = await athena_connection.cursor()
+    await cursor.execute(q)
 
     # 2. Actually run the load.
     q = "INSERT INTO {table_name} SELECT * FROM {table_name}_brad_loading".format(
         table_name=table_name
     )
     logger.debug("Running on Athena %s", q)
-    await athena_connection.execute(q)
+    await cursor.execute(q)
 
     # 3. Remove the loading table.
     q = "DROP TABLE {}_brad_loading".format(table_name)
     logger.debug("Running on Athena %s", q)
-    await athena_connection.execute(q)
+    await cursor.execute(q)
 
     logger.info("Done loading %s on Athena!", table_name)
     return Engine.Athena
@@ -269,28 +292,45 @@ async def _update_sync_progress(
 
 def _try_add_task(
     generator: Iterator[Coroutine[Any, Any, Engine]],
-    dest: List[asyncio.Task[Engine] | Coroutine[Any, Any, Engine]],
+    dest: List[asyncio.Task[Engine]],
 ) -> None:
     try:
-        dest.append(next(generator))
+        coro = next(generator)
+        task = asyncio.create_task(coro)
+        dest.append(task)
     except StopIteration:
         pass
 
 
 async def bulk_load_impl(args, manifest) -> None:
     config = ConfigFile(args.config_file)
-    blueprint_mgr = BlueprintManager(config, manifest["schema_name"])
+    assets = AssetManager(config)
+    blueprint_mgr = BlueprintManager(assets, manifest["schema_name"])
     await blueprint_mgr.load()
     blueprint = blueprint_mgr.get_blueprint()
 
+    # Check for specific engines.
+    if args.only_engines is not None and len(args.only_engines) > 0:
+        engines_filter = {Engine.from_str(val) for val in args.only_engines}
+    else:
+        engines_filter = {Engine.Aurora, Engine.Athena, Engine.Redshift}
+
     try:
-        running: List[asyncio.Task[Engine] | Coroutine[Any, Any, Engine]] = []
-        engines = await EngineConnections.connect(config, manifest["schema_name"])
+        running: List[asyncio.Task[Engine]] = []
+        engines = await EngineConnections.connect(
+            config, manifest["schema_name"], specific_engines=engines_filter
+        )
         if not args.force:
-            logger.info("Verifying that all tables are empty...")
-            await _ensure_empty(manifest, blueprint, engines)
+            logger.info("Checking for non-empty tables...")
+            nonempty_tables = await _ensure_empty(
+                manifest, blueprint, engines, engines_filter
+            )
         else:
-            logger.info("Not checking for empty tables.")
+            logger.info("Not checking for non-empty tables.")
+            nonempty_tables = []
+
+        if args.strict and len(nonempty_tables) > 0:
+            raise RuntimeError("There are non-empty tables and --strict is set.")
 
         ctx = _LoadContext(
             config, manifest["s3_bucket"], manifest["s3_bucket_region"], blueprint
@@ -299,24 +339,40 @@ async def bulk_load_impl(args, manifest) -> None:
         def load_tasks_for_engine(
             engine: Engine,
         ) -> Iterator[Coroutine[Any, Any, Engine]]:
+            if engine not in engines_filter:
+                return
+
             for table_options in manifest["tables"]:
                 table_name = table_options["table_name"]
                 table_locations = blueprint.get_table_locations(table_name)
-                if engine == Engine.Aurora and Engine.Aurora in table_locations:
+                table_tup = (engine, table_name)
+                if (
+                    engine == Engine.Aurora
+                    and Engine.Aurora in table_locations
+                    and table_tup not in nonempty_tables
+                ):
                     yield _load_aurora(
                         ctx,
                         table_name,
                         table_options,
                         engines.get_connection(Engine.Aurora),
                     )
-                elif engine == Engine.Redshift and Engine.Redshift in table_locations:
+                elif (
+                    engine == Engine.Redshift
+                    and Engine.Redshift in table_locations
+                    and table_tup not in nonempty_tables
+                ):
                     yield _load_redshift(
                         ctx,
                         table_name,
                         table_options,
                         engines.get_connection(Engine.Redshift),
                     )
-                elif engine == Engine.Athena and Engine.Athena in table_locations:
+                elif (
+                    engine == Engine.Athena
+                    and Engine.Athena in table_locations
+                    and table_tup not in nonempty_tables
+                ):
                     yield _load_athena(
                         ctx,
                         table_name,
@@ -361,14 +417,21 @@ async def bulk_load_impl(args, manifest) -> None:
                     elif engine == Engine.Athena:
                         _try_add_task(athena_loads, running)
 
-        await engines.get_connection(Engine.Aurora).commit()
-        await engines.get_connection(Engine.Redshift).commit()
+        if Engine.Aurora in engines_filter:
+            conn = engines.get_connection(Engine.Aurora)
+            cursor = await conn.cursor()
+            await cursor.commit()
+        if Engine.Redshift in engines_filter:
+            conn = engines.get_connection(Engine.Redshift)
+            cursor = await conn.cursor()
+            await cursor.commit()
         # Athena does not support transactions.
 
         # Update the sync tables.
-        await _update_sync_progress(
-            manifest, blueprint, engines.get_connection(Engine.Aurora)
-        )
+        if Engine.Aurora in engines_filter:
+            await _update_sync_progress(
+                manifest, blueprint, engines.get_connection(Engine.Aurora)
+            )
 
     except:
         for to_cancel in running:

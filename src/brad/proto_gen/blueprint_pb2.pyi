@@ -24,6 +24,12 @@ class Blueprint(_message.Message):
     tables: _containers.RepeatedCompositeFieldContainer[Table]
     def __init__(self, schema_name: _Optional[str] = ..., tables: _Optional[_Iterable[_Union[Table, _Mapping]]] = ..., aurora: _Optional[_Union[Provisioning, _Mapping]] = ..., redshift: _Optional[_Union[Provisioning, _Mapping]] = ..., policy: _Optional[_Union[RoutingPolicy, _Mapping]] = ...) -> None: ...
 
+class Index(_message.Message):
+    __slots__ = ["column_name"]
+    COLUMN_NAME_FIELD_NUMBER: _ClassVar[int]
+    column_name: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, column_name: _Optional[_Iterable[str]] = ...) -> None: ...
+
 class Provisioning(_message.Message):
     __slots__ = ["instance_type", "num_nodes"]
     INSTANCE_TYPE_FIELD_NUMBER: _ClassVar[int]
@@ -39,16 +45,18 @@ class RoutingPolicy(_message.Message):
     def __init__(self, policy: _Optional[bytes] = ...) -> None: ...
 
 class Table(_message.Message):
-    __slots__ = ["columns", "dependencies", "locations", "table_name"]
+    __slots__ = ["columns", "dependencies", "indexes", "locations", "table_name"]
     COLUMNS_FIELD_NUMBER: _ClassVar[int]
     DEPENDENCIES_FIELD_NUMBER: _ClassVar[int]
+    INDEXES_FIELD_NUMBER: _ClassVar[int]
     LOCATIONS_FIELD_NUMBER: _ClassVar[int]
     TABLE_NAME_FIELD_NUMBER: _ClassVar[int]
     columns: _containers.RepeatedCompositeFieldContainer[TableColumn]
     dependencies: TableDependency
+    indexes: _containers.RepeatedCompositeFieldContainer[Index]
     locations: _containers.RepeatedScalarFieldContainer[Engine]
     table_name: str
-    def __init__(self, table_name: _Optional[str] = ..., columns: _Optional[_Iterable[_Union[TableColumn, _Mapping]]] = ..., locations: _Optional[_Iterable[_Union[Engine, str]]] = ..., dependencies: _Optional[_Union[TableDependency, _Mapping]] = ...) -> None: ...
+    def __init__(self, table_name: _Optional[str] = ..., columns: _Optional[_Iterable[_Union[TableColumn, _Mapping]]] = ..., locations: _Optional[_Iterable[_Union[Engine, str]]] = ..., dependencies: _Optional[_Union[TableDependency, _Mapping]] = ..., indexes: _Optional[_Iterable[_Union[Index, _Mapping]]] = ...) -> None: ...
 
 class TableColumn(_message.Message):
     __slots__ = ["data_type", "is_primary", "name"]

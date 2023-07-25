@@ -16,7 +16,9 @@ from brad.config.strings import (
     update_trigger_name,
 )
 from ._table_templates import (
-    AURORA_INDEX_TEMPLATE,
+    AURORA_CREATE_BTREE_INDEX_TEMPLATE,
+    AURORA_DROP_INDEX_TEMPLATE,
+    AURORA_SEQ_COL_INDEX_TEMPLATE,
     AURORA_SEQ_CREATE_TABLE_TEMPLATE,
     AURORA_CREATE_SOURCE_VIEW_TEMPLATE,
     AURORA_DELETE_TRIGGER_FN_TEMPLATE,
@@ -57,7 +59,7 @@ class TableSqlGenerator:
                     pkey_columns=pkey_columns,
                 )
                 # The index on the monotonically increasing column.
-                create_source_index = AURORA_INDEX_TEMPLATE.format(
+                create_source_index = AURORA_SEQ_COL_INDEX_TEMPLATE.format(
                     index_name=seq_index_name(table, for_shadow=False),
                     table_name=source_table_name(table),
                 )
@@ -78,7 +80,7 @@ class TableSqlGenerator:
                     pkey_columns=pkey_columns,
                 )
                 # The index on the shadow table's monotonically increasing column.
-                create_shadow_index = AURORA_INDEX_TEMPLATE.format(
+                create_shadow_index = AURORA_SEQ_COL_INDEX_TEMPLATE.format(
                     index_name=seq_index_name(table, for_shadow=True),
                     table_name=shadow_table_name(table),
                 )
@@ -119,6 +121,21 @@ class TableSqlGenerator:
                     trigger_cond="BEFORE UPDATE",
                 )
 
+                # Any secondary indexes.
+                # NOTE: Aurora creates primary key indexes automatically.
+                create_indexes = []
+                for index_cols in table.secondary_indexed_columns:
+                    col_names = list(map(lambda col: col.name, index_cols))
+                    create_indexes.append(
+                        AURORA_CREATE_BTREE_INDEX_TEMPLATE.format(
+                            index_name="index_{}_{}".format(
+                                table.name, "_".join(col_names)
+                            ),
+                            table_name=source_table_name(table),
+                            columns=", ".join(col_names),
+                        )
+                    )
+
                 return (
                     [
                         create_source_table,
@@ -130,6 +147,7 @@ class TableSqlGenerator:
                         create_trigger,
                         create_update_trigger_fn,
                         create_update_trigger,
+                        *create_indexes,
                     ],
                     Engine.Aurora,
                 )
@@ -162,7 +180,11 @@ class TableSqlGenerator:
                 columns=comma_separated_column_names_and_types(
                     table.columns, Engine.Athena
                 ),
-                s3_path="{}{}".format(self._config.athena_s3_data_path, table.name),
+                s3_path="{}{}/{}".format(
+                    self._config.athena_s3_data_path,
+                    self._blueprint.schema_name(),
+                    table.name,
+                ),
             )
             return ([sql], Engine.Athena)
 
@@ -193,6 +215,36 @@ class TableSqlGenerator:
             queries.append(initialize_template.format(table_name=base_table_name))
 
         return (queries, Engine.Aurora)
+
+
+def generate_create_index_sql(
+    table: Table, indexes: List[Tuple[Column, ...]]
+) -> List[str]:
+    create_indexes = []
+    for index_cols in indexes:
+        col_names = list(map(lambda col: col.name, index_cols))
+        create_indexes.append(
+            AURORA_CREATE_BTREE_INDEX_TEMPLATE.format(
+                index_name="{}_{}_index".format(table.name, "_".join(col_names)),
+                table_name=source_table_name(table),
+                columns=", ".join(col_names),
+            )
+        )
+    return create_indexes
+
+
+def generate_drop_index_sql(
+    table: Table, indexes: List[Tuple[Column, ...]]
+) -> List[str]:
+    drop_indexes = []
+    for index_cols in indexes:
+        col_names = list(map(lambda col: col.name, index_cols))
+        drop_indexes.append(
+            AURORA_DROP_INDEX_TEMPLATE.format(
+                index_name="{}_{}_index".format(table.name, "_".join(col_names)),
+            )
+        )
+    return drop_indexes
 
 
 def comma_separated_column_names(cols: List[Column]) -> str:

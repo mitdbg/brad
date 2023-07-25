@@ -4,27 +4,38 @@ from typing import Dict
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.query_rep import QueryRep
-from brad.server.engine_connections import EngineConnections
-from brad.planner.plan_parsing import parse_explain_verbose, extract_base_cardinalities
+from brad.data_stats.plan_parsing import (
+    parse_explain_verbose,
+    extract_base_cardinalities,
+)
+from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
 
 class Query(QueryRep):
     """
-    A `QueryRep` that is decorated with statistics that need to be obtained at
-    runtime.
+    A `QueryRep` that is decorated with additional statistics that are used for
+    blueprint planning.
     """
 
-    def __init__(self, sql_query: str):
+    def __init__(self, sql_query: str, arrival_count: int = 1):
         super().__init__(sql_query)
+        self._arrival_count = arrival_count
+
+        # Legacy statistics.
         self._data_accessed_mb: Dict[Engine, int] = {}
         self._tuples_accessed: Dict[Engine, int] = {}
+
+    def arrival_count(self) -> int:
+        return self._arrival_count
+
+    # The methods below are legacy code.
 
     def data_accessed_mb(self, engine: Engine) -> int:
         return self._data_accessed_mb[engine]
 
-    async def populate_data_accessed_mb(
+    def populate_data_accessed_mb(
         self, for_engine: Engine, connections: EngineConnections, blueprint: Blueprint
     ) -> None:
         if for_engine in self._data_accessed_mb:
@@ -54,15 +65,15 @@ class Query(QueryRep):
         if source_engine == Engine.Aurora:
             query = "EXPLAIN VERBOSE {}".format(self.raw_query)
             aurora = connections.get_connection(Engine.Aurora)
-            cursor = await aurora.cursor()
+            cursor = aurora.cursor_sync()
         else:
             assert source_engine == Engine.Redshift
             query = "EXPLAIN {}".format(self.raw_query)
             redshift = connections.get_connection(Engine.Redshift)
-            cursor = await redshift.cursor()
+            cursor = redshift.cursor_sync()
 
-        await cursor.execute(query)
-        plan_rows = [tuple(row) async for row in cursor]
+        cursor.execute_sync(query)
+        plan_rows = [tuple(row) for row in cursor]
         plan = parse_explain_verbose(plan_rows)
         base_cardinalities = extract_base_cardinalities(plan)
 

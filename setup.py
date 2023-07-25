@@ -26,7 +26,6 @@ ENTRY_POINTS = {
 }
 
 INSTALL_REQUIRES = [
-    "aioodbc",
     "boto3",
     "grpcio",
     "pyodbc",
@@ -34,6 +33,11 @@ INSTALL_REQUIRES = [
     "sqlglot",
     "pandas",
     "scikit-learn",
+    "types-pytz",
+    "numpy",
+    "imbalanced-learn",
+    "redshift_connector",
+    "tabulate",
 ]
 
 DEV_REQUIRES = [
@@ -41,16 +45,15 @@ DEV_REQUIRES = [
     "black",
     "grpcio-tools",
     "mypy",
-    "numpy",
     "pylint",
     "pytest",
     "types-PyYAML",
     "types-protobuf",
     "absl-py",
-    "numpy",
     "immutables",
     "attrs",
     "typing-extensions",
+    "types-tabulate",
 ]
 
 KEYWORDS = []

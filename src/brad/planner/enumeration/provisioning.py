@@ -2,7 +2,7 @@ import importlib.resources as pkg_resources
 import json
 import math
 
-from typing import Iterator, Dict
+from typing import Iterator, Dict, Tuple, Optional
 
 from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
@@ -71,6 +71,9 @@ class ProvisioningEnumerator:
             for num_nodes in range(
                 int(specs["min_nodes"]), int(specs["max_nodes"]) + 1
             ):
+                if instance_type.startswith("db.") and num_nodes > 1:
+                    continue
+
                 candidate.set_num_nodes(num_nodes)
 
                 if (
@@ -83,17 +86,36 @@ class ProvisioningEnumerator:
     # part of the planner transition score.
 
     def scaling_to_distance(
-        self, base_provisioning: Provisioning, max_scaling_multiplier: float
+        self,
+        base_provisioning: Provisioning,
+        max_scaling_multiplier: float,
+        engine: Engine,
     ) -> float:
         """
         Helps with selecting a maximum distance value based on intuitive scaling
         limits on the existing provisioning.
         """
-        return (
-            float(self._instances[base_provisioning.instance_type()]["resource_value"])
-            * base_provisioning.num_nodes()
-            * max_scaling_multiplier
-        )
+        assert engine != Engine.Athena
+
+        if base_provisioning.num_nodes() == 0:
+            # Special case. Instead of using the current provisioning (which has
+            # 0 nodes, i.e., the engine is off), we use the "smallest" possible
+            # provisioning instead.
+            if engine == Engine.Aurora:
+                base_value = float(_MIN_AURORA[1]["resource_value"])
+            elif engine == Engine.Redshift:
+                base_value = float(_MIN_REDSHIFT[1]["resource_value"])
+            else:
+                raise RuntimeError("Unsupported engine {}".format(engine))
+        else:
+            base_value = (
+                float(
+                    self._instances[base_provisioning.instance_type()]["resource_value"]
+                )
+                * base_provisioning.num_nodes()
+            )
+
+        return base_value * max_scaling_multiplier
 
     def _compute_distance(self, source_value: float, dest: Provisioning) -> float:
         return self._compute_resource_value(dest) - source_value
@@ -107,7 +129,9 @@ class ProvisioningEnumerator:
 
 def _load_instance_resources(file_name: str) -> Dict[str, Dict[str, int | float]]:
     # Load data.
-    with pkg_resources.open_text(scoring_data, file_name) as data:
+    with pkg_resources.files(scoring_data).joinpath(file_name).open(
+        "r", encoding="UTF-8"
+    ) as data:
         instances = json.load(data)
     instances_map = {}
     for inst in instances:
@@ -121,5 +145,28 @@ def _load_instance_resources(file_name: str) -> Dict[str, Dict[str, int | float]
     return instances_map
 
 
+def _find_min_instance(
+    instances: Dict[str, Dict[str, int | float]]
+) -> Tuple[str, Dict[str, int | float]]:
+    min_type: Optional[str] = None
+    min_resources: Optional[Dict[str, int | float]] = None
+
+    for instance_type, resources in instances.items():
+        if (
+            min_resources is None
+            # pylint: disable-next=unsubscriptable-object
+            or resources["resource_value"] < min_resources["resource_value"]
+        ):
+            min_type = instance_type
+            min_resources = resources
+
+    assert min_type is not None
+    assert min_resources is not None
+    return min_type, min_resources
+
+
 _REDSHIFT_INSTANCES = _load_instance_resources("redshift_instances.json")
 _AURORA_INSTANCES = _load_instance_resources("aurora_postgresql_instances.json")
+
+_MIN_REDSHIFT = _find_min_instance(_REDSHIFT_INSTANCES)
+_MIN_AURORA = _find_min_instance(_AURORA_INSTANCES)

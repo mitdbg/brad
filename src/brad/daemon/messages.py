@@ -1,3 +1,4 @@
+from brad.row_list import RowList
 from brad.blueprint import Blueprint
 
 
@@ -10,18 +11,39 @@ class NewBlueprint:
         self.blueprint = blueprint
 
 
-class ReceivedQuery:
+class MetricsReport:
     """
-    Sent from the server to the daemon with a query that it received.
+    Sent from the front end to the daemon to report BRAD's client-side metrics.
     """
 
-    def __init__(self, query_str: str) -> None:
-        self.query_str = query_str
+    def __init__(self, fe_index: int, txn_completions_per_s: float) -> None:
+        self.fe_index = fe_index
+        self.txn_completions_per_s = txn_completions_per_s
 
 
-class ShutdownDaemon:
+class InternalCommandRequest:
     """
-    Sent from the server to the daemon indicating that it should shut down.
+    Sent from the front end to the daemon to handle an internal command.
+    """
+
+    def __init__(self, fe_index: int, request: str) -> None:
+        self.fe_index = fe_index
+        self.request = request
+
+
+class InternalCommandResponse:
+    """
+    Sent from the daemon to the front end to respond to an `InternalCommandRequest`.
+    """
+
+    def __init__(self, fe_index: int, response: RowList) -> None:
+        self.fe_index = fe_index
+        self.response = response
+
+
+class ShutdownFrontEnd:
+    """
+    Sent from the daemon to the front end indicating that it should shut down.
     """
 
 

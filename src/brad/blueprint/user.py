@@ -1,4 +1,5 @@
 import yaml
+import pathlib
 from typing import List, Set
 
 from .provisioning import Provisioning
@@ -21,7 +22,7 @@ class UserProvidedBlueprint:
     """
 
     @classmethod
-    def load_from_yaml_file(cls, path: str) -> "UserProvidedBlueprint":
+    def load_from_yaml_file(cls, path: str | pathlib.Path) -> "UserProvidedBlueprint":
         with open(path, "r", encoding="UTF-8") as file:
             raw_yaml = yaml.load(file, Loader=yaml.Loader)
         return cls._load_from_raw_yaml(raw_yaml)
@@ -42,7 +43,27 @@ class UserProvidedBlueprint:
                 list(raw_table["dependencies"]) if "dependencies" in raw_table else []
             )
             transform = raw_table["transform"] if "transform" in raw_table else None
-            tables.append(Table(name, columns, table_deps, transform))
+
+            secondary_indexed_columns = []
+            if "indexes" in raw_table:
+                column_map = {c.name: c for c in columns}
+                for indexed_cols in raw_table["indexes"]:
+                    col_list = []
+                    for col_name in indexed_cols.split(","):
+                        clean_col = col_name.strip()
+                        try:
+                            col_list.append(column_map[clean_col])
+                        except KeyError as ex:
+                            raise RuntimeError(
+                                "Invalid index column: '{}' is not a column of '{}'".format(
+                                    clean_col, name
+                                )
+                            ) from ex
+                    secondary_indexed_columns.append(tuple(col_list))
+
+            tables.append(
+                Table(name, columns, table_deps, transform, secondary_indexed_columns)
+            )
 
         if "provisioning" in raw_yaml:
             aurora = raw_yaml["provisioning"]["aurora"]

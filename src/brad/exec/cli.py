@@ -1,6 +1,7 @@
 import time
 
 import brad
+from tabulate import tabulate
 from brad.grpc_client import BradGrpcClient, BradClientError
 
 
@@ -48,17 +49,21 @@ def main(args):
                     # Dispatch query and print results. We buffer the whole result
                     # set in memory to get a reasonable estimate of the query
                     # execution time (including network overheads).
-                    encoded_rows = []
+                    exec_engine = None
                     start = time.time()
-                    encoded_row_stream = client.run_query(query)
-                    for encoded_row in encoded_row_stream:
-                        encoded_rows.append(encoded_row)
+                    results, exec_engine = client.run_query_json(query)
                     end = time.time()
 
-                    for encoded_row in encoded_rows:
-                        print(encoded_row.decode())
+                    print(tabulate(results, tablefmt="simple_grid"))
                     print()
-                    print("Took {:.3f} seconds.".format(end - start))
+                    if exec_engine is not None:
+                        print(
+                            "Took {:.3f} seconds. Ran on {}".format(
+                                end - start, exec_engine
+                            )
+                        )
+                    else:
+                        print("Took {:.3f} seconds.".format(end - start))
                     print()
                 except BradClientError as ex:
                     print()

@@ -1,0 +1,63 @@
+AVG_GAP_S = 5
+RUN_FOR_S = 5 * 60  # 5 minutes
+
+run_experiment(
+  name="initial_low_before_opt",
+  run="python3 olap_batch_runner.py",
+  options={
+    "num_clients": 1,
+    "avg_gap_s": AVG_GAP_S,
+    "run_for_s": RUN_FOR_S,
+  },
+)
+
+run_experiment(
+  name="initial_low_after_opt",
+  run="python3 olap_batch_runner.py",
+  options={
+    "num_clients": 1,
+    "avg_gap_s": AVG_GAP_S,
+    "run_for_s": RUN_FOR_S,
+  },
+)
+
+run_experiment(
+  name="medium_before_opt",
+  run="python3 olap_batch_runner.py",
+  options={
+    "num_clients": 5,
+    "avg_gap_s": AVG_GAP_S,
+    "run_for_s": RUN_FOR_S,
+  },
+)
+
+run_experiment(
+  name="high_before_opt",
+  run="python3 olap_batch_runner.py",
+  options={
+    "num_clients": 10,
+    "avg_gap_s": AVG_GAP_S,
+    "run_for_s": RUN_FOR_S,
+  },
+)
+
+run_experiment(
+  name="high_after_opt",
+  run="python3 olap_batch_runner.py",
+  options={
+    "num_clients": 10,
+    "avg_gap_s": AVG_GAP_S,
+    "run_for_s": RUN_FOR_S,
+  },
+)
+
+combine(
+  name="all",
+  deps=[
+    ":initial_low_before_opt",
+    ":initial_low_after_opt",
+    ":medium_before_opt",
+    ":high_before_opt",
+    ":high_after_opt",
+  ],
+)

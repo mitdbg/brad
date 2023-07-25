@@ -1,10 +1,12 @@
 import logging
-import pyodbc
 
+from brad.asset_manager import AssetManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
-from brad.server.blueprint_manager import BlueprintManager
-from brad.server.engine_connections import EngineConnections
+from brad.routing.policy import RoutingPolicy
+from brad.routing.tree_based.forest_router import ForestRouter
+from brad.blueprint_manager import BlueprintManager
+from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +22,7 @@ def register_admin_action(subparser) -> None:
     parser.add_argument(
         "--schema-name",
         type=str,
+        required=True,
         help="The name of the schema to drop.",
     )
     parser.set_defaults(admin_action=drop_schema)
@@ -31,22 +34,33 @@ def drop_schema(args):
     config = ConfigFile(args.config_file)
 
     # 2. Delete the persisted data blueprint, if it exists.
-    data_blueprint_mgr = BlueprintManager(config, args.schema_name)
+    assets = AssetManager(config)
+    data_blueprint_mgr = BlueprintManager(assets, args.schema_name)
     data_blueprint_mgr.delete_sync()
 
     # 3. Connect to the underlying engines without an explicit database.
     cxns = EngineConnections.connect_sync(config, autocommit=True)
-    redshift = cxns.get_connection(Engine.Redshift).cursor()
-    aurora = cxns.get_connection(Engine.Aurora).cursor()
-    athena = cxns.get_connection(Engine.Athena).cursor()
+    redshift = cxns.get_connection(Engine.Redshift).cursor_sync()
+    aurora = cxns.get_connection(Engine.Aurora).cursor_sync()
+    athena = cxns.get_connection(Engine.Athena).cursor_sync()
+
+    logger.info("Starting the schema drop...")
 
     # 4. Drop the underlying "databases" if they exist.
-    athena.execute("DROP DATABASE IF EXISTS {} CASCADE".format(args.schema_name))
-    aurora.execute("DROP DATABASE IF EXISTS {}".format(args.schema_name))
+    athena.execute_sync("DROP DATABASE IF EXISTS {} CASCADE".format(args.schema_name))
+    aurora.execute_sync("DROP DATABASE IF EXISTS {}".format(args.schema_name))
     try:
-        redshift.execute("DROP DATABASE {}".format(args.schema_name))
-    except pyodbc.Error:
+        redshift.execute_sync("DROP DATABASE {}".format(args.schema_name))
+    except:  # pylint: disable=bare-except
         # Ignore the error if a database does not exist.
         logger.exception("Exception when dropping Redshift database.")
+
+    # 5. Drop any serialized routers.
+    ForestRouter.static_drop_model_sync(
+        args.schema_name, RoutingPolicy.ForestTableSelectivity, assets
+    )
+    ForestRouter.static_drop_model_sync(
+        args.schema_name, RoutingPolicy.ForestTablePresence, assets
+    )
 
     logger.info("Done!")

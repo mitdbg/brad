@@ -1,0 +1,42 @@
+CSTR_VAR = "REDSHIFT_CSTR"
+QUERY_FILE = "../queries.sql"
+AVG_GAP_S = 5
+RUN_FOR_S = 6 * 60 + 10  # 6 minutes 10 seconds
+NUM_CLIENTS = [1, 2, 3, 4, 5]
+
+run_experiment_group(
+  name="dc2_large",
+  run="python3 ../olap_batch_runner.py",
+  experiments=[
+    ExperimentInstance(
+      name="dc2_large-{}".format(clients),
+      options={
+        "num_clients": clients,
+        "cstr_var": CSTR_VAR,
+        "query_file": QUERY_FILE,
+        "avg_gap_s": AVG_GAP_S,
+        "run_for_s": RUN_FOR_S,
+      },
+    )
+    for clients in NUM_CLIENTS
+  ],
+)
+
+run_experiment_group(
+  name="ra3_xlplus",
+  run="python3 ../olap_batch_runner.py",
+  experiments=[
+    ExperimentInstance(
+      name="ra3_xlplus-{}".format(clients),
+      options={
+        "num_clients": clients,
+        "cstr_var": CSTR_VAR,
+        "query_file": QUERY_FILE,
+        "avg_gap_s": AVG_GAP_S,
+        "run_for_s": RUN_FOR_S,
+        "redshift_cluster": "redshift-ra3-test-2",
+      },
+    )
+    for clients in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  ],
+)

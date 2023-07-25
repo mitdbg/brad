@@ -37,6 +37,8 @@ message Table {
   repeated TableColumn columns = 2;
   repeated Engine locations = 3;
   TableDependency dependencies = 4;
+  // These are secondary indexes.
+  repeated Index indexes = 5;
 }
 
 // Stores type information about a column. The `type` is expected to be a
@@ -67,4 +69,9 @@ message Provisioning {
 message RoutingPolicy {
   // A serialized form of the routing policy.
   bytes policy = 1;
+}
+
+// Tracks columns that are part of an index.
+message Index {
+  repeated string column_name = 1;
 }

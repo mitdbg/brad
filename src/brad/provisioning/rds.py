@@ -9,9 +9,15 @@ logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 class RdsProvisioning:
     # Initialize provisioning.
     # If cluster does not exist, you must specify its initial state for it to be created.
-    def __init__(self, cluster_name="brad-cluster0", initial_instance_type=None):
+    def __init__(
+        self,
+        cluster_name="brad-cluster0",
+        initial_instance_type=None,
+        initial_num_nodes=None,
+    ):
         self.cluster_name = cluster_name
         self.instance_type = initial_instance_type
+        self.num_nodes = initial_num_nodes
         self.paused = None
         self.address = None
         self.reader_address = None
@@ -21,9 +27,9 @@ class RdsProvisioning:
 
     # String representation.
     def __str__(self) -> str:
-        return f"RdsCluster(name={self.cluster_name}, instance_type={self.instance_type}, paused={self.paused}, address={self.address}, port={self.port})"
+        return f"RdsCluster(name={self.cluster_name}, instance_type={self.instance_type}, num_nodes={self.num_nodes}, paused={self.paused}, address={self.address}, port={self.port})"
 
-    # Return connection info.
+    # Return connection info (writer address, reader address, port).
     def connection_info(self):
         return (self.address, self.reader_address, self.port)
 
@@ -37,21 +43,30 @@ class RdsProvisioning:
     # Rescale a cluster.
     # This will wait until new cluster's state is avalaible.
     # Start it in a new thread if thou dost not want to wait.
-    def rescale(self, immediate=True, new_instance_type=None, new_paused=None):
+    def rescale(
+        self,
+        immediate=True,
+        new_instance_type=None,
+        new_num_nodes=None,
+        new_paused=None,
+    ):
         if new_instance_type is not None:
             self.instance_type = new_instance_type
         if new_paused is not None:
             self.paused = new_paused
+        if new_num_nodes is not None:
+            self.num_nodes = new_num_nodes
         self.redeploy(immediate)
 
     # Reconcile cluster state.
     def reconcile_cluster_state(self):
         while True:
             try:
+                print("reconcile_cluster_state.")
                 response = self.rds.describe_db_clusters(
                     DBClusterIdentifier=self.cluster_name,
                 )
-                logging.debug(f"reconcile_cluster_state. Response: {response}")
+                logging.info(f"reconcile_cluster_state. Response: {response}")
                 cluster = response["DBClusters"][0]
                 status = cluster["Status"]
                 # Set default values.
@@ -60,6 +75,8 @@ class RdsProvisioning:
                 self.port = cluster["Port"]
                 if self.paused is None:
                     self.paused = status in ("stopping", "stopped")
+                if self.num_nodes is None:
+                    self.num_nodes = len(cluster["DBClusterMembers"])
                 # Check if status is stable.
                 if status != "available" and status != "stopped":
                     logging.info(
@@ -77,9 +94,10 @@ class RdsProvisioning:
                 if self.paused and status == "available":
                     # Should pause.
                     logging.info(f"Rds Cluster {self.cluster_name}. Pausing...")
-                    self.rds.stop_db_cluster(
+                    resp = self.rds.stop_db_cluster(
                         DBClusterIdentifier=self.cluster_name,
                     )
+                    logging.info(f"Pause Resp: {resp}")
                     time.sleep(5.0)
                     continue
                 if not (self.paused) and status == "stopped":
@@ -110,13 +128,13 @@ class RdsProvisioning:
                     raise e
 
     # Get writer or create if not exists.
-    def get_or_create_writer(self):
+    def get_or_create_instance(self, instance_id):
         while True:
             try:
                 response = self.rds.describe_db_clusters(
                     DBClusterIdentifier=self.cluster_name,
                 )
-                logging.debug(f"get_or_create_writer. Response: {response}")
+                logging.info(f"get_or_create_writer. Response: {response}")
                 cluster = response["DBClusters"][0]
                 status = cluster["Status"]
                 # Check if status is stable.
@@ -126,20 +144,18 @@ class RdsProvisioning:
                     )
                     time.sleep(5.0)
                     continue
-                # Find writer.
-                members = cluster["DBClusterMembers"]
+                # Find instance.
                 members = [
-                    (x["DBInstanceIdentifier"], x["IsClusterWriter"]) for x in members
+                    x["DBInstanceIdentifier"] for x in cluster["DBClusterMembers"]
                 ]
-                for member_id, is_writer in members:
-                    if is_writer:
-                        return member_id
+                if instance_id in members:
+                    return
                 # Create Writer Instance.
-                logging.info("RDS. Creating Writer Instance...")
+                logging.info(f"RDS. Creating Instance {instance_id}...")
                 self.rds.create_db_instance(
                     DBClusterIdentifier=self.cluster_name,
                     # DBName="dev",
-                    DBInstanceIdentifier="brad-writer",
+                    DBInstanceIdentifier=instance_id,
                     PubliclyAccessible=True,
                     DBInstanceClass=self.instance_type,
                     Engine="aurora-postgresql",
@@ -151,16 +167,32 @@ class RdsProvisioning:
                 if "AlreadyExists" in e_str:
                     print("Rds Instance already exists...")
                     time.sleep(5.0)
-                    continue
+                    return
                 else:
                     raise e
 
-    # Reconcile writer state.
-    def reconcile_writer(self, writer_id, immediate):
+    # Kill Instance
+    def kill_instance_if_exists(self, instance_id):
+        try:
+            self.rds.delete_db_instance(
+                DBInstanceIdentifier=instance_id,
+                SkipFinalSnapshot=True,
+                DeleteAutomatedBackups=True,
+            )
+        except Exception as e:
+            e_str = f"{e}"
+            if "NotFound" in e_str:
+                print(f"Rds Instance {instance_id} already does not exits.")
+                return
+            else:
+                raise e
+
+    # Reconcile instance state.
+    def reconcile_instance(self, instance_id, immediate):
         while True:
             try:
                 response = self.rds.describe_db_instances(
-                    DBInstanceIdentifier=writer_id,
+                    DBInstanceIdentifier=instance_id,
                 )
                 logging.debug(f"RDS reconcile_writer. Response: {response}")
                 instance = response["DBInstances"][0]
@@ -172,7 +204,7 @@ class RdsProvisioning:
                 # Check if status is stable.
                 if status != "available" and status != "stopped":
                     logging.info(
-                        f"Rds Cluster {self.cluster_name}. Status: {status}. Waiting..."
+                        f"Rds Cluster {self.cluster_name}. Instance {instance_id} Status: {status}. Waiting..."
                     )
                     time.sleep(5.0)
                     continue
@@ -183,10 +215,10 @@ class RdsProvisioning:
                     return
                 # Must resize cluster.
                 logging.info(
-                    f"Rds Cluster {self.cluster_name}. Resizing to ({self.instance_type})..."
+                    f"Rds Cluster {self.cluster_name}. Resizing {instance_id} from {curr_instance_type} to {self.instance_type}..."
                 )
                 self.rds.modify_db_instance(
-                    DBInstanceIdentifier=writer_id,
+                    DBInstanceIdentifier=instance_id,
                     DBInstanceClass=self.instance_type,
                     ApplyImmediately=immediate,
                 )
@@ -207,8 +239,16 @@ class RdsProvisioning:
         self.reconcile_cluster_state()
         if self.paused:
             return
-        write_id = self.get_or_create_writer()
-        self.reconcile_writer(write_id, immediate)
+        active_instances = [i for i in range(0, self.num_nodes)]
+        dead_instances = [i for i in range(self.num_nodes, 16)]
+        # TODO(Amadou): Stupidly Parallelizable.
+        for i in active_instances:
+            instance_id = f"{self.cluster_name}-brad{i}"
+            self.get_or_create_instance(instance_id=instance_id)
+            self.reconcile_instance(instance_id=instance_id, immediate=immediate)
+        for i in dead_instances:
+            instance_id = f"{self.cluster_name}-brad{i}"
+            self.kill_instance_if_exists(instance_id=instance_id)
 
 
 if __name__ == "__main__":
@@ -219,13 +259,24 @@ if __name__ == "__main__":
         rd = RdsProvisioning(
             cluster_name="brad-cluster0", initial_instance_type="db.r6g.large"
         )
+    # Change Num Nodes.
+    num_nodes = rd.num_nodes
+    if num_nodes == 1:
+        num_nodes = 2
+    else:
+        num_nodes = 1
     # Change instance type.
     instance_type = rd.instance_type
     if instance_type == "db.r6g.large":
         instance_type = "db.r6g.xlarge"
     else:
         instance_type = "db.r6g.large"
-    rd.rescale(immediate=True, new_paused=False, new_instance_type=instance_type)
+    rd.rescale(
+        immediate=True,
+        new_paused=False,
+        new_instance_type=instance_type,
+        new_num_nodes=num_nodes,
+    )
     print(rd)
     # Pause.
     rd.rescale(immediate=True, new_paused=True)

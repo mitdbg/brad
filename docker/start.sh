@@ -39,8 +39,10 @@ if [ -z "$RUNNING" ] && [ -z "$EXITED" ]; then
   #         --shm-size=1g --ulimit memlock=-1
   #
   docker run -ti \
+    -p 6583:6583 \
     -e "CONTAINER_UID=$(id -u)" \
     -e "CONTAINER_UNAME=$(id -un)" \
+    --expose 6583 \
     --name $CONTAINER_NAME \
     --volume $MOUNT_VOL \
     --workdir=/home/$UNAME \

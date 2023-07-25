@@ -3,11 +3,28 @@
 
 # **DO NOT** check in your config.yml file!
 
-server_interface: "0.0.0.0"
-server_port: 6583
+# BRAD's front end servers will listen for client connections on this interface
+# and port. If `num_front_ends` is greater than one, subsequent front ends will
+# listen on successive ports (e.g., 6584, 6585, etc.).
+front_end_interface: "0.0.0.0"
+front_end_port: 6583
+num_front_ends: 1
 
 # Where BRAD's daemon process will write its logs.
 daemon_log_file: /tmp/brad_daemon.log
+
+# Where BRAD's front end processes will write their logs.
+front_end_log_path: /tmp
+
+# Where BRAD's blueprint planner will write debug logs.
+planner_log_path: .
+
+# The epoch length for metrics monitoring.
+epoch_length:
+  weeks: 0
+  days: 0
+  hours: 0
+  minutes: 1
 
 # BRAD uses these credentials when interacting with the AWS APIs.
 # These credentials should have access to
@@ -18,20 +35,32 @@ daemon_log_file: /tmp/brad_daemon.log
 aws_access_key: ABCABCABC123ABCABC45
 aws_access_key_secret: abCD+E1f2Gxhi3J4klmN/OP5QrSTuvwXYzabcdEF
 
-# BRAD stores metadata here (e.g., the physical data blueprint).
-s3_metadata_bucket: your-bucket
-s3_metadata_path: metadata/path/
+# BRAD stores assets and metadata here (e.g., the physical data blueprint,
+# serialized models, etc.).
+s3_assets_bucket: your-bucket
+s3_assets_path: brad-assets/path/
 
 # Holds intermediate results during data syncing.
 s3_extract_bucket: your-bucket
 s3_extract_path: extract/path/
 s3_extract_region: us-east-1
 
+# BRAD stores query logs here 
+s3_logs_bucket: your-bucket
+s3_logs_path: s3/logs/path/
+local_logs_path: local/logs/path/
+
+# Probability that each transactional query wil be logged.
+txn_log_prob: 0.5
+
 # Set to a non-zero value enable automatic data syncing. When this is set to 0,
 # automatic syncing is disabled.
 data_sync_period_seconds: 0
 
-# Set to always_{aurora, athena, redshift} to force IOHTAP to route all queries
+# BRAD's front end servers will report their metrics at regular intervals.
+front_end_metrics_reporting_period_seconds: 30
+
+# Set to always_{aurora, athena, redshift} to force BRAD to route all queries
 # to the specified engine. The `default` routing policy uses a predictor to
 # select the most suitable engine.
 routing_policy: default
@@ -58,3 +87,10 @@ redshift:
   user: awsuser
   password: awsuser_password
   s3_iam_role: arn:aws:iam:123
+
+sidecar_db:
+  odbc_driver: PostgreSQL
+  host: aurora.us-east-1.amazonaws.com
+  port: 5432
+  user: postgres
+  password: postgres_password

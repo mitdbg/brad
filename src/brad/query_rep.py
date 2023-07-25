@@ -10,6 +10,11 @@ _DATA_MODIFICATION_PREFIXES = [
     "BEGIN",
     "COMMIT",
     "ROLLBACK",
+    # HACK: Used to set the session's isolation level on Aurora/PostgreSQL.
+    # A better way is to provide a special debug API that will let us force
+    # commands on specific engines.
+    "SET SESSION",
+    "TRUNCATE",
 ]
 
 
@@ -37,9 +42,16 @@ class QueryRep:
     def is_data_modification_query(self) -> bool:
         if self._is_data_modification is None:
             self._is_data_modification = any(
-                map(self._raw_sql_query.startswith, _DATA_MODIFICATION_PREFIXES)
+                map(self._raw_sql_query.upper().startswith, _DATA_MODIFICATION_PREFIXES)
             )
         return self._is_data_modification
+
+    def is_transaction_start(self) -> bool:
+        return self._raw_sql_query.upper() == "BEGIN"
+
+    def is_transaction_end(self) -> bool:
+        raw_sql = self._raw_sql_query.upper()
+        return raw_sql == "COMMIT" or raw_sql == "ROLLBACK"
 
     def tables(self) -> List[str]:
         if self._tables is None:

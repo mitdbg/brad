@@ -12,6 +12,8 @@ brad.egg-info
 
 config/config.yml
 config/config_local.yml
+config/manifests/manifest.yml
+query_logs/
 
 cond-out*
 
@@ -19,3 +21,6 @@ build
 
 venv
 .python-version
+
+# Used for any scratch data/results that are not meant to be checked in.
+scratch

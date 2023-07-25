@@ -1,5 +1,7 @@
 import yaml
-from typing import Optional
+import pathlib
+from typing import Optional, Dict
+from datetime import timedelta
 
 from brad.config.engine import Engine
 from brad.routing.policy import RoutingPolicy
@@ -11,6 +13,13 @@ class ConfigFile:
         with open(path, "r", encoding="UTF-8") as file:
             self._raw = yaml.load(file, Loader=yaml.Loader)
 
+    def get_cluster_ids(self) -> Dict[Engine, str]:
+        return {
+            Engine.Aurora: self.aurora_cluster_id,
+            Engine.Redshift: self.redshift_cluster_id,
+            Engine.Athena: "brad-db0",  # TODO(Amadou): I don't want to break existing configs. Coordinate with Geoff on this.
+        }
+
     @property
     def raw_path(self) -> str:
         return self._raw_path
@@ -19,21 +28,36 @@ class ConfigFile:
     def daemon_log_path(self) -> Optional[str]:
         return self._raw["daemon_log_file"] if "daemon_log_file" in self._raw else None
 
-    @property
-    def server_interface(self) -> str:
-        return self._raw["server_interface"]
+    def front_end_log_file(self, worker_index: int) -> Optional[pathlib.Path]:
+        if "front_end_log_path" in self._raw:
+            prefix = pathlib.Path(self._raw["front_end_log_path"])
+            return prefix / f"brad_front_end_{worker_index}.log"
+        else:
+            return None
 
     @property
-    def server_port(self) -> int:
-        return int(self._raw["server_port"])
+    def front_end_interface(self) -> str:
+        return self._raw["front_end_interface"]
 
     @property
-    def server_daemon_port(self) -> int:
-        return int(self._raw["server_daemon_port"])
+    def front_end_port(self) -> int:
+        return int(self._raw["front_end_port"])
+
+    @property
+    def num_front_ends(self) -> int:
+        return int(self._raw["num_front_ends"])
+
+    @property
+    def planner_log_path(self) -> str:
+        return self._raw["planner_log_path"] if "planner_log_path" in self._raw else "."
 
     @property
     def athena_s3_data_path(self) -> str:
         return _ensure_slash_terminated(self._raw[Engine.Athena]["s3_data_path"])
+
+    @property
+    def athena_s3_output_path(self) -> str:
+        return _ensure_slash_terminated(self._raw[Engine.Athena]["s3_output_path"])
 
     @property
     def redshift_s3_iam_role(self) -> str:
@@ -49,12 +73,12 @@ class ConfigFile:
         return self._raw["aws_access_key_secret"]
 
     @property
-    def s3_metadata_bucket(self) -> str:
-        return self._raw["s3_metadata_bucket"]
+    def s3_assets_bucket(self) -> str:
+        return self._raw["s3_assets_bucket"]
 
     @property
-    def s3_metadata_path(self) -> str:
-        return _ensure_slash_terminated(self._raw["s3_metadata_path"])
+    def s3_assets_path(self) -> str:
+        return _ensure_slash_terminated(self._raw["s3_assets_path"])
 
     @property
     def s3_extract_bucket(self) -> str:
@@ -67,6 +91,22 @@ class ConfigFile:
         return _ensure_slash_terminated(self._raw["s3_extract_path"])
 
     @property
+    def s3_logs_bucket(self) -> str:
+        return self._raw["s3_logs_bucket"]
+
+    @property
+    def s3_logs_path(self) -> str:
+        return _ensure_slash_terminated(self._raw["s3_logs_path"])
+
+    @property
+    def local_logs_path(self) -> str:
+        return (
+            self._raw["local_logs_path"]
+            if "local_logs_path" in self._raw
+            else "./query_logs"
+        )
+
+    @property
     def s3_extract_region(self) -> str:
         """Needed when exporting data from Aurora to S3."""
         return self._raw["s3_extract_region"]
@@ -76,6 +116,10 @@ class ConfigFile:
         return float(self._raw["data_sync_period_seconds"])
 
     @property
+    def front_end_metrics_reporting_period_seconds(self) -> float:
+        return float(self._raw["front_end_metrics_reporting_period_seconds"])
+
+    @property
     def routing_policy(self) -> RoutingPolicy:
         return RoutingPolicy.from_str(self._raw["routing_policy"])
 
@@ -83,39 +127,36 @@ class ConfigFile:
     def redshift_cluster_id(self) -> str:
         return self._raw[Engine.Redshift]["host"].split(".")[0]
 
-    def get_odbc_connection_string(self, db: Engine, schema_name: Optional[str]) -> str:
-        if db not in self._raw:
-            raise AssertionError("Unhandled database type: " + str(db))
+    @property
+    def aurora_cluster_id(self) -> str:
+        return self._raw[Engine.Aurora]["host"].split(".")[0]
 
-        config = self._raw[db]
-        if db is Engine.Athena:
-            cstr = "Driver={{{}}};AwsRegion={};S3OutputLocation={};AuthenticationType=IAM Credentials;UID={};PWD={};".format(
-                config["odbc_driver"],
-                config["aws_region"],
-                config["s3_output_path"],
-                config["access_key"],
-                config["access_key_secret"],
-            )
-            if schema_name is not None:
-                cstr += "Schema={};".format(schema_name)
-            return cstr
+    @property
+    def epoch_length(self) -> timedelta:
+        epoch = self._raw["epoch_length"]
+        return timedelta(
+            weeks=epoch["weeks"],
+            days=epoch["days"],
+            hours=epoch["hours"],
+            minutes=epoch["minutes"],
+        )
 
-        elif db is Engine.Aurora or db is Engine.Redshift:
-            cstr = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};".format(
-                config["odbc_driver"],
-                config["host"],
-                config["port"],
-                config["user"],
-                config["password"],
-            )
-            if schema_name is not None:
-                cstr += "Database={};".format(schema_name)
-            elif db is Engine.Redshift:
-                # Redshift requires a database name to be specified. As far as
-                # we know, there is always a `dev` database. We connect without
-                # a database when we are bootstrapping a new database.
-                cstr += "Database=dev;"
-            return cstr
+    @property
+    def txn_log_prob(self) -> float:
+        return float(self._raw["txn_log_prob"])
+
+    def get_connection_details(self, engine: Engine) -> Dict[str, str]:
+        """
+        Returns the raw configuration details provided for an engine.
+        """
+        if engine not in self._raw:
+            raise AssertionError("Unhandled engine: " + str(engine))
+        return self._raw[engine]
+
+    def get_sidecar_db_details(self) -> Dict[str, str]:
+        if "sidecar_db" not in self._raw:
+            raise RuntimeError("Missing connection details for the Sidecar DBMS.")
+        return self._raw["sidecar_db"]
 
 
 def _ensure_slash_terminated(candidate: str) -> str:

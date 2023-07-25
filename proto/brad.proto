@@ -12,6 +12,10 @@ service Brad {
   // Run a SQL query (or execute an internal command like BRAD_SYNC).
   rpc RunQuery(RunQueryRequest) returns (stream RunQueryResponse) {}
 
+  // Run a SQL query (or execute an internal command like BRAD_SYNC) and return
+  // the results as a serialized JSON string.
+  rpc RunQueryJson(RunQueryRequest) returns (RunQueryJsonResponse) {}
+
   // End a previously started session. Clients must call this method once they
   // are done with their session.
   rpc EndSession(EndSessionRequest) returns (EndSessionResponse) {}
@@ -39,6 +43,16 @@ message RunQueryResponse {
     QueryResultRow row = 1;
     QueryError error = 2;
   }
+
+  // The engine that was used to actually run the query.
+  ExecutionEngine executor = 100;
+}
+
+message RunQueryJsonResponse {
+  oneof result {
+    QueryJsonResponse results = 1;
+    QueryError error = 2;
+  }
 }
 
 message QueryResultRow {
@@ -50,10 +64,25 @@ message QueryError {
   string error_msg = 1;
 }
 
+message QueryJsonResponse {
+  // The response, serialized as a JSON string.
+  string results_json = 1;
+
+  // The engine that was used to actually run the query.
+  ExecutionEngine executor = 2;
+}
+
 message EndSessionRequest {
   SessionId id = 1;
 }
 
 message EndSessionResponse {
   uint64 unused = 100;
+}
+
+enum ExecutionEngine {
+  ENG_UNKNOWN = 0;
+  ENG_AURORA = 1;
+  ENG_REDSHIFT = 2;
+  ENG_ATHENA = 3;
 }
