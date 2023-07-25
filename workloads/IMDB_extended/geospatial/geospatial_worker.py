@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from brad.grpc_client import RowList
 
 import sys
+
 sys.path.append("../")
 from transactions.database import Database
 
@@ -19,7 +20,6 @@ class GeospatialWorker:
         # to generate queries
         self.max_dist = 1000
         self.max_close_cinemas = 80
-
 
     def query1(self, db: Database) -> bool:
         """
@@ -40,7 +40,6 @@ class GeospatialWorker:
 
         except:
             return False
-
 
     def query2(self, db: Database) -> bool:
         """

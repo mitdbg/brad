@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 
 THEATRES_PER_SF = 1000
-HOMES_PER_SF = 100*THEATRES_PER_SF
+HOMES_PER_SF = 100 * THEATRES_PER_SF
 # N.B. There are only 2900212 movies, so some IDs are non-existent.
 # For simplicity, we do not account for this when generating showings.
 MIN_MOVIE_ID = 1

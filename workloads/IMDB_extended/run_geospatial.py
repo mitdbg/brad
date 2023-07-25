@@ -37,10 +37,7 @@ def runner(
         worker.query1,
         worker.query2,
     ]
-    query_weights = [
-        0.50,
-        0.50
-    ]
+    query_weights = [0.50, 0.50]
     query_indexes = list(range(len(queries)))
     latencies = [[] for _ in range(len(queries))]
 
@@ -77,7 +74,11 @@ def runner(
             except queue.Empty:
                 pass
         overall_end = time.time()
-        print(f"[{worker_idx}] Done running geospatial queries.", flush=True, file=sys.stderr)
+        print(
+            f"[{worker_idx}] Done running geospatial queries.",
+            flush=True,
+            file=sys.stderr,
+        )
 
     finally:
         # For printing out results.
@@ -88,7 +89,9 @@ def runner(
         else:
             out_dir = pathlib.Path(".")
 
-        with open(out_dir / "geospatial_latency_{}.csv".format(worker_idx), "w") as file:
+        with open(
+            out_dir / "geospatial_latency_{}.csv".format(worker_idx), "w"
+        ) as file:
             print("query_idx,run_time_s", file=file)
             for qidx, lat_list in enumerate(latencies):
                 for lat in lat_list:
