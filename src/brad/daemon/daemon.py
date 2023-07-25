@@ -9,7 +9,13 @@ from brad.blueprint import Blueprint
 from brad.blueprint_manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
-from brad.daemon.messages import ShutdownFrontEnd, Sentinel, MetricsReport
+from brad.daemon.messages import (
+    ShutdownFrontEnd,
+    Sentinel,
+    MetricsReport,
+    InternalCommandRequest,
+    InternalCommandResponse,
+)
 from brad.daemon.monitor import Monitor
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
@@ -25,6 +31,7 @@ from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyS
 from brad.planner.workload.provider import WorkloadProvider
 from brad.planner.workload import Workload
 from brad.routing.policy import RoutingPolicy
+from brad.row_list import RowList
 
 logger = logging.getLogger(__name__)
 
@@ -193,12 +200,23 @@ class BradDaemon:
             if isinstance(message, MetricsReport):
                 if message.fe_index != front_end.fe_index:
                     logger.warning(
-                        "Received message with invalid front end index. Expected %d. Received %d.",
+                        "Received MetricsReport with invalid front end index. Expected %d. Received %d.",
                         front_end.fe_index,
                         message.fe_index,
                     )
                     continue
                 self._monitor.handle_metric_report(message)
+            elif isinstance(message, InternalCommandRequest):
+                if message.fe_index != front_end.fe_index:
+                    logger.warning(
+                        "Received InternalCommandRequest with invalid front end index. Expected %d. Received %d.",
+                        front_end.fe_index,
+                        message.fe_index,
+                    )
+                    continue
+                asyncio.create_task(
+                    self._run_internal_command_request_response(message)
+                )
             else:
                 logger.debug(
                     "Received unexpected message from front end %d: %s",
@@ -219,6 +237,51 @@ class BradDaemon:
             await asyncio.sleep(self._config.data_sync_period_seconds)
             logger.debug("Starting an auto data sync.")
             await self._data_sync_executor.run_sync(self._blueprint_mgr.get_blueprint())
+
+    async def _run_internal_command_request_response(
+        self, msg: InternalCommandRequest
+    ) -> None:
+        results = await self._handle_internal_command(msg.request)
+        response = InternalCommandResponse(msg.fe_index, results)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None, self._front_ends[msg.fe_index].input_queue.put, response
+        )
+
+    async def _handle_internal_command(self, command: str) -> RowList:
+        if command == "BRAD_SYNC":
+            ran_sync = await self._data_sync_executor.run_sync(
+                self._blueprint_mgr.get_blueprint()
+            )
+            if ran_sync:
+                return [("Sync succeeded.",)]
+            else:
+                return [("Sync skipped. No new writes to sync.",)]
+
+        elif command == "BRAD_EXPLAIN_SYNC_STATIC":
+            logical_plan = self._data_sync_executor.get_static_logical_plan(
+                self._blueprint_mgr.get_blueprint()
+            )
+            to_return: RowList = [("Logical Data Sync Plan:",)]
+            for str_op in logical_plan.traverse_plan_sequentially():
+                to_return.append((str_op,))
+            return to_return
+
+        elif command == "BRAD_EXPLAIN_SYNC":
+            logical, physical = await self._data_sync_executor.get_processed_plans(
+                self._blueprint_mgr.get_blueprint()
+            )
+            to_return = [("Logical Data Sync Plan:",)]
+            for str_op in logical.traverse_plan_sequentially():
+                to_return.append((str_op,))
+            to_return.append(("Physical Data Sync Plan:",))
+            for str_op in physical.traverse_plan_sequentially():
+                to_return.append((str_op,))
+            return to_return
+
+        else:
+            logger.warning("Received unknown internal command: %s", command)
+            return []
 
 
 class _EmptyWorkloadProvider(WorkloadProvider):
