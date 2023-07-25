@@ -4,7 +4,7 @@ import logging
 import random
 import time
 import multiprocessing as mp
-from typing import AsyncIterable, Optional, Dict, Any, List, Tuple
+from typing import AsyncIterable, Optional, Dict, Any
 from datetime import datetime, timezone
 
 import grpc
@@ -13,13 +13,24 @@ import pyodbc
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
 
 from brad.asset_manager import AssetManager
+from brad.blueprint_manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.monitor import Monitor
-from brad.daemon.messages import ShutdownFrontEnd, Sentinel, MetricsReport
+from brad.daemon.messages import (
+    ShutdownFrontEnd,
+    Sentinel,
+    MetricsReport,
+    InternalCommandRequest,
+    InternalCommandResponse,
+)
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
-from brad.data_sync.execution.executor import DataSyncExecutor
+from brad.front_end.brad_interface import BradInterface
+from brad.front_end.epoch_file_handler import EpochFileHandler
+from brad.front_end.errors import QueryError
+from brad.front_end.grpc import BradGrpc
+from brad.front_end.session import SessionManager, SessionId
 from brad.query_rep import QueryRep
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.rule_based import RuleBased
@@ -27,20 +38,14 @@ from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
 from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
 from brad.routing.tree_based.forest_router import ForestRouter
-from brad.front_end.brad_interface import BradInterface
-from brad.blueprint_manager import BlueprintManager
-from brad.front_end.epoch_file_handler import EpochFileHandler
-from brad.front_end.errors import QueryError
-from brad.front_end.grpc import BradGrpc
-from brad.front_end.session import SessionManager, SessionId
+from brad.row_list import RowList
 from brad.utils.counter import Counter
 from brad.utils.json_decimal_encoder import DecimalEncoder
+from brad.utils.mailbox import Mailbox
 
 logger = logging.getLogger(__name__)
 
 LINESEP = "\n".encode()
-
-RowList = List[Tuple[Any, ...]]
 
 
 class BradFrontEnd(BradInterface):
@@ -119,16 +124,19 @@ class BradFrontEnd(BradInterface):
         logger.info("Using routing policy: %s", routing_policy)
 
         self._sessions = SessionManager(self._config, self._schema_name)
-
-        self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
-        self._timed_sync_task: Optional[asyncio.Task[None]] = None
         self._daemon_messages_task: Optional[asyncio.Task[None]] = None
-
         self._estimator: Optional[Estimator] = None
 
         # Number of transactions that completed.
         self._transaction_end_counter = Counter()
         self._brad_metrics_reporting_task: Optional[asyncio.Task[None]] = None
+
+        # Used to manage `BRAD_` requests that need to be sent to the daemon for
+        # execution. We only allow one such request to be in flight at any time
+        # (to simplify the logic here, since we only need it for completeness).
+        self._daemon_request_mailbox = Mailbox[str, RowList](
+            do_send_msg=self._send_daemon_request
+        )
 
     async def serve_forever(self):
         await self._run_setup()
@@ -164,10 +172,6 @@ class BradFrontEnd(BradInterface):
         await self._blueprint_mgr.load()
         logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
 
-        if self._config.data_sync_period_seconds > 0:
-            self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
-        await self._data_sync_executor.establish_connections()
-
         if self._routing_policy == RoutingPolicy.ForestTableSelectivity:
             self._estimator = await PostgresEstimator.connect(
                 self._schema_name, self._config
@@ -195,12 +199,6 @@ class BradFrontEnd(BradInterface):
         if self._daemon_messages_task is not None:
             self._daemon_messages_task.cancel()
             self._daemon_messages_task = None
-
-        if self._timed_sync_task is not None:
-            await self._timed_sync_task.close()
-            self._timed_sync_task = None
-
-        await self._data_sync_executor.shutdown()
 
         if self._brad_metrics_reporting_task is not None:
             self._brad_metrics_reporting_task.cancel()
@@ -319,45 +317,27 @@ class BradFrontEnd(BradInterface):
         """
         command = command_raw.upper()
 
-        if command == "BRAD_SYNC":
-            logger.debug("Manually triggered a data sync.")
-            ran_sync = await self._data_sync_executor.run_sync(
-                self._blueprint_mgr.get_blueprint()
-            )
-            if ran_sync:
-                return [("Sync succeeded.",)]
-            else:
-                return [("Sync skipped. No new writes to sync.",)]
+        if (
+            command == "BRAD_SYNC"
+            or command == "BRAD_EXPLAIN_SYNC_STATIC"
+            or command == "BRAD_EXPLAIN_SYNC"
+        ):
+            if self._daemon_request_mailbox.is_active():
+                return [
+                    (
+                        "Another internal command is pending. "
+                        "Please wait for it to complete first.",
+                    )
+                ]
 
-        elif command == "BRAD_EXPLAIN_SYNC_STATIC":
-            logical_plan = self._data_sync_executor.get_static_logical_plan(
-                self._blueprint_mgr.get_blueprint()
-            )
-            to_return: RowList = [("Logical Data Sync Plan:",)]
-            for str_op in logical_plan.traverse_plan_sequentially():
-                to_return.append((str_op,))
-            return to_return
+            if command == "BRAD_SYNC":
+                logger.debug("Manually requested a data sync.")
 
-        elif command == "BRAD_EXPLAIN_SYNC":
-            logical, physical = await self._data_sync_executor.get_processed_plans(
-                self._blueprint_mgr.get_blueprint()
-            )
-            to_return = [("Logical Data Sync Plan:",)]
-            for str_op in logical.traverse_plan_sequentially():
-                to_return.append((str_op,))
-            to_return.append(("Physical Data Sync Plan:",))
-            for str_op in physical.traverse_plan_sequentially():
-                to_return.append((str_op,))
-            return to_return
+            # Send the command to the daemon for execution.
+            return await self._daemon_request_mailbox.send_recv(command)
 
         else:
             return [("Unknown internal command: {}".format(command),)]
-
-    async def _run_sync_periodically(self) -> None:
-        while True:
-            await asyncio.sleep(self._config.data_sync_period_seconds)
-            logger.debug("Starting an auto data sync.")
-            await self._data_sync_executor.run_sync(self._blueprint_mgr.get_blueprint())
 
     async def _read_daemon_messages(self) -> None:
         assert self._input_queue is not None
@@ -369,6 +349,21 @@ class BradFrontEnd(BradInterface):
                 logger.debug("The BRAD front end is initiating a shut down...")
                 loop.create_task(_orchestrate_shutdown())
                 break
+            elif isinstance(message, InternalCommandResponse):
+                if message.fe_index != self._fe_index:
+                    logger.warning(
+                        "Received message with invalid front end index. Expected %d. Received %d.",
+                        self._fe_index,
+                        message.fe_index,
+                    )
+                    continue
+                if not self._daemon_request_mailbox.is_active():
+                    logger.warning(
+                        "Received an internal command response but no one was waiting for it: %s",
+                        message,
+                    )
+                    continue
+                self._daemon_request_mailbox.on_new_message(message.response)
             else:
                 logger.info("Received message from the daemon: %s", message)
 
@@ -399,6 +394,12 @@ class BradFrontEnd(BradInterface):
         if sql.endswith(";"):
             sql = sql[:-1]
         return sql.strip()
+
+    async def _send_daemon_request(self, request: str) -> None:
+        message = InternalCommandRequest(self._fe_index, request)
+        logger.debug("Sending internal command request: %s", message)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._output_queue.put, message)
 
 
 async def _orchestrate_shutdown() -> None:

@@ -53,12 +53,10 @@ class BradGrpc(rpc.BradServicer):
             result = await self._brad.run_query_json(
                 session_id, request.query, debug_info
             )
-            return b.RunQueryJsonResponse(
-                results=b.QueryJsonResponse(
-                    results_json=result,
-                    executor=self._convert_engine(debug_info["executor"]),
-                )
-            )
+            response = b.QueryJsonResponse(results_json=result)
+            if "executor" in debug_info:
+                response.executor = self._convert_engine(debug_info["executor"])
+            return b.RunQueryJsonResponse(results=response)
 
         except QueryError as ex:
             return b.RunQueryJsonResponse(error=b.QueryError(error_msg=str(ex)))
