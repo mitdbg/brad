@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 
 THEATRES_PER_SF = 1000
+HOMES_PER_SF = 100*THEATRES_PER_SF
 # N.B. There are only 2900212 movies, so some IDs are non-existent.
 # For simplicity, we do not account for this when generating showings.
 MIN_MOVIE_ID = 1
@@ -28,6 +29,21 @@ class Context:
         self.start_datetime = datetime(
             int(datetime_parts[0]), int(datetime_parts[1]), int(datetime_parts[2])
         )
+
+
+def generate_homes(ctx: Context) -> int:
+    total_homes = ctx.args.scale_factor * THEATRES_PER_SF
+    with open("homes.csv", "w", encoding="UTF-8") as out:
+        print("id|location_x|location_y", file=out)
+
+        for t in range(HOMES_PER_SF * ctx.args.scale_factor):
+            loc_x = ctx.prng.random() * ctx.location_range + ctx.args.location_min
+            loc_y = ctx.prng.random() * ctx.location_range + ctx.args.location_min
+            print(
+                "{}|{:.4f}|{:.4f}".format(t, loc_x, loc_y),
+                file=out,
+            )
+    return total_homes
 
 
 def generate_theatres(ctx: Context) -> int:
@@ -138,6 +154,7 @@ def main():
     # Scale
     # -----
     # Theatres: 1000 * SF
+    # Homes: 100 * NUM_THEATRES
     #
     # Showings:
     # - Pre-populated with 1 year's worth of showings
@@ -156,6 +173,8 @@ def main():
     total_showings = generate_showings(ctx, total_theatres)
     print("Generating ticket orders...")
     generate_ticket_orders(ctx, total_showings)
+    print("Generating homes...")
+    total_homes = generate_homes(ctx)
 
 
 if __name__ == "__main__":
