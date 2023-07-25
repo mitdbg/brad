@@ -1,6 +1,17 @@
 schema_name: imdb_extended
 
 tables:
+- table_name: homes
+  columns:
+  - name: id
+    data_type: SERIAL
+    primary_key: true
+  - name: location_x
+    data_type: DECIMAL(10)
+  - name: location_y
+    data_type: DECIMAL(10)
+
+tables:
 - table_name: theatres
   columns:
   - name: id
