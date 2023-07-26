@@ -30,31 +30,38 @@ class Directory:
             aws_secret_access_key=self._config.aws_access_key_secret,
         )
 
-        self._aurora_writer: Optional["AuroraInstance"] = None
-        self._aurora_readers: List["AuroraInstance"] = []
-        self._redshift_cluster: Optional["RedshiftCluster"] = None
+        self._aurora_writer: Optional["AuroraInstanceMetadata"] = None
+        self._aurora_readers: List["AuroraInstanceMetadata"] = []
+        self._redshift_cluster: Optional["RedshiftClusterMetadata"] = None
 
-    def aurora_writer(self) -> "AuroraInstance":
+    def aurora_writer(self) -> "AuroraInstanceMetadata":
         assert self._aurora_writer is not None
         return self._aurora_writer
 
-    def aurora_readers(self) -> List["AuroraInstance"]:
+    def aurora_readers(self) -> List["AuroraInstanceMetadata"]:
         return self._aurora_readers
 
-    def redshift_cluster(self) -> "RedshiftCluster":
+    def redshift_cluster(self) -> "RedshiftClusterMetadata":
         assert self._redshift_cluster is not None
         return self._redshift_cluster
 
     async def refresh(self) -> None:
-        await self._refresh_aurora()
-        await self._refresh_redshift()
+        aurora_writer, aurora_readers = await self._refresh_aurora()
+        redshift = await self._refresh_redshift()
 
-    async def _refresh_aurora(self) -> None:
+        self._aurora_writer = aurora_writer
+        self._aurora_readers.clear()
+        self._aurora_readers.extend(aurora_readers)
+        self._redshift_cluster = redshift
+
+    async def _refresh_aurora(
+        self,
+    ) -> Tuple["AuroraInstanceMetadata", List["AuroraInstanceMetadata"]]:
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(None, self._call_describe_aurora_cluster)
 
-        new_writer: Optional[AuroraInstance] = None
-        new_readers: List[AuroraInstance] = []
+        new_writer: Optional[AuroraInstanceMetadata] = None
+        new_readers: List[AuroraInstanceMetadata] = []
 
         for cluster_info in response["DBClusters"]:
             for instance_info in cluster_info["DBClusterMembers"]:
@@ -70,11 +77,11 @@ class Directory:
         assert new_writer is not None
         new_readers.sort()
 
-        self._aurora_writer = new_writer
-        self._aurora_readers.clear()
-        self._aurora_readers.extend(new_readers)
+        return (new_writer, new_readers)
 
-    async def _refresh_aurora_instance(self, instance_id: str) -> "AuroraInstance":
+    async def _refresh_aurora_instance(
+        self, instance_id: str
+    ) -> "AuroraInstanceMetadata":
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(None, self._call_describe_aurora_instance)
         instance_data = response["DBInstances"][0]
@@ -84,9 +91,9 @@ class Directory:
             "endpoint_address": instance_data["Endpoint"]["Address"],
             "endpoint_port": instance_data["Endpoint"]["Port"],
         }
-        return AuroraInstance(**kwargs)
+        return AuroraInstanceMetadata(**kwargs)
 
-    async def _refresh_redshift(self) -> None:
+    async def _refresh_redshift(self) -> "RedshiftClusterMetadata":
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
             None, self._call_describe_redshift_cluster
@@ -97,7 +104,7 @@ class Directory:
             "endpoint_address": cluster["Endpoint"]["Address"],
             "endpoint_port": cluster["Endpoint"]["Port"],
         }
-        self._redshift = RedshiftCluster(**kwargs)
+        return RedshiftClusterMetadata(**kwargs)
 
     def _call_describe_aurora_cluster(self) -> Dict[Any, Any]:
         return self._rds.describe_db_clusters(
@@ -115,7 +122,7 @@ class Directory:
         )
 
 
-class AuroraInstance:
+class AuroraInstanceMetadata:
     def __init__(
         self,
         instance_id: str,
@@ -137,11 +144,11 @@ class AuroraInstance:
     def endpoint(self) -> Tuple[str, int]:
         return (self._endpoint_address, self._endpoint_port)
 
-    def __lt__(self, other: "AuroraInstance") -> bool:
+    def __lt__(self, other: "AuroraInstanceMetadata") -> bool:
         return self.instance_id() < other.instance_id()
 
 
-class RedshiftCluster:
+class RedshiftClusterMetadata:
     def __init__(self, endpoint_address: str, endpoint_port: int) -> None:
         self._endpoint_address = endpoint_address
         self._endpoint_port = endpoint_port
