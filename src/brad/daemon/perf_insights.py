@@ -4,38 +4,48 @@ import pandas as pd
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 
+from .metrics_def import MetricDef
 from brad.config.file import ConfigFile
 
 
-class AwsPerformanceInsightsClient:
-    def __init__(
-        self, instance_identifier: str, config: Optional[ConfigFile] = None
-    ) -> None:
+class PerfInsightsClient:
+    @classmethod
+    def from_instance_identifier(
+        cls, instance_identifier: str, config: Optional[ConfigFile] = None
+    ) -> "PerfInsightsClient":
         if config is not None:
-            self._rds = boto3.client(
+            rds = boto3.client(
                 "rds",
                 aws_access_key_id=config.aws_access_key,
                 aws_secret_access_key=config.aws_access_key_secret,
             )
+        else:
+            rds = boto3.client("rds")
+
+        response = rds.describe_db_instances(
+            DBInstanceIdentifier=instance_identifier,
+        )
+        resource_id = response["DBInstances"][0]["DbiResourceId"]
+
+        return cls(resource_id, config)
+
+    def __init__(self, resource_id: str, config: Optional[ConfigFile] = None) -> None:
+        if config is not None:
             self._pi = boto3.client(
                 "pi",
                 aws_access_key_id=config.aws_access_key,
                 aws_secret_access_key=config.aws_access_key_secret,
             )
         else:
-            self._rds = boto3.client("rds")
             self._pi = boto3.client("pi")
+        self._resource_id = resource_id
 
-        self._instance_id = self._fetch_instance_id(instance_identifier)
-
-    def _fetch_instance_id(self, instance_identifier: str) -> str:
-        response = self._rds.describe_db_instances(
-            DBInstanceIdentifier=instance_identifier,
-        )
-        return response["DBInstances"][0]["DbiResourceId"]
+    @staticmethod
+    def metric_names(metric_defs: List[MetricDef]) -> List[str]:
+        return list(map(lambda m: "{}.{}".format(*m), metric_defs))
 
     def fetch_metrics(
-        self, metrics_list: List[str], period: timedelta, num_prev_points: int
+        self, metrics_list: List[MetricDef], period: timedelta, num_prev_points: int
     ) -> pd.DataFrame:
         # Retrieve datapoints
         now = datetime.now(tz=timezone.utc)
@@ -47,10 +57,12 @@ class AwsPerformanceInsightsClient:
         start_time = end_time - num_prev_points * period
 
         def fetch_batch(metrics_list):
-            metrics_queries = [{"Metric": metric} for metric in metrics_list]
+            metrics_queries = [
+                {"Metric": "{}.{}".format(*metric)} for metric in metrics_list
+            ]
             response = self._pi.get_resource_metrics(
                 ServiceType="RDS",
-                Identifier=self._instance_id,
+                Identifier=self._resource_id,
                 MetricQueries=metrics_queries,
                 StartTime=start_time,
                 EndTime=end_time,

@@ -21,7 +21,7 @@ from brad.calibration.load.metrics import (
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.cloudwatch import CloudwatchClient
-from brad.daemon.perf_insights import AwsPerformanceInsightsClient
+from brad.daemon.perf_insights import PerfInsightsClient
 from brad.connection.connection import Connection
 from brad.connection.factory import ConnectionFactory
 from brad.provisioning.directory import Directory
@@ -174,14 +174,14 @@ def main() -> None:
         cw: Optional[CloudwatchClient] = CloudwatchClient(
             Engine.Redshift, config.redshift_cluster_id, config
         )
-        pi: Optional[AwsPerformanceInsightsClient] = None
+        pi: Optional[PerfInsightsClient] = None
     else:
         cw = None
         aurora_instance_id = os.environ[args.aurora_instance_var]
         print(
             "Using Aurora instance ID:", aurora_instance_id, file=sys.stderr, flush=True
         )
-        pi = AwsPerformanceInsightsClient(aurora_instance_id, config)
+        pi = PerfInsightsClient.from_instance_identifier(aurora_instance_id, config)
 
     processes = []
     for idx in range(args.num_clients):
@@ -264,7 +264,7 @@ def main() -> None:
         metrics.to_csv(out_dir / "metrics.csv")
     elif engine == Engine.Aurora:
         assert pi is not None
-        metrics_list = [metric + ".avg" for metric in PERF_INSIGHTS_LOAD_METRICS]
+        metrics_list = [(metric, "avg") for metric in PERF_INSIGHTS_LOAD_METRICS]
         metrics = pi.fetch_metrics(
             metrics_list, period=timedelta(seconds=60), num_prev_points=10
         )
