@@ -6,8 +6,12 @@ See [this tutorial](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide
 
 ## Relevant tables
 
-- `theatres(id*, name, location_x, location_y)`: Location of theatres
-- `homes(id*, location_x, location_y)`: Homes of users that buy tickets
+Tables touched by geospatial queries:
+
+- `theatres(id*, name, location_x, location_y)`
+- `ticket_orders(id*, showing_id, quantity, contact_name, location_x, location_y)`
+- `showings(id*, theatre_id, movie_id, date_time, total_capacity, seats_left)`
+- `homes(id*, location_x, location_y)`
 
 `homes` is additionally added for this workload.
 

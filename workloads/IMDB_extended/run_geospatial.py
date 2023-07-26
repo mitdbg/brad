@@ -36,8 +36,9 @@ def runner(
     queries = [
         worker.query1,
         worker.query2,
+        worker.query3,
     ]
-    query_weights = [0.50, 0.50]
+    query_weights = [0.4, 0.3, 0.3]
     query_indexes = list(range(len(queries)))
     latencies = [[] for _ in range(len(queries))]
 

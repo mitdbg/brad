@@ -16,6 +16,8 @@ class GeospatialWorker:
         # to generate queries
         self.max_dist = 1000
         self.max_close_cinemas = 80
+        self.min_cap = 10
+        self.max_cap = 1000
 
     def query1(self, db: Database) -> bool:
         """
@@ -61,6 +63,26 @@ class GeospatialWorker:
             FROM homecinemacount
             WHERE c > {cutoff}
             ORDER BY c;
+            """
+            db.execute_sync(query)
+            return True
+
+        except:
+            return False
+
+    def query3(self, db: Database) -> bool:
+        """
+        Distance between showing's cinema and where ticket was purchased
+        """
+
+        try:
+            cap = self.prng.randint(self.min_cap, self.max_cap)
+
+            query = f"""SELECT ST_Distance(ST_Point(t.location_x, t.location_y), ST_Point(o.location_x, o.location_y))
+            FROM ticket_orders as o
+            JOIN showings as s ON s.id = o.showing_id
+            JOIN theatres as t ON t.id = s.theatre_id
+            WHERE s.total_capacity < {cap}
             """
             db.execute_sync(query)
             return True
