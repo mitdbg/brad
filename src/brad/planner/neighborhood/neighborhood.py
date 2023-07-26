@@ -22,6 +22,7 @@ from brad.planner.neighborhood.sampled_neighborhood import (
     SampledNeighborhoodSearchPlanner,
 )
 from brad.planner.strategy import PlanningStrategy
+from brad.provisioning.directory import Directory
 from brad.routing.rule_based import RuleBased
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
@@ -84,10 +85,11 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         ]
 
         # Establish connections to the underlying engines (needed for scoring
-        # purposes). We use synchronous connections since there appears to be a
-        # bug in aioodbc that causes an indefinite await on a query result.
+        # purposes).
+        directory = Directory(self._config)
+        await directory.refresh()
         engines = EngineConnections.connect_sync(
-            self._config, self._schema_name, autocommit=False
+            self._config, directory, self._schema_name, autocommit=False
         )
         table_sizer = TableSizer(engines, self._config)
 

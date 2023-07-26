@@ -74,16 +74,13 @@ athena:
   access_key_secret: abCD+E1f2Gxhi3J4klmN/OP5QrSTuvwXYzabcdEF
 
 aurora:
+  cluster_id: aurora-brad
   odbc_driver: PostgreSQL
-  host: aurora.us-east-1.amazonaws.com
-  port: 5432
   user: postgres
   password: postgres_password
 
 redshift:
-  odbc_driver: Redshift
-  host: redshift.us-east-1.amazonaws.com
-  port: 5439
+  cluster_id: redshift-brad
   user: awsuser
   password: awsuser_password
   s3_iam_role: arn:aws:iam:123

@@ -6,6 +6,7 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.connection.connection import Connection
 from brad.connection.factory import ConnectionFactory
+from brad.provisioning.directory import Directory
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ class EngineConnections:
     async def connect(
         cls,
         config: ConfigFile,
+        directory: Directory,
         schema_name: Optional[str] = None,
         autocommit: bool = True,
         specific_engines: Optional[Set[Engine]] = None,
@@ -40,7 +42,7 @@ class EngineConnections:
         for engine in specific_engines:
             logger.debug("Connecting to %s...", engine)
             connection_map[engine] = await ConnectionFactory.connect_to(
-                engine, schema_name, config, autocommit
+                engine, schema_name, config, directory, autocommit
             )
 
             # TODO: We may want this to be configurable.
@@ -55,13 +57,13 @@ class EngineConnections:
     def connect_sync(
         cls,
         config: ConfigFile,
+        directory: Directory,
         schema_name: Optional[str] = None,
         autocommit: bool = True,
         specific_engines: Optional[Set[Engine]] = None,
     ) -> "EngineConnections":
         """
-        Synchronously establishes connections to the underlying engines. The
-        connections made by this method are `pyodbc` connections.
+        Synchronously establishes connections to the underlying engines.
         """
 
         # As the system gets more sophisticated, we'll add connection pooling, etc.
@@ -77,7 +79,7 @@ class EngineConnections:
         for engine in specific_engines:
             logger.debug("Connecting to %s...", engine)
             connection_map[engine] = ConnectionFactory.connect_to_sync(
-                engine, schema_name, config, autocommit
+                engine, schema_name, config, directory, autocommit
             )
 
             # TODO: We may want this to be configurable.

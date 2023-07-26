@@ -125,7 +125,9 @@ class BradFrontEnd(BradInterface):
             )
         logger.info("Using routing policy: %s", routing_policy)
 
-        self._sessions = SessionManager(self._config, self._schema_name)
+        self._sessions = SessionManager(
+            self._config, self._blueprint_mgr, self._schema_name
+        )
         self._daemon_messages_task: Optional[asyncio.Task[None]] = None
         self._estimator: Optional[Estimator] = None
 

@@ -79,6 +79,7 @@ def register_admin_action(subparser) -> None:
 def add_indexes(args, config: ConfigFile, mgr: BlueprintManager) -> None:
     engines = EngineConnections.connect_sync(
         config,
+        mgr.get_directory(),
         schema_name=args.schema_name,
         autocommit=False,
         specific_engines={Engine.Aurora},

@@ -12,6 +12,7 @@ class RedshiftConnection(Connection):
     async def connect(
         cls,
         host: str,
+        port: int,
         user: str,
         password: str,
         schema_name: Optional[str],
@@ -22,6 +23,7 @@ class RedshiftConnection(Connection):
         def make_connection():
             kwargs = {
                 "host": host,
+                "port": port,
                 "user": user,
                 "password": password,
                 "database": schema_name if schema_name is not None else "dev",
@@ -36,6 +38,7 @@ class RedshiftConnection(Connection):
     def connect_sync(
         cls,
         host: str,
+        port: int,
         user: str,
         password: str,
         schema_name: Optional[str],
@@ -43,6 +46,7 @@ class RedshiftConnection(Connection):
     ) -> Connection:
         kwargs = {
             "host": host,
+            "port": port,
             "user": user,
             "password": password,
             "database": schema_name if schema_name is not None else "dev",

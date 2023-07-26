@@ -1,13 +1,15 @@
+import asyncio
 import logging
 
 from brad.asset_manager import AssetManager
 from brad.blueprint.user import UserProvidedBlueprint
 from brad.blueprint.sql_gen.table import TableSqlGenerator
+from brad.blueprint_manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
-from brad.planner.data import bootstrap_blueprint
-from brad.blueprint_manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
+from brad.planner.data import bootstrap_blueprint
+from brad.provisioning.directory import Directory
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,8 @@ def bootstrap_schema(args):
 
     # 4. Connect to the underlying engines and create "databases" for the
     # schema.
+    directory = Directory(config)
+    asyncio.run(directory.refresh())
 
     # Check for specific engines.
     if args.only_engines is not None and len(args.only_engines) > 0:
@@ -66,7 +70,7 @@ def bootstrap_schema(args):
         engines_filter = {Engine.Aurora, Engine.Athena, Engine.Redshift}
 
     cxns = EngineConnections.connect_sync(
-        config, autocommit=True, specific_engines=engines_filter
+        config, directory, autocommit=True, specific_engines=engines_filter
     )
     create_schema = "CREATE DATABASE {}".format(blueprint.schema_name())
     for engine in engines_filter:
@@ -77,6 +81,7 @@ def bootstrap_schema(args):
     # 5. Now re-connect to the underlying engines with the schema name.
     cxns = EngineConnections.connect_sync(
         config,
+        directory,
         schema_name=blueprint.schema_name(),
         autocommit=False,
         specific_engines=engines_filter,

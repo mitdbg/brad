@@ -1,3 +1,4 @@
+import asyncio
 import argparse
 import multiprocessing as mp
 import time
@@ -21,8 +22,9 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.cloudwatch import CloudwatchClient
 from brad.daemon.perf_insights import AwsPerformanceInsightsClient
-from brad.front_end.engine_connections import EngineConnections
 from brad.connection.connection import Connection
+from brad.connection.factory import ConnectionFactory
+from brad.provisioning.directory import Directory
 from brad.utils import set_up_logging
 
 
@@ -144,14 +146,11 @@ def main() -> None:
     queries = load_queries(args.query_file)
 
     if args.run_warmup:
-        ec = EngineConnections.connect_sync(
-            config,
-            schema_name,
-            autocommit=True,
-            specific_engines={engine},
-        )
-        run_warmup(ec.get_connection(engine), queries)
-        ec.close_sync()
+        directory = Directory(config)
+        asyncio.run(directory.refresh())
+        conn = ConnectionFactory.connect_to_sync(engine, schema_name, config, directory)
+        run_warmup(conn, queries)
+        conn.close_sync()
         return
 
     assert args.specific_query_idx is not None

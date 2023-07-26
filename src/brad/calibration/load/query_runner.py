@@ -1,3 +1,4 @@
+import asyncio
 import pathlib
 import random
 import sys
@@ -11,7 +12,8 @@ from typing import Callable
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.connection.connection import Cursor
-from brad.front_end.engine_connections import EngineConnections
+from brad.connection.factory import ConnectionFactory
+from brad.provisioning.directory import Directory
 
 
 class Options:
@@ -80,15 +82,12 @@ def run_until_signalled(
 
     signal.signal(signal.SIGINT, noop_handler)
 
-    ec = EngineConnections.connect_sync(
-        options.config,
-        options.schema_name,
-        autocommit=True,
-        specific_engines={options.engine},
+    directory = Directory(options.config)
+    asyncio.run(directory.refresh())
+    conn = ConnectionFactory.connect_to_sync(
+        options.engine, options.schema_name, options.config, directory
     )
-
     try:
-        conn = ec.get_connection(options.engine)
         cursor = conn.cursor_sync()
 
         # Hacky way to disable the query cache when applicable.
@@ -116,7 +115,7 @@ def run_until_signalled(
                 except queue.Empty:
                     pass
     finally:
-        ec.close_sync()
+        conn.close_sync()
 
 
 def get_run_specific_query(query_idx: int, query_str: str) -> RunQueryCallable:
