@@ -39,7 +39,7 @@ class MetricsSourceWithForecasting:
         Retrieves the latest metric values from the underlying source (e.g.,
         CloudWatch). This should be called at least once every `epoch_length`.
         """
-        raise NotImplementedError
+        self._forecaster.update_df_pointer(self._metrics_values())
 
     def _metrics_values(self) -> pd.DataFrame:
         raise NotImplementedError

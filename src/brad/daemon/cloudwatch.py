@@ -5,6 +5,7 @@ import pandas as pd
 from typing import List, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 
+from .metrics_def import MetricDef
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 
@@ -47,6 +48,10 @@ class CloudwatchClient:
         else:
             self._client = boto3.client("cloudwatch")
 
+    @staticmethod
+    def metric_names(metric_defs: List[MetricDef]) -> List[str]:
+        return list(map(lambda m: "{}_{}".format(*m), metric_defs))
+
     def fetch_metrics(
         self,
         metrics_list: List[Tuple[str, str]],
@@ -67,7 +72,7 @@ class CloudwatchClient:
             for metric, stat in metrics_list:
                 queries.append(
                     {
-                        "Id": f"{self._engine.value}_{metric}_{stat}",
+                        "Id": f"{metric}_{stat}",
                         "MetricStat": {
                             "Metric": {
                                 "Namespace": self._namespace,
@@ -102,6 +107,13 @@ class CloudwatchClient:
             df = df.sort_index()
             df.index = pd.to_datetime(df.index)
 
+            for metric_def in metrics_list:
+                metric_name = "{}_{}".format(*metric_def)
+                if metric_name in df.columns:
+                    continue
+                # Missing metric value.
+                df[metric_name] = pd.Series(dtype=np.float64)
+
             # Sort dataframe by timestamp
             return df.sort_index()
 
@@ -111,4 +123,12 @@ class CloudwatchClient:
             df = fetch_batch(metrics_list[i : i + batch_size])
             results.append(df)
 
-        return pd.concat(results, axis=1)
+        metrics = pd.concat(results, axis=1)
+
+        # This filters out any rows where *all* of the metrics are zero. This
+        # case occurs commonly with CloudWatch when retrieving metrics at the
+        # 1-minute granularity (CloudWatch takes longer than one minute to make
+        # metrics available).
+        metrics = metrics.loc[(metrics != 0).any(axis=1)]
+
+        return metrics

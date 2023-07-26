@@ -1,0 +1,47 @@
+{
+    "CPUUtilization": [
+        "Average",
+        "Minimum",
+        "Maximum"
+    ],
+    "ReadIOPS": [
+        "Average",
+        "Minimum",
+        "Maximum"
+    ],
+    "ReadLatency": [
+        "Average",
+        "Minimum",
+        "Maximum"
+    ],
+    "ReadThroughput": [
+        "Average",
+        "Minimum",
+        "Maximum"
+    ],
+    "WriteIOPS": [
+        "Average",
+        "Minimum",
+        "Maximum"
+    ],
+    "WriteLatency": [
+        "Average",
+        "Minimum",
+        "Maximum"
+    ],
+    "WriteThroughput": [
+        "Average",
+        "Minimum",
+        "Maximum"
+    ],
+    "NetworkTransmitThroughput": [
+        "Average",
+        "Minimum",
+        "Maximum"
+    ],
+    "NetworkReceiveThroughput": [
+        "Average",
+        "Minimum",
+        "Maximum"
+    ]
+}
