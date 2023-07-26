@@ -107,5 +107,3 @@ def test_window_average():
         start + timedelta(seconds=45), start + timedelta(seconds=50)
     )
     assert val == 0.0
-
-
