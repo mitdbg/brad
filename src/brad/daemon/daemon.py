@@ -62,8 +62,7 @@ class BradDaemon:
         self._blueprint_mgr = BlueprintManager(
             self._config, self._assets, self._schema_name
         )
-        # TODO(Amadou): Determine how to pass in specific clusters.
-        self._monitor = Monitor.from_config_file(config)
+        self._monitor = Monitor(self._config, self._blueprint_mgr)
         self._estimator_provider = _EstimatorProvider()
         self._planner: Optional[BlueprintPlanner] = None
 

@@ -215,7 +215,7 @@ def run_planner(args) -> None:
     )
 
     # 6. Start the planner.
-    monitor = Monitor.from_config_file(config)
+    monitor = Monitor(config, blueprint_mgr)
     if args.use_fixed_metrics is not None:
         metrics_provider: MetricsProvider = FixedMetricsProvider(
             Metrics(**parse_metrics(args.use_fixed_metrics))

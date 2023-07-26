@@ -10,6 +10,7 @@ from typing import List, Dict
 from datetime import datetime, timedelta, timezone
 
 import brad.daemon as daemon
+from brad.blueprint_manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.metrics import FrontEndMetric
@@ -44,15 +45,16 @@ class Monitor:
 
     def __init__(
         self,
-        cluster_ids: Dict[Engine, str],
+        config: ConfigFile,
+        blueprint_mgr: BlueprintManager,
         forecasting_method: str = "constant",
         forecasting_window_size: int = 5,  # (Up to) how many past samples to base the forecast on
-        forecasting_epoch: timedelta = timedelta(hours=1),
         enable_cost_monitoring: bool = False,
-        num_front_ends: int = 1,
     ) -> None:
-        self._cluster_ids = cluster_ids
-        self._epoch_length = forecasting_epoch
+        self._config = config
+        self._blueprint_mgr = blueprint_mgr
+
+        self._epoch_length = self._config.epoch_length
         self._enable_cost_monitoring = enable_cost_monitoring
         self._setup()
         self._values = pd.DataFrame(columns=self._metric_ids)
@@ -77,23 +79,13 @@ class Monitor:
         # servers.
         self._front_end_metrics: FrontEndMetricDict = {
             FrontEndMetric.TxnEndPerSecond: [
-                StreamingMetric[float]() for _ in range(num_front_ends)
+                StreamingMetric[float]() for _ in range(self._config.num_front_ends)
             ],
         }
 
     # Forcibly read metrics. Use to avoid `run_forever()`.
     def force_read_metrics(self) -> None:
         self._add_metrics()
-
-    # Create from config file.
-    @classmethod
-    def from_config_file(cls, config: ConfigFile):
-        cluster_ids = config.get_cluster_ids()
-        return cls(
-            cluster_ids,
-            forecasting_epoch=config.epoch_length,
-            num_front_ends=config.num_front_ends,
-        )
 
     async def run_forever(self) -> None:
         # Flesh out the monitor - maintain running averages of the underlying
