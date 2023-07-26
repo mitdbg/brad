@@ -100,6 +100,9 @@ class BradDaemon:
         await self._blueprint_mgr.load()
         logger.info("Current blueprint: %s", self._blueprint_mgr.get_blueprint())
 
+        # Initialize the monitor.
+        self._monitor.set_up_metrics_sources()
+
         if self._config.data_sync_period_seconds > 0:
             self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
         await self._data_sync_executor.establish_connections()
@@ -158,8 +161,6 @@ class BradDaemon:
             estimator = await PostgresEstimator.connect(self._schema_name, self._config)
             await estimator.analyze(self._blueprint_mgr.get_blueprint())
             self._estimator_provider.set_estimator(estimator)
-
-        self._monitor.force_read_metrics()
 
     async def _run_teardown(self) -> None:
         # Shut down the front end processes.

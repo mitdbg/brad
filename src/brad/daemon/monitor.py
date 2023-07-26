@@ -50,35 +50,33 @@ class Monitor:
         blueprint into the blueprint manager.
         """
         # TODO: Handle blueprint changes gracefully.
+        # TODO: No need to create metrics sources if the engine is paused.
         blueprint = self._blueprint_mgr.get_blueprint()
 
         aurora_prov = blueprint.aurora_provisioning()
-        if aurora_prov.num_nodes() > 0:
-            self._aurora_writer_metrics = AuroraMetrics(
-                self._config,
-                self._blueprint_mgr,
-                reader_instance_index=None,
-                forecasting_method=self._forecasting_method,
-                forecasting_window_size=self._forecasting_window_size,
-            )
+        self._aurora_writer_metrics = AuroraMetrics(
+            self._config,
+            self._blueprint_mgr,
+            reader_instance_index=None,
+            forecasting_method=self._forecasting_method,
+            forecasting_window_size=self._forecasting_window_size,
+        )
 
-            if aurora_prov.num_nodes() > 1:
-                for reader in range(aurora_prov.num_nodes() - 1):
-                    self._aurora_reader_metrics.append(
-                        AuroraMetrics(
-                            self._config,
-                            self._blueprint_mgr,
-                            reader_instance_index=reader,
-                            forecasting_method=self._forecasting_method,
-                            forecasting_window_size=self._forecasting_window_size,
-                        )
+        if aurora_prov.num_nodes() > 1:
+            for reader in range(aurora_prov.num_nodes() - 1):
+                self._aurora_reader_metrics.append(
+                    AuroraMetrics(
+                        self._config,
+                        self._blueprint_mgr,
+                        reader_instance_index=reader,
+                        forecasting_method=self._forecasting_method,
+                        forecasting_window_size=self._forecasting_window_size,
                     )
+                )
 
-        redshift_prov = blueprint.redshift_provisioning()
-        if redshift_prov.num_nodes() > 0:
-            self._redshift_metrics = RedshiftMetrics(
-                self._config, self._forecasting_method, self._forecasting_window_size
-            )
+        self._redshift_metrics = RedshiftMetrics(
+            self._config, self._forecasting_method, self._forecasting_window_size
+        )
 
     async def fetch_latest(self) -> None:
         """

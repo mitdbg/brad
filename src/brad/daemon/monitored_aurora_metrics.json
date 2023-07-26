@@ -58,6 +58,15 @@
         "avg",
         "min",
         "max"
+    ],
+    "db.IO.blks_read": [
+        "avg",
+        "min",
+        "max"
+    ],
+    "db.Cache.blks_hit": [
+        "avg",
+        "min",
+        "max"
     ]
-
 }
