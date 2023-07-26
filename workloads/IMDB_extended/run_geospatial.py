@@ -11,8 +11,8 @@ import os
 import multiprocessing as mp
 
 from brad.grpc_client import BradGrpcClient
-from transactions.database import Database, PyodbcDatabase, BradDatabase
-from geospatial.geospatial_worker import GeospatialWorker
+from workload_utils.database import Database, PyodbcDatabase, BradDatabase
+from workload_utils.geospatial_worker import GeospatialWorker
 
 
 def runner(

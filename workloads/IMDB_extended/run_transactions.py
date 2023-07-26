@@ -11,8 +11,8 @@ import os
 import multiprocessing as mp
 
 from brad.grpc_client import BradGrpcClient
-from transactions.database import Database, PyodbcDatabase, BradDatabase
-from transactions.transaction_worker import TransactionWorker
+from workload_utils.database import Database, PyodbcDatabase, BradDatabase
+from workload_utils.transaction_worker import TransactionWorker
 
 
 def runner(

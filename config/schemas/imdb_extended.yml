@@ -11,7 +11,6 @@ tables:
   - name: location_y
     data_type: DECIMAL(10)
 
-tables:
 - table_name: theatres
   columns:
   - name: id

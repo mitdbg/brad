@@ -3,11 +3,7 @@ import logging
 from datetime import datetime, timedelta
 
 from brad.grpc_client import RowList
-
-import sys
-
-sys.path.append("../")
-from transactions.database import Database
+from .database import Database
 
 logger = logging.getLogger(__name__)
 
