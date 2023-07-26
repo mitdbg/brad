@@ -78,11 +78,12 @@ class GeospatialWorker:
         try:
             cap = self.prng.randint(self.min_cap, self.max_cap)
 
-            query = f"""SELECT ST_Distance(ST_Point(t.location_x, t.location_y), ST_Point(o.location_x, o.location_y))
+            query = f"""
+            SELECT ST_Distance(ST_Point(t.location_x, t.location_y), ST_Point(o.location_x, o.location_y))
             FROM ticket_orders as o
             JOIN showings as s ON s.id = o.showing_id
             JOIN theatres as t ON t.id = s.theatre_id
-            WHERE s.total_capacity < {cap}
+            WHERE s.total_capacity < {cap};
             """
             db.execute_sync(query)
             return True
