@@ -125,11 +125,11 @@ class ConfigFile:
 
     @property
     def redshift_cluster_id(self) -> str:
-        return self._raw[Engine.Redshift]["host"].split(".")[0]
+        return self._raw[Engine.Redshift.value]["cluster_id"]
 
     @property
     def aurora_cluster_id(self) -> str:
-        return self._raw[Engine.Aurora]["host"].split(".")[0]
+        return self._raw[Engine.Aurora.value]["cluster_id"]
 
     @property
     def epoch_length(self) -> timedelta:

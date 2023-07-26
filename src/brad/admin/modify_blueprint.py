@@ -79,6 +79,7 @@ def register_admin_action(subparser) -> None:
 def add_indexes(args, config: ConfigFile, mgr: BlueprintManager) -> None:
     engines = EngineConnections.connect_sync(
         config,
+        mgr.get_directory(),
         schema_name=args.schema_name,
         autocommit=False,
         specific_engines={Engine.Aurora},
@@ -147,7 +148,7 @@ def modify_blueprint(args):
 
     # 2. Load the existing blueprint.
     assets = AssetManager(config)
-    blueprint_mgr = BlueprintManager(assets, args.schema_name)
+    blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
     blueprint_mgr.load_sync()
     blueprint = blueprint_mgr.get_blueprint()
 

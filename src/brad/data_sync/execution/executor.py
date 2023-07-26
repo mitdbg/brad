@@ -28,7 +28,10 @@ class DataSyncExecutor:
             "Data sync executor is establishing connections to the underlying engines..."
         )
         self._engines = await EngineConnections.connect(
-            self._config, self._blueprint_mgr.schema_name, autocommit=False
+            self._config,
+            self._blueprint_mgr.get_directory(),
+            self._blueprint_mgr.schema_name,
+            autocommit=False,
         )
         # Reads/writes to the data sync metadata are handled by this Aurora connection.
         # We need serializable isolation for correctness.

@@ -73,7 +73,9 @@ class BradFrontEnd(BradInterface):
         self._output_queue = output_queue
 
         self._assets = AssetManager(self._config)
-        self._blueprint_mgr = BlueprintManager(self._assets, self._schema_name)
+        self._blueprint_mgr = BlueprintManager(
+            self._config, self._assets, self._schema_name
+        )
         self._path_to_planner_config = path_to_planner_config
         self._monitor: Optional[Monitor] = None
 
@@ -123,7 +125,9 @@ class BradFrontEnd(BradInterface):
             )
         logger.info("Using routing policy: %s", routing_policy)
 
-        self._sessions = SessionManager(self._config, self._schema_name)
+        self._sessions = SessionManager(
+            self._config, self._blueprint_mgr, self._schema_name
+        )
         self._daemon_messages_task: Optional[asyncio.Task[None]] = None
         self._estimator: Optional[Estimator] = None
 

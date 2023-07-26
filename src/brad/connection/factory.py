@@ -5,6 +5,7 @@ from .redshift_connection import RedshiftConnection
 from .odbc_connection import OdbcConnection
 from brad.config.file import ConfigFile
 from brad.config.engine import Engine
+from brad.provisioning.directory import Directory
 
 
 class ConnectionFactory:
@@ -14,12 +15,17 @@ class ConnectionFactory:
         engine: Engine,
         schema_name: Optional[str],
         config: ConfigFile,
+        directory: Directory,
         autocommit: bool = True,
+        aurora_read_replica: Optional[int] = None,
     ) -> Connection:
         connection_details = config.get_connection_details(engine)
         if engine == Engine.Redshift:
+            cluster = directory.redshift_cluster()
+            address, port = cluster.endpoint()
             return await RedshiftConnection.connect(
-                host=connection_details["host"],
+                host=address,
+                port=port,
                 user=connection_details["user"],
                 password=connection_details["password"],
                 schema_name=schema_name,
@@ -27,8 +33,15 @@ class ConnectionFactory:
             )
         else:
             if engine == Engine.Aurora:
+                # N.B. The caller needs to specify a valid replica index.
+                instance = (
+                    directory.aurora_writer()
+                    if aurora_read_replica is None
+                    else directory.aurora_readers()[aurora_read_replica]
+                )
+                address, port = instance.endpoint()
                 cstr = cls._pg_aurora_odbc_connection_string(
-                    connection_details, schema_name
+                    address, port, connection_details, schema_name
                 )
             elif engine == Engine.Athena:
                 cstr = cls._athena_odbc_connection_string(
@@ -45,12 +58,17 @@ class ConnectionFactory:
         engine: Engine,
         schema_name: Optional[str],
         config: ConfigFile,
+        directory: Directory,
         autocommit: bool = True,
+        aurora_read_replica: Optional[int] = None,
     ) -> Connection:
         connection_details = config.get_connection_details(engine)
         if engine == Engine.Redshift:
+            cluster = directory.redshift_cluster()
+            address, port = cluster.endpoint()
             return RedshiftConnection.connect_sync(
-                host=connection_details["host"],
+                host=address,
+                port=port,
                 user=connection_details["user"],
                 password=connection_details["password"],
                 schema_name=schema_name,
@@ -58,8 +76,14 @@ class ConnectionFactory:
             )
         else:
             if engine == Engine.Aurora:
+                instance = (
+                    directory.aurora_writer()
+                    if aurora_read_replica is None
+                    else directory.aurora_readers()[aurora_read_replica]
+                )
+                address, port = instance.endpoint()
                 cstr = cls._pg_aurora_odbc_connection_string(
-                    connection_details, schema_name
+                    address, port, connection_details, schema_name
                 )
             elif engine == Engine.Athena:
                 cstr = cls._athena_odbc_connection_string(
@@ -75,20 +99,28 @@ class ConnectionFactory:
         cls, schema_name: str, config: ConfigFile
     ) -> Connection:
         connection_details = config.get_sidecar_db_details()
-        cstr = cls._pg_aurora_odbc_connection_string(connection_details, schema_name)
+        cstr = cls._pg_aurora_odbc_connection_string(
+            connection_details["host"],
+            int(connection_details["port"]),
+            connection_details,
+            schema_name,
+        )
         return await OdbcConnection.connect(cstr, autocommit=True)
 
     @staticmethod
     def _pg_aurora_odbc_connection_string(
-        connection_details: Dict[str, str], schema_name: Optional[str]
+        address: str,
+        port: int,
+        connection_details: Dict[str, str],
+        schema_name: Optional[str],
     ) -> str:
         """
         PostgreSQL-compatible Aurora connection string.
         """
         cstr = "Driver={{{}}};Server={};Port={};Uid={};Pwd={};".format(
             connection_details["odbc_driver"],
-            connection_details["host"],
-            connection_details["port"],
+            address,
+            port,
             connection_details["user"],
             connection_details["password"],
         )

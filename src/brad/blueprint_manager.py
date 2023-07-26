@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional
 
 from brad.asset_manager import AssetManager
@@ -6,6 +7,8 @@ from brad.blueprint.serde import (
     serialize_blueprint,
     deserialize_blueprint,
 )
+from brad.config.file import ConfigFile
+from brad.provisioning.directory import Directory
 
 
 class BlueprintManager:
@@ -13,10 +16,13 @@ class BlueprintManager:
     Utility class used for loading and providing access to the current blueprint.
     """
 
-    def __init__(self, assets: AssetManager, schema_name: str):
+    def __init__(
+        self, config: ConfigFile, assets: AssetManager, schema_name: str
+    ) -> None:
         self._assets = assets
         self._schema_name = schema_name
         self._blueprint: Optional[Blueprint] = None
+        self._directory = Directory(config)
 
     async def load(self) -> None:
         """
@@ -26,12 +32,14 @@ class BlueprintManager:
             _METADATA_KEY_TEMPLATE.format(self._schema_name)
         )
         self._blueprint = deserialize_blueprint(serialized)
+        await self._directory.refresh()
 
     def load_sync(self) -> None:
         serialized = self._assets.load_sync(
             _METADATA_KEY_TEMPLATE.format(self._schema_name)
         )
         self._blueprint = deserialize_blueprint(serialized)
+        asyncio.run(self._directory.refresh())
 
     def persist_sync(self) -> None:
         """
@@ -59,6 +67,9 @@ class BlueprintManager:
 
     def set_blueprint(self, blueprint: Blueprint) -> None:
         self._blueprint = blueprint
+
+    def get_directory(self) -> Directory:
+        return self._directory
 
 
 _METADATA_KEY_TEMPLATE = "{}.brad"

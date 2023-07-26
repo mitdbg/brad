@@ -100,6 +100,9 @@ files.
 - (07/24/2023) Update your local `config.yml` and add entries for
   `front_end_interface`, `front_end_port`, `num_front_ends`, and
   `front_end_log_path`. Remove `server_interface` and `server_port`.
+- (07/26/2023) Update your local `config.yml` and add entries for `cluster_id`
+  for Aurora and Redshift. You can remove any address/port details for Aurora and
+  Redshift; BRAD now resolves endpoints for the engines from AWS.
 
 
 ### Generate IMDB workload

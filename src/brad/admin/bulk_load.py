@@ -305,7 +305,7 @@ def _try_add_task(
 async def bulk_load_impl(args, manifest) -> None:
     config = ConfigFile(args.config_file)
     assets = AssetManager(config)
-    blueprint_mgr = BlueprintManager(assets, manifest["schema_name"])
+    blueprint_mgr = BlueprintManager(config, assets, manifest["schema_name"])
     await blueprint_mgr.load()
     blueprint = blueprint_mgr.get_blueprint()
 

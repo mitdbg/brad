@@ -2,6 +2,7 @@ import asyncio
 import logging
 from typing import Dict, Tuple, Optional
 
+from brad.blueprint_manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.session import SessionId
 from .engine_connections import EngineConnections
@@ -41,8 +42,11 @@ class Session:
 
 
 class SessionManager:
-    def __init__(self, config: ConfigFile, schema_name: str):
+    def __init__(
+        self, config: ConfigFile, blueprint_mgr: BlueprintManager, schema_name: str
+    ) -> None:
         self._config = config
+        self._blueprint_mgr = blueprint_mgr
         self._next_id_value = 0
         self._sessions: Dict[SessionId, Session] = {}
         # Eventually we will allow connections to multiple underlying "schemas"
@@ -58,6 +62,7 @@ class SessionManager:
         self._next_id_value += 1
         connections = await EngineConnections.connect(
             self._config,
+            self._blueprint_mgr.get_directory(),
             self._schema_name,
         )
         session = Session(session_id, connections)
