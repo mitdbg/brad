@@ -44,7 +44,34 @@ class MetricsSourceWithForecasting:
     def _metrics_values(self) -> pd.DataFrame:
         raise NotImplementedError
 
-    # Metrics retrieval methods.
+    ############
+    # The following functions, prefixed by `read_`, provide different ways to query this metrics source for
+    # the values of the metrics of interest. They return a dataframe with a schema that looks like the following:
+    #
+    #                            CPUUtilization_Average  ReadLatency_Maximum
+    # 2023-04-25 00:00:00+00:00                3.191965                  0.0
+    # 2023-04-26 00:00:00+00:00                3.198332                  0.0
+    # 2023-04-27 00:00:00+00:00                3.173024                  0.0
+    #
+    # The indices of these dataframes consist of timestamps associated with each epoch.
+    # Each column name is a `metric_id`, whose format depends on the engine.
+    #
+    # Redshift:
+    #   1. The metric name, a key in the `metrics` field within `monitored_redshift_metrics.json`
+    #   2. The reported statistic name, an element within a value in the `metrics` field within
+    #      `monitored_redshift_metrics.json`
+    #
+    #   These values are underscore (_) separated.
+    #
+    # Aurora:
+    #   1. The perf insight metric name, a key in the `metrics` within `monitored_aurora_metrics.json`
+    #   2. The reported statistic name, an element within a value in the `metrics` field within
+    #      `monitored_aurora_metrics.json`
+    #
+    #   These values are dot (.) separated.
+    #
+    # Front-end metrics:
+    #   See `front_end_metrics.py` for the metric IDs.
 
     def read_k_most_recent(
         self, k: int = 1, metric_ids: List[str] | None = None
