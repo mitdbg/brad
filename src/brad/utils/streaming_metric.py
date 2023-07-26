@@ -41,6 +41,44 @@ class StreamingMetric(Generic[T]):
         assert total is not None
         return total / num_samples
 
+    def average_in_window(self, start: datetime, end: datetime) -> float:
+        if len(self._metric_data) == 0:
+            return 0.0
+
+        # Assumption is that `metric_data` is sorted in ascending timestamp order.
+        total = None
+        num_samples = 0
+        collecting = False
+
+        for idx, (value, val_timestamp) in enumerate(self._metric_data):
+            if collecting:
+                if val_timestamp >= end:
+                    break
+
+                assert total is not None
+                total += value
+                num_samples += 1
+
+            else:
+                if val_timestamp > start:
+                    collecting = True
+                    total = value
+                    num_samples += 1
+
+                    if idx > 0:
+                        total += self._metric_data[idx - 1][0]
+                        num_samples += 1
+
+                elif val_timestamp == start:
+                    collecting = True
+                    total = value
+                    num_samples += 1
+
+        if total is None:
+            return 0.0
+        else:
+            return total / num_samples
+
     def _trim_metric_data(self) -> None:
         while len(self._metric_data) > self._window_size:
             self._metric_data.popleft()
