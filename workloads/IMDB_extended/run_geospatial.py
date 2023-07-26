@@ -12,7 +12,7 @@ import multiprocessing as mp
 
 from brad.grpc_client import BradGrpcClient
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
-from workload_utils.transaction_worker import TransactionWorker
+from workload_utils.geospatial_worker import GeospatialWorker
 
 
 def runner(
@@ -30,23 +30,17 @@ def runner(
 
     signal.signal(signal.SIGINT, noop_handler)
 
-    worker = TransactionWorker(worker_idx, args.seed ^ worker_idx, args.scale_factor)
+    worker = GeospatialWorker(worker_idx, args.seed ^ worker_idx, args.scale_factor)
 
-    txn_prng = random.Random(~(args.seed ^ worker_idx))
-    transactions = [
-        worker.purchase_tickets,
-        worker.add_new_showing,
-        worker.edit_movie_note,
+    prng = random.Random(~(args.seed ^ worker_idx))
+    queries = [
+        worker.query1,
+        worker.query2,
+        worker.query3,
     ]
-    transaction_weights = [
-        0.70,
-        0.20,
-        0.10,
-    ]
-    txn_indexes = list(range(len(transactions)))
-    latencies = [[] for _ in range(len(transactions))]
-    commits = [0 for _ in range(len(transactions))]
-    aborts = [0 for _ in range(len(transactions))]
+    query_weights = [0.4, 0.3, 0.3]
+    query_indexes = list(range(len(queries)))
+    latencies = [[] for _ in range(len(queries))]
 
     try:
         # Connect.
@@ -59,30 +53,21 @@ def runner(
             brad.connect()
             db = BradDatabase(brad)
 
-        # Set the isolation level.
-        db.execute_sync(
-            f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
-        )
-
         # Signal that we are ready to start and wait for other clients.
         start_queue.put("")
         _ = stop_queue.get()
 
         overall_start = time.time()
         while True:
-            txn_idx = txn_prng.choices(txn_indexes, weights=transaction_weights, k=1)[0]
-            txn = transactions[txn_idx]
+            q_idx = prng.choices(query_indexes, weights=query_weights, k=1)[0]
+            query = queries[q_idx]
 
-            txn_start = time.time()
-            succeeded = txn(db)
-            txn_end = time.time()
+            query_start = time.time()
+            succeeded = query(db)
+            query_end = time.time()
 
             # Record metrics.
-            if succeeded:
-                commits[txn_idx] += 1
-            else:
-                aborts[txn_idx] += 1
-            latencies[txn_idx].append(txn_end - txn_start)
+            latencies[q_idx].append(query_end - query_start)
 
             try:
                 _ = stop_queue.get_nowait()
@@ -90,7 +75,11 @@ def runner(
             except queue.Empty:
                 pass
         overall_end = time.time()
-        print(f"[{worker_idx}] Done running transactions.", flush=True, file=sys.stderr)
+        print(
+            f"[{worker_idx}] Done running geospatial queries.",
+            flush=True,
+            file=sys.stderr,
+        )
 
     finally:
         # For printing out results.
@@ -101,28 +90,20 @@ def runner(
         else:
             out_dir = pathlib.Path(".")
 
-        with open(out_dir / "oltp_latency_{}.csv".format(worker_idx), "w") as file:
-            print("txn_idx,run_time_s", file=file)
-            for tidx, lat_list in enumerate(latencies):
+        with open(
+            out_dir / "geospatial_latency_{}.csv".format(worker_idx), "w"
+        ) as file:
+            print("query_idx,run_time_s", file=file)
+            for qidx, lat_list in enumerate(latencies):
                 for lat in lat_list:
-                    print("{},{}".format(tidx, lat), file=file)
-
-        with open(out_dir / "oltp_stats_{}.csv".format(worker_idx), "w") as file:
-            print("stat,value", file=file)
-            print(f"overall_run_time_s,{overall_end - overall_start}", file=file)
-            print(f"purchase_commits,{commits[0]}", file=file)
-            print(f"add_showing_commits,{commits[1]}", file=file)
-            print(f"edit_note_commits,{commits[2]}", file=file)
-            print(f"purchase_aborts,{aborts[0]}", file=file)
-            print(f"add_showing_aborts,{aborts[1]}", file=file)
-            print(f"edit_note_aborts,{aborts[2]}", file=file)
+                    print("{},{}".format(qidx, lat), file=file)
 
         db.close_sync()
 
 
 def main():
     parser = argparse.ArgumentParser(
-        "Tool used to run IMDB-extended transactions against BRAD or an ODBC database."
+        "Tool used to run IMDB-extended geospatial workload against BRAD or an ODBC database."
     )
     parser.add_argument(
         "--run-for-s",
@@ -133,7 +114,7 @@ def main():
         "--num-clients",
         type=int,
         default=1,
-        help="The number of transactional clients.",
+        help="The number of geospatial clients.",
     )
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed for reproducibility."
@@ -148,12 +129,6 @@ def main():
         type=int,
         default=1,
         help="The scale factor used to generate the dataset.",
-    )
-    parser.add_argument(
-        "--isolation-level",
-        type=str,
-        default="REPEATABLE READ",
-        help="The isolation level to use when running the transactions.",
     )
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)
