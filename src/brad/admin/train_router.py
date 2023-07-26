@@ -117,7 +117,7 @@ def train_router(args):
     )
     if policy == RoutingPolicy.ForestTableSelectivity:
         asset_mgr = AssetManager(config)
-        mgr = BlueprintManager(asset_mgr, schema_name)
+        mgr = BlueprintManager(config, asset_mgr, schema_name)
         mgr.load_sync()
         blueprint = mgr.get_blueprint()
         estimator = asyncio.run(set_up_estimator(schema_name, blueprint, config))

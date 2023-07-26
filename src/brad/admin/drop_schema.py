@@ -35,7 +35,7 @@ def drop_schema(args):
 
     # 2. Delete the persisted data blueprint, if it exists.
     assets = AssetManager(config)
-    data_blueprint_mgr = BlueprintManager(assets, args.schema_name)
+    data_blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
     data_blueprint_mgr.delete_sync()
 
     # 3. Connect to the underlying engines without an explicit database.
