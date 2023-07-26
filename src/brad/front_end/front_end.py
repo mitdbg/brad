@@ -176,6 +176,10 @@ class BradFrontEnd(BradInterface):
         await self._blueprint_mgr.load()
         logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
 
+        if self._monitor is not None:
+            self._monitor.set_up_metrics_sources()
+            await self._monitor.fetch_latest()
+
         if self._routing_policy == RoutingPolicy.ForestTableSelectivity:
             self._estimator = await PostgresEstimator.connect(
                 self._schema_name, self._config
