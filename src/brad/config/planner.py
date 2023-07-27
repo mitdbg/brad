@@ -1,6 +1,7 @@
 import yaml
 import numpy as np
 import numpy.typing as npt
+from datetime import timedelta
 from typing import Dict, Optional
 from brad.planner.strategy import PlanningStrategy
 
@@ -21,6 +22,15 @@ class PlannerConfig:
 
     def strategy(self) -> PlanningStrategy:
         return PlanningStrategy.from_str(self._raw["strategy"])
+
+    def planning_window(self) -> timedelta:
+        epoch = self._raw["planning_window"]
+        return timedelta(
+            weeks=epoch["weeks"],
+            days=epoch["days"],
+            hours=epoch["hours"],
+            minutes=epoch["minutes"],
+        )
 
     def beam_size(self) -> int:
         return int(self._raw["beam_size"])

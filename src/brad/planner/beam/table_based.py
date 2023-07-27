@@ -281,7 +281,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         logger.info("%s", best_blueprint)
 
         debug_values = best_candidate.to_debug_values()
-        logger.debug(
+        logger.info(
             "Selected blueprint details: %s",
             json.dumps(debug_values, indent=2, default=str),
         )

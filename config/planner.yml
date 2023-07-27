@@ -1,5 +1,13 @@
 strategy: query_based_beam
 
+# Used to specify the period of time over which to use data for planning.
+# Currrently, this is a "look behind" window for the workload.
+planning_window:
+  weeks: 0
+  days: 0
+  hours: 0
+  minutes: 3
+
 ###
 ### Beam planning constants.
 ###

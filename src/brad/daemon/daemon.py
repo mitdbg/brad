@@ -1,8 +1,10 @@
 import asyncio
 import logging
 import queue
+import pytz
 import multiprocessing as mp
 from typing import Optional, List
+from datetime import datetime
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -28,10 +30,12 @@ from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import MetricsFromMonitor
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
-from brad.planner.workload.provider import WorkloadProvider
 from brad.planner.workload import Workload
+from brad.planner.workload.builder import WorkloadBuilder
+from brad.planner.workload.provider import LoggedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
 from brad.row_list import RowList
+from brad.utils.time_periods import period_start
 
 logger = logging.getLogger(__name__)
 
@@ -113,13 +117,15 @@ class BradDaemon:
         self._planner = BlueprintPlannerFactory.create(
             planner_config=self._planner_config,
             current_blueprint=self._blueprint_mgr.get_blueprint(),
-            # N.B. This is a placeholder
+            # TODO: Maybe we should seed the initial workload with the last
+            # workload, if it exists.
             current_workload=Workload.empty(),
             monitor=self._monitor,
             config=self._config,
             schema_name=self._schema_name,
-            # TODO: Hook into the query logging infrastructure. This is a placeholder.
-            workload_provider=_EmptyWorkloadProvider(),
+            workload_provider=LoggedWorkloadProvider(
+                self._config, self._planner_config
+            ),
             # TODO: Hook into the learned performance cost model. This is a placeholder.
             analytics_latency_scorer=_NoopAnalyticsScorer(),
             # TODO: Make this configurable.
@@ -284,14 +290,47 @@ class BradDaemon:
                 to_return.append((str_op,))
             return to_return
 
+        elif command.startswith("BRAD_INSPECT_WORKLOAD"):
+            now = datetime.now().astimezone(pytz.utc)
+            epoch_length = self._config.epoch_length
+            planning_window = self._planner_config.planning_window()
+            window_end = period_start(now, self._config.epoch_length) + epoch_length
+
+            parts = command.split(" ")
+            if len(parts) > 1:
+                try:
+                    window_multiplier = int(parts[-1])
+                except ValueError:
+                    window_multiplier = 1
+            else:
+                window_multiplier = 1
+
+            window_start = window_end - planning_window * window_multiplier
+            w = (
+                WorkloadBuilder()
+                .add_queries_from_s3_logs(self._config, window_start, window_end)
+                .build()
+            )
+
+            return [
+                ("Unique AP queries", len(w.analytical_queries())),
+                ("Unique TP queries", len(w.transactional_queries())),
+                ("Period", w.period()),
+                ("Window start (UTC)", str(window_start)),
+                ("Window end (UTC)", str(window_end)),
+            ]
+
+        elif command.startswith("BRAD_RUN_PLANNER"):
+            if self._planner is None:
+                return [("Planner not yet initialized.",)]
+
+            logger.info("Triggering the planner based on an external request...")
+            await self._planner.run_replan()
+            return [("Planner completed. See the daemon's logs for more details.",)]
+
         else:
             logger.warning("Received unknown internal command: %s", command)
             return []
-
-
-class _EmptyWorkloadProvider(WorkloadProvider):
-    def next_workload(self) -> Workload:
-        return Workload.empty()
 
 
 class _NoopAnalyticsScorer(AnalyticsLatencyScorer):

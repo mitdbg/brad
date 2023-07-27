@@ -340,6 +340,8 @@ class BradFrontEnd(BradInterface):
             command == "BRAD_SYNC"
             or command == "BRAD_EXPLAIN_SYNC_STATIC"
             or command == "BRAD_EXPLAIN_SYNC"
+            or command.startswith("BRAD_INSPECT_WORKLOAD")
+            or command == "BRAD_RUN_PLANNER"
         ):
             if self._daemon_request_mailbox.is_active():
                 return [
