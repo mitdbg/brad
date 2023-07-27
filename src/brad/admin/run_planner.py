@@ -86,11 +86,6 @@ def register_admin_action(subparser) -> None:
         help="The number of analytical queries issued per second.",
     )
     parser.add_argument(
-        "--transactional-rate-per-s",
-        type=float,
-        help="The number of transactions issued per second.",
-    )
-    parser.add_argument(
         "--debug",
         action="store_true",
         help="Set to enable debug logging.",
@@ -151,7 +146,6 @@ def run_planner(args) -> None:
     elif args.workload_source == "query_bank":
         assert args.query_bank_file is not None
         assert args.query_counts_file is not None
-        assert args.transactional_rate_per_s is not None
         assert args.workload_dir is not None
 
         engines = EngineConnections.connect_sync(
@@ -166,9 +160,6 @@ def run_planner(args) -> None:
                 args.query_counts_file,
             )
             .add_transactional_queries_from_file(workload_dir / "oltp.sql")
-            .uniform_total_transaction_rate(
-                args.transactional_rate_per_s, period=timedelta(seconds=1)
-            )
             .for_period(timedelta(hours=1))
             .table_sizes_from_engines(blueprint_mgr.get_blueprint(), table_sizer)
             .build()
@@ -176,7 +167,6 @@ def run_planner(args) -> None:
 
     elif args.workload_source == "workload_dir":
         assert args.analytical_rate_per_s is not None
-        assert args.transactional_rate_per_s is not None
 
         engines = EngineConnections.connect_sync(
             config, args.schema_name, autocommit=True
@@ -189,9 +179,6 @@ def run_planner(args) -> None:
             .add_transactional_queries_from_file(workload_dir / "oltp.sql")
             .uniform_per_analytical_query_rate(
                 args.analytical_rate_per_s, period=timedelta(seconds=1)
-            )
-            .uniform_total_transaction_rate(
-                args.transactional_rate_per_s, period=timedelta(seconds=1)
             )
             .for_period(timedelta(hours=1))
             .table_sizes_from_engines(blueprint_mgr.get_blueprint(), table_sizer)

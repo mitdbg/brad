@@ -47,7 +47,7 @@ class Workload:
 
     @classmethod
     def empty(cls) -> "Workload":
-        return cls(timedelta(hours=1), [], [], 0, {})
+        return cls(timedelta(hours=1), [], [], {})
 
     @classmethod
     def from_pickle(cls, file_path: str | Path) -> "Workload":
@@ -59,13 +59,11 @@ class Workload:
         period: timedelta,
         analytical_queries: List[Query],
         transactional_queries: List[Query],
-        transaction_arrival_count: float,
         table_sizes: Dict[str, int],
     ) -> None:
         self._period = period
         self._analytical_queries: List[Query] = analytical_queries
         self._transactional_queries: List[Query] = transactional_queries
-        self._transaction_arrival_count = transaction_arrival_count
         self._table_sizes = table_sizes
 
         # The predicted latencies of the analytical queries.
@@ -106,9 +104,6 @@ class Workload:
 
     def all_queries(self) -> Iterable[Query]:
         return chain(self._transactional_queries, self._analytical_queries)
-
-    def transaction_arrival_count(self) -> float:
-        return self._transaction_arrival_count
 
     def table_num_rows(self, table_name: str) -> int:
         return self._table_sizes[table_name]
