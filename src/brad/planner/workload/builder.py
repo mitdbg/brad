@@ -164,23 +164,47 @@ class WorkloadBuilder:
         range_end: Optional[datetime] = None
         range_start: Optional[datetime] = None
 
+        def extract_epoch_start(file_stem: str) -> datetime:
+            return datetime.strptime(
+                " ".join(file_stem.split("_")[:2]), "%Y-%m-%d %H:%M:%S"
+            ).replace(tzinfo=timezone.utc)
+
+        def intervals_intersect(
+            start1: datetime, end1: datetime, start2: datetime, end2: datetime
+        ) -> bool:
+            # Left endpoint is inclusive, right endpoint is exclusive.
+            return not (end1 <= start2 or end2 <= start1)
+
+        epoch_length = config.epoch_length
+
+        # The logic below extracts data from log files that represent epochs
+        # that intersect with the provided window.
+        #
+        # NOTE: This logic will overcount the time period if there are log gaps
+        # in the window (e.g., the window spans multiple epochs and we did not
+        # log a few epochs in the middle of the window). This behavior is OK for
+        # our use cases since we will assume that the query logger runs
+        # continuously.
+
         # Skip files that represent epochs after `window_end`.
         while file_idx < len(sorted_files):
             file_obj = sorted_files[file_idx]
             file_key = file_obj["Key"]
             file_stem = file_key.split("/")[-1]
 
-            epoch_timestamp = datetime.strptime(
-                file_stem.split("_")[0], "%Y-%m-%d %H:%M:%S,%f"
-            ).replace(tzinfo=timezone.utc)
+            epoch_start = extract_epoch_start(file_stem)
+            epoch_end = epoch_start + epoch_length
 
-            if epoch_timestamp >= window_end:
+            if not intervals_intersect(
+                epoch_start, epoch_end, window_start, window_end
+            ):
                 file_idx += 1
-                logger.debug("Skipping log at epoch start: %s", epoch_timestamp)
+                logger.debug("Skipping log at epoch start: %s", epoch_start)
             else:
                 # This assumes the epoch length did not change from when the
                 # data was logged to now.
-                range_end = epoch_timestamp + config.epoch_length
+                range_end = epoch_end
+                range_start = epoch_start
                 break
 
         # Retrieve the contents of each overlapping file.
@@ -189,34 +213,39 @@ class WorkloadBuilder:
             file_key = file_obj["Key"]
             file_stem = file_key.split("/")[-1]
 
-            epoch_timestamp = datetime.strptime(
-                file_stem.split("_")[0], "%Y-%m-%d %H:%M:%S,%f"
-            ).replace(tzinfo=timezone.utc)
-            logger.debug("Processing log at epoch start: %s", epoch_timestamp)
+            epoch_start = extract_epoch_start(file_stem)
+            epoch_end = epoch_start + epoch_length
+            if not intervals_intersect(
+                epoch_start, epoch_end, window_start, window_end
+            ):
+                break
+
+            logger.debug("Processing log at epoch start: %s", epoch_start)
 
             response = s3.get_object(Bucket=config.s3_logs_bucket, Key=file_key)
             content = response["Body"].read().decode("utf-8")
 
             if "analytical" in file_key:
                 for line in content.strip().split("\n"):
-                    q = re.findall(r"Query: (.+?) Engine:", line)[0]
+                    matches = re.findall(r"Query: (.+?) Engine:", line)
+                    if len(matches) == 0:
+                        continue
+                    q = matches[0]
                     analytical_queries.append(q.strip())
+
             elif "transactional" in file_key:
                 prob = re.findall(r"_p(\d+)\.log$", file_key)[0]
                 prob = float(prob) / 100.0
                 if (prob / 100.0) < sampling_prob:
                     sampling_prob = prob
                 for line in content.strip().split("\n"):
-                    print(line)
-                    q = re.findall(r"Query: (.+) Engine:", line)[0]
+                    matches = re.findall(r"Query: (.+) Engine:", line)
+                    if len(matches) == 0:
+                        continue
+                    q = matches[0]
                     txn_queries.append(q.strip())
 
-            range_start = epoch_timestamp
-            if epoch_timestamp <= window_start:
-                # The epoch timestamp in the log file name marks the start of the epoch.
-                # We include all logs up to the oldest epoch that intersects `since`.
-                break
-
+            range_start = epoch_start
             file_idx += 1
 
         # Sanity checks.
