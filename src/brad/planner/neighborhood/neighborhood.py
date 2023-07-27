@@ -16,7 +16,6 @@ from brad.planner.neighborhood.filters.single_engine_execution import (
 )
 from brad.planner.neighborhood.filters.table_on_engine import TableOnEngine
 from brad.planner.neighborhood.impl import NeighborhoodImpl
-# from brad.planner.neighborhood.scaling_scorer import ALL_METRICS
 from brad.planner.neighborhood.score import ScoringContext
 from brad.planner.neighborhood.full_neighborhood import FullNeighborhoodSearchPlanner
 from brad.planner.neighborhood.sampled_neighborhood import (
@@ -27,6 +26,8 @@ from brad.provisioning.directory import Directory
 from brad.routing.rule_based import RuleBased
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
+
+# from brad.planner.neighborhood.scaling_scorer import ALL_METRICS
 
 logger = logging.getLogger(__name__)
 
