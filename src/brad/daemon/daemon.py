@@ -28,7 +28,7 @@ from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import MetricsFromMonitor
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
-from brad.planner.workload.provider import WorkloadProvider
+from brad.planner.workload.provider import LoggedWorkloadProvider
 from brad.planner.workload import Workload
 from brad.routing.policy import RoutingPolicy
 from brad.row_list import RowList
@@ -113,13 +113,15 @@ class BradDaemon:
         self._planner = BlueprintPlannerFactory.create(
             planner_config=self._planner_config,
             current_blueprint=self._blueprint_mgr.get_blueprint(),
-            # N.B. This is a placeholder
+            # TODO: Maybe we should seed the initial workload with the last
+            # workload, if it exists.
             current_workload=Workload.empty(),
             monitor=self._monitor,
             config=self._config,
             schema_name=self._schema_name,
-            # TODO: Hook into the query logging infrastructure. This is a placeholder.
-            workload_provider=_EmptyWorkloadProvider(),
+            workload_provider=LoggedWorkloadProvider(
+                self._config, self._planner_config
+            ),
             # TODO: Hook into the learned performance cost model. This is a placeholder.
             analytics_latency_scorer=_NoopAnalyticsScorer(),
             # TODO: Make this configurable.
@@ -287,11 +289,6 @@ class BradDaemon:
         else:
             logger.warning("Received unknown internal command: %s", command)
             return []
-
-
-class _EmptyWorkloadProvider(WorkloadProvider):
-    def next_workload(self) -> Workload:
-        return Workload.empty()
 
 
 class _NoopAnalyticsScorer(AnalyticsLatencyScorer):

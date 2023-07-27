@@ -101,6 +101,8 @@ class EpochFileHandler(logging.Handler):
             self._log_file_t.close()
             self._log_file_a.close()
             log_file_path_t, log_file_path_a = self.get_log_file_paths()
+            # TODO: These need to be made async, otherwise they will block the
+            # front end from processing queries.
             self.upload_to_s3(log_file_path_t)
             self.upload_to_s3(log_file_path_a)
 
