@@ -1,7 +1,8 @@
 import pandas as pd
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timedelta
 
+from brad.daemon.metrics_logger import MetricsLogger
 from brad.forecasting import Forecaster
 from brad.forecasting.constant_forecaster import ConstantForecaster
 from brad.forecasting.moving_average_forecaster import MovingAverageForecaster
@@ -40,8 +41,14 @@ class MetricsSourceWithForecasting:
         CloudWatch). This should be called at least once every `epoch_length`.
         """
         self._forecaster.update_df_pointer(self._metrics_values())
+        logger = self._metrics_logger()
+        if logger is not None:
+            logger.log_new_metrics(self._metrics_values())
 
     def _metrics_values(self) -> pd.DataFrame:
+        raise NotImplementedError
+
+    def _metrics_logger(self) -> Optional[MetricsLogger]:
         raise NotImplementedError
 
     ############

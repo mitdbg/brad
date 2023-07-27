@@ -1,12 +1,13 @@
 import asyncio
 import pandas as pd
 import json
-from typing import List
+from typing import List, Optional
 from importlib.resources import files, as_file
 
 import brad.daemon as daemon
 from .metrics_def import MetricDef
 from .metrics_source import MetricsSourceWithForecasting
+from .metrics_logger import MetricsLogger
 from .cloudwatch import CloudWatchClient
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
@@ -27,6 +28,9 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
         self._cw_client = CloudWatchClient(
             Engine.Redshift, self._config.redshift_cluster_id, self._config
         )
+        self._logger = MetricsLogger.create_from_config(
+            self._config, "brad_metrics_redshift.log"
+        )
 
         super().__init__(
             self._config.epoch_length, forecasting_method, forecasting_window_size
@@ -40,6 +44,9 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
 
     def _metrics_values(self) -> pd.DataFrame:
         return self._values
+
+    def _metrics_logger(self) -> Optional[MetricsLogger]:
+        return self._logger
 
     def _load_metric_defs(self) -> List[MetricDef]:
         metrics_file = files(daemon).joinpath("monitored_redshift_metrics.json")

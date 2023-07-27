@@ -66,9 +66,11 @@ def main(args):
     mp.set_start_method("spawn")
 
     config = ConfigFile(args.config_file)
-    set_up_logging(
-        filename=config.daemon_log_path, debug_mode=args.debug, also_console=True
-    )
+
+    log_path = config.daemon_log_path
+    if log_path is not None:
+        log_path /= "brad_daemon.log"
+    set_up_logging(filename=log_path, debug_mode=args.debug, also_console=True)
 
     event_loop = asyncio.new_event_loop()
     event_loop.set_debug(enabled=args.debug)

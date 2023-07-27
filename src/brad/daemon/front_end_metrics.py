@@ -2,13 +2,14 @@ import math
 import logging
 import pandas as pd
 import pytz
-from typing import Dict, List
+from typing import Dict, List, Optional
 from datetime import datetime, timezone
 
 from .metrics_source import MetricsSourceWithForecasting
 from brad.config.file import ConfigFile
 from brad.config.metrics import FrontEndMetric
 from brad.daemon.messages import MetricsReport
+from brad.daemon.metrics_logger import MetricsLogger
 from brad.utils.streaming_metric import StreamingMetric
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,9 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
         self._ordered_metrics = list(self._front_end_metrics.keys())
         self._values_df = pd.DataFrame(
             columns=list(map(lambda metric: metric.value, self._ordered_metrics))
+        )
+        self._logger = MetricsLogger.create_from_config(
+            self._config, "brad_metrics_front_end.log"
         )
 
         super().__init__(
@@ -82,6 +86,9 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
 
     def _metrics_values(self) -> pd.DataFrame:
         return self._values_df
+
+    def _metrics_logger(self) -> Optional[MetricsLogger]:
+        return self._logger
 
     def handle_metric_report(self, report: MetricsReport) -> None:
         now = datetime.now(tz=timezone.utc)

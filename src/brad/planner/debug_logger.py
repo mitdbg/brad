@@ -1,9 +1,10 @@
 import csv
-import os
 import datetime
+import pathlib
+import pytz
 from typing import Optional, Dict, List
 
-LOG_REPLAN_VAR = "BRAD_LOG_PLANNING"
+from brad.config.file import ConfigFile
 
 
 class BlueprintPlanningDebugLogger:
@@ -13,16 +14,19 @@ class BlueprintPlanningDebugLogger:
 
     @classmethod
     def create_if_requested(
-        cls, prefix: str
+        cls, config: ConfigFile, file_name_prefix: str
     ) -> Optional["BlueprintPlanningDebugLogger"]:
-        if LOG_REPLAN_VAR not in os.environ:
+        log_path = config.planner_log_path
+        if log_path is None:
             return None
-        return cls(prefix)
+        return cls(log_path, file_name_prefix)
 
-    def __init__(self, prefix: str) -> None:
-        curr_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        out_file_name = f"{prefix}_{curr_time}.csv"
-        self._out_file = open(out_file_name, "w", encoding="UTF-8")
+    def __init__(self, log_path: pathlib.Path, file_name_prefix: str) -> None:
+        timestamp = datetime.datetime.now()
+        timestamp = timestamp.astimezone(pytz.utc)  # UTC for consistency.
+        curr_time = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
+        out_file_name = f"{file_name_prefix}_{curr_time}.csv"
+        self._out_file = open(log_path / out_file_name, "w", encoding="UTF-8")
         self._key_order: List[str] = []
         self._first_log = True
 

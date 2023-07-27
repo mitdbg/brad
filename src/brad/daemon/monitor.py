@@ -74,6 +74,7 @@ class Monitor:
         """
         Fetches the latest metrics from our metrics sources.
         """
+        logger.debug("Fetching latest metrics...")
         futures = []
         for source in chain(
             [self._aurora_writer_metrics],
