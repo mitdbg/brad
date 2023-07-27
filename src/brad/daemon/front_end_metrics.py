@@ -1,4 +1,5 @@
 import math
+import logging
 import pandas as pd
 import pytz
 from typing import Dict, List
@@ -9,6 +10,8 @@ from brad.config.file import ConfigFile
 from brad.config.metrics import FrontEndMetric
 from brad.daemon.messages import MetricsReport
 from brad.utils.streaming_metric import StreamingMetric
+
+logger = logging.getLogger(__name__)
 
 
 FrontEndMetricDict = Dict[FrontEndMetric, List[StreamingMetric]]
@@ -35,7 +38,9 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             ],
         }
         self._ordered_metrics = list(self._front_end_metrics.keys())
-        self._values_df = pd.DataFrame(columns=list(map(str, self._ordered_metrics)))
+        self._values_df = pd.DataFrame(
+            columns=list(map(lambda metric: metric.value, self._ordered_metrics))
+        )
 
         super().__init__(
             self._epoch_length, forecasting_method, forecasting_window_size
@@ -72,16 +77,7 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
         assert len(timestamps) == len(data_cols[FrontEndMetric.TxnEndPerSecond.value])
 
         new_metrics = pd.DataFrame(data_cols, index=timestamps)
-        self._values_df = (
-            self._values_df
-            if self._values_df.empty
-            else pd.concat(
-                [
-                    self._values_df,
-                    new_metrics.loc[new_metrics.index > self._values_df.index[-1]],
-                ]
-            )
-        )
+        self._values_df = self._get_updated_metrics(new_metrics)
         await super().fetch_latest()
 
     def _metrics_values(self) -> pd.DataFrame:
@@ -94,3 +90,9 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             report.fe_index
         ]
         metric.add_sample(report.txn_completions_per_s, now)
+        logger.debug(
+            "Received metrics report: [%d] %f (ts: %s)",
+            report.fe_index,
+            report.txn_completions_per_s,
+            now,
+        )

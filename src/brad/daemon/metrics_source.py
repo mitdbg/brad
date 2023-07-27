@@ -146,3 +146,22 @@ class MetricsSourceWithForecasting:
         )
 
         return pd.concat([past, future], axis=0)
+
+    def _get_updated_metrics(self, new_metrics: pd.DataFrame) -> pd.DataFrame:
+        """
+        Appends new metric values into the existing values dataframe.
+        """
+        values = self._metrics_values()
+        if new_metrics.empty:
+            return values
+
+        return (
+            pd.concat(
+                [
+                    values,
+                    new_metrics.loc[new_metrics.index > values.index[-1]],
+                ]
+            )
+            if not values.empty
+            else pd.concat([values, new_metrics])
+        )

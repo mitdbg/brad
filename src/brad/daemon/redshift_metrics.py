@@ -35,16 +35,7 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
     async def fetch_latest(self) -> None:
         loop = asyncio.get_running_loop()
         new_metrics = await loop.run_in_executor(None, self._fetch_cw_metrics, 5)
-        self._values = (
-            self._values
-            if self._values.empty
-            else pd.concat(
-                [
-                    self._values,
-                    new_metrics.loc[new_metrics.index > self._values.index[-1]],
-                ]
-            )
-        )
+        self._values = self._get_updated_metrics(new_metrics)
         await super().fetch_latest()
 
     def _metrics_values(self) -> pd.DataFrame:

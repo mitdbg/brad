@@ -103,7 +103,7 @@ class Monitor:
 
     def _print_front_end_metrics(self) -> None:
         fe = self.front_end_metrics().read_k_most_recent(1)
-        logger.debug("Front end metrics: %s", fe)
+        logger.debug("Front end metrics:\n%s", fe)
 
     # The methods below are used to retrieve metrics.
 
