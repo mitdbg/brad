@@ -4,7 +4,7 @@ from .athena import AthenaProvisioning
 
 from brad.blueprint.blueprint import Blueprint
 from brad.config.engine import Engine
-from brad.daemon.monitor import Monitor, get_metric_id
+from brad.daemon.monitor import Monitor
 import brad.provisioning as provisioning
 import json
 from importlib.resources import files, as_file
@@ -57,26 +57,32 @@ class PhysicalProvisioning:
     # Currently only reads the previous metric.
     # Can override certain metrics by providing Dict[metric_id -> value]
     def should_trigger_replan(self, overrides=None) -> bool:
-        df = self._monitor.read_k_most_recent(1)
+        redshift = self._monitor.redshift_metrics().read_k_most_recent(1)
+        aurora = self._monitor.aurora_metrics(reader_index=None).read_k_most_recent(1)
         print("TRIGGER REPLAN")
-        print(df)
-        if df is None:
+        print("REDSHIFT")
+        print(redshift)
+        print("AURORA")
+        print(aurora)
+        if redshift.empty or aurora.empty:
             return False
         for engine, triggers in self._trigger_ranges.items():
-            roles = triggers.get("roles", [""])
             metrics = triggers["metrics"]
-            for role in roles:
-                for metric_name, lohi in metrics.items():
-                    lo, hi = lohi[0], lohi[1]
-                    metric_id = get_metric_id(engine, metric_name, "Average", role=role)
-                    if metric_id not in df.columns:
-                        continue
-                    metric_value = df[metric_id][-1]
-                    print(f"Metric {metric_id}: {metric_value}")
-                    if overrides is not None and metric_id in overrides:
-                        metric_value = overrides[metric_id]
-                    if metric_value < lo or metric_value > hi:
-                        return True
+
+            for metric_name, lohi in metrics.items():
+                lo, hi = lohi[0], lohi[1]
+
+                if engine == "redshift":
+                    df = redshift
+                elif engine == "aurora":
+                    df = aurora
+                metric_value = df[metric_name].iloc[-1]
+
+                print(f"Metric {metric_name}: {metric_value}")
+                if overrides is not None and metric_name in overrides:
+                    metric_value = overrides[metric_name]
+                if metric_value < lo or metric_value > hi:
+                    return True
 
         return False
 

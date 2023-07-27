@@ -14,14 +14,6 @@ from brad.daemon.redshift_metrics import RedshiftMetrics
 logger = logging.getLogger(__name__)
 
 
-# Return the id of a metric in the dataframe.
-def get_metric_id(engine: str, metric_name: str, stat: str, role: str = ""):
-    metric_id = f"{engine}_{metric_name}_{stat}"
-    if role != "":
-        metric_id = f"{engine}_{role}_{metric_name}_{stat}"
-    return metric_id
-
-
 class Monitor:
     def __init__(
         self,

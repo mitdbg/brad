@@ -1,13 +1,12 @@
 {
     "redshift": {
         "metrics": {
-            "CPUUtilization": [25, 90]
+            "CPUUtilization_Average": [25, 90]
         }
     },
     "aurora": {
-        "roles": ["WRITER"],
         "metrics": {
-            "CPUUtilization": [25, 90]
+            "os.cpuUtilization.total.avg": [25, 90]
         }
     }
 }

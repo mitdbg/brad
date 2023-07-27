@@ -1,8 +1,13 @@
+import asyncio
+import pytest
+
+from brad.asset_manager import AssetManager
+from brad.blueprint_manager import BlueprintManager
 from brad.blueprint.user import UserProvidedBlueprint
+from brad.config.file import ConfigFile
 from brad.planner.data import bootstrap_blueprint
 from brad.provisioning.physical import PhysicalProvisioning
-from brad.daemon.monitor import Monitor, get_metric_id
-import pytest
+from brad.daemon.monitor import Monitor
 
 
 @pytest.mark.skip(reason="No way of running in CI. It needs to start actual clusters.")
@@ -37,20 +42,17 @@ def test_neighborhood_change():
     """
     user = UserProvidedBlueprint.load_from_yaml_str(table_config)
     initial = bootstrap_blueprint(user)
-    test_cluster_ids = {
-        "aurora": "brad-test",
-        "redshift": "brad-test",
-        "athena": "brad-test",
-    }
     print()  # Flush stdout.
     print("Running test")
-    monitor = Monitor(
-        cluster_ids=test_cluster_ids
-    )  # Alternatively, cal call: Monitor.from_config.
-    monitor.force_read_metrics()  # Same effect as running for a long time.
-    physical = PhysicalProvisioning(
-        monitor=monitor, initial_blueprint=initial, cluster_ids=test_cluster_ids
-    )
+    config = ConfigFile(
+        "config.yml"
+    )  # TODO: Support configs in tests. This will not work.
+    assets = AssetManager(config)
+    blueprint_mgr = BlueprintManager(config, assets, "test")
+    blueprint_mgr.set_blueprint(initial)
+    monitor = Monitor(config, blueprint_mgr)
+    asyncio.run(monitor.fetch_latest())  # Same effect as running for a long time.
+    physical = PhysicalProvisioning(monitor=monitor, initial_blueprint=initial)
     # With default bounds, should be underutilized. (Only works if no concurrent benchmark running)
     print("TEST NEIGH")
     should_plan = physical.should_trigger_replan()
@@ -58,17 +60,17 @@ def test_neighborhood_change():
     # Set utilization within bound. Should not trigger replan.
     should_plan = physical.should_trigger_replan(
         overrides={
-            get_metric_id("aurora", "CPUUtilization", "Average", role="WRITER"): 60,
-            get_metric_id("redshift", "CPUUtilization", "Average"): 60,
+            "CPUUtilization_Average": 60,
+            "os.cpuUtilization.total.avg": 60,
         }
     )
     assert not (should_plan)
     # Override specific metrics for testing.
     # Setting utilization to 100% should trigger a
-    monitor.force_read_metrics()  # Same effect as run_forever after 5 minutes.
+    asyncio.run(monitor.fetch_latest())  # Same effect as run_forever after 5 minutes.
     should_plan = physical.should_trigger_replan(
         overrides={
-            get_metric_id("aurora", "CPUUtilization", "Average"): 100,
+            "os.cpuUtilization.total.avg": 100,
         }
     )
     assert should_plan
