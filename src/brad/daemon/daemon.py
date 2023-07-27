@@ -11,6 +11,7 @@ from brad.blueprint import Blueprint
 from brad.blueprint_manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
+from brad.config.temp_config import TempConfig
 from brad.daemon.messages import (
     ShutdownFrontEnd,
     Sentinel,
@@ -24,12 +25,18 @@ from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.front_end.start_front_end import start_front_end
 from brad.planner.abstract import BlueprintPlanner
-from brad.planner.compare.cost import best_cost_under_geomean_latency
+from brad.planner.compare.cost import best_cost_under_p99_latency
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import MetricsFromMonitor
 from brad.planner.scoring.data_access.provider import DataAccessProvider
+from brad.planner.scoring.data_access.precomputed_values import (
+    PrecomputedDataAccessProvider,
+)
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
+from brad.planner.scoring.performance.precomputed_predictions import (
+    PrecomputedPredictions,
+)
 from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import LoggedWorkloadProvider
@@ -52,11 +59,13 @@ class BradDaemon:
     def __init__(
         self,
         config: ConfigFile,
+        temp_config: Optional[TempConfig],
         schema_name: str,
         path_to_planner_config: str,
         debug_mode: bool,
     ):
         self._config = config
+        self._temp_config = temp_config
         self._schema_name = schema_name
         self._path_to_planner_config = path_to_planner_config
         self._planner_config = PlannerConfig(path_to_planner_config)
@@ -114,6 +123,28 @@ class BradDaemon:
             self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
         await self._data_sync_executor.establish_connections()
 
+        if self._temp_config is not None:
+            # TODO: Actually call into the models. We avoid doing so for now to
+            # avoid having to implement model loading, etc.
+            latency_scorer = PrecomputedPredictions.load(
+                workload_file_path=self._temp_config.query_bank_path(),
+                aurora_predictions_path=self._temp_config.aurora_preds_path(),
+                redshift_predictions_path=self._temp_config.redshift_preds_path(),
+                athena_predictions_path=self._temp_config.athena_preds_path(),
+            )
+            data_access_provider = PrecomputedDataAccessProvider.load(
+                workload_file_path=self._temp_config.query_bank_path(),
+                aurora_accessed_pages_path=self._temp_config.aurora_data_access_path(),
+                athena_accessed_bytes_path=self._temp_config.athena_data_access_path(),
+            )
+            comparator = best_cost_under_p99_latency(
+                max_latency_ceiling_s=self._temp_config.latency_ceiling_s()
+            )
+        else:
+            latency_scorer = _NoopAnalyticsScorer()
+            data_access_provider = _NoopDataAccessProvider()
+            comparator = best_cost_under_p99_latency(max_latency_ceiling_s=10)
+
         self._planner = BlueprintPlannerFactory.create(
             planner_config=self._planner_config,
             current_blueprint=self._blueprint_mgr.get_blueprint(),
@@ -126,13 +157,10 @@ class BradDaemon:
             workload_provider=LoggedWorkloadProvider(
                 self._config, self._planner_config
             ),
-            # TODO: Hook into the learned performance cost model. This is a placeholder.
-            analytics_latency_scorer=_NoopAnalyticsScorer(),
-            # TODO: Make this configurable.
-            comparator=best_cost_under_geomean_latency(geomean_latency_ceiling_s=10),
+            analytics_latency_scorer=latency_scorer,
+            comparator=comparator,
             metrics_provider=MetricsFromMonitor(self._monitor, forecasted=True),
-            # TODO: Hook into the data access models. This is a placeholder.
-            data_access_provider=_NoopDataAccessProvider(),
+            data_access_provider=data_access_provider,
             estimator_provider=self._estimator_provider,
         )
         self._planner.register_new_blueprint_callback(self._handle_new_blueprint)

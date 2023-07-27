@@ -34,6 +34,11 @@ def register_command(subparsers):
         help="Path to the blueprint planner's configuration file.",
     )
     parser.add_argument(
+        "--temp-config-file",
+        type=str,
+        help="Path to the temporary configuration file.",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="Set to enable debug logging.",
