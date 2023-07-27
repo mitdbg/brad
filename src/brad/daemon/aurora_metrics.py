@@ -60,9 +60,9 @@ class AuroraMetrics(MetricsSourceWithForecasting):
 
     def _metrics_logger_name(self, reader_instance_index: Optional[int]) -> str:
         if reader_instance_index is None:
-            return "metrics_aurora_writer.log"
+            return "brad_metrics_aurora_writer.log"
         else:
-            return "metrics_aurora_reader_{}.log".format(reader_instance_index)
+            return "brad_metrics_aurora_reader_{}.log".format(reader_instance_index)
 
     def _load_metric_defs(self) -> List[MetricDef]:
         metrics_file = files(daemon).joinpath("monitored_aurora_metrics.json")

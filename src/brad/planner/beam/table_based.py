@@ -193,7 +193,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         # Log the placement top k for debugging purposes, if needed.
         placement_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
-            "table_beam_placement_topk"
+            self._config, "brad_table_beam_placement_topk"
         )
         if placement_top_k_logger is not None:
             for candidate in current_top_k:
@@ -254,7 +254,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         # Log the final top k for debugging purposes, if needed.
         final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
-            "table_beam_final_topk"
+            self._config, "brad_table_beam_final_topk"
         )
         if final_top_k_logger is not None:
             for candidate in final_top_k:

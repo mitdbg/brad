@@ -29,7 +29,7 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
             Engine.Redshift, self._config.redshift_cluster_id, self._config
         )
         self._logger = MetricsLogger.create_from_config(
-            self._config, "metrics_redshift.log"
+            self._config, "brad_metrics_redshift.log"
         )
 
         super().__init__(

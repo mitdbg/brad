@@ -43,7 +43,7 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             columns=list(map(lambda metric: metric.value, self._ordered_metrics))
         )
         self._logger = MetricsLogger.create_from_config(
-            self._config, "metrics_front_end.log"
+            self._config, "brad_metrics_front_end.log"
         )
 
         super().__init__(

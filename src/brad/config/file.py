@@ -30,15 +30,14 @@ class ConfigFile:
         return self._raw_path
 
     @property
-    def daemon_log_path(self) -> Optional[str]:
-        return self._raw["daemon_log_file"] if "daemon_log_file" in self._raw else None
+    def daemon_log_path(self) -> Optional[pathlib.Path]:
+        return self._extract_log_path("daemon_log_file")
 
     def front_end_log_file(self, worker_index: int) -> Optional[pathlib.Path]:
-        if "front_end_log_path" in self._raw:
-            prefix = pathlib.Path(self._raw["front_end_log_path"])
-            return prefix / f"brad_front_end_{worker_index}.log"
-        else:
+        log_path = self._extract_log_path("front_end_log_path")
+        if log_path is None:
             return None
+        return log_path / f"brad_front_end_{worker_index}.log"
 
     def metrics_log_path(self) -> Optional[pathlib.Path]:
         return self._extract_log_path("metrics_log_path")
@@ -56,8 +55,8 @@ class ConfigFile:
         return int(self._raw["num_front_ends"])
 
     @property
-    def planner_log_path(self) -> str:
-        return self._raw["planner_log_path"] if "planner_log_path" in self._raw else "."
+    def planner_log_path(self) -> Optional[pathlib.Path]:
+        return self._extract_log_path("planner_log_path")
 
     @property
     def athena_s3_data_path(self) -> str:

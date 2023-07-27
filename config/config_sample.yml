@@ -10,14 +10,19 @@ front_end_interface: "0.0.0.0"
 front_end_port: 6583
 num_front_ends: 1
 
+# For the logging configs below, you can omit them to disable logging.
+# You can also set them to an environment variable (string must be ALL_CAPS with
+# only underscores and numbers permitted) and BRAD will use the path stored in
+# that variable.
+
 # Where BRAD's daemon process will write its logs.
-daemon_log_file: /tmp/brad_daemon.log
+daemon_log_file: /tmp
 
 # Where BRAD's front end processes will write their logs.
 front_end_log_path: /tmp
 
 # Where BRAD's blueprint planner will write debug logs.
-planner_log_path: .
+planner_log_path: /tmp
 
 # Where BRAD's metrics loggers will write their logs.
 metrics_log_path: /tmp

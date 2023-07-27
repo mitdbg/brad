@@ -1,8 +1,8 @@
 import asyncio
 import logging
 import pandas as pd
-from typing import Dict, List
-from pathlib import Path
+from io import TextIOWrapper
+from typing import Dict, List, Optional
 
 from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
@@ -48,11 +48,15 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             TableOnEngine(),
         ]
 
-        self._metrics_out = open(
-            Path(self._config.planner_log_path) / "actual_metrics.csv",
-            "a",
-            encoding="UTF-8",
-        )
+        planner_log_path = self._config.planner_log_path
+        if planner_log_path is not None:
+            self._metrics_out: Optional[TextIOWrapper] = open(
+                planner_log_path / "actual_metrics.csv",
+                "a",
+                encoding="UTF-8",
+            )
+        else:
+            self._metrics_out = None
 
         planner_config: PlannerConfig = kwargs["planner_config"]
         strategy = planner_config.strategy()
@@ -72,7 +76,8 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 if self._check_if_metrics_warrant_replanning():
                     await self.run_replan()
         finally:
-            self._metrics_out.close()
+            if self._metrics_out is not None:
+                self._metrics_out.close()
 
     async def run_replan(self) -> None:
         # This will be long-running and will block the event loop. For our
@@ -194,6 +199,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         return total_accessed_mb
 
     def _log_current_metrics(self) -> None:
+        if self._metrics_out is None:
+            return
+
         redshift_prov = self._current_blueprint.redshift_provisioning()
         aurora_prov = self._current_blueprint.aurora_provisioning()
         # TODO: If needed, we need to transition this logic to the new metrics format.
