@@ -79,6 +79,9 @@ class PerfInsightsClient:
                 data_points = obj["DataPoints"]
                 for data_point in data_points:
                     timestamp = data_point["Timestamp"]
+                    # Ensure we operate in UTC for consistency across all our
+                    # metrics handling.
+                    timestamp = timestamp.astimezone(pytz.utc)
                     value = data_point.get("Value", float("nan"))
                     if timestamp not in data_dict:
                         data_dict[timestamp] = {}
