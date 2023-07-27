@@ -108,7 +108,7 @@ class BradFrontEnd(BradInterface):
         elif routing_policy == RoutingPolicy.AlwaysRedshift:
             self._router = AlwaysOneRouter(Engine.Redshift)
         elif routing_policy == RoutingPolicy.RuleBased:
-            self._monitor = Monitor.from_config_file(config)
+            self._monitor = Monitor(config, self._blueprint_mgr)
             self._router = RuleBased(
                 blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
             )
@@ -175,6 +175,10 @@ class BradFrontEnd(BradInterface):
     async def _run_setup(self) -> None:
         await self._blueprint_mgr.load()
         logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
+
+        if self._monitor is not None:
+            self._monitor.set_up_metrics_sources()
+            await self._monitor.fetch_latest()
 
         if self._routing_policy == RoutingPolicy.ForestTableSelectivity:
             self._estimator = await PostgresEstimator.connect(

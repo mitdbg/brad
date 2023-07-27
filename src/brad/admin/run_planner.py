@@ -215,7 +215,8 @@ def run_planner(args) -> None:
     )
 
     # 6. Start the planner.
-    monitor = Monitor.from_config_file(config)
+    monitor = Monitor(config, blueprint_mgr)
+    monitor.set_up_metrics_sources()
     if args.use_fixed_metrics is not None:
         metrics_provider: MetricsProvider = FixedMetricsProvider(
             Metrics(**parse_metrics(args.use_fixed_metrics))
@@ -249,7 +250,7 @@ def run_planner(args) -> None:
         data_access_provider=data_access_provider,
         estimator_provider=estimator_provider,
     )
-    monitor.force_read_metrics()
+    asyncio.run(monitor.fetch_latest())
 
     async def on_new_blueprint(blueprint: Blueprint):
         logger.info("Selected new blueprint")

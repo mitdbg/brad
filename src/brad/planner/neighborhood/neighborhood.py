@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import pandas as pd
 from typing import Dict, List
 from pathlib import Path
 
@@ -15,7 +16,6 @@ from brad.planner.neighborhood.filters.single_engine_execution import (
 )
 from brad.planner.neighborhood.filters.table_on_engine import TableOnEngine
 from brad.planner.neighborhood.impl import NeighborhoodImpl
-from brad.planner.neighborhood.scaling_scorer import ALL_METRICS
 from brad.planner.neighborhood.score import ScoringContext
 from brad.planner.neighborhood.full_neighborhood import FullNeighborhoodSearchPlanner
 from brad.planner.neighborhood.sampled_neighborhood import (
@@ -26,6 +26,8 @@ from brad.provisioning.directory import Directory
 from brad.routing.rule_based import RuleBased
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
+
+# from brad.planner.neighborhood.scaling_scorer import ALL_METRICS
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +97,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
 
         try:
             # Load metrics.
-            metrics = self._monitor.read_k_most_recent(metric_ids=ALL_METRICS)
+            # metrics = self._monitor.read_k_most_recent(metric_ids=ALL_METRICS)
+            # TODO: If needed, we need to transition this logic to the new metrics format.
+            metrics = pd.DataFrame({})
 
             # Update the dataset size. We must use the current blueprint because it
             # contains information about where the tables are now.
@@ -192,7 +196,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
     def _log_current_metrics(self) -> None:
         redshift_prov = self._current_blueprint.redshift_provisioning()
         aurora_prov = self._current_blueprint.aurora_provisioning()
-        metrics = self._monitor.read_k_most_recent(metric_ids=ALL_METRICS)
+        # TODO: If needed, we need to transition this logic to the new metrics format.
+        # metrics = self._monitor.read_k_most_recent(metric_ids=ALL_METRICS)
+        metrics = pd.DataFrame({})
         # Prepend provisioning information.
         metrics.insert(0, "redshift_instance_type", redshift_prov.instance_type())
         metrics.insert(1, "redshift_num_nodes", redshift_prov.num_nodes())

@@ -62,8 +62,7 @@ class BradDaemon:
         self._blueprint_mgr = BlueprintManager(
             self._config, self._assets, self._schema_name
         )
-        # TODO(Amadou): Determine how to pass in specific clusters.
-        self._monitor = Monitor.from_config_file(config)
+        self._monitor = Monitor(self._config, self._blueprint_mgr)
         self._estimator_provider = _EstimatorProvider()
         self._planner: Optional[BlueprintPlanner] = None
 
@@ -92,6 +91,9 @@ class BradDaemon:
                 self._monitor.run_forever(),
                 *message_reader_tasks,
             )
+        except Exception:
+            logger.exception("The BRAD daemon encountered an unexpected exception.")
+            raise
         finally:
             logger.info("The BRAD daemon is shutting down...")
             await self._run_teardown()
@@ -100,6 +102,9 @@ class BradDaemon:
     async def _run_setup(self) -> None:
         await self._blueprint_mgr.load()
         logger.info("Current blueprint: %s", self._blueprint_mgr.get_blueprint())
+
+        # Initialize the monitor.
+        self._monitor.set_up_metrics_sources()
 
         if self._config.data_sync_period_seconds > 0:
             self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
@@ -159,8 +164,6 @@ class BradDaemon:
             estimator = await PostgresEstimator.connect(self._schema_name, self._config)
             await estimator.analyze(self._blueprint_mgr.get_blueprint())
             self._estimator_provider.set_estimator(estimator)
-
-        self._monitor.force_read_metrics()
 
     async def _run_teardown(self) -> None:
         # Shut down the front end processes.

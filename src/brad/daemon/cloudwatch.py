@@ -2,14 +2,18 @@ import boto3
 import pytz
 import numpy as np
 import pandas as pd
+import logging
 from typing import List, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 
+from .metrics_def import MetricDef
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 
+logger = logging.getLogger(__name__)
 
-class CloudwatchClient:
+
+class CloudWatchClient:
     def __init__(
         self,
         engine: Engine,
@@ -47,6 +51,10 @@ class CloudwatchClient:
         else:
             self._client = boto3.client("cloudwatch")
 
+    @staticmethod
+    def metric_names(metric_defs: List[MetricDef]) -> List[str]:
+        return list(map(lambda m: "{}_{}".format(*m), metric_defs))
+
     def fetch_metrics(
         self,
         metrics_list: List[Tuple[str, str]],
@@ -61,13 +69,18 @@ class CloudwatchClient:
         # minute and things are logged every minute, small delays might cause
         # us to miss some points. Deduplication is performed later on.
         start_time = end_time - num_prev_points * period
+        logger.debug(
+            "Querying CloudWatch using the range %s -- %s", start_time, end_time
+        )
 
         def fetch_batch(metrics_list):
             queries = []
             for metric, stat in metrics_list:
                 queries.append(
                     {
-                        "Id": f"{self._engine.value}_{metric}_{stat}",
+                        # CloudWatch expects this ID to start with a lowercase
+                        # character.
+                        "Id": f"a{metric}_{stat}",
                         "MetricStat": {
                             "Metric": {
                                 "Namespace": self._namespace,
@@ -91,7 +104,7 @@ class CloudwatchClient:
             # Parse metrics from json responses
             resp_dict = {}
             for metric_data in response["MetricDataResults"]:
-                metric_id = metric_data["Id"]
+                metric_id = metric_data["Id"][1:]
                 metric_timestamps = metric_data["Timestamps"]
                 metric_values = metric_data["Values"]
                 resp_dict[metric_id] = pd.Series(
@@ -102,6 +115,13 @@ class CloudwatchClient:
             df = df.sort_index()
             df.index = pd.to_datetime(df.index)
 
+            for metric_def in metrics_list:
+                metric_name = "{}_{}".format(*metric_def)
+                if metric_name in df.columns:
+                    continue
+                # Missing metric value.
+                df[metric_name] = pd.Series(dtype=np.float64)
+
             # Sort dataframe by timestamp
             return df.sort_index()
 
@@ -111,4 +131,20 @@ class CloudwatchClient:
             df = fetch_batch(metrics_list[i : i + batch_size])
             results.append(df)
 
-        return pd.concat(results, axis=1)
+        metrics = pd.concat(results, axis=1)
+        num_entries_before = len(metrics)
+
+        # This filters out any rows where *all* of the metrics are zero. This
+        # case occurs commonly with CloudWatch when retrieving metrics at the
+        # 1-minute granularity (CloudWatch takes longer than one minute to make
+        # metrics available).
+        metrics = metrics.loc[(metrics != 0).any(axis=1)]
+        num_entries_after = len(metrics)
+
+        if num_entries_after < num_entries_before:
+            logger.debug(
+                "CloudWatchClient filtered out %d all-zero entries",
+                num_entries_before - num_entries_after,
+            )
+
+        return metrics
