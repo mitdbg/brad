@@ -92,7 +92,7 @@ class Monitor:
         """
         while True:
             await self.fetch_latest()
-            self._print_front_end_metrics()
+            self._print_key_metrics()
             await asyncio.sleep(self._epoch_length.total_seconds())  # Read every epoch
 
     def handle_metric_report(self, report: MetricsReport) -> None:
@@ -101,9 +101,29 @@ class Monitor:
         """
         self._front_end_metrics.handle_metric_report(report)
 
-    def _print_front_end_metrics(self) -> None:
-        fe = self.front_end_metrics().read_k_most_recent(1)
+    def _print_key_metrics(self) -> None:
+        # Used for debug purposes.
+        if logger.level > logging.DEBUG:
+            return
+
+        fe = self.front_end_metrics().read_k_most_recent(2)
         logger.debug("Front end metrics:\n%s", fe)
+
+        redshift = self.redshift_metrics().read_k_most_recent(
+            2, ["CPUUtilization_Average", "ReadIOPS_Average"]
+        )
+        logger.debug("Redshift metrics:\n%s", redshift)
+
+        aurora = self.aurora_metrics(reader_index=None).read_k_most_recent(
+            2,
+            [
+                "os.cpuUtilization.total.avg",
+                "os.loadAverageMinute.one.avg",
+                "db.IO.blks_read.avg",
+                "db.Cache.blks_hit.avg",
+            ],
+        )
+        logger.debug("Aurora metrics:\n%s", aurora)
 
     # The methods below are used to retrieve metrics.
 
