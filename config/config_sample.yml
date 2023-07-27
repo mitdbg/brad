@@ -19,6 +19,9 @@ front_end_log_path: /tmp
 # Where BRAD's blueprint planner will write debug logs.
 planner_log_path: .
 
+# Where BRAD's metrics loggers will write their logs.
+metrics_log_path: /tmp
+
 # The epoch length for metrics monitoring.
 epoch_length:
   weeks: 0

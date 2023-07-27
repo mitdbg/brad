@@ -1,10 +1,15 @@
-import yaml
+import logging
+import os
 import pathlib
+import re
+import yaml
 from typing import Optional, Dict
 from datetime import timedelta
 
 from brad.config.engine import Engine
 from brad.routing.policy import RoutingPolicy
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigFile:
@@ -34,6 +39,9 @@ class ConfigFile:
             return prefix / f"brad_front_end_{worker_index}.log"
         else:
             return None
+
+    def metrics_log_path(self) -> Optional[pathlib.Path]:
+        return self._extract_log_path("metrics_log_path")
 
     @property
     def front_end_interface(self) -> str:
@@ -158,9 +166,31 @@ class ConfigFile:
             raise RuntimeError("Missing connection details for the Sidecar DBMS.")
         return self._raw["sidecar_db"]
 
+    def _extract_log_path(self, config_key: str) -> Optional[pathlib.Path]:
+        if config_key not in self._raw:
+            return None
+        raw_value = self._raw[config_key]
+
+        if _ENV_VAR_REGEX.match(raw_value) is not None:
+            # Treat it as an environment variable.
+            if raw_value not in os.environ:
+                logger.warning(
+                    "Specified an environment variable '%s' for config '%s', but the variable was not set.",
+                    raw_value,
+                    config_key,
+                )
+                return None
+            return pathlib.Path(os.environ[raw_value])
+        else:
+            # Treat is as a path.
+            return pathlib.Path(raw_value)
+
 
 def _ensure_slash_terminated(candidate: str) -> str:
     if not candidate.endswith("/"):
         return candidate + "/"
     else:
         return candidate
+
+
+_ENV_VAR_REGEX = re.compile("[A-Z][A-Z0-9_]*")

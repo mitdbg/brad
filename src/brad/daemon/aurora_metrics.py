@@ -6,6 +6,7 @@ from importlib.resources import files, as_file
 
 import brad.daemon as daemon
 from .metrics_def import MetricDef
+from .metrics_logger import MetricsLogger
 from .metrics_source import MetricsSourceWithForecasting
 from .perf_insights import PerfInsightsClient
 from brad.blueprint_manager import BlueprintManager
@@ -37,6 +38,9 @@ class AuroraMetrics(MetricsSourceWithForecasting):
             else directory.aurora_readers()[reader_instance_index].resource_id()
         )
         self._pi_client = PerfInsightsClient(resource_id, config)
+        self._logger = MetricsLogger.create_from_config(
+            self._config, self._metrics_logger_name(reader_instance_index)
+        )
 
         super().__init__(
             self._config.epoch_length, forecasting_method, forecasting_window_size
@@ -50,6 +54,15 @@ class AuroraMetrics(MetricsSourceWithForecasting):
 
     def _metrics_values(self) -> pd.DataFrame:
         return self._values
+
+    def _metrics_logger(self) -> Optional[MetricsLogger]:
+        return self._logger
+
+    def _metrics_logger_name(self, reader_instance_index: Optional[int]) -> str:
+        if reader_instance_index is None:
+            return "metrics_aurora_writer.log"
+        else:
+            return "metrics_aurora_reader_{}.log".format(reader_instance_index)
 
     def _load_metric_defs(self) -> List[MetricDef]:
         metrics_file = files(daemon).joinpath("monitored_aurora_metrics.json")
