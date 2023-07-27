@@ -1,8 +1,10 @@
 import asyncio
 import logging
 import queue
+import pytz
 import multiprocessing as mp
 from typing import Optional, List
+from datetime import datetime
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -28,10 +30,12 @@ from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import MetricsFromMonitor
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
-from brad.planner.workload.provider import LoggedWorkloadProvider
 from brad.planner.workload import Workload
+from brad.planner.workload.builder import WorkloadBuilder
+from brad.planner.workload.provider import LoggedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
 from brad.row_list import RowList
+from brad.utils.time_periods import period_start
 
 logger = logging.getLogger(__name__)
 
@@ -285,6 +289,36 @@ class BradDaemon:
             for str_op in physical.traverse_plan_sequentially():
                 to_return.append((str_op,))
             return to_return
+
+        elif command.startswith("BRAD_INSPECT_WORKLOAD"):
+            now = datetime.now().astimezone(pytz.utc)
+            epoch_length = self._config.epoch_length
+            planning_window = self._planner_config.planning_window()
+            window_end = period_start(now, self._config.epoch_length) + epoch_length
+
+            parts = command.split(" ")
+            if len(parts) > 1:
+                try:
+                    window_multiplier = int(parts[-1])
+                except ValueError:
+                    window_multiplier = 1
+            else:
+                window_multiplier = 1
+
+            window_start = window_end - planning_window * window_multiplier
+            w = (
+                WorkloadBuilder()
+                .add_queries_from_s3_logs(self._config, window_start, window_end)
+                .build()
+            )
+
+            return [
+                ["Unique AP queries", len(w.analytical_queries())],
+                ["Unique TP queries", len(w.transactional_queries())],
+                ["Period", w.period()],
+                ["Window start (UTC)", str(window_start)],
+                ["Window end (UTC)", str(window_end)],
+            ]
 
         else:
             logger.warning("Received unknown internal command: %s", command)

@@ -45,8 +45,9 @@ class WorkloadBuilder:
             analytics = self._prespecified_queries
 
         transactions = [
-            Query(q, arrival_count=0)
-            for q in self._deduplicate_queries(self._transactional_queries).keys()
+            # N.B. `count` is sampled!
+            Query(q, arrival_count=count)
+            for q, count in self._deduplicate_queries(self._transactional_queries).items()
         ]
 
         return Workload(
@@ -252,6 +253,7 @@ class WorkloadBuilder:
         if range_end is None:
             assert range_start is None
             # No queries match.
+            self._period = timedelta(seconds=0)
             return self
 
         # If `range_end` is defined, we must have executed the second loop at
