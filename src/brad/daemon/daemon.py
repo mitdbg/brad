@@ -91,6 +91,9 @@ class BradDaemon:
                 self._monitor.run_forever(),
                 *message_reader_tasks,
             )
+        except Exception:
+            logger.exception("The BRAD daemon encountered an unexpected exception.")
+            raise
         finally:
             logger.info("The BRAD daemon is shutting down...")
             await self._run_teardown()

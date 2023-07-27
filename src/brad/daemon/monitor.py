@@ -92,6 +92,7 @@ class Monitor:
         """
         while True:
             await self.fetch_latest()
+            self._print_front_end_metrics()
             await asyncio.sleep(self._epoch_length.total_seconds())  # Read every epoch
 
     def handle_metric_report(self, report: MetricsReport) -> None:
@@ -99,6 +100,10 @@ class Monitor:
         Used to pass on front-end metrics to the underlying metrics source.
         """
         self._front_end_metrics.handle_metric_report(report)
+
+    def _print_front_end_metrics(self) -> None:
+        fe = self.front_end_metrics().read_k_most_recent(1)
+        logger.debug("Front end metrics: %s", fe)
 
     # The methods below are used to retrieve metrics.
 

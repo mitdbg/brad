@@ -72,7 +72,9 @@ class CloudwatchClient:
             for metric, stat in metrics_list:
                 queries.append(
                     {
-                        "Id": f"{metric}_{stat}",
+                        # CloudWatch expects this ID to start with a lowercase
+                        # character.
+                        "Id": f"a{metric}_{stat}",
                         "MetricStat": {
                             "Metric": {
                                 "Namespace": self._namespace,
@@ -96,7 +98,7 @@ class CloudwatchClient:
             # Parse metrics from json responses
             resp_dict = {}
             for metric_data in response["MetricDataResults"]:
-                metric_id = metric_data["Id"]
+                metric_id = metric_data["Id"][1:]
                 metric_timestamps = metric_data["Timestamps"]
                 metric_values = metric_data["Values"]
                 resp_dict[metric_id] = pd.Series(

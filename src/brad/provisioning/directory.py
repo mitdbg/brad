@@ -83,7 +83,9 @@ class Directory:
         self, instance_id: str
     ) -> "AuroraInstanceMetadata":
         loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(None, self._call_describe_aurora_instance)
+        response = await loop.run_in_executor(
+            None, self._call_describe_aurora_instance, instance_id
+        )
         instance_data = response["DBInstances"][0]
         kwargs = {
             "instance_id": instance_id,

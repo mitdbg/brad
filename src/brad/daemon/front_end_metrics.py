@@ -69,7 +69,7 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             timestamps.append(window_end)
 
         # Sanity checks.
-        assert len(timestamps) == data_cols[FrontEndMetric.TxnEndPerSecond.value]
+        assert len(timestamps) == len(data_cols[FrontEndMetric.TxnEndPerSecond.value])
 
         new_metrics = pd.DataFrame(data_cols, index=timestamps)
         self._values_df = (
