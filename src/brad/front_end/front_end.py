@@ -3,6 +3,7 @@ import json
 import logging
 import random
 import time
+import pytz
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import datetime, timezone
@@ -82,17 +83,18 @@ class BradFrontEnd(BradInterface):
         # Set up query logger
         self._qlogger = logging.getLogger("queries")
         self._qlogger.setLevel(logging.INFO)
-        qhandler = EpochFileHandler(
+        self._qhandler = EpochFileHandler(
+            self._fe_index,
             self._config.local_logs_path,
             self._config.epoch_length,
             self._config.s3_logs_bucket,
             self._config.s3_logs_path,
             self._config.txn_log_prob,
         )
-        qhandler.setLevel(logging.INFO)
+        self._qhandler.setLevel(logging.INFO)
         formatter = logging.Formatter("%(message)s")
-        qhandler.setFormatter(formatter)
-        self._qlogger.addHandler(qhandler)
+        self._qhandler.setFormatter(formatter)
+        self._qlogger.addHandler(self._qhandler)
         self._qlogger.propagate = False  # Avoids printing to stdout
 
         # We have different routing policies for performance evaluation and
@@ -141,6 +143,9 @@ class BradFrontEnd(BradInterface):
         self._daemon_request_mailbox = Mailbox[str, RowList](
             do_send_msg=self._send_daemon_request
         )
+
+        # Used to close a logging epoch when needed.
+        self._qlogger_refresh_task: Optional[asyncio.Task[None]] = None
 
     async def serve_forever(self):
         await self._run_setup()
@@ -197,6 +202,8 @@ class BradFrontEnd(BradInterface):
         # Used to handle messages from the daemon.
         self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
 
+        self._qlogger_refresh_task = asyncio.create_task(self._refresh_qlogger())
+
     async def _run_teardown(self):
         logger.debug("Starting BRAD front end _run_teardown()")
         await self._sessions.end_all_sessions()
@@ -211,6 +218,10 @@ class BradFrontEnd(BradInterface):
         if self._brad_metrics_reporting_task is not None:
             self._brad_metrics_reporting_task.cancel()
             self._brad_metrics_reporting_task = None
+
+        if self._qlogger_refresh_task is not None:
+            self._qlogger_refresh_task.cancel()
+            self._qlogger_refresh_task = None
 
         if self._estimator is not None:
             await self._estimator.close()
@@ -408,6 +419,14 @@ class BradFrontEnd(BradInterface):
         logger.debug("Sending internal command request: %s", message)
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._output_queue.put, message)
+
+    async def _refresh_qlogger(self) -> None:
+        while True:
+            await asyncio.sleep(self._config.epoch_length.total_seconds())
+            now = datetime.now().astimezone(pytz.utc)
+            self._qhandler.close_epoch_and_advance_if_needed(
+                self._qhandler.log_record_epoch_start(now)
+            )
 
 
 async def _orchestrate_shutdown() -> None:
