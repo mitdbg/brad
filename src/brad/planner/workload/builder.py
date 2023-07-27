@@ -47,7 +47,9 @@ class WorkloadBuilder:
         transactions = [
             # N.B. `count` is sampled!
             Query(q, arrival_count=count)
-            for q, count in self._deduplicate_queries(self._transactional_queries).items()
+            for q, count in self._deduplicate_queries(
+                self._transactional_queries
+            ).items()
         ]
 
         return Workload(

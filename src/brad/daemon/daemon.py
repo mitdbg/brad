@@ -313,12 +313,20 @@ class BradDaemon:
             )
 
             return [
-                ["Unique AP queries", len(w.analytical_queries())],
-                ["Unique TP queries", len(w.transactional_queries())],
-                ["Period", w.period()],
-                ["Window start (UTC)", str(window_start)],
-                ["Window end (UTC)", str(window_end)],
+                ("Unique AP queries", len(w.analytical_queries())),
+                ("Unique TP queries", len(w.transactional_queries())),
+                ("Period", w.period()),
+                ("Window start (UTC)", str(window_start)),
+                ("Window end (UTC)", str(window_end)),
             ]
+
+        elif command.startswith("BRAD_RUN_PLANNER"):
+            if self._planner is None:
+                return [("Planner not yet initialized.",)]
+
+            logger.info("Triggering the planner based on an external request...")
+            await self._planner.run_replan()
+            return [("Planner completed. See the daemon's logs for more details.",)]
 
         else:
             logger.warning("Received unknown internal command: %s", command)
