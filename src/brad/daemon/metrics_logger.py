@@ -33,9 +33,11 @@ class MetricsLogger:
         if self._last_logged_timestamp is None:
             metrics.to_csv(self._fp, mode="a", index_label="timestamp")
             self._last_logged_timestamp = metrics.index[-1]
+            self._fp.flush()
         else:
             new_values = metrics.loc[metrics.index > self._last_logged_timestamp]
             if new_values.empty:
                 return
             new_values.to_csv(self._fp, mode="a", header=False)
             self._last_logged_timestamp = new_values.index[-1]
+            self._fp.flush()
