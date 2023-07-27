@@ -126,7 +126,7 @@ class BradDaemon:
         if self._temp_config is not None:
             # TODO: Actually call into the models. We avoid doing so for now to
             # avoid having to implement model loading, etc.
-            latency_scorer = PrecomputedPredictions.load(
+            latency_scorer: AnalyticsLatencyScorer = PrecomputedPredictions.load(
                 workload_file_path=self._temp_config.query_bank_path(),
                 aurora_predictions_path=self._temp_config.aurora_preds_path(),
                 redshift_predictions_path=self._temp_config.redshift_preds_path(),
@@ -141,6 +141,9 @@ class BradDaemon:
                 max_latency_ceiling_s=self._temp_config.latency_ceiling_s()
             )
         else:
+            logger.warning(
+                "TempConfig not provided. The planner will not be able to run correctly."
+            )
             latency_scorer = _NoopAnalyticsScorer()
             data_access_provider = _NoopDataAccessProvider()
             comparator = best_cost_under_p99_latency(max_latency_ceiling_s=10)
