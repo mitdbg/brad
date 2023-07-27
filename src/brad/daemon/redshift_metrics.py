@@ -7,7 +7,7 @@ from importlib.resources import files, as_file
 import brad.daemon as daemon
 from .metrics_def import MetricDef
 from .metrics_source import MetricsSourceWithForecasting
-from .cloudwatch import CloudwatchClient
+from .cloudwatch import CloudWatchClient
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 
@@ -22,9 +22,9 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
         self._config = config
         self._metric_defs = self._load_metric_defs()
         self._values = pd.DataFrame(
-            columns=CloudwatchClient.metric_names(self._metric_defs)
+            columns=CloudWatchClient.metric_names(self._metric_defs)
         )
-        self._cw_client = CloudwatchClient(
+        self._cw_client = CloudWatchClient(
             Engine.Redshift, self._config.redshift_cluster_id, self._config
         )
 

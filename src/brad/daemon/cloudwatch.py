@@ -2,6 +2,7 @@ import boto3
 import pytz
 import numpy as np
 import pandas as pd
+import logging
 from typing import List, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 
@@ -9,8 +10,10 @@ from .metrics_def import MetricDef
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 
+logger = logging.getLogger(__name__)
 
-class CloudwatchClient:
+
+class CloudWatchClient:
     def __init__(
         self,
         engine: Engine,
@@ -66,6 +69,9 @@ class CloudwatchClient:
         # minute and things are logged every minute, small delays might cause
         # us to miss some points. Deduplication is performed later on.
         start_time = end_time - num_prev_points * period
+        logger.debug(
+            "Querying CloudWatch using the range %s -- %s", start_time, end_time
+        )
 
         def fetch_batch(metrics_list):
             queries = []
@@ -126,11 +132,19 @@ class CloudwatchClient:
             results.append(df)
 
         metrics = pd.concat(results, axis=1)
+        num_entries_before = len(metrics)
 
         # This filters out any rows where *all* of the metrics are zero. This
         # case occurs commonly with CloudWatch when retrieving metrics at the
         # 1-minute granularity (CloudWatch takes longer than one minute to make
         # metrics available).
         metrics = metrics.loc[(metrics != 0).any(axis=1)]
+        num_entries_after = len(metrics)
+
+        if num_entries_after < num_entries_before:
+            logger.debug(
+                "CloudWatchClient filtered out %d all-zero entries",
+                num_entries_before - num_entries_after,
+            )
 
         return metrics

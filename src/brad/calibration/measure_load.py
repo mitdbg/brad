@@ -20,7 +20,7 @@ from brad.calibration.load.metrics import (
 )
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
-from brad.daemon.cloudwatch import CloudwatchClient
+from brad.daemon.cloudwatch import CloudWatchClient
 from brad.daemon.perf_insights import PerfInsightsClient
 from brad.connection.connection import Connection
 from brad.connection.factory import ConnectionFactory
@@ -171,7 +171,7 @@ def main() -> None:
     out_dir = get_output_dir()
 
     if engine == Engine.Redshift:
-        cw: Optional[CloudwatchClient] = CloudwatchClient(
+        cw: Optional[CloudWatchClient] = CloudWatchClient(
             Engine.Redshift, config.redshift_cluster_id, config
         )
         pi: Optional[PerfInsightsClient] = None
@@ -257,7 +257,7 @@ def main() -> None:
 
     if engine == Engine.Redshift:
         assert cw is not None
-        # Fetch Cloudwatch metrics for the duration of this workload.
+        # Fetch CloudWatch metrics for the duration of this workload.
         metrics = cw.fetch_metrics(
             CLOUDWATCH_LOAD_METRICS, period=timedelta(seconds=60), num_prev_points=30
         )
