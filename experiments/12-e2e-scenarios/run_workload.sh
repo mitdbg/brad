@@ -55,6 +55,7 @@ trap "cancel_experiment" TERM
 start_brad
 sleep 30
 
+# Warm up.
 python3 ana_runner.py \
   --num-clients $a_clients \
   --avg-gap-s $a_gap_s \
@@ -77,6 +78,9 @@ python3 ana_runner.py \
 ana_pid=$!
 
 sleep $run_for_s
+
+# Invoke the planner and wait for it to complete.
+brad cli --command "BRAD_RUN_PLANNER;"
 
 # Send SIGINT to the runner processes.
 kill -INT $txn_pid

@@ -22,10 +22,49 @@ def register_command(subparsers):
         default=6583,
         help="The port on which BRAD is listening for connections.",
     )
+    parser.add_argument(
+        "-c",
+        "--command",
+        type=str,
+        help="Run a single SQL query (or internal command) and exit.",
+    )
     parser.set_defaults(func=main)
 
 
-def main(args):
+def run_command(args) -> None:
+    with BradGrpcClient(args.host, args.port) as client:
+        run_query(client, args.command)
+
+
+def run_query(client: BradGrpcClient, query: str) -> None:
+    try:
+        # Dispatch query and print results. We buffer the whole result
+        # set in memory to get a reasonable estimate of the query
+        # execution time (including network overheads).
+        exec_engine = None
+        start = time.time()
+        results, exec_engine = client.run_query_json(query)
+        end = time.time()
+
+        print(tabulate(results, tablefmt="simple_grid"))
+        print()
+        if exec_engine is not None:
+            print("Took {:.3f} seconds. Ran on {}".format(end - start, exec_engine))
+        else:
+            print("Took {:.3f} seconds.".format(end - start))
+        print()
+    except BradClientError as ex:
+        print()
+        print("Query resulted in an error:")
+        print(ex.message())
+        print()
+
+
+def main(args) -> None:
+    if args.command is not None:
+        run_command(args)
+        return
+
     print("BRAD Interactive CLI v{}".format(brad.__version__))
     print()
     print("Connecting to BRAD at {}:{}...".format(args.host, args.port))
@@ -45,31 +84,7 @@ def main(args):
                     pieces.append(input("--> "))
                 query = " ".join(pieces)
 
-                try:
-                    # Dispatch query and print results. We buffer the whole result
-                    # set in memory to get a reasonable estimate of the query
-                    # execution time (including network overheads).
-                    exec_engine = None
-                    start = time.time()
-                    results, exec_engine = client.run_query_json(query)
-                    end = time.time()
-
-                    print(tabulate(results, tablefmt="simple_grid"))
-                    print()
-                    if exec_engine is not None:
-                        print(
-                            "Took {:.3f} seconds. Ran on {}".format(
-                                end - start, exec_engine
-                            )
-                        )
-                    else:
-                        print("Took {:.3f} seconds.".format(end - start))
-                    print()
-                except BradClientError as ex:
-                    print()
-                    print("Query resulted in an error:")
-                    print(ex.message())
-                    print()
+                run_query(client, query)
 
         except (EOFError, KeyboardInterrupt):
             pass
