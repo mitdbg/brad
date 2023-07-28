@@ -28,7 +28,13 @@ class PrecomputedPredictions(AnalyticsLatencyScorer):
         with open(workload_file_path, "r", encoding="UTF-8") as query_file:
             raw_queries = [line.strip() for line in query_file]
 
-        queries_map = {query: idx for idx, query in enumerate(raw_queries)}
+        queries_map = {}
+        for idx, query in enumerate(raw_queries):
+            if query.endswith(";"):
+                queries_map[query[:-1]] = idx
+            else:
+                queries_map[query] = idx
+
         aurora = np.load(aurora_predictions_path)
         redshift = np.load(redshift_predictions_path)
         athena = np.load(athena_predictions_path)
@@ -58,9 +64,18 @@ class PrecomputedPredictions(AnalyticsLatencyScorer):
 
     def apply_predicted_latencies(self, workload: Workload) -> None:
         query_indices = []
+        has_unmatched = False
         for query in workload.analytical_queries():
             try:
-                query_indices.append(self._queries_map[query.raw_query.strip() + ";"])
+                query_str = query.raw_query.strip()
+                if query_str.endswith(";"):
+                    query_str = query_str[:-1]
+                query_indices.append(self._queries_map[query_str])
             except KeyError:
                 logger.warning("Cannot match query:\n%s", query.raw_query.strip())
+                query_indices.append(-1)
+                has_unmatched = True
+
+        if has_unmatched:
+            raise RuntimeError("Workload contains unmatched queries.")
         workload.set_predicted_analytical_latencies(self._predictions[query_indices, :])

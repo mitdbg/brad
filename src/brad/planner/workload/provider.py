@@ -22,6 +22,10 @@ class WorkloadProvider:
     """
 
     def next_workload(self, window_multiplier: int = 1) -> Workload:
+        """
+        Retrieve the next workload. Use `window_multiplier` to expand the window
+        used for extracting the workload from the query logs.
+        """
         raise NotImplementedError
 
 
@@ -65,21 +69,23 @@ class LoggedWorkloadProvider(WorkloadProvider):
         ec = EngineConnections.connect_sync(
             self._config, self._blueprint_mgr.get_directory(), self._schema_name
         )
-        table_sizer = TableSizer(ec, self._config)
+        try:
+            table_sizer = TableSizer(ec, self._config)
 
-        builder = WorkloadBuilder()
-        # TODO: This call should be async. But since we run it on the daemon,
-        # it's probably fine.
-        builder.add_queries_from_s3_logs(self._config, window_start, window_end)
-        builder.table_sizes_from_engines(
-            self._blueprint_mgr.get_blueprint(), table_sizer
-        )
-        workload = builder.build()
-        logger.debug(
-            "LoggedWorkloadProvider loaded workload: %d unique A queries, %d T queries, period %s",
-            len(workload.analytical_queries()),
-            len(workload.transactional_queries()),
-            workload.period(),
-        )
-        ec.close_sync()
-        return workload
+            builder = WorkloadBuilder()
+            # TODO: These calls should be async. But since we run them on the
+            # daemon, it's probably fine.
+            builder.add_queries_from_s3_logs(self._config, window_start, window_end)
+            builder.table_sizes_from_engines(
+                self._blueprint_mgr.get_blueprint(), table_sizer
+            )
+            workload = builder.build()
+            logger.debug(
+                "LoggedWorkloadProvider loaded workload: %d unique A queries, %d T queries, period %s",
+                len(workload.analytical_queries()),
+                len(workload.transactional_queries()),
+                workload.period(),
+            )
+            return workload
+        finally:
+            ec.close_sync()

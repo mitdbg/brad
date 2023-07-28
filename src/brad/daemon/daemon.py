@@ -368,8 +368,12 @@ class BradDaemon:
                 window_multiplier = 1
 
             logger.info("Triggering the planner based on an external request...")
-            await self._planner.run_replan(window_multiplier)
-            return [("Planner completed. See the daemon's logs for more details.",)]
+            try:
+                await self._planner.run_replan(window_multiplier)
+                return [("Planner completed. See the daemon's logs for more details.",)]
+            except Exception as ex:
+                logger.exception("Encountered exception when running the planner.")
+                return [(str(ex),)]
 
         else:
             logger.warning("Received unknown internal command: %s", command)

@@ -91,3 +91,4 @@ wait $ana_pid
 
 # Stop BRAD.
 kill -INT $brad_pid
+wait $brad_pid

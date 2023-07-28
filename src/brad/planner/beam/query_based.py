@@ -38,13 +38,6 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         return False
 
     async def run_replan(self, window_multiplier: int = 1) -> None:
-        try:
-            await self.run_replan_impl(window_multiplier)
-        except Exception:
-            logger.exception("ERROR")
-            raise
-
-    async def run_replan_impl(self, window_multiplier: int = 1) -> None:
         logger.info("Running a replan...")
 
         # 1. Fetch the next workload and apply predictions.
