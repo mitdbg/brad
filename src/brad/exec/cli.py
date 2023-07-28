@@ -1,9 +1,12 @@
 import cmd
+import pathlib
+import readline
 import time
-from typing import List
+from typing import List, Optional
+from tabulate import tabulate
 
 import brad
-from tabulate import tabulate
+from brad.config.strings import SHELL_HISTORY_FILE
 from brad.grpc_client import BradGrpcClient, BradClientError
 
 
@@ -73,9 +76,16 @@ class BradShell(cmd.Cmd):
         self._client = client
         self._multiline_parts: List[str] = []
 
+        self._history_file = pathlib.Path.home() / SHELL_HISTORY_FILE
+        readline.set_history_length(1000)
+        try:
+            readline.read_history_file(self._history_file)
+        except FileNotFoundError:
+            pass
+
     def default(self, line: str) -> None:
         if line == "EOF":
-            return True
+            return True  # type: ignore
 
         line = line.strip()
         if line.endswith(self.TERM_STR):
@@ -91,7 +101,6 @@ class BradShell(cmd.Cmd):
             self._multiline_parts.append(line)
             self.prompt = self.MULTILINE_PROMPT
 
-
     def do_help(self, _command: str) -> None:
         print("Type SQL queries and hit enter to submit them to BRAD.")
         print("Terminate all SQL queries with a semicolon (;). Hit Ctrl-D to exit.")
@@ -103,6 +112,8 @@ class BradShell(cmd.Cmd):
         except (KeyboardInterrupt, EOFError):
             # Graceful shutdown.
             pass
+        finally:
+            readline.write_history_file(self._history_file)
 
     def _run_query(self, query: str) -> None:
         run_query(self._client, query)
