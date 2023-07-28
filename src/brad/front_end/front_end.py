@@ -3,7 +3,6 @@ import json
 import logging
 import random
 import time
-import pytz
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import datetime, timezone
@@ -423,12 +422,14 @@ class BradFrontEnd(BradInterface):
         await loop.run_in_executor(None, self._output_queue.put, message)
 
     async def _refresh_qlogger(self) -> None:
-        while True:
-            await asyncio.sleep(self._config.epoch_length.total_seconds())
-            now = datetime.now().astimezone(pytz.utc)
-            self._qhandler.close_epoch_and_advance_if_needed(
-                self._qhandler.log_record_epoch_start(now)
-            )
+        try:
+            while True:
+                await asyncio.sleep(self._config.epoch_length.total_seconds())
+                await self._qhandler.refresh()
+        finally:
+            # Run one last refresh before exiting to ensure any remaining log
+            # files are uploaded.
+            await self._qhandler.refresh()
 
 
 async def _orchestrate_shutdown() -> None:

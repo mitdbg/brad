@@ -106,11 +106,11 @@ class ConfigFile:
         return _ensure_slash_terminated(self._raw["s3_logs_path"])
 
     @property
-    def local_logs_path(self) -> str:
+    def local_logs_path(self) -> pathlib.Path:
         return (
-            self._raw["local_logs_path"]
+            pathlib.Path(self._raw["local_logs_path"])
             if "local_logs_path" in self._raw
-            else "./query_logs"
+            else pathlib.Path("./query_logs")
         )
 
     @property
