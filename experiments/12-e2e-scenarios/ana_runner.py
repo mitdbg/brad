@@ -65,7 +65,8 @@ def runner(
                     wait_for_s = 0.0
                 time.sleep(wait_for_s)
 
-            qidx = prng.randint(0, len(queries) - 1)
+            qidx_offset = prng.randint(0, len(queries) - 1)
+            qidx = queries[qidx_offset]
             query = query_bank[qidx]
 
             engine = None
