@@ -3,7 +3,6 @@ import json
 import logging
 import random
 import time
-import pytz
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import datetime, timezone
@@ -425,10 +424,7 @@ class BradFrontEnd(BradInterface):
     async def _refresh_qlogger(self) -> None:
         while True:
             await asyncio.sleep(self._config.epoch_length.total_seconds())
-            now = datetime.now().astimezone(pytz.utc)
-            self._qhandler.close_epoch_and_advance_if_needed(
-                self._qhandler.log_record_epoch_start(now)
-            )
+            await self._qhandler.refresh()
 
 
 async def _orchestrate_shutdown() -> None:
