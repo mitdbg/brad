@@ -10,7 +10,7 @@ import threading
 import signal
 from typing import List
 
-from brad.grpc_client import BradGrpcClient
+from brad.grpc_client import BradGrpcClient, BradClientError
 from typing import Dict
 
 
@@ -69,19 +69,22 @@ def runner(
             qidx = queries[qidx_offset]
             query = query_bank[qidx]
 
-            engine = None
-            start = time.time()
-            _, engine = brad_client.run_query_json(query)
-            end = time.time()
-            print(
-                "{},{},{}".format(
-                    qidx,
-                    end - start,
-                    engine.value if engine is not None else "unknown",
-                ),
-                file=file,
-                flush=True,
-            )
+            try:
+                engine = None
+                start = time.time()
+                _, engine = brad_client.run_query_json(query)
+                end = time.time()
+                print(
+                    "{},{},{}".format(
+                        qidx,
+                        end - start,
+                        engine.value if engine is not None else "unknown",
+                    ),
+                    file=file,
+                    flush=True,
+                )
+            except BradClientError as ex:
+                print("Query error:", str(ex), flush=True, file=sys.stderr)
 
             try:
                 _ = stop_queue.get_nowait()
