@@ -1,4 +1,5 @@
 import pathlib
+import logging
 import numpy as np
 import numpy.typing as npt
 from typing import Dict
@@ -6,6 +7,8 @@ from typing import Dict
 from brad.config.engine import Engine
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 from brad.planner.workload import Workload
+
+logger = logging.getLogger(__name__)
 
 
 class PrecomputedPredictions(AnalyticsLatencyScorer):
@@ -56,5 +59,8 @@ class PrecomputedPredictions(AnalyticsLatencyScorer):
     def apply_predicted_latencies(self, workload: Workload) -> None:
         query_indices = []
         for query in workload.analytical_queries():
-            query_indices.append(self._queries_map[query.raw_query.strip()])
+            try:
+                query_indices.append(self._queries_map[query.raw_query.strip() + ";"])
+            except KeyError:
+                logger.warning("Cannot match query:\n%s", query.raw_query.strip())
         workload.set_predicted_analytical_latencies(self._predictions[query_indices, :])

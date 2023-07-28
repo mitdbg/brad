@@ -202,7 +202,6 @@ class WorkloadBuilder:
                 epoch_start, epoch_end, window_start, window_end
             ):
                 file_idx += 1
-                logger.debug("Skipping log at epoch start: %s", epoch_start)
             else:
                 # This assumes the epoch length did not change from when the
                 # data was logged to now.

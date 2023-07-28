@@ -46,7 +46,7 @@ class PrecomputedDataAccessProvider(DataAccessProvider):
     def apply_access_statistics(self, workload: Workload) -> None:
         query_indices = []
         for query in workload.analytical_queries():
-            query_indices.append(self._queries_map[query.raw_query.strip()])
+            query_indices.append(self._queries_map[query.raw_query.strip() + ";"])
         workload.set_predicted_data_access_statistics(
             aurora_pages=self._aurora_accessed_pages[query_indices],
             athena_bytes=self._athena_accessed_bytes[query_indices],
