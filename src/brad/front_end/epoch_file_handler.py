@@ -73,7 +73,10 @@ class EpochFileHandler(logging.Handler):
         Meant to be called periodically (once an "epoch") to do any cleanup
         tasks (e.g., closing the current epoch, uploading files).
         """
-        self._close_epoch_and_advance_if_needed(datetime.now().astimezone(pytz.utc))
+        epoch_start = period_start(
+            datetime.now().astimezone(pytz.utc), self._epoch_length
+        )
+        self._close_epoch_and_advance_if_needed(epoch_start)
         await self._do_uploads()
 
     def _get_log_file_paths(self) -> Tuple[pathlib.Path, pathlib.Path]:

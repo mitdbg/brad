@@ -61,9 +61,11 @@ class BlueprintPlanner:
         """
         raise NotImplementedError
 
-    async def run_replan(self) -> None:
+    async def run_replan(self, window_multiplier: int = 1) -> None:
         """
         Triggers a "forced" replan. Used for debugging.
+
+        Use `window_multiplier` to expand the window used for planning.
         """
         raise NotImplementedError
 

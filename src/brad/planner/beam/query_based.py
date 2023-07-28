@@ -37,11 +37,11 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         # process.
         return False
 
-    async def run_replan(self) -> None:
+    async def run_replan(self, window_multiplier: int = 1) -> None:
         logger.info("Running a replan...")
 
         # 1. Fetch the next workload and apply predictions.
-        next_workload = self._workload_provider.next_workload()
+        next_workload = self._workload_provider.next_workload(window_multiplier)
         self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
         self._analytics_latency_scorer.apply_predicted_latencies(self._current_workload)
         self._data_access_provider.apply_access_statistics(next_workload)
@@ -56,7 +56,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
         # Sanity check. We cannot run planning without at least one query in the
         # workload.
-        assert len(query_indices) > 0
+        if len(query_indices) == 0:
+            logger.info("No queries in the workload. Cannot replan.")
+            return
 
         # 3. Initialize planning state.
         ctx = ScoringContext(

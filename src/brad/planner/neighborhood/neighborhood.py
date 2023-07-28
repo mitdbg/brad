@@ -79,7 +79,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             if self._metrics_out is not None:
                 self._metrics_out.close()
 
-    async def run_replan(self) -> None:
+    async def run_replan(self, window_multiplier: int = 1) -> None:
         # This will be long-running and will block the event loop. For our
         # current needs, this is fine since the planner is the main component in
         # the daemon process.

@@ -158,7 +158,10 @@ class BradDaemon:
             config=self._config,
             schema_name=self._schema_name,
             workload_provider=LoggedWorkloadProvider(
-                self._config, self._planner_config
+                self._config,
+                self._planner_config,
+                self._blueprint_mgr,
+                self._schema_name,
             ),
             analytics_latency_scorer=latency_scorer,
             comparator=comparator,
@@ -355,9 +358,22 @@ class BradDaemon:
             if self._planner is None:
                 return [("Planner not yet initialized.",)]
 
+            parts = command.split(" ")
+            if len(parts) > 1:
+                try:
+                    window_multiplier = int(parts[-1])
+                except ValueError:
+                    window_multiplier = 1
+            else:
+                window_multiplier = 1
+
             logger.info("Triggering the planner based on an external request...")
-            await self._planner.run_replan()
-            return [("Planner completed. See the daemon's logs for more details.",)]
+            try:
+                await self._planner.run_replan(window_multiplier)
+                return [("Planner completed. See the daemon's logs for more details.",)]
+            except Exception as ex:
+                logger.exception("Encountered exception when running the planner.")
+                return [(str(ex),)]
 
         else:
             logger.warning("Received unknown internal command: %s", command)
