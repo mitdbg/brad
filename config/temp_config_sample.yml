@@ -1,0 +1,12 @@
+latency_ceiling_s: 100.0
+
+# These should be predictions. We use the actual run times for now.
+aurora_preds_path: workloads/IMDB/OLAP_queries_new/all_queries_aurora_runtime.npy
+redshift_preds_path: workloads/IMDB/OLAP_queries_new/all_queries_redshift_runtime.npy
+athena_preds_path: workloads/IMDB/OLAP_queries_new/all_queries_athena_runtime.npy
+
+# These should be predictions. We use the actual data amounts for now.
+aurora_data_access_path: workloads/IMDB/OLAP_queries_new/all_queries_athena_scanned_bytes.npy  # Intentional.
+athena_data_access_path: workloads/IMDB/OLAP_queries_new/all_queries_athena_scanned_bytes.npy
+
+query_bank_path: workloads/IMDB/OLAP_queries_new/all_queries.sql

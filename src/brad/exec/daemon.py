@@ -4,6 +4,7 @@ import signal
 import multiprocessing as mp
 
 from brad.config.file import ConfigFile
+from brad.config.temp_config import TempConfig
 from brad.daemon.daemon import BradDaemon
 from brad.utils import set_up_logging
 
@@ -32,6 +33,11 @@ def register_command(subparsers):
         type=str,
         required=True,
         help="Path to the blueprint planner's configuration file.",
+    )
+    parser.add_argument(
+        "--temp-config-file",
+        type=str,
+        help="Path to the temporary configuration file.",
     )
     parser.add_argument(
         "--debug",
@@ -66,6 +72,11 @@ def main(args):
     mp.set_start_method("spawn")
 
     config = ConfigFile(args.config_file)
+    temp_config = (
+        TempConfig.load_from_file(args.temp_config_file)
+        if args.temp_config_file is not None
+        else None
+    )
 
     log_path = config.daemon_log_path
     if log_path is not None:
@@ -84,7 +95,11 @@ def main(args):
 
     try:
         daemon = BradDaemon(
-            config, args.schema_name, args.planner_config_file, args.debug
+            config,
+            temp_config,
+            args.schema_name,
+            args.planner_config_file,
+            args.debug,
         )
         event_loop.create_task(daemon.run_forever())
         event_loop.run_forever()
