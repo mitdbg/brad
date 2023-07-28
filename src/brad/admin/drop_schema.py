@@ -1,12 +1,14 @@
+import asyncio
 import logging
 
 from brad.asset_manager import AssetManager
+from brad.blueprint_manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
+from brad.front_end.engine_connections import EngineConnections
+from brad.provisioning.directory import Directory
 from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.forest_router import ForestRouter
-from brad.blueprint_manager import BlueprintManager
-from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +34,11 @@ def register_admin_action(subparser) -> None:
 def drop_schema(args):
     # 1. Load the config and blueprint.
     config = ConfigFile(args.config_file)
-    assets = AssetManager(config)
-    blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
-    blueprint_mgr.load_sync()
 
     # 2. Connect to the underlying engines without an explicit database.
-    cxns = EngineConnections.connect_sync(
-        config, blueprint_mgr.get_directory(), autocommit=True
-    )
+    directory = Directory(config)
+    asyncio.run(directory.refresh())
+    cxns = EngineConnections.connect_sync(config, directory, autocommit=True)
     redshift = cxns.get_connection(Engine.Redshift).cursor_sync()
     aurora = cxns.get_connection(Engine.Aurora).cursor_sync()
     athena = cxns.get_connection(Engine.Athena).cursor_sync()
@@ -56,6 +55,7 @@ def drop_schema(args):
         logger.exception("Exception when dropping Redshift database.")
 
     # 4. Drop any serialized routers.
+    assets = AssetManager(config)
     ForestRouter.static_drop_model_sync(
         args.schema_name, RoutingPolicy.ForestTableSelectivity, assets
     )
@@ -63,7 +63,8 @@ def drop_schema(args):
         args.schema_name, RoutingPolicy.ForestTablePresence, assets
     )
 
-    # 5. Delete the persisted blueprint.
+    # 5. Delete the persisted blueprint if it exists.
+    blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
     blueprint_mgr.delete_sync()
 
     logger.info("Done!")
