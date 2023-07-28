@@ -1,0 +1,12 @@
+run_experiment(
+  name="light_start",
+  run="./run_workload.sh",
+  options={
+    "a-clients": 1,
+    "t-clients": 1,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 2,
+    "a-gap-s": 3,
+    "run-for-s": 60 * 5,
+  },
+)

@@ -55,7 +55,8 @@ def runner(
                 pyodbc.connect(os.environ[args.cstr_var], autocommit=True)
             )
         else:
-            brad = BradGrpcClient(args.brad_host, args.brad_port)
+            port_offset = worker_idx % args.num_front_ends
+            brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
             brad.connect()
             db = BradDatabase(brad)
 
@@ -157,6 +158,7 @@ def main():
     )
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)
+    parser.add_argument("--num-front-ends", type=int, default=1)
     args = parser.parse_args()
 
     mgr = mp.Manager()
