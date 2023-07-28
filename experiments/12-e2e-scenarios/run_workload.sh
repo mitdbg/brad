@@ -31,6 +31,21 @@ for val in "${orig_args[@]}"; do
   fi
 done
 
+function start_brad() {
+  pushd ../../
+  brad daemon \
+    --config-file config/config_cond.yml \
+    --schema-name imdb_extended \
+    --planner-config-file config/planner.yml \
+    --temp-config-file config/temp_config.yml \
+    &
+  brad_pid=$!
+  popd
+}
+
+start_brad
+sleep 30
+
 python3 ../../workloads/IMDB_extended/run_transactions.py \
   --num-clients $t_clients \
   --num-front-ends $num_front_ends \
@@ -53,3 +68,6 @@ kill -INT $ana_pid
 
 wait $txn_pid
 wait $ana_pid
+
+# Stop BRAD.
+kill -INT $brad_pid
