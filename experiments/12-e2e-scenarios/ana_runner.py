@@ -5,6 +5,9 @@ import os
 import pathlib
 import random
 import queue
+import sys
+import threading
+import signal
 from typing import List
 
 from brad.grpc_client import BradGrpcClient
@@ -56,8 +59,8 @@ def runner(
         _ = stop_queue.get()
 
         while True:
-            if args.ana_avg_gap_s is not None:
-                wait_for_s = prng.gauss(args.ana_avg_gap_s, 0.5)
+            if args.avg_gap_s is not None:
+                wait_for_s = prng.gauss(args.avg_gap_s, 0.5)
                 if wait_for_s < 0.0:
                     wait_for_s = 0.0
                 time.sleep(wait_for_s)
@@ -76,6 +79,7 @@ def runner(
                     engine.value if engine is not None else "unknown",
                 ),
                 file=file,
+                flush=True,
             )
 
             try:
@@ -147,7 +151,7 @@ def main():
     stop_queue = mgr.Queue()
 
     processes = []
-    for idx in range(args.ana_num_clients):
+    for idx in range(args.num_clients):
         p = mp.Process(
             target=runner,
             args=(idx, start_queue, stop_queue, args, query_bank, queries),
@@ -156,14 +160,33 @@ def main():
         processes.append(p)
 
     print("Waiting for startup...", flush=True)
-    for _ in range(args.ana_num_clients):
+    for _ in range(args.num_clients):
         start_queue.get()
 
-    print("Telling {} clients to start.".format(args.ana_num_clients), flush=True)
-    for _ in range(args.ana_num_clients):
+    print("Telling {} clients to start.".format(args.num_clients), flush=True)
+    for _ in range(args.num_clients):
         stop_queue.put("")
 
-    # Wait for the experiment to finish.
+    # Wait until requested to stop.
+    print(
+        "Analytics waiting until requested to stop... (hit Ctrl-C)",
+        flush=True,
+        file=sys.stderr,
+    )
+    should_shutdown = threading.Event()
+
+    def signal_handler(_signal, _frame):
+        should_shutdown.set()
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    should_shutdown.wait()
+
+    print("Stopping clients...", flush=True, file=sys.stderr)
+    for _ in range(args.num_clients):
+        stop_queue.put("")
+
     print("Waiting for the clients to complete.")
     for p in processes:
         p.join()

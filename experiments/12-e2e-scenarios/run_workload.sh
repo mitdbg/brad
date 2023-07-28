@@ -43,8 +43,24 @@ function start_brad() {
   popd
 }
 
+function cancel_experiment() {
+  kill -INT $brad_pid
+  kill -INT $txn_pid
+  kill -INT $ana_pid
+}
+
+trap "cancel_experiment" INT
+trap "cancel_experiment" TERM
+
 start_brad
 sleep 30
+
+python3 ana_runner.py \
+  --num-clients $a_clients \
+  --avg-gap-s $a_gap_s \
+  --num-front-ends $num_front_ends \
+  --query-indexes $query_indexes \
+  --run-warmup
 
 python3 ../../workloads/IMDB_extended/run_transactions.py \
   --num-clients $t_clients \
