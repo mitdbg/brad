@@ -2,7 +2,7 @@ import cmd
 import pathlib
 import readline
 import time
-from typing import List, Optional
+from typing import List
 from tabulate import tabulate
 
 import brad
