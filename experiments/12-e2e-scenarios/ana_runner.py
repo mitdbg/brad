@@ -133,7 +133,7 @@ def main():
     with open(args.query_bank_file, "r", encoding="UTF-8") as file:
         query_bank = [line.strip() for line in file]
 
-    queries = list(map(int, args.query_indexes.strip(",")))
+    queries = list(map(int, args.query_indexes.split(",")))
     for qidx in queries:
         assert qidx < len(query_bank)
         assert qidx >= 0
