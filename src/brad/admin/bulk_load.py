@@ -3,10 +3,11 @@ import logging
 import yaml
 from concurrent.futures import ThreadPoolExecutor
 from collections import namedtuple
-from typing import Any, Coroutine, Iterator, List, Set, Tuple
+from typing import Any, Coroutine, Iterator, List, Set, Tuple, Dict
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
+from brad.blueprint_manager import BlueprintManager
 from brad.blueprint.sql_gen.table import (
     comma_separated_column_names_and_types,
     comma_separated_column_names,
@@ -19,7 +20,6 @@ from brad.config.strings import (
     AURORA_SEQ_COLUMN,
     source_table_name,
 )
-from brad.blueprint_manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
@@ -302,7 +302,7 @@ def _try_add_task(
         pass
 
 
-async def bulk_load_impl(args, manifest) -> None:
+async def bulk_load_impl(args, manifest: Dict[str, Any]) -> None:
     config = ConfigFile(args.config_file)
     assets = AssetManager(config)
     blueprint_mgr = BlueprintManager(config, assets, manifest["schema_name"])
@@ -318,7 +318,10 @@ async def bulk_load_impl(args, manifest) -> None:
     try:
         running: List[asyncio.Task[Engine]] = []
         engines = await EngineConnections.connect(
-            config, manifest["schema_name"], specific_engines=engines_filter
+            config,
+            blueprint_mgr.get_directory(),
+            manifest["schema_name"],
+            specific_engines=engines_filter,
         )
         if not args.force:
             logger.info("Checking for non-empty tables...")
