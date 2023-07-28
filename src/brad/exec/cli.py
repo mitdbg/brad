@@ -1,4 +1,6 @@
+import cmd
 import time
+from typing import List
 
 import brad
 from tabulate import tabulate
@@ -60,12 +62,58 @@ def run_query(client: BradGrpcClient, query: str) -> None:
         print()
 
 
+class BradShell(cmd.Cmd):
+    READY_PROMPT = ">>> "
+    MULTILINE_PROMPT = "--> "
+    TERM_STR = ";"
+
+    def __init__(self, client: BradGrpcClient) -> None:
+        super().__init__()
+        self.prompt = self.READY_PROMPT
+        self._client = client
+        self._multiline_parts: List[str] = []
+
+    def default(self, line: str) -> None:
+        if line == "EOF":
+            return True
+
+        line = line.strip()
+        if line.endswith(self.TERM_STR):
+            if len(self._multiline_parts) > 0:
+                self._multiline_parts.append(line)
+                full_query = " ".join(self._multiline_parts)
+                self._multiline_parts.clear()
+                self.prompt = self.READY_PROMPT
+            else:
+                full_query = line
+            self._run_query(full_query)
+        else:
+            self._multiline_parts.append(line)
+            self.prompt = self.MULTILINE_PROMPT
+
+
+    def do_help(self, _command: str) -> None:
+        print("Type SQL queries and hit enter to submit them to BRAD.")
+        print("Terminate all SQL queries with a semicolon (;). Hit Ctrl-D to exit.")
+        print()
+
+    def cmdloop(self, intro=None) -> None:
+        try:
+            super().cmdloop(intro)
+        except (KeyboardInterrupt, EOFError):
+            # Graceful shutdown.
+            pass
+
+    def _run_query(self, query: str) -> None:
+        run_query(self._client, query)
+
+
 def main(args) -> None:
     if args.command is not None:
         run_command(args)
         return
 
-    print("BRAD Interactive CLI v{}".format(brad.__version__))
+    print("BRAD Interactive Shell v{}".format(brad.__version__))
     print()
     print("Connecting to BRAD at {}:{}...".format(args.host, args.port))
 
@@ -73,18 +121,8 @@ def main(args) -> None:
         print("Connected!")
         print()
         print("Terminate all SQL queries with a semicolon (;). Hit Ctrl-D to exit.")
+        print("Enter 'help' or '?' for details on additional commands.")
         print()
 
-        try:
-            while True:
-                # Allow multiline input.
-                pieces = []
-                pieces.append(input(">>> ").strip())
-                while not pieces[-1].endswith(";"):
-                    pieces.append(input("--> "))
-                query = " ".join(pieces)
-
-                run_query(client, query)
-
-        except (EOFError, KeyboardInterrupt):
-            pass
+        shell = BradShell(client)
+        shell.cmdloop()
