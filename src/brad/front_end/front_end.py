@@ -422,8 +422,13 @@ class BradFrontEnd(BradInterface):
         await loop.run_in_executor(None, self._output_queue.put, message)
 
     async def _refresh_qlogger(self) -> None:
-        while True:
-            await asyncio.sleep(self._config.epoch_length.total_seconds())
+        try:
+            while True:
+                await asyncio.sleep(self._config.epoch_length.total_seconds())
+                await self._qhandler.refresh()
+        finally:
+            # Run one last refresh before exiting to ensure any remaining log
+            # files are uploaded.
             await self._qhandler.refresh()
 
 
