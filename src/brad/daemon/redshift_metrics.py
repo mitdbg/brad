@@ -1,6 +1,8 @@
 import asyncio
 import pandas as pd
 import json
+import pytz
+from datetime import timedelta, datetime
 from typing import List, Optional
 from importlib.resources import files, as_file
 
@@ -11,6 +13,7 @@ from .metrics_logger import MetricsLogger
 from .cloudwatch import CloudWatchClient
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
+from brad.utils.time_periods import impute_old_missing_metrics
 
 
 class RedshiftMetrics(MetricsSourceWithForecasting):
@@ -39,6 +42,11 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
     async def fetch_latest(self) -> None:
         loop = asyncio.get_running_loop()
         new_metrics = await loop.run_in_executor(None, self._fetch_cw_metrics, 5)
+
+        now = datetime.now().astimezone(pytz.utc)
+        cutoff_ts = now - timedelta(minutes=3)
+        new_metrics = impute_old_missing_metrics(new_metrics, cutoff_ts, value=0.0)
+
         self._values = self._get_updated_metrics(new_metrics)
         await super().fetch_latest()
 

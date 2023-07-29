@@ -61,7 +61,12 @@ class CloudWatchClient:
         period: timedelta,
         num_prev_points: int,
     ) -> pd.DataFrame:
-        # Retrieve datapoints
+        """
+        Retrieves metrics from CloudWatch. Note that some metric values may be
+        NaN: this indicates that the value is not available, but may become
+        available later.
+        """
+
         now = datetime.now(tz=timezone.utc)
         end_time = now - (now - datetime.min.replace(tzinfo=pytz.UTC)) % period
 
@@ -111,7 +116,7 @@ class CloudWatchClient:
                     metric_values, index=metric_timestamps, dtype=np.float64
                 )
 
-            df = pd.DataFrame(resp_dict).fillna(0)
+            df = pd.DataFrame(resp_dict)
             df = df.sort_index()
             df.index = pd.to_datetime(df.index)
 
@@ -120,7 +125,7 @@ class CloudWatchClient:
                 if metric_name in df.columns:
                     continue
                 # Missing metric value.
-                df[metric_name] = pd.Series(dtype=np.float64)
+                df.loc[metric_name] = pd.Series(dtype=np.float64)
 
             # Sort dataframe by timestamp
             return df.sort_index()
@@ -131,20 +136,4 @@ class CloudWatchClient:
             df = fetch_batch(metrics_list[i : i + batch_size])
             results.append(df)
 
-        metrics = pd.concat(results, axis=1)
-        num_entries_before = len(metrics)
-
-        # This filters out any rows where *all* of the metrics are zero. This
-        # case occurs commonly with CloudWatch when retrieving metrics at the
-        # 1-minute granularity (CloudWatch takes longer than one minute to make
-        # metrics available).
-        metrics = metrics.loc[(metrics != 0).any(axis=1)]
-        num_entries_after = len(metrics)
-
-        if num_entries_after < num_entries_before:
-            logger.debug(
-                "CloudWatchClient filtered out %d all-zero entries",
-                num_entries_before - num_entries_after,
-            )
-
-        return metrics
+        return pd.concat(results, axis=1)
