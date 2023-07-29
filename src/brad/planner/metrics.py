@@ -60,6 +60,8 @@ class MetricsFromMonitor(MetricsProvider):
             ).read_k_most_recent
             front_end_source = self._monitor.front_end_metrics().read_k_most_recent
 
+        # TODO: Redshift metrics may be delayed. We should be extracting metrics
+        # over the same time range.
         redshift = redshift_source(k=1, metric_ids=_REDSHIFT_METRICS)
         aurora = aurora_source(k=2, metric_ids=_AURORA_METRICS)
         front_end = front_end_source(k=1, metric_ids=_FRONT_END_METRICS)
