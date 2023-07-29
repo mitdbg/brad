@@ -43,9 +43,22 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
         loop = asyncio.get_running_loop()
         new_metrics = await loop.run_in_executor(None, self._fetch_cw_metrics, 5)
 
+        # CloudWatch has delayed metrics reporting, in particular for CPU
+        # utilization (i.e., metrics for the last minute are not always
+        # immediately available.). Our metrics client will report `NaN` for
+        # missing metrics.
+        #
+        # The logic below drops rows that contain `NaN` values. To avoid
+        # "forever missing" metric values, we set a cutoff of 3 minutes. Any
+        # metrics that are older than 3 minutes are presumed to be 0.
+        #
+        # This approach ensures that clients of this object have reliable access
+        # to metrics (i.e., a set of metrics for a period will only appear in
+        # the DataFrame once we are confident they are all available).
         now = datetime.now().astimezone(pytz.utc)
         cutoff_ts = now - timedelta(minutes=3)
         new_metrics = impute_old_missing_metrics(new_metrics, cutoff_ts, value=0.0)
+        new_metrics = new_metrics.dropna()
 
         self._values = self._get_updated_metrics(new_metrics)
         await super().fetch_latest()
