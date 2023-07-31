@@ -55,7 +55,7 @@ class AuroraProvisioningScore:
         ) * aurora_num_cpus(curr_prov)
 
         # 1. Compute the transaction portion of load.
-        client_txns_per_s = ctx.metrics.client_txn_completions_per_s_avg
+        client_txns_per_s = ctx.metrics.txn_completions_per_s
         pred_txn_load = client_txns_per_s * ctx.planner_config.client_txn_to_load()
         pred_txn_cpu_denorm = (
             client_txns_per_s * ctx.planner_config.client_txn_to_cpu_denorm()

@@ -17,6 +17,9 @@ from brad.utils.time_periods import impute_old_missing_metrics
 
 
 class RedshiftMetrics(MetricsSourceWithForecasting):
+    # Indicates that metrics for the last 3 minutes may not be available.
+    METRICS_DELAY = timedelta(minutes=3)
+
     def __init__(
         self,
         config: ConfigFile,
@@ -56,12 +59,17 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
         # to metrics (i.e., a set of metrics for a period will only appear in
         # the DataFrame once we are confident they are all available).
         now = datetime.now().astimezone(pytz.utc)
-        cutoff_ts = now - timedelta(minutes=3)
+        cutoff_ts = now - self.METRICS_DELAY
         new_metrics = impute_old_missing_metrics(new_metrics, cutoff_ts, value=0.0)
         new_metrics = new_metrics.dropna()
 
         self._values = self._get_updated_metrics(new_metrics)
         await super().fetch_latest()
+
+    def real_time_delay(self) -> int:
+        # Usually, Redshift metrics are delayed up to 3 minutes.
+        num_epochs = self.METRICS_DELAY / self._epoch_length
+        return int(num_epochs)  # Want to floor this number.
 
     def _metrics_values(self) -> pd.DataFrame:
         return self._values
