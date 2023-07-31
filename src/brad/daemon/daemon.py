@@ -165,7 +165,7 @@ class BradDaemon:
             ),
             analytics_latency_scorer=latency_scorer,
             comparator=comparator,
-            metrics_provider=MetricsFromMonitor(self._monitor, forecasted=True),
+            metrics_provider=MetricsFromMonitor(self._monitor),
             data_access_provider=data_access_provider,
             estimator_provider=self._estimator_provider,
         )

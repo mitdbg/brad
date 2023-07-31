@@ -14,7 +14,7 @@ Metrics = namedtuple(
         "aurora_cpu_avg",
         "buffer_hit_pct_avg",
         "aurora_load_minute_avg",
-        "client_txn_completions_per_s_avg",
+        "txn_completions_per_s",
     ],
 )
 
@@ -42,29 +42,37 @@ class FixedMetricsProvider(MetricsProvider):
 
 
 class MetricsFromMonitor(MetricsProvider):
-    def __init__(self, monitor: Monitor, forecasted: bool = True) -> None:
+    def __init__(self, monitor: Monitor) -> None:
         self._monitor = monitor
-        self._forecasted = forecasted
 
     def get_metrics(self) -> Metrics:
-        if self._forecasted:
-            redshift_source = self._monitor.redshift_metrics().read_k_upcoming
-            aurora_source = self._monitor.aurora_metrics(
-                reader_index=None
-            ).read_k_upcoming
-            front_end_source = self._monitor.front_end_metrics().read_k_upcoming
-        else:
-            redshift_source = self._monitor.redshift_metrics().read_k_most_recent
-            aurora_source = self._monitor.aurora_metrics(
-                reader_index=None
-            ).read_k_most_recent
-            front_end_source = self._monitor.front_end_metrics().read_k_most_recent
+        redshift_source = self._monitor.redshift_metrics()
+        aurora_source = self._monitor.aurora_metrics(reader_index=None)
+        front_end_source = self._monitor.front_end_metrics()
 
-        # TODO: Redshift metrics may be delayed. We should be extracting metrics
-        # over the same time range.
-        redshift = redshift_source(k=1, metric_ids=_REDSHIFT_METRICS)
-        aurora = aurora_source(k=2, metric_ids=_AURORA_METRICS)
-        front_end = front_end_source(k=1, metric_ids=_FRONT_END_METRICS)
+        # The `max()` of `real_time_delay()` indicates the number of previous
+        # epochs where a metrics source's metrics can be unavailable. We add one
+        # to get the minimum number of epochs we should read to be able to find
+        # an intersection across all metrics sources.
+        max_available_after_epochs = (
+            max(
+                redshift_source.real_time_delay(),
+                aurora_source.real_time_delay(),
+                front_end_source.real_time_delay(),
+            )
+            + 1
+        )
+
+        # TODO: Need to support forecasted metrics.
+        redshift = redshift_source.read_k_most_recent(
+            k=max_available_after_epochs, metric_ids=_REDSHIFT_METRICS
+        )
+        aurora = aurora_source.read_k_most_recent(
+            k=max_available_after_epochs + 1, metric_ids=_AURORA_METRICS
+        )
+        front_end = front_end_source.read_k_most_recent(
+            k=max_available_after_epochs, metric_ids=_FRONT_END_METRICS
+        )
 
         if redshift.empty or aurora.empty or front_end.empty:
             logger.warning(
@@ -75,29 +83,44 @@ class MetricsFromMonitor(MetricsProvider):
             )
             return Metrics(1.0, 1.0, 100.0, 1.0, 1.0)
 
-        redshift_cpu = redshift[_REDSHIFT_METRICS[0]].iloc[0]
-        aurora_cpu = aurora[_AURORA_METRICS[0]].iloc[1]
+        # Align timestamps across the metrics.
+        common_timestamps = redshift.index.intersection(aurora.index).intersection(
+            front_end.index
+        )
+        most_recent_common = common_timestamps.max()
 
-        # Load averages are exponentially averaged. We do the following to
-        # recover the load value for the last minute.
-        exp_1 = math.exp(-1)
-        exp_1_rest = 1 - exp_1
-        load_last = aurora[_AURORA_METRICS[1]].iloc[1]
-        load_2nd_last = aurora[_AURORA_METRICS[1]].iloc[0]
-        load_minute = (load_last - exp_1 * load_2nd_last) / exp_1_rest
+        redshift_cpu = redshift.loc[
+            redshift.index <= most_recent_common, _REDSHIFT_METRICS[0]
+        ].iloc[-1]
+        txn_per_s = front_end.loc[
+            front_end.index <= most_recent_common, _FRONT_END_METRICS[0]
+        ].iloc[-1]
 
-        blks_read = aurora[_AURORA_METRICS[2]].iloc[1]
-        blks_hit = aurora[_AURORA_METRICS[3]].iloc[1]
+        aurora_rel = aurora.loc[aurora.index <= most_recent_common]
+        aurora_cpu = aurora_rel[_AURORA_METRICS[0]].iloc[-1]
+
+        if len(aurora_rel) < 2:
+            logger.warning("Not enough Aurora metric entries to compute current load.")
+            load_minute = aurora_rel[_AURORA_METRICS[1]].iloc[-1]
+        else:
+            # Load averages are exponentially averaged. We do the following to
+            # recover the load value for the last minute.
+            exp_1 = math.exp(-1)
+            exp_1_rest = 1 - exp_1
+            load_last = aurora_rel[_AURORA_METRICS[1]].iloc[-1]
+            load_2nd_last = aurora_rel[_AURORA_METRICS[1]].iloc[-2]
+            load_minute = (load_last - exp_1 * load_2nd_last) / exp_1_rest
+
+        blks_read = aurora_rel[_AURORA_METRICS[2]].iloc[-1]
+        blks_hit = aurora_rel[_AURORA_METRICS[3]].iloc[-1]
         hit_rate = blks_hit / (blks_read + blks_hit)
-
-        completions = front_end[_FRONT_END_METRICS[0]].iloc[0]
 
         return Metrics(
             redshift_cpu,
             aurora_cpu,
             buffer_hit_pct_avg=hit_rate * 100,
             aurora_load_minute_avg=load_minute,
-            client_txn_completions_per_s_avg=completions,
+            txn_completions_per_s=txn_per_s,
         )
 
 
