@@ -292,6 +292,9 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             "Selected blueprint details: %s",
             json.dumps(debug_values, indent=2, default=str),
         )
+        logger.info(
+            "Metrics used during planning: %s", json.dumps(metrics._asdict(), indent=2)
+        )
 
         await self._notify_new_blueprint(best_blueprint)
 
