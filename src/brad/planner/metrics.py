@@ -88,6 +88,9 @@ class MetricsFromMonitor(MetricsProvider):
             front_end.index
         )
         most_recent_common = common_timestamps.max()
+        logger.debug(
+            "MetricsFromMonitor using metrics starting at %s", str(most_recent_common)
+        )
 
         redshift_cpu = redshift.loc[
             redshift.index <= most_recent_common, _REDSHIFT_METRICS[0]
