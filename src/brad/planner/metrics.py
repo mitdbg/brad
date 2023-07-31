@@ -122,6 +122,12 @@ class MetricsFromMonitor(MetricsProvider):
             load_last = aurora_rel[_AURORA_METRICS[1]].iloc[-1]
             load_2nd_last = aurora_rel[_AURORA_METRICS[1]].iloc[-2]
             load_minute = (load_last - exp_1 * load_2nd_last) / exp_1_rest
+            logger.debug(
+                "Aurora load renormalization: %.4f, %.4f, %.4f",
+                load_2nd_last,
+                load_last,
+                load_minute,
+            )
 
         blks_read = aurora_rel[_AURORA_METRICS[2]].iloc[-1]
         blks_hit = aurora_rel[_AURORA_METRICS[3]].iloc[-1]
