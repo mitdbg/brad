@@ -41,8 +41,11 @@ class TableBasedBeamPlanner(BlueprintPlanner):
     async def run_replan(self, window_multiplier: int = 1) -> None:
         logger.info("Running a replan...")
 
-        # 1. Fetch the next workload and apply predictions.
-        next_workload = self._workload_provider.next_workload(window_multiplier)
+        # 1. Fetch metrics and the next workload and then apply predictions.
+        metrics, metrics_timestamp = self._metrics_provider.get_metrics()
+        next_workload = self._workload_provider.next_workload(
+            metrics_timestamp, window_multiplier
+        )
         self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
         self._analytics_latency_scorer.apply_predicted_latencies(self._current_workload)
         self._data_access_provider.apply_access_statistics(next_workload)
@@ -64,7 +67,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             self._current_blueprint,
             self._current_workload,
             next_workload,
-            self._metrics_provider.get_metrics(),
+            metrics,
             self._planner_config,
         )
         await ctx.simulate_current_workload_routing(

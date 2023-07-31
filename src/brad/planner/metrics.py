@@ -1,6 +1,9 @@
 import logging
 import math
+import pytz
+from datetime import datetime
 from collections import namedtuple
+from typing import Tuple
 
 from brad.config.metrics import FrontEndMetric
 from brad.daemon.monitor import Monitor
@@ -25,7 +28,11 @@ class MetricsProvider:
     blueprint planning purposes).
     """
 
-    def get_metrics(self) -> Metrics:
+    def get_metrics(self) -> Tuple[Metrics, datetime]:
+        """
+        Return the metrics and the timestamp associated with them (when the
+        metrics were recorded).
+        """
         raise NotImplementedError
 
 
@@ -34,18 +41,19 @@ class FixedMetricsProvider(MetricsProvider):
     Always returns the same fixed metrics. Used for debugging purposes.
     """
 
-    def __init__(self, metrics: Metrics) -> None:
+    def __init__(self, metrics: Metrics, timestamp: datetime) -> None:
         self._metrics = metrics
+        self._timestamp = timestamp
 
-    def get_metrics(self) -> Metrics:
-        return self._metrics
+    def get_metrics(self) -> Tuple[Metrics, datetime]:
+        return (self._metrics, self._timestamp)
 
 
 class MetricsFromMonitor(MetricsProvider):
     def __init__(self, monitor: Monitor) -> None:
         self._monitor = monitor
 
-    def get_metrics(self) -> Metrics:
+    def get_metrics(self) -> Tuple[Metrics, datetime]:
         redshift_source = self._monitor.redshift_metrics()
         aurora_source = self._monitor.aurora_metrics(reader_index=None)
         front_end_source = self._monitor.front_end_metrics()
@@ -81,7 +89,8 @@ class MetricsFromMonitor(MetricsProvider):
                 aurora.empty,
                 front_end.empty,
             )
-            return Metrics(1.0, 1.0, 100.0, 1.0, 1.0)
+            now = datetime.now().astimezone(pytz.utc)
+            return (Metrics(1.0, 1.0, 100.0, 1.0, 1.0), now)
 
         # Align timestamps across the metrics.
         common_timestamps = redshift.index.intersection(aurora.index).intersection(
@@ -118,12 +127,15 @@ class MetricsFromMonitor(MetricsProvider):
         blks_hit = aurora_rel[_AURORA_METRICS[3]].iloc[-1]
         hit_rate = blks_hit / (blks_read + blks_hit)
 
-        return Metrics(
-            redshift_cpu,
-            aurora_cpu,
-            buffer_hit_pct_avg=hit_rate * 100,
-            aurora_load_minute_avg=load_minute,
-            txn_completions_per_s=txn_per_s,
+        return (
+            Metrics(
+                redshift_cpu,
+                aurora_cpu,
+                buffer_hit_pct_avg=hit_rate * 100,
+                aurora_load_minute_avg=load_minute,
+                txn_completions_per_s=txn_per_s,
+            ),
+            most_recent_common,
         )
 
 
