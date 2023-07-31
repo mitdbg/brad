@@ -2,6 +2,7 @@ import asyncio
 import heapq
 import json
 import logging
+from datetime import timedelta
 from typing import List
 
 from brad.config.engine import Engine, EngineBitmapValues
@@ -43,7 +44,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         # 1. Fetch the next workload and apply predictions.
         metrics, metrics_timestamp = self._metrics_provider.get_metrics()
         next_workload = self._workload_provider.next_workload(
-            metrics_timestamp, window_multiplier
+            metrics_timestamp, window_multiplier, desired_period=timedelta(hours=1)
         )
         self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
         self._analytics_latency_scorer.apply_predicted_latencies(self._current_workload)

@@ -1,6 +1,6 @@
 import logging
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from brad.blueprint_manager import BlueprintManager
 from brad.config.file import ConfigFile
@@ -20,7 +20,10 @@ class WorkloadProvider:
     """
 
     def next_workload(
-        self, window_end: datetime, window_multiplier: int = 1
+        self,
+        window_end: datetime,
+        window_multiplier: int = 1,
+        desired_period: Optional[timedelta] = None,
     ) -> Workload:
         """
         Retrieve the next workload.
@@ -45,7 +48,10 @@ class FixedWorkloadProvider(WorkloadProvider):
         self._workload = workload
 
     def next_workload(
-        self, window_end: datetime, window_multiplier: int = 1
+        self,
+        window_end: datetime,
+        window_multiplier: int = 1,
+        desired_period: Optional[timedelta] = None,
     ) -> Workload:
         return self._workload
 
@@ -69,7 +75,10 @@ class LoggedWorkloadProvider(WorkloadProvider):
         self._schema_name = schema_name
 
     def next_workload(
-        self, window_end: datetime, window_multiplier: int = 1
+        self,
+        window_end: datetime,
+        window_multiplier: int = 1,
+        desired_period: Optional[timedelta] = None,
     ) -> Workload:
         window_length = self._planner_config.planning_window() * window_multiplier
         window_start = window_end - window_length
@@ -93,7 +102,7 @@ class LoggedWorkloadProvider(WorkloadProvider):
             builder.table_sizes_from_engines(
                 self._blueprint_mgr.get_blueprint(), table_sizer
             )
-            workload = builder.build()
+            workload = builder.build(rescale_to_period=desired_period)
             logger.debug(
                 "LoggedWorkloadProvider loaded workload: %d unique A queries, %d T queries, period %s",
                 len(workload.analytical_queries()),

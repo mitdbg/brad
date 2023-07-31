@@ -33,27 +33,47 @@ class WorkloadBuilder:
         self._table_sizes: Dict[str, int] = {}
         self._prespecified_queries: List[Query] = []
 
-    def build(self) -> Workload:
+    def build(self, rescale_to_period: Optional[timedelta] = None) -> Workload:
+        """
+        Change the workload's period using `rescale_period`. We linearly scale
+        the query counts.
+        """
+        if rescale_to_period is None:
+            multiplier = 1.0
+        else:
+            multiplier = rescale_to_period / self._period
+
         if len(self._analytical_queries) > 0:
             analytics = [
-                Query(q, arrival_count=self._analytics_count_per * count)
+                Query(
+                    q,
+                    arrival_count=max(
+                        int(self._analytics_count_per * count * multiplier), 1
+                    ),
+                )
                 for q, count in self._deduplicate_queries(
                     self._analytical_queries
                 ).items()
             ]
         else:
-            analytics = self._prespecified_queries
+            if rescale_to_period is not None:
+                analytics = [
+                    Query(q.raw_query, max(int(q.arrival_count() * multiplier), 1))
+                    for q in self._prespecified_queries
+                ]
+            else:
+                analytics = self._prespecified_queries
 
         transactions = [
             # N.B. `count` is sampled!
-            Query(q, arrival_count=count)
+            Query(q, arrival_count=max(int(count * multiplier), 1))
             for q, count in self._deduplicate_queries(
                 self._transactional_queries
             ).items()
         ]
 
         return Workload(
-            period=self._period,
+            period=self._period if rescale_to_period is None else rescale_to_period,
             analytical_queries=analytics,
             transactional_queries=transactions,
             table_sizes=self._table_sizes,
