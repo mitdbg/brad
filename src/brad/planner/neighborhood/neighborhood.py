@@ -1,8 +1,10 @@
 import asyncio
 import logging
+import pytz
 import pandas as pd
 from io import TextIOWrapper
 from typing import Dict, List, Optional
+from datetime import datetime
 
 from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
@@ -85,7 +87,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         # the daemon process.
         logger.info("Running a replan.")
         self._log_current_metrics()
-        next_workload = self._workload_provider.next_workload()
+        next_workload = self._workload_provider.next_workload(
+            datetime.now().astimezone(pytz.utc), window_multiplier
+        )
         workload_filters = [
             AuroraTransactions(next_workload),
             SingleEngineExecution(next_workload),

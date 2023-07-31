@@ -7,6 +7,6 @@ run_experiment(
     "query-indexes": "81,108,133",
     "num-front-ends": 2,
     "a-gap-s": 3,
-    "run-for-s": 60 * 5,
+    "run-for-s": 60 * 6,
   },
 )

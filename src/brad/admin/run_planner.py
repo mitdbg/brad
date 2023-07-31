@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import pathlib
+import pytz
 from typing import Dict
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -205,8 +206,10 @@ def run_planner(args) -> None:
     monitor = Monitor(config, blueprint_mgr)
     monitor.set_up_metrics_sources()
     if args.use_fixed_metrics is not None:
+        now = datetime.now().astimezone(pytz.utc)
         metrics_provider: MetricsProvider = FixedMetricsProvider(
-            Metrics(**parse_metrics(args.use_fixed_metrics))
+            Metrics(**parse_metrics(args.use_fixed_metrics)),
+            now,
         )
     else:
         metrics_provider = MetricsFromMonitor(monitor)

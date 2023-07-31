@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.typing as npt
+from datetime import timedelta
 from typing import Any, Dict, List, Optional, Iterable, Tuple
 
 from brad.blueprint import Blueprint
@@ -329,6 +330,7 @@ class BlueprintCandidate(ComparableBlueprint):
         redshift_prov_cost = compute_redshift_hourly_operational_cost(
             self.redshift_provisioning
         )
+        cost_scale_factor = timedelta(hours=1) / ctx.next_workload.period()
 
         aurora_transition_time_s = compute_aurora_transition_time_s(
             ctx.current_blueprint.aurora_provisioning(),
@@ -341,7 +343,9 @@ class BlueprintCandidate(ComparableBlueprint):
             ctx.planner_config,
         )
 
-        self.provisioning_cost = aurora_prov_cost + redshift_prov_cost
+        self.provisioning_cost = (
+            aurora_prov_cost + redshift_prov_cost
+        ) * cost_scale_factor
         self.provisioning_trans_time_s = (
             aurora_transition_time_s + redshift_transition_time_s
         )

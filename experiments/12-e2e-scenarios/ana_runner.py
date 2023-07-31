@@ -37,6 +37,11 @@ def runner(
     query_bank: List[str],
     queries: List[int],
 ) -> None:
+    def noop(_signal, _frame):
+        pass
+
+    signal.signal(signal.SIGINT, noop)
+
     # For printing out results.
     if "COND_OUT" in os.environ:
         import conductor.lib as cond

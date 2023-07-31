@@ -2,6 +2,7 @@ import asyncio
 import heapq
 import json
 import logging
+from datetime import timedelta
 from typing import List
 
 from brad.config.engine import Engine, EngineBitmapValues
@@ -41,7 +42,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         logger.info("Running a replan...")
 
         # 1. Fetch the next workload and apply predictions.
-        next_workload = self._workload_provider.next_workload(window_multiplier)
+        metrics, metrics_timestamp = self._metrics_provider.get_metrics()
+        next_workload = self._workload_provider.next_workload(
+            metrics_timestamp, window_multiplier, desired_period=timedelta(hours=1)
+        )
         self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
         self._analytics_latency_scorer.apply_predicted_latencies(self._current_workload)
         self._data_access_provider.apply_access_statistics(next_workload)
@@ -66,7 +70,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             self._current_blueprint,
             self._current_workload,
             next_workload,
-            self._metrics_provider.get_metrics(),
+            metrics,
             self._planner_config,
         )
         await ctx.simulate_current_workload_routing(
@@ -306,6 +310,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         debug_values = best_candidate.to_debug_values()
         logger.info(
             "Selected blueprint details: %s", json.dumps(debug_values, indent=2)
+        )
+        logger.info(
+            "Metrics used during planning: %s", json.dumps(metrics._asdict(), indent=2)
         )
 
         await self._notify_new_blueprint(best_blueprint)

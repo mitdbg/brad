@@ -1,14 +1,12 @@
-import pytz
 import logging
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from brad.blueprint_manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
-from brad.utils.time_periods import period_start
 from brad.utils.table_sizer import TableSizer
 from brad.front_end.engine_connections import EngineConnections
 
@@ -21,10 +19,22 @@ class WorkloadProvider:
     (for blueprint planning purposes).
     """
 
-    def next_workload(self, window_multiplier: int = 1) -> Workload:
+    def next_workload(
+        self,
+        window_end: datetime,
+        window_multiplier: int = 1,
+        desired_period: Optional[timedelta] = None,
+    ) -> Workload:
         """
-        Retrieve the next workload. Use `window_multiplier` to expand the window
-        used for extracting the workload from the query logs.
+        Retrieve the next workload.
+
+        Use `window_end` to specify the endpoint of the workload "look behind"
+        window. We use this to (i) prevent trying to read query logs that have not
+        yet been uploaded, and (ii) to only read logs that correspond with the
+        metrics being used.
+
+        Use `window_multiplier` to expand the window used for extracting the
+        workload from the query logs.
         """
         raise NotImplementedError
 
@@ -37,7 +47,12 @@ class FixedWorkloadProvider(WorkloadProvider):
     def __init__(self, workload: Workload) -> None:
         self._workload = workload
 
-    def next_workload(self, window_multiplier: int = 1) -> Workload:
+    def next_workload(
+        self,
+        window_end: datetime,
+        window_multiplier: int = 1,
+        desired_period: Optional[timedelta] = None,
+    ) -> Workload:
         return self._workload
 
 
@@ -59,12 +74,20 @@ class LoggedWorkloadProvider(WorkloadProvider):
         self._blueprint_mgr = blueprint_mgr
         self._schema_name = schema_name
 
-    def next_workload(self, window_multiplier: int = 1) -> Workload:
+    def next_workload(
+        self,
+        window_end: datetime,
+        window_multiplier: int = 1,
+        desired_period: Optional[timedelta] = None,
+    ) -> Workload:
         window_length = self._planner_config.planning_window() * window_multiplier
-        now = datetime.now().astimezone(pytz.utc)
-        window_start = period_start(now, window_length)
-        window_end = window_start + window_length
-        logger.debug("Retrieving workload in range %s -- %s", window_start, window_end)
+        window_start = window_end - window_length
+        logger.debug(
+            "Retrieving workload in range %s -- %s. Length: %s",
+            window_start,
+            window_end,
+            window_length,
+        )
 
         ec = EngineConnections.connect_sync(
             self._config, self._blueprint_mgr.get_directory(), self._schema_name
@@ -79,7 +102,7 @@ class LoggedWorkloadProvider(WorkloadProvider):
             builder.table_sizes_from_engines(
                 self._blueprint_mgr.get_blueprint(), table_sizer
             )
-            workload = builder.build()
+            workload = builder.build(rescale_to_period=desired_period)
             logger.debug(
                 "LoggedWorkloadProvider loaded workload: %d unique A queries, %d T queries, period %s",
                 len(workload.analytical_queries()),
