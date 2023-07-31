@@ -37,6 +37,7 @@ INSTALL_REQUIRES = [
     "numpy",
     "imbalanced-learn",
     "redshift_connector",
+    "mysql-connector-python",
 ]
 
 DEV_REQUIRES = [
