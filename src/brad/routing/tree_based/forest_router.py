@@ -9,7 +9,7 @@ from brad.data_stats.estimator import Estimator
 from brad.query_rep import QueryRep
 from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
-from brad.server.blueprint_manager import BlueprintManager
+from brad.blueprint_manager import BlueprintManager
 
 
 class ForestRouter(Router):

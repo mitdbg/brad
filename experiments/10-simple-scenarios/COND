@@ -1,0 +1,53 @@
+run_experiment(
+  name="initial_low_before_opt_3",
+  run="./run_workload.sh",
+  options={
+    "txn_num_clients": 1,
+    "ana_num_clients": 1,
+    "ana_avg_gap_s": 2.0,
+    "query_counts_file": "1-small-3.csv",
+  },
+)
+
+run_experiment(
+  name="initial_low_after_opt_3",
+  run="./run_workload.sh",
+  options={
+    "txn_num_clients": 1,
+    "ana_num_clients": 1,
+    "ana_avg_gap_s": 2.0,
+    "query_counts_file": "1-small-3.csv",
+  },
+)
+
+run_experiment(
+  name="initial2_low_before_opt_3",
+  run="./run_workload.sh",
+  options={
+    "txn_num_clients": 1,
+    "ana_num_clients": 1,
+    "ana_avg_gap_s": 2.0,
+    "query_counts_file": "2-small-3.csv",
+  },
+)
+
+run_experiment(
+  name="initial2_low_after_opt_3",
+  run="./run_workload.sh",
+  options={
+    "txn_num_clients": 1,
+    "ana_num_clients": 1,
+    "ana_avg_gap_s": 2.0,
+    "query_counts_file": "2-small-3.csv",
+  },
+)
+
+combine(
+  name="relevant",
+  deps=[
+    ":initial_low_before_opt_3",
+    ":initial_low_after_opt_3",
+    ":initial2_low_before_opt_3",
+    ":initial2_low_after_opt_3",
+  ],
+)

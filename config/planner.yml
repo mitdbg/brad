@@ -1,5 +1,13 @@
 strategy: query_based_beam
 
+# Used to specify the period of time over which to use data for planning.
+# Currrently, this is a "look behind" window for the workload.
+planning_window:
+  weeks: 0
+  days: 0
+  hours: 0
+  minutes: 3
+
 ###
 ### Beam planning constants.
 ###
@@ -79,6 +87,31 @@ table_extract_bytes_per_row:
     movie_info: 73.69504549846432
     person_info: 133.59130584387262
 
+  imdb_extended:
+    theatres: 30.569
+    showings: 47.33581266922088
+    ticket_orders: 41.52476844359898
+    aka_name: 82.09059925022993
+    aka_title: 115.82265016377478
+    cast_info: 42.755255854541055
+    char_name: 72.92298283720325
+    comp_cast_type: 11.25
+    company_name: 78.13220594305459
+    company_type: 23.0
+    complete_cast: 17.87376189982678
+    info_type: 17.061946902654867
+    keyword: 28.256227174480138
+    kind_type: 12.142857142857142
+    link_type: 14.5
+    movie_companies: 36.64833781694964
+    movie_info_idx: 27.52364903788672
+    movie_keyword: 20.734031472635518
+    movie_link: 21.888322165549887
+    name: 79.88613316741416
+    role_type: 13.333333333333334
+    title: 90.15402727195061
+    movie_info: 66.48728137225561
+    person_info: 133.20102076348735
 
 ###
 ### Performance metrics scaling modifiers.
@@ -149,15 +182,33 @@ aurora_load_factor:
 ###
 
 aurora_txns:
+  # N.B. These values are for the initial IMDB "bulk insert" transactions
   client_thpt_to_load: 0.06493011
   client_thpt_to_cpu_denorm: 0.04584762
   # We used the number of CPUs as the "resource score".
   # Should be a bit more precise.
   prov_to_peak_cpu_denorm: 0.56730588
 
+  # N.B. These values are for the IMDB-extended transactions.
+  client_thpt_to_cpu_denorm: 0.0015366357203185784
+  client_thpt_to_load: 0.0037392906617191367
+  # We used the number of CPUs as the "resource score".
+  # Should be a bit more precise.
+  prov_to_peak_cpu_denorm: 0.6800294117647058
+
+
 aurora_scaling:
-  # [coef1(load)^2(resource)^2 + coef2(load)^2 + coef3(resource)^2 + coef4] * base
+  # [coef1(load)^2(resource ratio)^2 + coef2(load)^2 + coef3(resource ratio)^2 + coef4] * base
   coef1: 0.2454489
   coef2: 0.00841046
   coef3: 0.27845245
   coef4: 0.56823644
+
+redshift_scaling:
+  # Same model as above.
+  # [coef1(load)^2(resource ratio)^2 + coef2(load)^2 + coef3(resource ratio)^2 + coef4] * base
+  # Load is denormalized CPU usage.
+  coef1: 0.63933825
+  coef2: 0.00370447
+  coef3: 0.49948713
+  coef4: 0.36256359

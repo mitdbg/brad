@@ -5,7 +5,7 @@ import logging
 from typing import List
 
 from brad.config.engine import Engine, EngineBitmapValues
-from brad.planner import BlueprintPlanner
+from brad.planner.abstract import BlueprintPlanner
 from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.query_based_candidate import BlueprintCandidate
 from brad.planner.beam.router_provider import RouterProvider
@@ -37,11 +37,11 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         # process.
         return False
 
-    async def run_replan(self) -> None:
+    async def run_replan(self, window_multiplier: int = 1) -> None:
         logger.info("Running a replan...")
 
         # 1. Fetch the next workload and apply predictions.
-        next_workload = self._workload_provider.next_workload()
+        next_workload = self._workload_provider.next_workload(window_multiplier)
         self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
         self._analytics_latency_scorer.apply_predicted_latencies(self._current_workload)
         self._data_access_provider.apply_access_statistics(next_workload)
@@ -56,7 +56,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
         # Sanity check. We cannot run planning without at least one query in the
         # workload.
-        assert len(query_indices) > 0
+        if len(query_indices) == 0:
+            logger.info("No queries in the workload. Cannot replan.")
+            return
 
         # 3. Initialize planning state.
         ctx = ScoringContext(
@@ -180,7 +182,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
         # Log the placement top k for debugging purposes, if needed.
         placement_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
-            "query_beam_placement_topk"
+            self._config, "query_beam_placement_topk"
         )
         if placement_top_k_logger is not None:
             for candidate in current_top_k:
@@ -231,6 +233,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 aurora_enumerator.scaling_to_distance(
                     ctx.current_blueprint.aurora_provisioning(),
                     ctx.planner_config.max_provisioning_multiplier(),
+                    Engine.Aurora,
                 ),
             )
             for aurora in aurora_it:
@@ -239,6 +242,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     redshift_enumerator.scaling_to_distance(
                         ctx.current_blueprint.redshift_provisioning(),
                         ctx.planner_config.max_provisioning_multiplier(),
+                        Engine.Redshift,
                     ),
                 )
                 for redshift in redshift_it:
@@ -272,7 +276,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
         # Log the final top k for debugging purposes, if needed.
         final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
-            "query_beam_final_topk"
+            self._config, "query_beam_final_topk"
         )
         if final_top_k_logger is not None:
             for candidate in final_top_k:
@@ -300,7 +304,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         logger.info("%s", best_blueprint)
 
         debug_values = best_candidate.to_debug_values()
-        logger.debug(
+        logger.info(
             "Selected blueprint details: %s", json.dumps(debug_values, indent=2)
         )
 

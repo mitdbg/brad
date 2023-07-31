@@ -2,7 +2,7 @@ from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
-from brad.planner import BlueprintPlanner
+from brad.planner.abstract import BlueprintPlanner
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.neighborhood.neighborhood import NeighborhoodSearchPlanner

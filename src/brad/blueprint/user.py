@@ -50,12 +50,13 @@ class UserProvidedBlueprint:
                 for indexed_cols in raw_table["indexes"]:
                     col_list = []
                     for col_name in indexed_cols.split(","):
+                        clean_col = col_name.strip()
                         try:
-                            col_list.append(column_map[col_name])
+                            col_list.append(column_map[clean_col])
                         except KeyError as ex:
                             raise RuntimeError(
                                 "Invalid index column: '{}' is not a column of '{}'".format(
-                                    col_name, name
+                                    clean_col, name
                                 )
                             ) from ex
                     secondary_indexed_columns.append(tuple(col_list))
@@ -76,7 +77,7 @@ class UserProvidedBlueprint:
         else:
             # These are our defaults.
             aurora_provisioning = Provisioning(
-                instance_type="db.r6i.large", num_nodes=1
+                instance_type="db.r6g.large", num_nodes=1
             )
             redshift_provisioning = Provisioning(instance_type="dc2.large", num_nodes=1)
 

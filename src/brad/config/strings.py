@@ -71,3 +71,5 @@ def delete_delta_table_name(table: str | Table) -> str:
 
 AURORA_EXTRACT_PROGRESS_TABLE_NAME = "brad_extract_progress"
 AURORA_SEQ_COLUMN = "brad_seq"
+
+SHELL_HISTORY_FILE = ".brad_history"

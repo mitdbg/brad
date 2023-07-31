@@ -1,4 +1,3 @@
-import math
 import numpy as np
 import numpy.typing as npt
 from typing import Any, Dict, List, Optional, Iterable, Tuple
@@ -12,12 +11,8 @@ from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
-from brad.planner.scoring.performance.load_factor import scale_redshift_run_time_by_load
-from brad.planner.scoring.performance.cpu import compute_next_redshift_cpu
-from brad.planner.scoring.performance.provisioning_scaling import (
-    scale_redshift_predicted_latency,
-)
 from brad.planner.scoring.performance.unified_aurora import AuroraProvisioningScore
+from brad.planner.scoring.performance.unified_redshift import RedshiftProvisioningScore
 from brad.planner.scoring.provisioning import (
     compute_aurora_hourly_operational_cost,
     compute_redshift_hourly_operational_cost,
@@ -100,7 +95,7 @@ class BlueprintCandidate(ComparableBlueprint):
         # Used during comparisons.
         self._memoized: Dict[str, Any] = {}
         self.aurora_score: Optional[AuroraProvisioningScore] = None
-        self.redshift_cpu = np.nan
+        self.redshift_score: Optional[RedshiftProvisioningScore] = None
 
     def to_blueprint(self) -> Blueprint:
         # We use the source blueprint for table schema information.
@@ -141,8 +136,6 @@ class BlueprintCandidate(ComparableBlueprint):
         values["table_movement_trans_time_s"] = self.table_movement_trans_time_s
         values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
 
-        values["redshift_cpu"] = self.redshift_cpu
-
         if self.aurora_score is not None:
             values["aurora_load"] = self.aurora_score.overall_system_load
             values["aurora_cpu_denorm"] = self.aurora_score.overall_cpu_denorm
@@ -150,6 +143,10 @@ class BlueprintCandidate(ComparableBlueprint):
                 "pred_txn_peak_cpu_denorm"
             ] = self.aurora_score.pred_txn_peak_cpu_denorm
             values.update(self.aurora_score.debug_values)
+
+        if self.redshift_score is not None:
+            values["redshift_cpu_denorm"] = self.redshift_score.overall_cpu_denorm
+            values.update(self.redshift_score.debug_values)
 
         return values
 
@@ -357,40 +354,26 @@ class BlueprintCandidate(ComparableBlueprint):
             self.aurora_provisioning,
             ctx,
         )
+        self.redshift_score = RedshiftProvisioningScore.compute(
+            ctx.next_workload.get_predicted_analytical_latency_batch(
+                self.query_locations[Engine.Redshift], Engine.Redshift
+            ),
+            ctx.current_blueprint.redshift_provisioning(),
+            self.redshift_provisioning,
+            ctx,
+        )
 
         # Predicted query performance.
         self.scaled_query_latencies.clear()
         self.scaled_query_latencies[Engine.Aurora] = self.aurora_score.scaled_run_times
-        self.scaled_query_latencies[Engine.Redshift] = scale_redshift_predicted_latency(
-            ctx.next_workload.get_predicted_analytical_latency_batch(
-                self.query_locations[Engine.Redshift], Engine.Redshift
-            ),
-            self.redshift_provisioning,
-            ctx,
-        )
+        self.scaled_query_latencies[
+            Engine.Redshift
+        ] = self.redshift_score.scaled_run_times
         self.scaled_query_latencies[
             Engine.Athena
         ] = ctx.next_workload.get_predicted_analytical_latency_batch(
             self.query_locations[Engine.Athena], Engine.Athena
         )
-
-        # Account for load.
-        if (
-            ctx.current_blueprint.redshift_provisioning().num_nodes() > 0
-            and self.redshift_provisioning.num_nodes() > 0
-        ):
-            self.redshift_cpu = compute_next_redshift_cpu(
-                ctx.metrics.redshift_cpu_avg,
-                ctx.current_blueprint.redshift_provisioning(),
-                self.redshift_provisioning,
-                self.scaled_query_latencies[Engine.Redshift].sum(),
-                ctx,
-            )
-            self.scaled_query_latencies[
-                Engine.Redshift
-            ] = scale_redshift_run_time_by_load(
-                self.scaled_query_latencies[Engine.Redshift], self.redshift_cpu, ctx
-            )
 
     def is_better_than(self, other: "BlueprintCandidate") -> bool:
         return self._comparator(self, other)
@@ -416,6 +399,7 @@ class BlueprintCandidate(ComparableBlueprint):
             aurora_enumerator.scaling_to_distance(
                 ctx.current_blueprint.aurora_provisioning(),
                 ctx.planner_config.max_provisioning_multiplier(),
+                Engine.Aurora,
             ),
         )
 
@@ -431,6 +415,7 @@ class BlueprintCandidate(ComparableBlueprint):
                 redshift_enumerator.scaling_to_distance(
                     ctx.current_blueprint.redshift_provisioning(),
                     ctx.planner_config.max_provisioning_multiplier(),
+                    Engine.Redshift,
                 ),
             )
 
@@ -502,7 +487,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
         return True
 
-    def compute_runtime_feasibility(self, ctx: ScoringContext) -> None:
+    def compute_runtime_feasibility(self, _ctx: ScoringContext) -> None:
         if self.feasibility != BlueprintFeasibility.Unchecked:
             # Already ran.
             return
@@ -516,12 +501,7 @@ class BlueprintCandidate(ComparableBlueprint):
                 self.feasibility = BlueprintFeasibility.Infeasible
             return
 
-        if (
-            not math.isnan(self.redshift_cpu)
-            and self.redshift_cpu >= ctx.planner_config.max_feasible_cpu()
-        ):
-            self.feasibility = BlueprintFeasibility.Infeasible
-            return
+        # Might need to check for Redshift load feasibility.
 
         self.feasibility = BlueprintFeasibility.Feasible
 
@@ -564,9 +544,11 @@ class BlueprintCandidate(ComparableBlueprint):
         cloned.explored_provisionings = self.explored_provisionings
         cloned.feasibility = self.feasibility
         cloned.scaled_query_latencies = self.scaled_query_latencies.copy()
-        cloned.redshift_cpu = self.redshift_cpu
         cloned.aurora_score = (
             self.aurora_score.copy() if self.aurora_score is not None else None
+        )
+        cloned.redshift_score = (
+            self.redshift_score.copy() if self.redshift_score is not None else None
         )
         # pylint: disable-next=protected-access
         cloned._memoized = self._memoized.copy()

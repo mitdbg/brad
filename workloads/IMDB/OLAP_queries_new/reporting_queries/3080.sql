@@ -1,1 +1,0 @@
-SELECT COUNT(*) as agg_0, SUM("title"."episode_of_id") as agg_1 FROM "kind_type" LEFT OUTER JOIN "title" ON "kind_type"."id" = "title"."kind_id" LEFT OUTER JOIN "movie_keyword" ON "title"."id" = "movie_keyword"."movie_id"  WHERE "title"."title" LIKE '%Th%e%' AND "movie_keyword"."movie_id" >= 1705599 AND "movie_keyword"."keyword_id" BETWEEN 99 AND 4131;

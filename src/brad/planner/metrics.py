@@ -1,5 +1,11 @@
+import logging
+import math
 from collections import namedtuple
+
+from brad.config.metrics import FrontEndMetric
 from brad.daemon.monitor import Monitor
+
+logger = logging.getLogger(__name__)
 
 Metrics = namedtuple(
     "Metrics",
@@ -42,34 +48,70 @@ class MetricsFromMonitor(MetricsProvider):
 
     def get_metrics(self) -> Metrics:
         if self._forecasted:
-            metrics = self._monitor.read_k_upcoming(
-                k=1, metric_ids=list(_RELEVANT_METRICS.values())
-            )
+            redshift_source = self._monitor.redshift_metrics().read_k_upcoming
+            aurora_source = self._monitor.aurora_metrics(
+                reader_index=None
+            ).read_k_upcoming
+            front_end_source = self._monitor.front_end_metrics().read_k_upcoming
         else:
-            metrics = self._monitor.read_k_most_recent(
-                k=1, metric_ids=list(_RELEVANT_METRICS.values())
-            )
+            redshift_source = self._monitor.redshift_metrics().read_k_most_recent
+            aurora_source = self._monitor.aurora_metrics(
+                reader_index=None
+            ).read_k_most_recent
+            front_end_source = self._monitor.front_end_metrics().read_k_most_recent
 
-        if metrics.empty:
+        # TODO: Redshift metrics may be delayed. We should be extracting metrics
+        # over the same time range.
+        redshift = redshift_source(k=1, metric_ids=_REDSHIFT_METRICS)
+        aurora = aurora_source(k=2, metric_ids=_AURORA_METRICS)
+        front_end = front_end_source(k=1, metric_ids=_FRONT_END_METRICS)
+
+        if redshift.empty or aurora.empty or front_end.empty:
+            logger.warning(
+                "Empty metrics. Redshift empty: %r, Aurora empty: %r, Front end empty: %r",
+                redshift.empty,
+                aurora.empty,
+                front_end.empty,
+            )
             return Metrics(1.0, 1.0, 100.0, 1.0, 1.0)
 
-        redshift_cpu = metrics[_RELEVANT_METRICS["redshift_cpu_avg"]].iloc[0]
-        aurora_cpu = metrics[_RELEVANT_METRICS["aurora_cpu_avg"]].iloc[0]
-        hit_pct = metrics[_RELEVANT_METRICS["buffer_hit_pct_avg"]].iloc[0]
+        redshift_cpu = redshift[_REDSHIFT_METRICS[0]].iloc[0]
+        aurora_cpu = aurora[_AURORA_METRICS[0]].iloc[1]
 
-        # TODO: Retrieve performance insights metrics.
-        # TODO: Retrieve client-side metrics.
+        # Load averages are exponentially averaged. We do the following to
+        # recover the load value for the last minute.
+        exp_1 = math.exp(-1)
+        exp_1_rest = 1 - exp_1
+        load_last = aurora[_AURORA_METRICS[1]].iloc[1]
+        load_2nd_last = aurora[_AURORA_METRICS[1]].iloc[0]
+        load_minute = (load_last - exp_1 * load_2nd_last) / exp_1_rest
+
+        blks_read = aurora[_AURORA_METRICS[2]].iloc[1]
+        blks_hit = aurora[_AURORA_METRICS[3]].iloc[1]
+        hit_rate = blks_hit / (blks_read + blks_hit)
+
+        completions = front_end[_FRONT_END_METRICS[0]].iloc[0]
+
         return Metrics(
             redshift_cpu,
             aurora_cpu,
-            hit_pct,
-            aurora_load_minute_avg=1.0,
-            client_txn_completions_per_s_avg=1.0,
+            buffer_hit_pct_avg=hit_rate * 100,
+            aurora_load_minute_avg=load_minute,
+            client_txn_completions_per_s_avg=completions,
         )
 
 
-_RELEVANT_METRICS = {
-    "redshift_cpu_avg": "redshift_CPUUtilization_Average",
-    "aurora_cpu_avg": "aurora_WRITER_CPUUtilization_Average",
-    "buffer_hit_pct_avg": "aurora_WRITER_BufferCacheHitRatio_Average",
-}
+_AURORA_METRICS = [
+    "os.cpuUtilization.total.avg",
+    "os.loadAverageMinute.one.avg",
+    "db.IO.blks_read.avg",
+    "db.Cache.blks_hit.avg",
+]
+
+_REDSHIFT_METRICS = [
+    "CPUUtilization_Average",
+]
+
+_FRONT_END_METRICS = [
+    FrontEndMetric.TxnEndPerSecond.value,
+]

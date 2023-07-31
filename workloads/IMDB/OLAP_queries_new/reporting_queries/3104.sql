@@ -1,1 +1,0 @@
-SELECT COUNT(*) as agg_0 FROM "title" LEFT OUTER JOIN "movie_companies" ON "title"."id" = "movie_companies"."movie_id" LEFT OUTER JOIN "movie_keyword" ON "title"."id" = "movie_keyword"."movie_id"  WHERE "movie_keyword"."movie_id" <= 1801986 AND "movie_companies"."note" NOT LIKE '%(20%04)%' AND "title"."title" LIKE '%P%art%' AND "movie_keyword"."keyword_id" >= 595;

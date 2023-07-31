@@ -1,1 +1,0 @@
-SELECT MIN("movie_keyword"."id") as agg_0 FROM "keyword" LEFT OUTER JOIN "movie_keyword" ON "keyword"."id" = "movie_keyword"."keyword_id" LEFT OUTER JOIN "title" ON "movie_keyword"."movie_id" = "title"."id"  WHERE "title"."kind_id" >= 2 AND "title"."title" LIKE '%in%' AND "movie_keyword"."movie_id" >= 2343753 AND "movie_keyword"."keyword_id" BETWEEN 368 AND 4213;

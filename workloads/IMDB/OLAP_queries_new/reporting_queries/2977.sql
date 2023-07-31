@@ -1,1 +1,0 @@
-SELECT MAX("title"."kind_id") as agg_0 FROM "title" LEFT OUTER JOIN "kind_type" ON "title"."kind_id" = "kind_type"."id" LEFT OUTER JOIN "movie_companies" ON "title"."id" = "movie_companies"."movie_id"  WHERE "title"."title" NOT LIKE '%the%' AND "title"."episode_of_id" >= 1128215.4400981532 AND "movie_companies"."company_type_id" BETWEEN 1 AND 2 AND "kind_type"."id" >= 1;

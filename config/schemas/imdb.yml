@@ -159,7 +159,8 @@ tables:
   - data_type: character varying(32)
     name: info
 
-- columns:
+- table_name: keyword
+  columns:
   - data_type: SERIAL
     name: id
     primary_key: true
@@ -167,7 +168,6 @@ tables:
     name: keyword
   - data_type: character varying(5)
     name: phonetic_code
-  table_name: keyword
 
 - table_name: kind_type
   columns:

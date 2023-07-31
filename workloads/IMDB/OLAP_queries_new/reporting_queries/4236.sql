@@ -1,1 +1,0 @@
-SELECT AVG("person_info"."info_type_id") as agg_0 FROM "person_info" LEFT OUTER JOIN "name" ON "person_info"."person_id" = "name"."id" LEFT OUTER JOIN "aka_name" ON "name"."id" = "aka_name"."person_id"  WHERE "aka_name"."person_id" <= 418267 AND "aka_name"."name_pcode_cf" NOT LIKE '%A53%62%' AND "person_info"."person_id" >= 310433;

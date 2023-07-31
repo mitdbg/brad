@@ -1,6 +1,6 @@
 import sys
 from collections import deque
-from typing import List, Dict
+from typing import List, Dict, Iterator
 
 from brad.config.engine import Engine
 
@@ -151,14 +151,22 @@ class LogicalDataSyncPlan:
         Prints a topological ordering of the plan. Useful for debugging
         purposes.
         """
+        print("Logical Data Sync Plan:", file=file)
+        for str_op in self.traverse_plan_sequentially():
+            print(str_op, file=file)
+
+    def traverse_plan_sequentially(self) -> Iterator[str]:
+        """
+        Yields a string-based topological ordering of the plan. Useful for
+        debugging purposes.
+        """
 
         deps_left = {op: len(op.dependencies()) for op in self._operators}
         ready_to_run = deque([*self._base_operators])
 
-        print("Logical Data Sync Plan:", file=file)
         while len(ready_to_run) > 0:
             op = ready_to_run.popleft()
-            print("-", str(op), file=file)
+            yield "- {}".format(str(op))
             for dependee in op.dependees():
                 deps_left[dependee] -= 1
                 if deps_left[dependee] == 0:

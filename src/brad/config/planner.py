@@ -1,6 +1,7 @@
 import yaml
 import numpy as np
 import numpy.typing as npt
+from datetime import timedelta
 from typing import Dict, Optional
 from brad.planner.strategy import PlanningStrategy
 
@@ -17,9 +18,19 @@ class PlannerConfig:
             self._raw = yaml.load(file, Loader=yaml.Loader)
 
         self._aurora_scaling_coefs: Optional[npt.NDArray] = None
+        self._redshift_scaling_coefs: Optional[npt.NDArray] = None
 
     def strategy(self) -> PlanningStrategy:
         return PlanningStrategy.from_str(self._raw["strategy"])
+
+    def planning_window(self) -> timedelta:
+        epoch = self._raw["planning_window"]
+        return timedelta(
+            weeks=epoch["weeks"],
+            days=epoch["days"],
+            hours=epoch["hours"],
+            minutes=epoch["minutes"],
+        )
 
     def beam_size(self) -> int:
         return int(self._raw["beam_size"])
@@ -162,3 +173,14 @@ class PlannerConfig:
                 [coefs["coef1"], coefs["coef2"], coefs["coef3"], coefs["coef4"]]
             )
         return self._aurora_scaling_coefs
+
+    ###
+    ### Unified Redshift scaling
+    ###
+    def redshift_scaling_coefs(self) -> npt.NDArray:
+        if self._redshift_scaling_coefs is None:
+            coefs = self._raw["redshift_scaling"]
+            self._redshift_scaling_coefs = np.array(
+                [coefs["coef1"], coefs["coef2"], coefs["coef3"], coefs["coef4"]]
+            )
+        return self._redshift_scaling_coefs

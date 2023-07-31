@@ -1,1 +1,0 @@
-SELECT COUNT(*) as agg_0 FROM "kind_type" LEFT OUTER JOIN "title" ON "kind_type"."id" = "title"."kind_id" LEFT OUTER JOIN "cast_info" ON "title"."id" = "cast_info"."movie_id" LEFT OUTER JOIN "movie_info_idx" ON "title"."id" = "movie_info_idx"."movie_id"  WHERE "movie_info_idx"."info" LIKE '%7.9%' AND "kind_type"."kind" LIKE '%video%' AND "cast_info"."id" >= 14134555;

@@ -1,11 +1,12 @@
 import asyncio
 import logging
-from typing import Dict, List
-from pathlib import Path
+import pandas as pd
+from io import TextIOWrapper
+from typing import Dict, List, Optional
 
 from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
-from brad.planner import BlueprintPlanner
+from brad.planner.abstract import BlueprintPlanner
 from brad.planner.enumeration.neighborhood import NeighborhoodBlueprintEnumerator
 from brad.planner.neighborhood.filters import Filter
 from brad.planner.neighborhood.filters.aurora_transactions import AuroraTransactions
@@ -15,16 +16,18 @@ from brad.planner.neighborhood.filters.single_engine_execution import (
 )
 from brad.planner.neighborhood.filters.table_on_engine import TableOnEngine
 from brad.planner.neighborhood.impl import NeighborhoodImpl
-from brad.planner.neighborhood.scaling_scorer import ALL_METRICS
 from brad.planner.neighborhood.score import ScoringContext
 from brad.planner.neighborhood.full_neighborhood import FullNeighborhoodSearchPlanner
 from brad.planner.neighborhood.sampled_neighborhood import (
     SampledNeighborhoodSearchPlanner,
 )
 from brad.planner.strategy import PlanningStrategy
+from brad.provisioning.directory import Directory
 from brad.routing.rule_based import RuleBased
-from brad.server.engine_connections import EngineConnections
+from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
+
+# from brad.planner.neighborhood.scaling_scorer import ALL_METRICS
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +48,15 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             TableOnEngine(),
         ]
 
-        self._metrics_out = open(
-            Path(self._config.planner_log_path) / "actual_metrics.csv",
-            "a",
-            encoding="UTF-8",
-        )
+        planner_log_path = self._config.planner_log_path
+        if planner_log_path is not None:
+            self._metrics_out: Optional[TextIOWrapper] = open(
+                planner_log_path / "actual_metrics.csv",
+                "a",
+                encoding="UTF-8",
+            )
+        else:
+            self._metrics_out = None
 
         planner_config: PlannerConfig = kwargs["planner_config"]
         strategy = planner_config.strategy()
@@ -69,9 +76,10 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 if self._check_if_metrics_warrant_replanning():
                     await self.run_replan()
         finally:
-            self._metrics_out.close()
+            if self._metrics_out is not None:
+                self._metrics_out.close()
 
-    async def run_replan(self) -> None:
+    async def run_replan(self, window_multiplier: int = 1) -> None:
         # This will be long-running and will block the event loop. For our
         # current needs, this is fine since the planner is the main component in
         # the daemon process.
@@ -84,16 +92,19 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         ]
 
         # Establish connections to the underlying engines (needed for scoring
-        # purposes). We use synchronous connections since there appears to be a
-        # bug in aioodbc that causes an indefinite await on a query result.
+        # purposes).
+        directory = Directory(self._config)
+        await directory.refresh()
         engines = EngineConnections.connect_sync(
-            self._config, self._schema_name, autocommit=False
+            self._config, directory, self._schema_name, autocommit=False
         )
         table_sizer = TableSizer(engines, self._config)
 
         try:
             # Load metrics.
-            metrics = self._monitor.read_k_most_recent(metric_ids=ALL_METRICS)
+            # metrics = self._monitor.read_k_most_recent(metric_ids=ALL_METRICS)
+            # TODO: If needed, we need to transition this logic to the new metrics format.
+            metrics = pd.DataFrame({})
 
             # Update the dataset size. We must use the current blueprint because it
             # contains information about where the tables are now.
@@ -188,9 +199,14 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         return total_accessed_mb
 
     def _log_current_metrics(self) -> None:
+        if self._metrics_out is None:
+            return
+
         redshift_prov = self._current_blueprint.redshift_provisioning()
         aurora_prov = self._current_blueprint.aurora_provisioning()
-        metrics = self._monitor.read_k_most_recent(metric_ids=ALL_METRICS)
+        # TODO: If needed, we need to transition this logic to the new metrics format.
+        # metrics = self._monitor.read_k_most_recent(metric_ids=ALL_METRICS)
+        metrics = pd.DataFrame({})
         # Prepend provisioning information.
         metrics.insert(0, "redshift_instance_type", redshift_prov.instance_type())
         metrics.insert(1, "redshift_num_nodes", redshift_prov.num_nodes())

@@ -24,10 +24,14 @@ class NeighborhoodBlueprintEnumerator:
         redshift_enum = ProvisioningEnumerator(Engine.Redshift)
 
         max_aurora_dist = aurora_enum.scaling_to_distance(
-            base_blueprint.aurora_provisioning(), max_provisioning_multiplier
+            base_blueprint.aurora_provisioning(),
+            max_provisioning_multiplier,
+            Engine.Aurora,
         )
         max_redshift_dist = redshift_enum.scaling_to_distance(
-            base_blueprint.redshift_provisioning(), max_provisioning_multiplier
+            base_blueprint.redshift_provisioning(),
+            max_provisioning_multiplier,
+            Engine.Redshift,
         )
 
         for aurora_prov in aurora_enum.enumerate_nearby(

@@ -149,6 +149,3 @@ tables:
     redshift_options: CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
-
-
-

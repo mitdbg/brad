@@ -1,1 +1,0 @@
-SELECT MAX("title"."id") as agg_0, MIN("title"."episode_nr") as agg_1 FROM "char_name" LEFT OUTER JOIN "cast_info" ON "char_name"."id" = "cast_info"."person_role_id" LEFT OUTER JOIN "title" ON "cast_info"."movie_id" = "title"."id"  WHERE "cast_info"."note" NOT LIKE '%fo%otage)%' AND "char_name"."name" NOT LIKE '%Mr.%' AND "title"."season_nr" <= 1.4616759871984741;

@@ -121,13 +121,18 @@ python run_cost_model.py --database aurora --train_model --workload_runs ../data
 ## Train Redshift cost model
 
 ```angular2html
-python run_cost_model.py --database redshift --train_model --workload_runs ../data/imdb/parsed_queries/redshift_IMDB_10k_10_6_train.json --test_workload_runs ../data/imdb/parsed_queries/redshift_IMDB_10k_10_6_test.json --statistics_file ../data/imdb/parsed_queries/statistics_workload_combined.json --target ../data/imdb/evaluation/ --hyperparameter_path cost_model/setup/tuned_hyperparameters/redshift_tune_est_best_config.json --max_epoch_tuples 100000 --loss_class_name QLoss --device cpu --filename_model imdb_1_redshift --num_workers 16 --seed 0 --save_best
+python run_cost_model.py --database redshift --train_model --workload_runs ../data/imdb/parsed_queries/redshift_IMDB_10k_10_6_train.json --test_workload_runs ../data/imdb/parsed_queries/redshift_IMDB_10k_10_6_test.json --statistics_file ../data/imdb/parsed_queries/statistics_workload_combined.json --target ../data/imdb/evaluation/ --hyperparameter_path src/brad/cost_model/setup/tuned_hyperparameters/redshift_tune_est_best_config.json --max_epoch_tuples 100000 --loss_class_name QLoss --device cpu --filename_model imdb_1_redshift --num_workers 16 --seed 0 --save_best
 ```
 
 ## Train Athena cost model
 
 ```angular2html
-python run_cost_model.py --database athena --train_model --workload_runs ../data/imdb/parsed_queries/athena_IMDB_10k_10_6_train.json --test_workload_runs ../data/imdb/parsed_queries/athena_IMDB_10k_10_6_test.json --statistics_file ../data/imdb/parsed_queries/statistics_workload_combined.json --target ../data/imdb/evaluation/ --hyperparameter_path cost_model/setup/tuned_hyperparameters/athena_tune_est_best_config.json --max_epoch_tuples 100000 --loss_class_name QLoss --device cpu --filename_model imdb_1_athena --num_workers 16 --seed 0 --save_best
+python run_cost_model.py --database athena --train_model --workload_runs ../data/imdb/parsed_queries/athena_IMDB_10k_10_6_train.json --test_workload_runs ../data/imdb/parsed_queries/athena_IMDB_10k_10_6_test.json --statistics_file ../data/imdb/parsed_queries/statistics_workload_combined.json --target ../data/imdb/evaluation/ --hyperparameter_path src/brad/cost_model/setup/tuned_hyperparameters/athena_tune_est_best_config.json --max_epoch_tuples 100000 --loss_class_name QLoss --device cpu --filename_model imdb_1_athena --num_workers 16 --seed 0 --save_best
 ```
 
 
+# Auto-scaling dataset
+
+```angular2html
+python run_cost_model.py --scale_dataset --db_name imdb --source ../data/imdb/data --target ../data/imdb/scaled_data --scale_factor 10
+```

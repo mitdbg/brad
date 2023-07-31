@@ -1,13 +1,15 @@
+import asyncio
 import logging
 
 from brad.asset_manager import AssetManager
 from brad.blueprint.user import UserProvidedBlueprint
 from brad.blueprint.sql_gen.table import TableSqlGenerator
+from brad.blueprint_manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
+from brad.front_end.engine_connections import EngineConnections
 from brad.planner.data import bootstrap_blueprint
-from brad.server.blueprint_manager import BlueprintManager
-from brad.server.engine_connections import EngineConnections
+from brad.provisioning.directory import Directory
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,19 @@ def register_admin_action(subparser) -> None:
         type=str,
         help="Path to the database schema to bootstrap.",
     )
+    parser.add_argument(
+        "--only-engines",
+        type=str,
+        nargs="+",
+        help="Use this flag to bootstrap only a subset of the engines. "
+        "Only meant to be used if you know what you are doing!",
+    )
+    parser.add_argument(
+        "--skip-persisting-blueprint",
+        action="store_true",
+        help="Set this flag to avoid persisting the blueprint. "
+        "Only meant to be used if you know what you are doing!",
+    )
     parser.set_defaults(admin_action=bootstrap_schema)
 
 
@@ -45,20 +60,32 @@ def bootstrap_schema(args):
 
     # 4. Connect to the underlying engines and create "databases" for the
     # schema.
-    cxns = EngineConnections.connect_sync(config, autocommit=True)
+    directory = Directory(config)
+    asyncio.run(directory.refresh())
+
+    # Check for specific engines.
+    if args.only_engines is not None and len(args.only_engines) > 0:
+        engines_filter = {Engine.from_str(val) for val in args.only_engines}
+    else:
+        engines_filter = {Engine.Aurora, Engine.Athena, Engine.Redshift}
+
+    cxns = EngineConnections.connect_sync(
+        config, directory, autocommit=True, specific_engines=engines_filter
+    )
     create_schema = "CREATE DATABASE {}".format(blueprint.schema_name())
-    cxns.get_connection(Engine.Aurora).cursor_sync().execute_sync(create_schema)
-    cxns.get_connection(Engine.Athena).cursor_sync().execute_sync(create_schema)
-    cxns.get_connection(Engine.Redshift).cursor_sync().execute_sync(create_schema)
+    for engine in engines_filter:
+        cxns.get_connection(engine).cursor_sync().execute_sync(create_schema)
     cxns.close_sync()
     del cxns
 
     # 5. Now re-connect to the underlying engines with the schema name.
     cxns = EngineConnections.connect_sync(
-        config, schema_name=blueprint.schema_name(), autocommit=False
+        config,
+        directory,
+        schema_name=blueprint.schema_name(),
+        autocommit=False,
+        specific_engines=engines_filter,
     )
-    redshift = cxns.get_connection(Engine.Redshift).cursor_sync()
-    aurora = cxns.get_connection(Engine.Aurora).cursor_sync()
 
     # 6. Set up the underlying tables.
     sql_gen = TableSqlGenerator(config, blueprint)
@@ -66,6 +93,8 @@ def bootstrap_schema(args):
     for table in blueprint.tables():
         table_locations = blueprint.get_table_locations(table.name)
         for location in table_locations:
+            if location not in engines_filter:
+                continue
             logger.info(
                 "Creating table '%s' on %s...",
                 table.name,
@@ -79,26 +108,33 @@ def bootstrap_schema(args):
                 cursor.execute_sync(q)
 
     # 7. Create and set up the extraction progress table.
-    queries, db_type = sql_gen.generate_extraction_progress_set_up_table_sql()
-    conn = cxns.get_connection(db_type)
-    cursor = conn.cursor_sync()
-    for q in queries:
-        logger.debug("Running on %s: %s", str(db_type), q)
-        cursor.execute_sync(q)
+    if Engine.Aurora in engines_filter:
+        queries, db_type = sql_gen.generate_extraction_progress_set_up_table_sql()
+        conn = cxns.get_connection(db_type)
+        cursor = conn.cursor_sync()
+        for q in queries:
+            logger.debug("Running on %s: %s", str(db_type), q)
+            cursor.execute_sync(q)
 
     # 9. Commit the changes.
-    aurora.commit_sync()
-    redshift.commit_sync()
-    # Athena does not support the notion of committing a transaction.
+    # N.B. Athena does not support the notion of committing a transaction.
+    if Engine.Aurora in engines_filter:
+        cxns.get_connection(Engine.Aurora).cursor_sync().commit_sync()
+    if Engine.Redshift in engines_filter:
+        cxns.get_connection(Engine.Redshift).cursor_sync().commit_sync()
 
     # 10. Install the `aws_s3` extension (needed for data extraction).
-    aurora.execute_sync("CREATE EXTENSION IF NOT EXISTS aws_s3 CASCADE")
-    aurora.commit_sync()
+    if Engine.Aurora in engines_filter:
+        aurora = cxns.get_connection(Engine.Aurora)
+        cursor = aurora.cursor_sync()
+        cursor.execute_sync("CREATE EXTENSION IF NOT EXISTS aws_s3 CASCADE")
+        cursor.commit_sync()
 
     # 11. Persist the data blueprint.
-    assets = AssetManager(config)
-    blueprint_mgr = BlueprintManager(assets, blueprint.schema_name())
-    blueprint_mgr.set_blueprint(blueprint)
-    blueprint_mgr.persist_sync()
+    if not args.skip_persisting_blueprint:
+        assets = AssetManager(config)
+        blueprint_mgr = BlueprintManager(config, assets, blueprint.schema_name())
+        blueprint_mgr.set_blueprint(blueprint)
+        blueprint_mgr.persist_sync()
 
     logger.info("Done!")

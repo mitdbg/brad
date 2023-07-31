@@ -1,1 +1,0 @@
-SELECT MAX("title"."episode_nr") as agg_0 FROM "movie_info" LEFT OUTER JOIN "title" ON "movie_info"."movie_id" = "title"."id" LEFT OUTER JOIN "movie_companies" ON "title"."id" = "movie_companies"."movie_id"  WHERE "movie_info"."movie_id" <= 2218906 AND "movie_info"."info_type_id" <= 1 AND "title"."title" LIKE '%Part%' AND "movie_companies"."movie_id" IS NOT NULL;

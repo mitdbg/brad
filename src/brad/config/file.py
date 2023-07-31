@@ -1,9 +1,15 @@
+import logging
+import os
+import pathlib
+import re
 import yaml
 from typing import Optional, Dict
 from datetime import timedelta
 
 from brad.config.engine import Engine
 from brad.routing.policy import RoutingPolicy
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigFile:
@@ -24,24 +30,33 @@ class ConfigFile:
         return self._raw_path
 
     @property
-    def daemon_log_path(self) -> Optional[str]:
-        return self._raw["daemon_log_file"] if "daemon_log_file" in self._raw else None
+    def daemon_log_path(self) -> Optional[pathlib.Path]:
+        return self._extract_log_path("daemon_log_file")
+
+    def front_end_log_file(self, worker_index: int) -> Optional[pathlib.Path]:
+        log_path = self._extract_log_path("front_end_log_path")
+        if log_path is None:
+            return None
+        return log_path / f"brad_front_end_{worker_index}.log"
+
+    def metrics_log_path(self) -> Optional[pathlib.Path]:
+        return self._extract_log_path("metrics_log_path")
 
     @property
-    def planner_log_path(self) -> str:
-        return self._raw["planner_log_path"] if "planner_log_path" in self._raw else "."
+    def front_end_interface(self) -> str:
+        return self._raw["front_end_interface"]
 
     @property
-    def server_interface(self) -> str:
-        return self._raw["server_interface"]
+    def front_end_port(self) -> int:
+        return int(self._raw["front_end_port"])
 
     @property
-    def server_port(self) -> int:
-        return int(self._raw["server_port"])
+    def num_front_ends(self) -> int:
+        return int(self._raw["num_front_ends"])
 
     @property
-    def server_daemon_port(self) -> int:
-        return int(self._raw["server_daemon_port"])
+    def planner_log_path(self) -> Optional[pathlib.Path]:
+        return self._extract_log_path("planner_log_path")
 
     @property
     def athena_s3_data_path(self) -> str:
@@ -91,11 +106,11 @@ class ConfigFile:
         return _ensure_slash_terminated(self._raw["s3_logs_path"])
 
     @property
-    def local_logs_path(self) -> str:
+    def local_logs_path(self) -> pathlib.Path:
         return (
-            self._raw["local_logs_path"]
+            pathlib.Path(self._raw["local_logs_path"])
             if "local_logs_path" in self._raw
-            else "./query_logs"
+            else pathlib.Path("./query_logs")
         )
 
     @property
@@ -117,11 +132,11 @@ class ConfigFile:
 
     @property
     def redshift_cluster_id(self) -> str:
-        return self._raw[Engine.Redshift]["host"].split(".")[0]
+        return self._raw[Engine.Redshift.value]["cluster_id"]
 
     @property
     def aurora_cluster_id(self) -> str:
-        return self._raw[Engine.Aurora]["host"].split(".")[0]
+        return self._raw[Engine.Aurora.value]["cluster_id"]
 
     @property
     def epoch_length(self) -> timedelta:
@@ -150,9 +165,31 @@ class ConfigFile:
             raise RuntimeError("Missing connection details for the Sidecar DBMS.")
         return self._raw["sidecar_db"]
 
+    def _extract_log_path(self, config_key: str) -> Optional[pathlib.Path]:
+        if config_key not in self._raw:
+            return None
+        raw_value = self._raw[config_key]
+
+        if _ENV_VAR_REGEX.match(raw_value) is not None:
+            # Treat it as an environment variable.
+            if raw_value not in os.environ:
+                logger.warning(
+                    "Specified an environment variable '%s' for config '%s', but the variable was not set.",
+                    raw_value,
+                    config_key,
+                )
+                return None
+            return pathlib.Path(os.environ[raw_value])
+        else:
+            # Treat is as a path.
+            return pathlib.Path(raw_value)
+
 
 def _ensure_slash_terminated(candidate: str) -> str:
     if not candidate.endswith("/"):
         return candidate + "/"
     else:
         return candidate
+
+
+_ENV_VAR_REGEX = re.compile("[A-Z][A-Z0-9_]*")

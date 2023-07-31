@@ -38,6 +38,7 @@ INSTALL_REQUIRES = [
     "imbalanced-learn",
     "redshift_connector",
     "mysql-connector-python",
+    "tabulate",
 ]
 
 DEV_REQUIRES = [
@@ -53,6 +54,7 @@ DEV_REQUIRES = [
     "immutables",
     "attrs",
     "typing-extensions",
+    "types-tabulate",
 ]
 
 KEYWORDS = []

@@ -25,6 +25,11 @@ class BradStub(object):
                 request_serializer=brad__pb2.RunQueryRequest.SerializeToString,
                 response_deserializer=brad__pb2.RunQueryResponse.FromString,
                 )
+        self.RunQueryJson = channel.unary_unary(
+                '/brad.Brad/RunQueryJson',
+                request_serializer=brad__pb2.RunQueryRequest.SerializeToString,
+                response_deserializer=brad__pb2.RunQueryJsonResponse.FromString,
+                )
         self.EndSession = channel.unary_unary(
                 '/brad.Brad/EndSession',
                 request_serializer=brad__pb2.EndSessionRequest.SerializeToString,
@@ -52,6 +57,14 @@ class BradServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RunQueryJson(self, request, context):
+        """Run a SQL query (or execute an internal command like BRAD_SYNC) and return
+        the results as a serialized JSON string.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def EndSession(self, request, context):
         """End a previously started session. Clients must call this method once they
         are done with their session.
@@ -72,6 +85,11 @@ def add_BradServicer_to_server(servicer, server):
                     servicer.RunQuery,
                     request_deserializer=brad__pb2.RunQueryRequest.FromString,
                     response_serializer=brad__pb2.RunQueryResponse.SerializeToString,
+            ),
+            'RunQueryJson': grpc.unary_unary_rpc_method_handler(
+                    servicer.RunQueryJson,
+                    request_deserializer=brad__pb2.RunQueryRequest.FromString,
+                    response_serializer=brad__pb2.RunQueryJsonResponse.SerializeToString,
             ),
             'EndSession': grpc.unary_unary_rpc_method_handler(
                     servicer.EndSession,
@@ -120,6 +138,23 @@ class Brad(object):
         return grpc.experimental.unary_stream(request, target, '/brad.Brad/RunQuery',
             brad__pb2.RunQueryRequest.SerializeToString,
             brad__pb2.RunQueryResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def RunQueryJson(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/brad.Brad/RunQueryJson',
+            brad__pb2.RunQueryRequest.SerializeToString,
+            brad__pb2.RunQueryJsonResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

@@ -3,14 +3,29 @@
 
 # **DO NOT** check in your config.yml file!
 
-server_interface: "0.0.0.0"
-server_port: 6583
+# BRAD's front end servers will listen for client connections on this interface
+# and port. If `num_front_ends` is greater than one, subsequent front ends will
+# listen on successive ports (e.g., 6584, 6585, etc.).
+front_end_interface: "0.0.0.0"
+front_end_port: 6583
+num_front_ends: 1
+
+# For the logging configs below, you can omit them to disable logging.
+# You can also set them to an environment variable (string must be ALL_CAPS with
+# only underscores and numbers permitted) and BRAD will use the path stored in
+# that variable.
 
 # Where BRAD's daemon process will write its logs.
-daemon_log_file: /tmp/brad_daemon.log
+daemon_log_file: /tmp
+
+# Where BRAD's front end processes will write their logs.
+front_end_log_path: /tmp
 
 # Where BRAD's blueprint planner will write debug logs.
-planner_log_path: .
+planner_log_path: /tmp
+
+# Where BRAD's metrics loggers will write their logs.
+metrics_log_path: /tmp
 
 # The epoch length for metrics monitoring.
 epoch_length:
@@ -67,16 +82,13 @@ athena:
   access_key_secret: abCD+E1f2Gxhi3J4klmN/OP5QrSTuvwXYzabcdEF
 
 aurora:
+  cluster_id: aurora-brad
   odbc_driver: PostgreSQL
-  host: aurora.us-east-1.amazonaws.com
-  port: 5432
   user: postgres
   password: postgres_password
 
 redshift:
-  odbc_driver: Redshift
-  host: redshift.us-east-1.amazonaws.com
-  port: 5439
+  cluster_id: redshift-brad
   user: awsuser
   password: awsuser_password
   s3_iam_role: arn:aws:iam:123

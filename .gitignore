@@ -13,7 +13,8 @@ brad.egg-info
 config/config.yml
 config/config_local.yml
 config/manifests/manifest.yml
-config/tidb_bench.yml
+config/tidb.yml
+config/temp_config.yml
 query_logs/
 
 cond-out*

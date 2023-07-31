@@ -27,11 +27,27 @@ class QueryError(_message.Message):
     error_msg: str
     def __init__(self, error_msg: _Optional[str] = ...) -> None: ...
 
+class QueryJsonResponse(_message.Message):
+    __slots__ = ["executor", "results_json"]
+    EXECUTOR_FIELD_NUMBER: _ClassVar[int]
+    RESULTS_JSON_FIELD_NUMBER: _ClassVar[int]
+    executor: ExecutionEngine
+    results_json: str
+    def __init__(self, results_json: _Optional[str] = ..., executor: _Optional[_Union[ExecutionEngine, str]] = ...) -> None: ...
+
 class QueryResultRow(_message.Message):
     __slots__ = ["row_data"]
     ROW_DATA_FIELD_NUMBER: _ClassVar[int]
     row_data: bytes
     def __init__(self, row_data: _Optional[bytes] = ...) -> None: ...
+
+class RunQueryJsonResponse(_message.Message):
+    __slots__ = ["error", "results"]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    RESULTS_FIELD_NUMBER: _ClassVar[int]
+    error: QueryError
+    results: QueryJsonResponse
+    def __init__(self, results: _Optional[_Union[QueryJsonResponse, _Mapping]] = ..., error: _Optional[_Union[QueryError, _Mapping]] = ...) -> None: ...
 
 class RunQueryRequest(_message.Message):
     __slots__ = ["id", "query"]

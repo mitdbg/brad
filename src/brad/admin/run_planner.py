@@ -31,8 +31,8 @@ from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import FixedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
-from brad.server.blueprint_manager import BlueprintManager
-from brad.server.engine_connections import EngineConnections
+from brad.blueprint_manager import BlueprintManager
+from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 
 logger = logging.getLogger(__name__)
@@ -86,11 +86,6 @@ def register_admin_action(subparser) -> None:
         help="The number of analytical queries issued per second.",
     )
     parser.add_argument(
-        "--transactional-rate-per-s",
-        type=float,
-        help="The number of transactions issued per second.",
-    )
-    parser.add_argument(
         "--debug",
         action="store_true",
         help="Set to enable debug logging.",
@@ -137,7 +132,7 @@ def run_planner(args) -> None:
 
     # 3. Load the blueprint.
     assets = AssetManager(config)
-    blueprint_mgr = BlueprintManager(assets, args.schema_name)
+    blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
     blueprint_mgr.load_sync()
     logger.info("Current blueprint:")
     logger.info("%s", blueprint_mgr.get_blueprint())
@@ -151,7 +146,6 @@ def run_planner(args) -> None:
     elif args.workload_source == "query_bank":
         assert args.query_bank_file is not None
         assert args.query_counts_file is not None
-        assert args.transactional_rate_per_s is not None
         assert args.workload_dir is not None
 
         engines = EngineConnections.connect_sync(
@@ -164,12 +158,8 @@ def run_planner(args) -> None:
             builder.add_analytical_queries_and_counts_from_file(
                 args.query_bank_file,
                 args.query_counts_file,
-                args.query_counts_multiplier,
             )
             .add_transactional_queries_from_file(workload_dir / "oltp.sql")
-            .uniform_total_transaction_rate(
-                args.transactional_rate_per_s, period=timedelta(seconds=1)
-            )
             .for_period(timedelta(hours=1))
             .table_sizes_from_engines(blueprint_mgr.get_blueprint(), table_sizer)
             .build()
@@ -177,7 +167,6 @@ def run_planner(args) -> None:
 
     elif args.workload_source == "workload_dir":
         assert args.analytical_rate_per_s is not None
-        assert args.transactional_rate_per_s is not None
 
         engines = EngineConnections.connect_sync(
             config, args.schema_name, autocommit=True
@@ -190,9 +179,6 @@ def run_planner(args) -> None:
             .add_transactional_queries_from_file(workload_dir / "oltp.sql")
             .uniform_per_analytical_query_rate(
                 args.analytical_rate_per_s, period=timedelta(seconds=1)
-            )
-            .uniform_total_transaction_rate(
-                args.transactional_rate_per_s, period=timedelta(seconds=1)
             )
             .for_period(timedelta(hours=1))
             .table_sizes_from_engines(blueprint_mgr.get_blueprint(), table_sizer)
@@ -216,7 +202,8 @@ def run_planner(args) -> None:
     )
 
     # 6. Start the planner.
-    monitor = Monitor.from_config_file(config)
+    monitor = Monitor(config, blueprint_mgr)
+    monitor.set_up_metrics_sources()
     if args.use_fixed_metrics is not None:
         metrics_provider: MetricsProvider = FixedMetricsProvider(
             Metrics(**parse_metrics(args.use_fixed_metrics))
@@ -250,7 +237,7 @@ def run_planner(args) -> None:
         data_access_provider=data_access_provider,
         estimator_provider=estimator_provider,
     )
-    monitor.force_read_metrics()
+    asyncio.run(monitor.fetch_latest())
 
     async def on_new_blueprint(blueprint: Blueprint):
         logger.info("Selected new blueprint")

@@ -9,8 +9,8 @@ from brad.blueprint.sql_gen.table import (
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.planner.enumeration.blueprint import EnumeratedBlueprint
-from brad.server.blueprint_manager import BlueprintManager
-from brad.server.engine_connections import EngineConnections
+from brad.blueprint_manager import BlueprintManager
+from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,7 @@ def register_admin_action(subparser) -> None:
 def add_indexes(args, config: ConfigFile, mgr: BlueprintManager) -> None:
     engines = EngineConnections.connect_sync(
         config,
+        mgr.get_directory(),
         schema_name=args.schema_name,
         autocommit=False,
         specific_engines={Engine.Aurora},
@@ -110,6 +111,14 @@ def add_indexes(args, config: ConfigFile, mgr: BlueprintManager) -> None:
             indexes_to_remove = curr_indexes.difference(next_indexes)
             indexes_to_add = next_indexes.difference(curr_indexes)
 
+            if len(indexes_to_remove) == 0 and len(indexes_to_add) == 0:
+                # Create indexes just to be safe.
+                sql_to_run = generate_create_index_sql(table, list(next_indexes))
+                for sql in sql_to_run:
+                    logger.debug("Running on Aurora: %s", sql)
+                    cursor.execute_sync(sql)
+                continue
+
             sql_to_run = generate_create_index_sql(table, list(indexes_to_add))
             for sql in sql_to_run:
                 logger.debug("Running on Aurora: %s", sql)
@@ -139,7 +148,7 @@ def modify_blueprint(args):
 
     # 2. Load the existing blueprint.
     assets = AssetManager(config)
-    blueprint_mgr = BlueprintManager(assets, args.schema_name)
+    blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
     blueprint_mgr.load_sync()
     blueprint = blueprint_mgr.get_blueprint()
 

@@ -1,1 +1,0 @@
-SELECT COUNT(*) as agg_0 FROM "movie_companies" LEFT OUTER JOIN "company_name" ON "movie_companies"."company_id" = "company_name"."id" LEFT OUTER JOIN "company_type" ON "movie_companies"."company_type_id" = "company_type"."id"  WHERE "movie_companies"."company_type_id" >= 1 AND "company_name"."id" >= 26819 AND "movie_companies"."id" >= 2185607 AND "company_type"."id" IS NOT NULL;
