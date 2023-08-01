@@ -8,7 +8,9 @@ import sys
 import threading
 import time
 import os
+import pytz
 import multiprocessing as mp
+from datetime import datetime
 
 from brad.grpc_client import BradGrpcClient
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
@@ -62,12 +64,13 @@ def runner(
             q_idx = prng.choices(query_indexes, weights=query_weights, k=1)[0]
             query = queries[q_idx]
 
+            now = datetime.now().astimezone(pytz.utc)
             query_start = time.time()
             succeeded = query(db)
             query_end = time.time()
 
             # Record metrics.
-            latencies[q_idx].append(query_end - query_start)
+            latencies[q_idx].append((now, query_end - query_start))
 
             try:
                 _ = stop_queue.get_nowait()
@@ -93,10 +96,10 @@ def runner(
         with open(
             out_dir / "geospatial_latency_{}.csv".format(worker_idx), "w"
         ) as file:
-            print("query_idx,run_time_s", file=file)
+            print("query_idx,timestamp,run_time_s", file=file)
             for qidx, lat_list in enumerate(latencies):
-                for lat in lat_list:
-                    print("{},{}".format(qidx, lat), file=file)
+                for timestamp, lat in lat_list:
+                    print("{},{},{}".format(qidx, timestamp, lat), file=file)
 
         db.close_sync()
 
