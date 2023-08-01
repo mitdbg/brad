@@ -143,18 +143,18 @@ class TransactionWorker:
         # 1. Select a random theatre number.
         theatre_num = self.prng.randint(self.min_theatre_id, self.max_theatre_id)
 
-        if select_using_name:
-            results = db.execute_sync(
-                f"SELECT id FROM theatres WHERE name = 'Theatre #{theatre_num}'"
-            )
-            theatre_id = results[0][0]
-        else:
-            # By design, the theatre number is equal to the ID.
-            theatre_id = theatre_num
-
         try:
             # Start the transaction.
             db.execute_sync("BEGIN")
+
+            if select_using_name:
+                results = db.execute_sync(
+                    f"SELECT id FROM theatres WHERE name = 'Theatre #{theatre_num}'"
+                )
+                theatre_id = results[0][0]
+            else:
+                # By design, the theatre number is equal to the ID.
+                theatre_id = theatre_num
 
             # 2. Look for a showing.
             num_to_consider = self.prng.randint(*self.showings_to_consider)
