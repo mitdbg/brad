@@ -1,6 +1,6 @@
 run_experiment(
   name="light_start",
-  run="./run_workload.sh",
+  run="./run_steady_workload_then_replan.sh",
   options={
     "a-clients": 1,
     "t-clients": 1,
