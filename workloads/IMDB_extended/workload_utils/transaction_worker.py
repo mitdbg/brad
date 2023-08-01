@@ -151,6 +151,10 @@ class TransactionWorker:
                 results = db.execute_sync(
                     f"SELECT id FROM theatres WHERE name = 'Theatre #{theatre_num}'"
                 )
+                if len(results) == 0:
+                    # Occasionally, nothing is found.
+                    db.commit_sync()
+                    return True
                 theatre_id = results[0][0]
             else:
                 # By design, the theatre number is equal to the ID.

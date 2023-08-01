@@ -1,5 +1,9 @@
 #! /bin/bash
 
+script_loc=$(cd $(dirname $0) && pwd -P)
+cd $script_loc
+source common.sh
+
 # Evaluates any environment variables in this script's arguments. This script
 # should only be run on trusted input.
 orig_args=($@)
@@ -22,6 +26,10 @@ for val in "${orig_args[@]}"; do
     a_gap_s=${phys_arg:10}
   fi
 
+  if [[ $phys_arg =~ --a-gap-std-s=.+ ]]; then
+    a_gap_std_s=${phys_arg:14}
+  fi
+
   if [[ $phys_arg =~ --num-front-ends=.+ ]]; then
     num_front_ends=${phys_arg:17}
   fi
@@ -30,24 +38,6 @@ for val in "${orig_args[@]}"; do
     run_for_s=${phys_arg:12}
   fi
 done
-
-function start_brad() {
-  pushd ../../
-  brad daemon \
-    --config-file config/config_cond.yml \
-    --schema-name imdb_extended \
-    --planner-config-file config/planner.yml \
-    --temp-config-file config/temp_config.yml \
-    &
-  brad_pid=$!
-  popd
-}
-
-function cancel_experiment() {
-  kill -INT $brad_pid
-  kill -INT $txn_pid
-  kill -INT $ana_pid
-}
 
 trap "cancel_experiment" INT
 trap "cancel_experiment" TERM
@@ -59,6 +49,7 @@ sleep 60
 python3 ana_runner.py \
   --num-clients $a_clients \
   --avg-gap-s $a_gap_s \
+  --avg-gap-std-s $a_gap_std_s \
   --num-front-ends $num_front_ends \
   --query-indexes $query_indexes \
   --run-warmup
@@ -72,6 +63,7 @@ txn_pid=$!
 python3 ana_runner.py \
   --num-clients $a_clients \
   --avg-gap-s $a_gap_s \
+  --avg-gap-std-s $a_gap_std_s \
   --num-front-ends $num_front_ends \
   --query-indexes $query_indexes \
   &

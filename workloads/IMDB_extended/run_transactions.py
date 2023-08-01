@@ -8,7 +8,9 @@ import sys
 import threading
 import time
 import os
+import pytz
 import multiprocessing as mp
+from datetime import datetime
 
 from brad.grpc_client import BradGrpcClient
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
@@ -75,6 +77,7 @@ def runner(
             txn_idx = txn_prng.choices(txn_indexes, weights=transaction_weights, k=1)[0]
             txn = transactions[txn_idx]
 
+            now = datetime.now().astimezone(pytz.utc)
             txn_start = time.time()
             if txn == worker.purchase_tickets:
                 succeeded = txn(
@@ -89,7 +92,7 @@ def runner(
                 commits[txn_idx] += 1
             else:
                 aborts[txn_idx] += 1
-            latencies[txn_idx].append(txn_end - txn_start)
+            latencies[txn_idx].append((now, txn_end - txn_start))
 
             try:
                 _ = stop_queue.get_nowait()
@@ -109,10 +112,10 @@ def runner(
             out_dir = pathlib.Path(".")
 
         with open(out_dir / "oltp_latency_{}.csv".format(worker_idx), "w") as file:
-            print("txn_idx,run_time_s", file=file)
+            print("txn_idx,timestamp,run_time_s", file=file)
             for tidx, lat_list in enumerate(latencies):
-                for lat in lat_list:
-                    print("{},{}".format(tidx, lat), file=file)
+                for timestamp, lat in lat_list:
+                    print("{},{},{}".format(tidx, timestamp, lat), file=file)
 
         with open(out_dir / "oltp_stats_{}.csv".format(worker_idx), "w") as file:
             print("stat,value", file=file)

@@ -1,12 +1,28 @@
 run_experiment(
   name="light_start",
-  run="./run_workload.sh",
+  run="./run_steady_workload_then_replan.sh",
   options={
     "a-clients": 1,
     "t-clients": 1,
     "query-indexes": "81,108,133",
     "num-front-ends": 2,
-    "a-gap-s": 3,
+    "a-gap-s": 30,
+    "a-gap-std-s": 5,
     "run-for-s": 60 * 6,
+  },
+)
+
+run_experiment(
+  name="increase_txns",
+  run="./run_increasing_txn_workload.sh",
+  options={
+    "a-clients": 1,
+    "t-clients-lo": 1,
+    "t-clients-hi": 8,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 2,
+    "a-gap-s": 30,
+    "a-gap-std-s": 5,
+    "run-for-s": 60 * 3,  # For each configuration.
   },
 )

@@ -62,6 +62,11 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             logger.info("No queries in the workload. Cannot replan.")
             return
 
+        if len(next_workload.analytical_queries()) < 20:
+            logger.info("[Table-Based Planner] Query arrival counts")
+            for q in next_workload.analytical_queries():
+                logger.info("Query: %s -- Count: %d", q.raw_query, q.arrival_count())
+
         # 3. Initialize planning state.
         ctx = ScoringContext(
             self._schema_name,
