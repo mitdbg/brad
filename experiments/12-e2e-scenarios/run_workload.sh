@@ -22,6 +22,10 @@ for val in "${orig_args[@]}"; do
     a_gap_s=${phys_arg:10}
   fi
 
+  if [[ $phys_arg =~ --a-gap-std-s=.+ ]]; then
+    a_gap_std_s=${phys_arg:14}
+  fi
+
   if [[ $phys_arg =~ --num-front-ends=.+ ]]; then
     num_front_ends=${phys_arg:17}
   fi
@@ -59,6 +63,7 @@ sleep 60
 python3 ana_runner.py \
   --num-clients $a_clients \
   --avg-gap-s $a_gap_s \
+  --avg-gap-std-s $a_gap_std_s \
   --num-front-ends $num_front_ends \
   --query-indexes $query_indexes \
   --run-warmup

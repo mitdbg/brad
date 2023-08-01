@@ -65,7 +65,7 @@ def runner(
 
         while True:
             if args.avg_gap_s is not None:
-                wait_for_s = prng.gauss(args.avg_gap_s, 0.5)
+                wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
                 if wait_for_s < 0.0:
                     wait_for_s = 0.0
                 time.sleep(wait_for_s)
@@ -140,6 +140,7 @@ def main():
     )
     parser.add_argument("--num-clients", type=int, default=1)
     parser.add_argument("--avg-gap-s", type=float)
+    parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
     parser.add_argument("--query-indexes", type=str, required=True)
     args = parser.parse_args()
 
