@@ -43,6 +43,7 @@ def runner(
         0.20,
         0.10,
     ]
+    lookup_theatre_id_by_name = 0.8
     txn_indexes = list(range(len(transactions)))
     latencies = [[] for _ in range(len(transactions))]
     commits = [0 for _ in range(len(transactions))]
@@ -75,7 +76,12 @@ def runner(
             txn = transactions[txn_idx]
 
             txn_start = time.time()
-            succeeded = txn(db)
+            if txn == worker.purchase_tickets:
+                succeeded = txn(
+                    db, select_using_name=txn_prng.random() < lookup_theatre_id_by_name
+                )
+            else:
+                succeeded = txn(db)
             txn_end = time.time()
 
             # Record metrics.
