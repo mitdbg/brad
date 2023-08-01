@@ -22,6 +22,8 @@ tables:
     data_type: DECIMAL(10)
   - name: location_y
     data_type: DECIMAL(10)
+  indexes:
+  - name
 
 - table_name: showings
   columns:
