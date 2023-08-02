@@ -356,6 +356,10 @@ class BradFrontEnd(BradInterface):
             # Send the command to the daemon for execution.
             return await self._daemon_request_mailbox.send_recv(command)
 
+        elif command == "BRAD_NOOP":
+            # Used to measure the overhead of accessing BRAD.
+            return [("OK",)]
+
         else:
             return [("Unknown internal command: {}".format(command),)]
 
