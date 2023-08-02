@@ -9,6 +9,7 @@ from collections import deque
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple, Deque
 
+from .common import TIMESTAMP_PREFIX_FORMAT
 from brad.utils.time_periods import period_start
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,9 @@ class EpochFileHandler(logging.Handler):
 
     def _get_log_file_paths(self) -> Tuple[pathlib.Path, pathlib.Path]:
         assert self._current_epoch_start is not None
-        formatted_epoch_start = self._current_epoch_start.strftime("%Y-%m-%d_%H:%M:%S")
+        formatted_epoch_start = self._current_epoch_start.strftime(
+            TIMESTAMP_PREFIX_FORMAT
+        )
         return (
             self._log_directory
             / f"{formatted_epoch_start}_{self._front_end_index}_transactional_p{int(self._txn_log_prob*100)}.log"
