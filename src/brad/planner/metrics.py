@@ -141,7 +141,7 @@ class MetricsFromMonitor(MetricsProvider):
                 aurora_load_minute_avg=load_minute,
                 txn_completions_per_s=txn_per_s,
             ),
-            most_recent_common,
+            most_recent_common.to_pydatetime(),
         )
 
 
