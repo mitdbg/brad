@@ -31,7 +31,7 @@ class LogFetcher:
         """
 
         for batch_start_timestamp in timestamp_iterator(
-            window_start, window_end, timedelta(hours=1)
+            window_start, window_end, timedelta(days=1)
         ):
             prefix = self._timestamp_to_prefix(batch_start_timestamp)
             for log_file_key in self._s3_list_objects_full(prefix):
@@ -76,16 +76,21 @@ class LogFetcher:
         if continuation_token is not None:
             kwargs["ContinuationToken"] = continuation_token
         response = self._s3.list_objects_v2(**kwargs)
+        num_results = response["KeyCount"]
         is_truncated = response["IsTruncated"]
         return _ObjectList(
-            list(map(lambda f: f["Key"], response["Contents"])),
+            (
+                list(map(lambda f: f["Key"], response["Contents"]))
+                if num_results > 0
+                else []
+            ),
             is_truncated,
             response["NextContinuationToken"] if is_truncated else None,
         )
 
     def _timestamp_to_prefix(self, timestamp: datetime) -> str:
-        # We retrieve logs by the hour.
-        return timestamp.strftime("%Y-%m-%d_%H")
+        # We retrieve logs by the day.
+        return timestamp.strftime("%Y-%m-%d")
 
     def _extract_epoch_start(self, file_s3_key: str) -> datetime:
         file_stem = file_s3_key.split("/")[-1]
