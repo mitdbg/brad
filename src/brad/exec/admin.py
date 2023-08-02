@@ -8,6 +8,7 @@ import brad.admin.bulk_load as bulk_load
 import brad.admin.run_planner as run_planner
 import brad.admin.modify_blueprint as modify_blueprint
 import brad.admin.train_router as train_router
+import brad.admin.workload_logs as workload_logs
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ def register_command(subparsers) -> None:
     run_planner.register_admin_action(admin_subparsers)
     modify_blueprint.register_admin_action(admin_subparsers)
     train_router.register_admin_action(admin_subparsers)
+    workload_logs.register_admin_action(admin_subparsers)
     parser.set_defaults(func=main)
 
 

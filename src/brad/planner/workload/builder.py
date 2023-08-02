@@ -38,7 +38,7 @@ class WorkloadBuilder:
         Change the workload's period using `rescale_period`. We linearly scale
         the query counts.
         """
-        if rescale_to_period is None:
+        if rescale_to_period is None or self._period.total_seconds() == 0.0:
             multiplier = 1.0
         else:
             multiplier = rescale_to_period / self._period
