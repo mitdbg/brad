@@ -1,9 +1,8 @@
-import boto3
 import csv
 import pathlib
 import logging
 import re
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta, datetime
 from typing import List, Dict, Optional
 
 from brad.blueprint import Blueprint
@@ -12,6 +11,7 @@ from brad.config.file import ConfigFile
 from brad.planner.workload import Workload
 from brad.planner.workload.query import Query
 from brad.utils.table_sizer import TableSizer
+from brad.workload_logging.log_fetcher import LogFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class WorkloadBuilder:
         Change the workload's period using `rescale_period`. We linearly scale
         the query counts.
         """
-        if rescale_to_period is None:
+        if rescale_to_period is None or self._period.total_seconds() == 0.0:
             multiplier = 1.0
         else:
             multiplier = rescale_to_period / self._period
@@ -164,21 +164,7 @@ class WorkloadBuilder:
         assert window_start <= window_end
         self._prespecified_queries.clear()
 
-        s3 = boto3.client(
-            "s3",
-            aws_access_key_id=config.aws_access_key,
-            aws_secret_access_key=config.aws_access_key_secret,
-        )
-
-        response = s3.list_objects_v2(
-            Bucket=config.s3_logs_bucket, Prefix=config.s3_logs_path
-        )
-
-        # TODO: This may miss logs that are in the process of being uploaded.
-        sorted_files = sorted(
-            response["Contents"], key=lambda obj: obj["Key"], reverse=True
-        )
-        file_idx = 0
+        log_fetcher = LogFetcher(config)
 
         txn_queries = []
         analytical_queries = []
@@ -186,18 +172,6 @@ class WorkloadBuilder:
 
         range_end: Optional[datetime] = None
         range_start: Optional[datetime] = None
-
-        def extract_epoch_start(file_stem: str) -> datetime:
-            return datetime.strptime(
-                " ".join(file_stem.split("_")[:2]), "%Y-%m-%d %H:%M:%S"
-            ).replace(tzinfo=timezone.utc)
-
-        def intervals_intersect(
-            start1: datetime, end1: datetime, start2: datetime, end2: datetime
-        ) -> bool:
-            # Left endpoint is inclusive, right endpoint is exclusive.
-            return not (end1 <= start2 or end2 <= start1)
-
         epoch_length = config.epoch_length
 
         # The logic below extracts data from log files that represent epochs
@@ -209,77 +183,50 @@ class WorkloadBuilder:
         # our use cases since we will assume that the query logger runs
         # continuously.
 
-        # Skip files that represent epochs after `window_end`.
-        while file_idx < len(sorted_files):
-            file_obj = sorted_files[file_idx]
-            file_key = file_obj["Key"]
-            file_stem = file_key.split("/")[-1]
+        for log_file in log_fetcher.fetch_logs(
+            window_start, window_end, include_contents=True
+        ):
+            is_valid = False
 
-            epoch_start = extract_epoch_start(file_stem)
-            epoch_end = epoch_start + epoch_length
-
-            if not intervals_intersect(
-                epoch_start, epoch_end, window_start, window_end
-            ):
-                file_idx += 1
-            else:
-                # This assumes the epoch length did not change from when the
-                # data was logged to now.
-                range_end = epoch_end
-                range_start = epoch_start
-                break
-
-        # Retrieve the contents of each overlapping file.
-        while file_idx < len(sorted_files):
-            file_obj = sorted_files[file_idx]
-            file_key = file_obj["Key"]
-            file_stem = file_key.split("/")[-1]
-
-            epoch_start = extract_epoch_start(file_stem)
-            epoch_end = epoch_start + epoch_length
-            if not intervals_intersect(
-                epoch_start, epoch_end, window_start, window_end
-            ):
-                break
-
-            logger.debug("Processing log at epoch start: %s", epoch_start)
-
-            response = s3.get_object(Bucket=config.s3_logs_bucket, Key=file_key)
-            content = response["Body"].read().decode("utf-8")
-
-            if "analytical" in file_key:
-                for line in content.strip().split("\n"):
+            if "analytical" in log_file.file_key:
+                for line in log_file.contents.strip().split("\n"):
                     matches = re.findall(r"Query: (.+?) Engine:", line)
                     if len(matches) == 0:
                         continue
                     q = matches[0]
                     analytical_queries.append(q.strip())
+                is_valid = True
 
-            elif "transactional" in file_key:
-                prob = re.findall(r"_p(\d+)\.log$", file_key)[0]
+            elif "transactional" in log_file.file_key:
+                prob = re.findall(r"_p(\d+)\.log$", log_file.file_key)[0]
                 prob = float(prob) / 100.0
                 if (prob / 100.0) < sampling_prob:
                     sampling_prob = prob
-                for line in content.strip().split("\n"):
+                for line in log_file.contents.strip().split("\n"):
                     matches = re.findall(r"Query: (.+) Engine:", line)
                     if len(matches) == 0:
                         continue
                     q = matches[0]
                     txn_queries.append(q.strip())
+                is_valid = True
 
-            range_start = epoch_start
-            file_idx += 1
+            # Adjust the processed range of data.
+            if is_valid:
+                if range_start is None:
+                    range_start = log_file.epoch_start
+                else:
+                    range_start = min(range_start, log_file.epoch_start)
+
+                if range_end is None:
+                    range_end = log_file.epoch_start + epoch_length
+                else:
+                    range_end = max(range_end, log_file.epoch_start + epoch_length)
 
         # Sanity checks.
-        if range_end is None:
-            assert range_start is None
+        if range_start is None or range_end is None:
             # No queries match.
             self._period = timedelta(seconds=0)
             return self
-
-        # If `range_end` is defined, we must have executed the second loop at
-        # least once.
-        assert range_start is not None
 
         self._transactional_queries.extend(txn_queries)
         self._analytical_queries.extend(analytical_queries)

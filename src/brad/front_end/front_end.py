@@ -27,7 +27,6 @@ from brad.daemon.messages import (
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.front_end.brad_interface import BradInterface
-from brad.front_end.epoch_file_handler import EpochFileHandler
 from brad.front_end.errors import QueryError
 from brad.front_end.grpc import BradGrpc
 from brad.front_end.session import SessionManager, SessionId
@@ -42,6 +41,7 @@ from brad.row_list import RowList
 from brad.utils.counter import Counter
 from brad.utils.json_decimal_encoder import DecimalEncoder
 from brad.utils.mailbox import Mailbox
+from brad.workload_logging.epoch_file_handler import EpochFileHandler
 
 logger = logging.getLogger(__name__)
 
