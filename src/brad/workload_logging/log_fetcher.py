@@ -69,15 +69,18 @@ class LogFetcher:
     def _s3_list_objects_raw(
         self, prefix: str, continuation_token: Optional[str]
     ) -> "_ObjectList":
-        response = self._s3.list_objects_v2(
-            Bucket=self._config.s3_logs_bucket,
-            Prefix=self._config.s3_logs_path + prefix,
-            ContinuationToken=continuation_token,
-        )
+        kwargs = {
+            "Bucket": self._config.s3_logs_bucket,
+            "Prefix": self._config.s3_logs_path + prefix,
+        }
+        if continuation_token is not None:
+            kwargs["ContinuationToken"] = continuation_token
+        response = self._s3.list_objects_v2(**kwargs)
+        is_truncated = response["IsTruncated"]
         return _ObjectList(
             list(map(lambda f: f["Key"], response["Contents"])),
-            response["IsTruncated"],
-            response["NextContinuationToken"],
+            is_truncated,
+            response["NextContinuationToken"] if is_truncated else None,
         )
 
     def _timestamp_to_prefix(self, timestamp: datetime) -> str:
@@ -87,7 +90,7 @@ class LogFetcher:
     def _extract_epoch_start(self, file_s3_key: str) -> datetime:
         file_stem = file_s3_key.split("/")[-1]
         return datetime.strptime(
-            " ".join(file_stem.split("_")[:2]), TIMESTAMP_PREFIX_FORMAT
+            "_".join(file_stem.split("_")[:2]), TIMESTAMP_PREFIX_FORMAT
         ).replace(tzinfo=pytz.utc)
 
 
