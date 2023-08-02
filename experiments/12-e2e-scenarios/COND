@@ -5,7 +5,7 @@ run_experiment(
     "a-clients": 1,
     "t-clients": 1,
     "query-indexes": "81,108,133",
-    "num-front-ends": 2,
+    "num-front-ends": 8,
     "a-gap-s": 30,
     "a-gap-std-s": 5,
     "run-for-s": 60 * 6,
@@ -20,7 +20,7 @@ run_experiment(
     "t-clients-lo": 1,
     "t-clients-hi": 8,
     "query-indexes": "81,108,133",
-    "num-front-ends": 2,
+    "num-front-ends": 8,
     "a-gap-s": 30,
     "a-gap-std-s": 5,
     "run-for-s": 60 * 3,  # For each configuration.

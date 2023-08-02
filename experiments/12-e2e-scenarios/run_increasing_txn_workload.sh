@@ -47,7 +47,7 @@ trap "cancel_experiment" INT
 trap "cancel_experiment" TERM
 
 start_brad
-sleep 60
+sleep 120
 
 # Warm up.
 python3 ana_runner.py \
