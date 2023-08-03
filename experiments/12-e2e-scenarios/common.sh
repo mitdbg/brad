@@ -1,6 +1,6 @@
 function start_brad() {
   pushd ../../
-  brad daemon \
+  BRAD_PERSIST_BLUEPRINT=1 brad daemon \
     --config-file config/config_cond.yml \
     --schema-name imdb_extended \
     --planner-config-file config/planner.yml \
