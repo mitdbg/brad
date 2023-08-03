@@ -146,7 +146,7 @@ class MetricsFromMonitor(MetricsProvider):
 _AURORA_METRICS = [
     "os.cpuUtilization.total.avg",
     "os.loadAverageMinute.one.avg",
-    "BufferCacheHitRate_Average",
+    "BufferCacheHitRatio_Average",
 ]
 
 _REDSHIFT_METRICS = [
