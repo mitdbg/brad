@@ -24,6 +24,7 @@ from brad.planner.neighborhood.sampled_neighborhood import (
     SampledNeighborhoodSearchPlanner,
 )
 from brad.planner.strategy import PlanningStrategy
+from brad.planner.workload import Workload
 from brad.provisioning.directory import Directory
 from brad.routing.rule_based import RuleBased
 from brad.front_end.engine_connections import EngineConnections
@@ -87,7 +88,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         # the daemon process.
         logger.info("Running a replan.")
         self._log_current_metrics()
-        next_workload = self._workload_provider.next_workload(
+        current_workload, next_workload = self._workload_provider.get_workloads(
             datetime.now().astimezone(pytz.utc), window_multiplier
         )
         workload_filters = [
@@ -112,11 +113,11 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
 
             # Update the dataset size. We must use the current blueprint because it
             # contains information about where the tables are now.
-            if self._current_workload.table_sizes_empty():
-                self._current_workload.populate_table_sizes_using_blueprint(
+            if current_workload.table_sizes_empty():
+                current_workload.populate_table_sizes_using_blueprint(
                     self._current_blueprint, table_sizer
                 )
-                self._current_workload.set_dataset_size_from_table_sizes()
+                current_workload.set_dataset_size_from_table_sizes()
 
             if next_workload.table_sizes_empty():
                 next_workload.populate_table_sizes_using_blueprint(
@@ -125,12 +126,14 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 next_workload.set_dataset_size_from_table_sizes()
 
             # Determine the amount of data accessed by the existing workload.
-            data_accessed_mb = self._estimate_current_data_accessed(engines)
+            data_accessed_mb = self._estimate_current_data_accessed(
+                engines, current_workload
+            )
 
             # Used for all scoring.
             scoring_ctx = ScoringContext(
                 self._current_blueprint,
-                self._current_workload,
+                current_workload,
                 next_workload,
                 engines,
                 metrics,
@@ -170,7 +173,6 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
 
             selected_blueprint = self._impl.on_enumeration_complete(scoring_ctx)
             self._current_blueprint = selected_blueprint
-            self._current_workload = next_workload
             await self._notify_new_blueprint(selected_blueprint)
 
         finally:
@@ -182,7 +184,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         return False
 
     def _estimate_current_data_accessed(
-        self, engines: EngineConnections
+        self, engines: EngineConnections, current_workload: Workload
     ) -> Dict[Engine, int]:
         current_router = RuleBased(blueprint=self._current_blueprint)
 
@@ -193,7 +195,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
 
         # Compute the total amount of data accessed on each engine in the
         # current workload (used to weigh the workload assigned to each engine).
-        for q in self._current_workload.analytical_queries():
+        for q in current_workload.analytical_queries():
             current_engine = current_router.engine_for_sync(q)
             q.populate_data_accessed_mb(
                 current_engine, engines, self._current_blueprint

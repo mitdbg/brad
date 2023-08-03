@@ -44,13 +44,13 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         # 1. Fetch metrics and the next workload and then apply predictions.
         metrics, metrics_timestamp = self._metrics_provider.get_metrics()
-        next_workload = self._workload_provider.next_workload(
+        current_workload, next_workload = self._workload_provider.get_workloads(
             metrics_timestamp, window_multiplier, desired_period=timedelta(hours=1)
         )
         self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
-        self._analytics_latency_scorer.apply_predicted_latencies(self._current_workload)
+        self._analytics_latency_scorer.apply_predicted_latencies(current_workload)
         self._data_access_provider.apply_access_statistics(next_workload)
-        self._data_access_provider.apply_access_statistics(self._current_workload)
+        self._data_access_provider.apply_access_statistics(current_workload)
 
         # 2. Cluster queries by tables and sort by gains (sum).
         clusters = self._preprocess_workload_queries(next_workload)
@@ -71,7 +71,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         ctx = ScoringContext(
             self._schema_name,
             self._current_blueprint,
-            self._current_workload,
+            current_workload,
             next_workload,
             metrics,
             self._planner_config,
@@ -287,7 +287,6 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         # 8. Output the new blueprint.
         best_blueprint = best_candidate.to_blueprint()
         self._current_blueprint = best_blueprint
-        self._current_workload = next_workload
 
         logger.info("Selected blueprint:")
         logger.info("%s", best_blueprint)

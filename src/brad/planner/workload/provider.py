@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 from datetime import datetime, timedelta
 
 from brad.blueprint_manager import BlueprintManager
@@ -15,18 +15,18 @@ logger = logging.getLogger(__name__)
 
 class WorkloadProvider:
     """
-    An abstract interface over a component that can provide the next workload
-    (for blueprint planning purposes).
+    An abstract interface over a component that provides the current and next
+    workload (for blueprint planning purposes).
     """
 
-    def next_workload(
+    def get_workloads(
         self,
         window_end: datetime,
         window_multiplier: int = 1,
         desired_period: Optional[timedelta] = None,
-    ) -> Workload:
+    ) -> Tuple[Workload, Workload]:
         """
-        Retrieve the next workload.
+        Retrieves the current and next workload.
 
         Use `window_end` to specify the endpoint of the workload "look behind"
         window. We use this to (i) prevent trying to read query logs that have not
@@ -36,6 +36,8 @@ class WorkloadProvider:
         Use `window_multiplier` to expand the window used for extracting the
         workload from the query logs.
         """
+        # TODO: Might be a good idea to differentiate the "current" workload
+        # provider from the "next" workload provider.
         raise NotImplementedError
 
 
@@ -45,15 +47,16 @@ class FixedWorkloadProvider(WorkloadProvider):
     """
 
     def __init__(self, workload: Workload) -> None:
-        self._workload = workload
+        self._workload_curr = workload
+        self._workload_next = workload.clone()
 
-    def next_workload(
+    def get_workloads(
         self,
         window_end: datetime,
         window_multiplier: int = 1,
         desired_period: Optional[timedelta] = None,
-    ) -> Workload:
-        return self._workload
+    ) -> Tuple[Workload, Workload]:
+        return self._workload_curr, self._workload_next
 
 
 class LoggedWorkloadProvider(WorkloadProvider):
@@ -74,12 +77,12 @@ class LoggedWorkloadProvider(WorkloadProvider):
         self._blueprint_mgr = blueprint_mgr
         self._schema_name = schema_name
 
-    def next_workload(
+    def get_workloads(
         self,
         window_end: datetime,
         window_multiplier: int = 1,
         desired_period: Optional[timedelta] = None,
-    ) -> Workload:
+    ) -> Tuple[Workload, Workload]:
         window_length = self._planner_config.planning_window() * window_multiplier
         window_start = window_end - window_length
         logger.debug(
@@ -109,6 +112,6 @@ class LoggedWorkloadProvider(WorkloadProvider):
                 len(workload.transactional_queries()),
                 workload.period(),
             )
-            return workload
+            return workload, workload.clone()
         finally:
             ec.close_sync()

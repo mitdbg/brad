@@ -10,7 +10,6 @@ from brad.planner.estimator import EstimatorProvider
 from brad.planner.metrics import MetricsProvider
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
-from brad.planner.workload import Workload
 from brad.planner.workload.provider import WorkloadProvider
 
 NewBlueprintCallback = Callable[[Blueprint], Coroutine[None, None, None]]
@@ -27,7 +26,6 @@ class BlueprintPlanner:
         self,
         planner_config: PlannerConfig,
         current_blueprint: Blueprint,
-        current_workload: Workload,
         monitor: Monitor,
         config: ConfigFile,
         schema_name: str,
@@ -40,7 +38,6 @@ class BlueprintPlanner:
     ) -> None:
         self._planner_config = planner_config
         self._current_blueprint = current_blueprint
-        self._current_workload = current_workload
         self._monitor = monitor
         self._config = config
         self._schema_name = schema_name

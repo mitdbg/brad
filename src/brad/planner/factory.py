@@ -12,7 +12,6 @@ from brad.planner.metrics import MetricsProvider
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 from brad.planner.strategy import PlanningStrategy
-from brad.planner.workload import Workload
 from brad.planner.workload.provider import WorkloadProvider
 
 
@@ -21,7 +20,6 @@ class BlueprintPlannerFactory:
     def create(
         planner_config: PlannerConfig,
         current_blueprint: Blueprint,
-        current_workload: Workload,
         monitor: Monitor,
         config: ConfigFile,
         schema_name: str,
@@ -39,7 +37,6 @@ class BlueprintPlannerFactory:
         ):
             return NeighborhoodSearchPlanner(
                 current_blueprint=current_blueprint,
-                current_workload=current_workload,
                 planner_config=planner_config,
                 monitor=monitor,
                 config=config,
@@ -55,7 +52,6 @@ class BlueprintPlannerFactory:
         elif strategy == PlanningStrategy.QueryBasedBeam:
             return QueryBasedBeamPlanner(
                 current_blueprint=current_blueprint,
-                current_workload=current_workload,
                 planner_config=planner_config,
                 monitor=monitor,
                 config=config,
@@ -71,7 +67,6 @@ class BlueprintPlannerFactory:
         elif strategy == PlanningStrategy.TableBasedBeam:
             return TableBasedBeamPlanner(
                 current_blueprint=current_blueprint,
-                current_workload=current_workload,
                 planner_config=planner_config,
                 monitor=monitor,
                 config=config,

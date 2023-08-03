@@ -17,6 +17,8 @@ class Query(QueryRep):
     """
     A `QueryRep` that is decorated with additional statistics that are used for
     blueprint planning.
+
+    Objects of this class are logically immutable.
     """
 
     def __init__(self, sql_query: str, arrival_count: int = 1):
@@ -94,6 +96,3 @@ class Query(QueryRep):
 
         # MB, so we divide by 1000 twice.
         self._data_accessed_mb[for_engine] = total_storage_bytes // 1000 // 1000
-
-    def clear_stats(self) -> None:
-        self._data_accessed_mb.clear()

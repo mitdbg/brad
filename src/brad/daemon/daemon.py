@@ -155,9 +155,6 @@ class BradDaemon:
         self._planner = BlueprintPlannerFactory.create(
             planner_config=self._planner_config,
             current_blueprint=self._blueprint_mgr.get_blueprint(),
-            # TODO: Maybe we should seed the initial workload with the last
-            # workload, if it exists.
-            current_workload=Workload.empty(),
             monitor=self._monitor,
             config=self._config,
             schema_name=self._schema_name,
