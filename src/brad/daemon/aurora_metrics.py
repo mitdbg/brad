@@ -1,6 +1,8 @@
 import asyncio
 import pandas as pd
 import json
+import pytz
+from datetime import timedelta, datetime
 from typing import List, Optional, Tuple
 from importlib.resources import files, as_file
 
@@ -13,9 +15,12 @@ from .perf_insights import PerfInsightsClient
 from brad.blueprint_manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
+from brad.utils.time_periods import impute_old_missing_metrics
 
 
 class AuroraMetrics(MetricsSourceWithForecasting):
+    METRICS_DELAY = timedelta(minutes=1)
+
     def __init__(
         self,
         config: ConfigFile,
@@ -78,9 +83,20 @@ class AuroraMetrics(MetricsSourceWithForecasting):
             right_index=True,
             how="inner",
         )
+
+        # See the comment in `redshift_metrics.py`.
+        now = datetime.now().astimezone(pytz.utc)
+        cutoff_ts = now - self.METRICS_DELAY
+        new_metrics = impute_old_missing_metrics(new_metrics, cutoff_ts, value=0.0)
         new_metrics = new_metrics.dropna()
+
         self._values = self._get_updated_metrics(new_metrics)
         await super().fetch_latest()
+
+    def real_time_delay(self) -> int:
+        # The cache hit rate from CloudWatch can be delayed up to 1 minute.
+        num_epochs = self.METRICS_DELAY / self._epoch_length
+        return int(num_epochs)  # Want to floor this number.
 
     def _metrics_values(self) -> pd.DataFrame:
         return self._values
