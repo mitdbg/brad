@@ -41,15 +41,20 @@ for val in "${orig_args[@]}"; do
   if [[ $phys_arg =~ --run-for-s=.+ ]]; then
     run_for_s=${phys_arg:12}
   fi
+
+  if [[ $phys_arg =~ --config-file=.+ ]]; then
+    config_file=${phys_arg:14}
+  fi
 done
 
 trap "cancel_experiment" INT
 trap "cancel_experiment" TERM
 
-start_brad
+start_brad $config_file
 sleep 30
 
 # Warm up.
+log_workload_point "warmup"
 python3 ana_runner.py \
   --num-clients $a_clients \
   --avg-gap-s $a_gap_s \
@@ -59,6 +64,7 @@ python3 ana_runner.py \
   --run-warmup
 
 # Start the analytical runner.
+log_workload_point "ana_${a_clients}"
 python3 ana_runner.py \
   --num-clients $a_clients \
   --avg-gap-s $a_gap_s \
@@ -75,6 +81,7 @@ function run_t_workload() {
   results_dir=$COND_OUT/t_${t_clients}
   mkdir $results_dir
 
+  log_workload_point "txn_${t_clients}"
   COND_OUT=$results_dir python3 ../../workloads/IMDB_extended/run_transactions.py \
     --num-clients $t_clients \
     --num-front-ends $num_front_ends \
@@ -92,7 +99,9 @@ function run_t_workload() {
   fi
 }
 
-run_t_workload 1
+if [ $t_clients_lo = 1 ]; then
+  run_t_workload 1
+fi
 
 # Run with an increasing number of transactional clients.
 # Start from 2 clients and always add 2 (to keep an even number of clients).
@@ -105,6 +114,7 @@ done
 sleep 180
 
 # Run the planner and wait for it to complete.
+log_workload_point "invoke_planner"
 brad cli --command "BRAD_RUN_PLANNER;"
 
 # Shut down everything now.

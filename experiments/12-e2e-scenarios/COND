@@ -9,20 +9,38 @@ run_experiment(
     "a-gap-s": 30,
     "a-gap-std-s": 5,
     "run-for-s": 60 * 6,
+    "config-file": "config/config_cond.yml",
   },
 )
 
 run_experiment(
-  name="increase_txns",
+  name="increase_txns_1",
   run="./run_increasing_txn_workload.sh",
   options={
     "a-clients": 1,
     "t-clients-lo": 1,
+    "t-clients-hi": 4,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
+    "a-gap-s": 30,
+    "a-gap-std-s": 5,
+    "run-for-s": 60 * 3,  # For each configuration.
+    "config-file": "config/config_cond.yml",
+  },
+)
+
+run_experiment(
+  name="increase_txns_2",
+  run="./run_increasing_txn_workload.sh",
+  options={
+    "a-clients": 1,
+    "t-clients-lo": 4,
     "t-clients-hi": 8,
     "query-indexes": "81,108,133",
     "num-front-ends": 8,
     "a-gap-s": 30,
     "a-gap-std-s": 5,
     "run-for-s": 60 * 3,  # For each configuration.
+    "config-file": "config/config_cond.yml",
   },
 )
