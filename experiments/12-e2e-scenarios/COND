@@ -9,6 +9,7 @@ run_experiment(
     "a-gap-s": 30,
     "a-gap-std-s": 5,
     "run-for-s": 60 * 6,
+    "config-file": "config/config_cond.yml",
   },
 )
 
@@ -24,5 +25,6 @@ run_experiment(
     "a-gap-s": 30,
     "a-gap-std-s": 5,
     "run-for-s": 60 * 3,  # For each configuration.
+    "config-file": "config/config_cond.yml",
   },
 )
