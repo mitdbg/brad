@@ -2,6 +2,7 @@ import asyncio
 import logging
 import queue
 import pytz
+import os
 import multiprocessing as mp
 from typing import Optional, List
 from datetime import datetime
@@ -45,6 +46,9 @@ from brad.row_list import RowList
 from brad.utils.time_periods import period_start
 
 logger = logging.getLogger(__name__)
+
+# Temporarily used.
+PERSIST_BLUEPRINT_VAR = "BRAD_PERSIST_BLUEPRINT"
 
 
 class BradDaemon:
@@ -276,6 +280,13 @@ class BradDaemon:
         # TODO: Need to persist the blueprint and notify the front ends to
         # transition.
         logger.info("Planner selected new blueprint: %s", blueprint)
+
+        if PERSIST_BLUEPRINT_VAR in os.environ:
+            logger.info(
+                "Persisting the new blueprint. Restart BRAD to load the new blueprint."
+            )
+            self._blueprint_mgr.set_blueprint(blueprint)
+            await self._blueprint_mgr.persist()
 
     async def _run_sync_periodically(self) -> None:
         while True:

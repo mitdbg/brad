@@ -41,6 +41,16 @@ class BlueprintManager:
         self._blueprint = deserialize_blueprint(serialized)
         asyncio.run(self._directory.refresh())
 
+    async def persist(self) -> None:
+        """
+        Persists the current blueprint to S3.
+        """
+        assert self._blueprint is not None
+        serialized = serialize_blueprint(self._blueprint)
+        await self._assets.persist(
+            _METADATA_KEY_TEMPLATE.format(self._schema_name), serialized
+        )
+
     def persist_sync(self) -> None:
         """
         Persists the current blueprint to S3.

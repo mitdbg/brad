@@ -68,5 +68,10 @@
         "avg",
         "min",
         "max"
+    ],
+    "db.SQL.logical_reads": [
+        "avg",
+        "min",
+        "max"
     ]
 }
