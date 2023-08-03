@@ -120,8 +120,7 @@ class Monitor:
             [
                 "os.cpuUtilization.total.avg",
                 "os.loadAverageMinute.one.avg",
-                "db.IO.blks_read.avg",
-                "db.Cache.blks_hit.avg",
+                "BufferCacheHitRatio_Average",
             ],
         )
         logger.debug("Aurora metrics:\n%s", aurora)

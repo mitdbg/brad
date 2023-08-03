@@ -17,23 +17,40 @@ class CloudWatchClient:
     def __init__(
         self,
         engine: Engine,
-        cluster_identifier: str,
+        cluster_identifier: Optional[str],
+        instance_identifier: Optional[str],
         config: Optional[ConfigFile] = None,
     ) -> None:
         self._engine = engine
         self._dimensions = []
 
+        assert (
+            cluster_identifier is not None or instance_identifier is not None
+        ), "Must provide a cluster or instance identifier."
+
         if self._engine == Engine.Aurora:
             self._namespace = "AWS/RDS"
-            self._dimensions.append(
-                {
-                    "Name": "DBClusterIdentifier",
-                    "Value": cluster_identifier,
-                }
-            )
+            if cluster_identifier is not None:
+                self._dimensions.append(
+                    {
+                        "Name": "DBClusterIdentifier",
+                        "Value": cluster_identifier,
+                    }
+                )
+            else:
+                assert instance_identifier is not None
+                self._dimensions.append(
+                    {
+                        "Name": "DBInstanceIdentifier",
+                        "Value": instance_identifier,
+                    }
+                )
         elif self._engine == Engine.Athena:
             self._namespace = "AWS/Athena"
         elif self._engine == Engine.Redshift:
+            assert (
+                cluster_identifier is not None
+            ), "Must provide cluster ID for Redshift."
             self._namespace = "AWS/Redshift"
             self._dimensions.append(
                 {

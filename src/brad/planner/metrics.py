@@ -129,15 +129,13 @@ class MetricsFromMonitor(MetricsProvider):
                 load_minute,
             )
 
-        blks_read = aurora_rel[_AURORA_METRICS[2]].iloc[-1]
-        blks_hit = aurora_rel[_AURORA_METRICS[3]].iloc[-1]
-        hit_rate = blks_hit / (blks_read + blks_hit)
+        hit_rate_pct = aurora_rel[_AURORA_METRICS[2]].iloc[-1]
 
         return (
             Metrics(
                 redshift_cpu,
                 aurora_cpu,
-                buffer_hit_pct_avg=hit_rate * 100,
+                buffer_hit_pct_avg=hit_rate_pct,
                 aurora_load_minute_avg=load_minute,
                 txn_completions_per_s=txn_per_s,
             ),
@@ -148,8 +146,7 @@ class MetricsFromMonitor(MetricsProvider):
 _AURORA_METRICS = [
     "os.cpuUtilization.total.avg",
     "os.loadAverageMinute.one.avg",
-    "db.IO.blks_read.avg",
-    "db.Cache.blks_hit.avg",
+    "BufferCacheHitRatio_Average",
 ]
 
 _REDSHIFT_METRICS = [
