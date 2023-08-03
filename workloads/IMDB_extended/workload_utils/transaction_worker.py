@@ -2,7 +2,7 @@ import random
 import logging
 from datetime import datetime, timedelta
 
-from brad.grpc_client import RowList
+from brad.grpc_client import RowList, BradClientError
 from .database import Database
 
 logger = logging.getLogger(__name__)
@@ -195,6 +195,10 @@ class TransactionWorker:
             # 6. Commit changes.
             db.commit_sync()
             return True
+
+        except BradClientError:
+            db.rollback_sync()
+            return False
 
         except:
             logger.exception("Need to rollback.")

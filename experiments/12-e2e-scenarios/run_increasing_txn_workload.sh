@@ -101,11 +101,13 @@ function run_t_workload() {
 
 if [ $t_clients_lo = 1 ]; then
   run_t_workload 1
+  start_val=2
+else
+  start_val=$t_clients_lo
 fi
 
 # Run with an increasing number of transactional clients.
-# Start from 2 clients and always add 2 (to keep an even number of clients).
-for t_clients in $(seq 2 2 $t_clients_hi); do
+for t_clients in $(seq $start_val 2 $t_clients_hi); do
   run_t_workload $t_clients
 done
 
