@@ -5,7 +5,7 @@ from .estimator import Estimator
 
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
-from brad.config.strings import base_table_name_from_source
+from brad.config.strings import base_table_name_from_source, source_table_name
 from brad.connection.connection import Connection
 from brad.connection.cursor import Cursor
 from brad.connection.factory import ConnectionFactory
@@ -60,18 +60,13 @@ class PostgresEstimator(Estimator):
         await self._connection.close()
 
     async def _get_table_sizes(self) -> Dict[str, int]:
-        assert self._blueprint is not None
-        table_counts = {}
+        # Try using PostgreSQL stats directly (faster).
+        table_counts = await self._get_table_sizes_stats()
+        if table_counts is not None:
+            return table_counts
 
-        for table in self._blueprint.tables():
-            query = f"SELECT COUNT(*) FROM {table.name}"
-            logger.debug("PostgresEstimator running: %s", query)
-            await self._cursor.execute(query)
-            row = await self._cursor.fetchone()
-            assert row is not None
-            table_counts[table.name] = int(row[0])
-
-        return table_counts
+        # Fallback to direct stats.
+        return await self._get_table_sizes_direct()
 
     def _extract_access_infos(self, plan_lines: List[str]) -> List[AccessInfo]:
         parsed_plan = parse_explain_verbose(plan_lines)
@@ -97,3 +92,44 @@ class PostgresEstimator(Estimator):
             )
 
         return access_infos
+
+    async def _get_table_sizes_stats(self) -> Optional[Dict[str, int]]:
+        assert self._blueprint is not None
+
+        # Fetch stats from PostgreSQL directly.
+        raw_table_counts = {}
+        query = "SELECT relname, n_live_tup FROM pg_stat_user_tables"
+        await self._cursor.execute(query)
+        results = await self._cursor.fetchall()
+        for row in results:
+            raw_table_name = row[0]
+            row_count = row[1]
+            raw_table_counts[raw_table_name] = row_count
+
+        table_counts = {}
+        for table in self._blueprint.tables():
+            source_name = source_table_name(table)
+            if source_name not in raw_table_counts:
+                logger.debug("Missing tables when trying to use PostgreSQL stats.")
+                return None
+            table_counts[table.name] = raw_table_counts[source_name]
+
+        if all(map(lambda v: v == 0, table_counts.values())):
+            logger.debug("Table stats are all zero.")
+            return None
+
+        return table_counts
+
+    async def _get_table_sizes_direct(self) -> Dict[str, int]:
+        assert self._blueprint is not None
+        table_counts = {}
+
+        for table in self._blueprint.tables():
+            query = f"SELECT COUNT(*) FROM {table.name}"
+            logger.debug("PostgresEstimator running: %s", query)
+            await self._cursor.execute(query)
+            row = await self._cursor.fetchone()
+            assert row is not None
+            table_counts[table.name] = int(row[0])
+
+        return table_counts
