@@ -32,7 +32,10 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
             columns=CloudWatchClient.metric_names(self._metric_defs)
         )
         self._cw_client = CloudWatchClient(
-            Engine.Redshift, self._config.redshift_cluster_id, self._config
+            Engine.Redshift,
+            self._config.redshift_cluster_id,
+            instance_identifier=None,
+            config=self._config,
         )
         self._logger = MetricsLogger.create_from_config(
             self._config, "brad_metrics_redshift.log"

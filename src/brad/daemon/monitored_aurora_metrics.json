@@ -1,77 +1,86 @@
 {
-    "os.cpuUtilization.total": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "os.loadAverageMinute.one": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "os.loadAverageMinute.five": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "os.loadAverageMinute.fifteen": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "os.network.rx": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "os.network.tx": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "os.diskIO.auroraStorage.readThroughput": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "os.diskIO.auroraStorage.writeThroughput": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "os.diskIO.auroraStorage.readLatency": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "os.diskIO.auroraStorage.writeLatency": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "os.diskIO.auroraStorage.readIOsPS": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "os.diskIO.auroraStorage.writeIOsPS": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "db.IO.blks_read": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "db.Cache.blks_hit": [
-        "avg",
-        "min",
-        "max"
-    ],
-    "db.SQL.logical_reads": [
-        "avg",
-        "min",
-        "max"
-    ]
+    "perf_insights": {
+        "os.cpuUtilization.total": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "os.loadAverageMinute.one": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "os.loadAverageMinute.five": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "os.loadAverageMinute.fifteen": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "os.network.rx": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "os.network.tx": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "os.diskIO.auroraStorage.readThroughput": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "os.diskIO.auroraStorage.writeThroughput": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "os.diskIO.auroraStorage.readLatency": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "os.diskIO.auroraStorage.writeLatency": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "os.diskIO.auroraStorage.readIOsPS": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "os.diskIO.auroraStorage.writeIOsPS": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "db.IO.blks_read": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "db.Cache.blks_hit": [
+            "avg",
+            "min",
+            "max"
+        ],
+        "db.SQL.logical_reads": [
+            "avg",
+            "min",
+            "max"
+        ]
+    },
+    "cloudwatch": {
+        "BufferCacheHitRatio": [
+            "Average",
+            "Minimum",
+            "Maximum"
+        ]
+    }
 }
