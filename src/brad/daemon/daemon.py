@@ -24,7 +24,6 @@ from brad.daemon.monitor import Monitor
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
-from brad.front_end.engine_connections import EngineConnections
 from brad.front_end.start_front_end import start_front_end
 from brad.planner.abstract import BlueprintPlanner
 from brad.planner.compare.cost import best_cost_under_p99_latency
@@ -44,7 +43,6 @@ from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import LoggedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
 from brad.row_list import RowList
-from brad.utils.table_sizer import TableSizer
 from brad.utils.time_periods import period_start
 
 logger = logging.getLogger(__name__)
@@ -154,11 +152,9 @@ class BradDaemon:
             data_access_provider = _NoopDataAccessProvider()
             comparator = best_cost_under_p99_latency(max_latency_ceiling_s=10)
 
-        initial_workload = self._seed_initial_workload()
         self._planner = BlueprintPlannerFactory.create(
             planner_config=self._planner_config,
             current_blueprint=self._blueprint_mgr.get_blueprint(),
-            current_workload=initial_workload,
             monitor=self._monitor,
             config=self._config,
             schema_name=self._schema_name,
@@ -390,27 +386,6 @@ class BradDaemon:
         else:
             logger.warning("Received unknown internal command: %s", command)
             return []
-
-    def _seed_initial_workload(self) -> Workload:
-        logger.info("Seeding the initial workload...")
-        ec = EngineConnections.connect_sync(
-            self._config, self._blueprint_mgr.get_directory(), self._schema_name
-        )
-        try:
-            table_sizer = TableSizer(ec, self._config)
-
-            builder = WorkloadBuilder()
-            # TODO: These calls should be async. But since we run them on the
-            # daemon, it's probably fine.
-            # TODO: If needed, we should load the last few logged queries too.
-            builder.table_sizes_from_engines(
-                self._blueprint_mgr.get_blueprint(), table_sizer
-            )
-            workload = builder.build()
-            logger.info("Done seeding the initial workload.")
-            return workload
-        finally:
-            ec.close_sync()
 
 
 class _NoopAnalyticsScorer(AnalyticsLatencyScorer):

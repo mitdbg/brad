@@ -223,7 +223,6 @@ def run_planner(args) -> None:
 
     planner = BlueprintPlannerFactory.create(
         current_blueprint=blueprint_mgr.get_blueprint(),
-        current_workload=workload,
         planner_config=planner_config,
         monitor=monitor,
         config=config,
