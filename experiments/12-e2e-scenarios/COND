@@ -14,6 +14,22 @@ run_experiment(
 )
 
 run_experiment(
+  name="baseline-light_start",
+  run="./run_steady_workload_then_replan.sh",
+  options={
+    "a-clients": 1,
+    "t-clients": 1,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
+    "a-gap-s": 30,
+    "a-gap-std-s": 5,
+    "run-for-s": 60 * 6,
+    "config-file": "config/config_cond_baseline.yml",
+    "skip-replan": 1,
+  },
+)
+
+run_experiment(
   name="increase_txns_1",
   run="./run_increasing_txn_workload.sh",
   options={
@@ -30,6 +46,23 @@ run_experiment(
 )
 
 run_experiment(
+  name="baseline-increase_txns_1",
+  run="./run_increasing_txn_workload.sh",
+  options={
+    "a-clients": 1,
+    "t-clients-lo": 1,
+    "t-clients-hi": 4,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
+    "a-gap-s": 30,
+    "a-gap-std-s": 5,
+    "run-for-s": 60 * 3,  # For each configuration.
+    "config-file": "config/config_cond_baseline.yml",
+    "skip-replan": 1,
+  },
+)
+
+run_experiment(
   name="increase_txns_2",
   run="./run_increasing_txn_workload.sh",
   options={
@@ -40,7 +73,24 @@ run_experiment(
     "num-front-ends": 8,
     "a-gap-s": 30,
     "a-gap-std-s": 5,
-    "run-for-s": 60 * 3,  # For each configuration.
+    "run-for-s": 60 * 2,  # For each configuration.
     "config-file": "config/config_cond.yml",
+  },
+)
+
+run_experiment(
+  name="baseline-increase_txns_2",
+  run="./run_increasing_txn_workload.sh",
+  options={
+    "a-clients": 1,
+    "t-clients-lo": 4,
+    "t-clients-hi": 8,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
+    "a-gap-s": 30,
+    "a-gap-std-s": 5,
+    "run-for-s": 60 * 2,  # For each configuration.
+    "config-file": "config/config_cond_baseline.yml",
+    "skip-replan": 1,
   },
 )

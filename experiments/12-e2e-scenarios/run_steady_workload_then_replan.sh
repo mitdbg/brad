@@ -41,6 +41,10 @@ for val in "${orig_args[@]}"; do
   if [[ $phys_arg =~ --config-file=.+ ]]; then
     config_file=${phys_arg:14}
   fi
+
+  if [[ $phys_arg =~ --skip-replan=.+ ]]; then
+    skip_replan=${phys_arg:14}
+  fi
 done
 
 trap "cancel_experiment" INT
@@ -76,11 +80,13 @@ python3 ana_runner.py \
   &
 ana_pid=$!
 
-sleep $run_for_s
+if [ -z $skip_replan ]; then
+  sleep $run_for_s
 
-# Invoke the planner and wait for it to complete.
-log_workload_point "invoke_planner"
-brad cli --command "BRAD_RUN_PLANNER;"
+  # Invoke the planner and wait for it to complete.
+  log_workload_point "invoke_planner"
+  brad cli --command "BRAD_RUN_PLANNER;"
+fi
 
 # Send SIGINT to the runner processes.
 kill -INT $txn_pid

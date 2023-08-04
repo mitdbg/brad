@@ -45,6 +45,10 @@ for val in "${orig_args[@]}"; do
   if [[ $phys_arg =~ --config-file=.+ ]]; then
     config_file=${phys_arg:14}
   fi
+
+  if [[ $phys_arg =~ --skip-replan=.+ ]]; then
+    skip_replan=${phys_arg:14}
+  fi
 done
 
 trap "cancel_experiment" INT
@@ -111,13 +115,15 @@ for t_clients in $(seq $start_val 2 $t_clients_hi); do
   run_t_workload $t_clients
 done
 
-# Need to sleep an extra 3 minutes before starting the planner to ensure the
-# metrics catch up.
-sleep 180
+if [ -z $skip_replan ]; then
+  # Need to sleep an extra 3 minutes before starting the planner to ensure the
+  # metrics catch up.
+  sleep 180
 
-# Run the planner and wait for it to complete.
-log_workload_point "invoke_planner"
-brad cli --command "BRAD_RUN_PLANNER;"
+  # Run the planner and wait for it to complete.
+  log_workload_point "invoke_planner"
+  brad cli --command "BRAD_RUN_PLANNER;"
+fi
 
 # Shut down everything now.
 >&2 echo "Scenario done. Shutting down runners..."
