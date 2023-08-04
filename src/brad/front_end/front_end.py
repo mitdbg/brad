@@ -146,6 +146,9 @@ class BradFrontEnd(BradInterface):
         # Used to close a logging epoch when needed.
         self._qlogger_refresh_task: Optional[asyncio.Task[None]] = None
 
+        self._txn_breakdown = open("txn_breakdown.csv", "w")
+        print("section,run_time_s", file=self._txn_breakdown)
+
     async def serve_forever(self):
         await self._run_setup()
         try:
@@ -250,6 +253,7 @@ class BradFrontEnd(BradInterface):
     async def _run_query_impl(
         self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
     ) -> RowList:
+        t_start = time.perf_counter()
         session = self._sessions.get_session(session_id)
         if session is None:
             raise QueryError("Invalid session id {}".format(str(session_id)))
@@ -265,6 +269,7 @@ class BradFrontEnd(BradInterface):
             if query.startswith("BRAD_"):
                 return await self._handle_internal_command(query)
 
+            t_clean = time.perf_counter()
             # 2. Select an engine for the query.
             query_rep = QueryRep(query)
             transactional_query = (
@@ -274,6 +279,7 @@ class BradFrontEnd(BradInterface):
                 engine_to_use = Engine.Aurora
             else:
                 engine_to_use = await self._router.engine_for(query_rep)
+            t_post_route = time.perf_counter()
 
             logger.debug(
                 "[S%d] Routing '%s' to %s", session_id.value(), query, engine_to_use
@@ -290,6 +296,7 @@ class BradFrontEnd(BradInterface):
             except (pyodbc.ProgrammingError, pyodbc.Error) as ex:
                 # Error when executing the query.
                 raise QueryError.from_exception(ex)
+            t_post_exec = time.perf_counter()
 
             # We keep track of transactional state after executing the query in
             # case the query failed.
@@ -299,12 +306,14 @@ class BradFrontEnd(BradInterface):
             if query_rep.is_transaction_end():
                 session.set_in_transaction(in_txn=False)
                 self._transaction_end_counter.bump()
+            t_post_check = time.perf_counter()
 
             # Decide whether to log the query.
             if not transactional_query or (random.random() < self._config.txn_log_prob):
                 self._qlogger.info(
                     f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {end-start}s IsTransaction: {transactional_query}"
                 )
+            t_post_log = time.perf_counter()
 
             # Extract and return the results, if any.
             try:
@@ -315,6 +324,15 @@ class BradFrontEnd(BradInterface):
                         break
                     results.append(tuple(row))
                 logger.debug("Responded with %d rows.", len(results))
+                t_post_results = time.perf_counter()
+
+                print("clean,{}".format(t_clean - t_start), file=self._txn_breakdown)
+                print("route,{}".format(t_post_route - t_clean), file=self._txn_breakdown)
+                print("exec,{}".format(t_post_exec - t_post_route), file=self._txn_breakdown)
+                print("check,{}".format(t_post_check - t_post_exec), file=self._txn_breakdown)
+                print("log,{}".format(t_post_log - t_post_check), file=self._txn_breakdown)
+                print("results,{}".format(t_post_results - t_post_log), file=self._txn_breakdown)
+
                 return results
             except pyodbc.ProgrammingError:
                 logger.debug("No rows produced.")
