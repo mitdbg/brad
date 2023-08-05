@@ -172,7 +172,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 self._impl.on_enumerated_blueprint(bp, scoring_ctx)
 
             selected_blueprint = self._impl.on_enumeration_complete(scoring_ctx)
-            self._current_blueprint = selected_blueprint
+            self._last_suggested_blueprint = selected_blueprint
             await self._notify_new_blueprint(selected_blueprint)
 
         finally:

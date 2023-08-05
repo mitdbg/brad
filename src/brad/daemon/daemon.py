@@ -284,6 +284,7 @@ class BradDaemon:
             )
             self._blueprint_mgr.set_blueprint(blueprint)
             await self._blueprint_mgr.persist()
+            self._planner.update_blueprint(blueprint)
 
     async def _run_sync_periodically(self) -> None:
         while True:
