@@ -317,12 +317,8 @@ class BradFrontEnd(BradInterface):
 
             # Extract and return the results, if any.
             try:
-                results = []
-                while True:
-                    row = await cursor.fetchone()
-                    if row is None:
-                        break
-                    results.append(tuple(row))
+                #results = await cursor.fetchall()
+                results = cursor.fetchall_sync()
                 logger.debug("Responded with %d rows.", len(results))
                 t_post_results = time.perf_counter()
 
