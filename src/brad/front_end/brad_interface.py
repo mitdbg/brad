@@ -21,8 +21,7 @@ class BradInterface:
         self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
     ) -> str:
         """
-        Returns query results encoded as a JSON string. Note that clients may
-        need to parse non-string data types (e.g., integers).
+        Returns query results encoded as a JSON string.
 
         This method may throw an error to indicate a problem with the query.
         """
