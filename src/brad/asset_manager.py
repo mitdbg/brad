@@ -1,5 +1,6 @@
 import asyncio
 import boto3
+from botocore.exceptions import ClientError
 
 from brad.config.file import ConfigFile
 
@@ -19,11 +20,17 @@ class AssetManager:
         )
 
     def load_sync(self, key: str) -> bytes:
-        response = self._s3_client.get_object(
-            Bucket=self._config.s3_assets_bucket,
-            Key=self._config.s3_assets_path + key,
-        )
-        return response["Body"].read()
+        try:
+            response = self._s3_client.get_object(
+                Bucket=self._config.s3_assets_bucket,
+                Key=self._config.s3_assets_path + key,
+            )
+            return response["Body"].read()
+        except ClientError as ex:
+            if ex.response["Error"]["Code"] == "NoSuchKey":
+                raise ValueError(f"Key '{key}' does not exist.") from ex
+            else:
+                raise RuntimeError from ex
 
     def persist_sync(self, key: str, payload: bytes) -> None:
         self._s3_client.put_object(
