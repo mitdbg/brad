@@ -155,7 +155,7 @@ class TransactionWorker:
                     # Occasionally, nothing is found.
                     db.commit_sync()
                     return True
-                theatre_id = int(results[0][0])
+                theatre_id = results[0][0]
             else:
                 # By design, the theatre number is equal to the ID.
                 theatre_id = theatre_num
@@ -174,8 +174,8 @@ class TransactionWorker:
             # 3. Choose a showing.
             choice = self.prng.randint(0, len(showing_options) - 1)
             showing = showing_options[choice]
-            showing_id = int(showing[0])
-            seats_left = int(showing[1])
+            showing_id = showing[0]
+            seats_left = showing[1]
 
             # 4. Insert the ticket order.
             quantity = min(self.prng.randint(*self.ticket_quantity), seats_left)
