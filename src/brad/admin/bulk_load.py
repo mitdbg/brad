@@ -7,7 +7,7 @@ from typing import Any, Coroutine, Iterator, List, Set, Tuple, Dict
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.blueprint.sql_gen.table import (
     comma_separated_column_names_and_types,
     comma_separated_column_names,

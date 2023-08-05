@@ -9,7 +9,7 @@ from datetime import datetime
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.config.temp_config import TempConfig
@@ -284,6 +284,7 @@ class BradDaemon:
             )
             self._blueprint_mgr.set_blueprint(blueprint)
             await self._blueprint_mgr.persist()
+            assert self._planner is not None
             self._planner.update_blueprint(blueprint)
 
     async def _run_sync_periodically(self) -> None:

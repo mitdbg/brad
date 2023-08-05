@@ -18,13 +18,13 @@ class TransitionState(enum.Enum):
     CleaningUp = "cleaning_up"
 
     @staticmethod
-    def from_str(self, candidate: str) -> "TransitionState":
-        if candidate == self.Stable.value:
-            return self.Stable
-        elif candidate == self.TransitioningButAbortable.value:
-            return self.TransitioningButAbortable
-        elif candidate == self.Transitioning.value:
-            return self.Transitioning
-        elif candidate == self.CleaningUp.value:
-            return self.CleaningUp
+    def from_str(candidate: str) -> "TransitionState":
+        if candidate == TransitionState.Stable.value:
+            return TransitionState.Stable
+        elif candidate == TransitionState.TransitioningButAbortable.value:
+            return TransitionState.TransitioningButAbortable
+        elif candidate == TransitionState.Transitioning.value:
+            return TransitionState.Transitioning
+        elif candidate == TransitionState.CleaningUp.value:
+            return TransitionState.CleaningUp
         raise RuntimeError(f"Invalid blueprint transition state: {candidate}")

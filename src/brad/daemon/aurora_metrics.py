@@ -12,7 +12,7 @@ from .metrics_def import MetricDef
 from .metrics_logger import MetricsLogger
 from .metrics_source import MetricsSourceWithForecasting
 from .perf_insights import PerfInsightsClient
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.utils.time_periods import impute_old_missing_metrics
