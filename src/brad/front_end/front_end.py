@@ -308,12 +308,8 @@ class BradFrontEnd(BradInterface):
 
             # Extract and return the results, if any.
             try:
-                results = []
-                while True:
-                    row = await cursor.fetchone()
-                    if row is None:
-                        break
-                    results.append(tuple(row))
+                # Using `fetchall_sync()` is lower overhead than the async interface.
+                results = cursor.fetchall_sync()
                 logger.debug("Responded with %d rows.", len(results))
                 return results
             except pyodbc.ProgrammingError:
