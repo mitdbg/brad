@@ -31,6 +31,26 @@ class BlueprintManager:
         self._next_blueprint: Optional[Blueprint] = None
         self._directory = Directory(config)
 
+    @staticmethod
+    def initialize_schema(
+        assets: AssetManager,
+        schema_name: str,
+        blueprint: Blueprint,
+    ) -> None:
+        """
+        Used when bootstrapping a new schema.
+        """
+
+        serialized = serialize_blueprint(blueprint)
+        versioning = BlueprintVersioning(0, TransitionState.Stable, None)
+        assets.persist_sync(
+            _METADATA_KEY_TEMPLATE.format(schema_name=schema_name, version=0),
+            serialized,
+        )
+        assets.persist_sync(
+            _VERSION_KEY.format(schema_name=schema_name), versioning.serialize()
+        )
+
     async def load(self) -> None:
         """
         Loads the persisted version of the blueprint from S3.
@@ -72,31 +92,78 @@ class BlueprintManager:
             self._next_blueprint = None
         asyncio.run(self._directory.refresh())
 
-    async def persist(self) -> None:
-        """
-        Persists the current blueprint to S3.
-        """
-        assert self._blueprint is not None
-        serialized = serialize_blueprint(self._blueprint)
+    async def start_transition(self, new_blueprint: Blueprint) -> None:
+        assert self._versioning is not None, "Run load() first."
+        assert (
+            self._versioning.transition_state == TransitionState.Stable
+        ), "New blueprint is not yet stable."
+
+        next_version = self._versioning.version + 1
+        serialized = serialize_blueprint(new_blueprint)
         await self._assets.persist(
-            _METADATA_KEY_TEMPLATE.format(self._schema_name), serialized
+            _METADATA_KEY_TEMPLATE.format(
+                schema_name=self._schema_name, version=next_version
+            ),
+            serialized,
         )
 
-    def persist_sync(self) -> None:
+        next_versioning = self._versioning.copy()
+        next_versioning.next_version = next_version
+        next_versioning.transition_state = TransitionState.TransitioningButAbortable
+        await self._assets.persist(_VERSION_KEY, next_versioning.serialize())
+        self._versioning = next_versioning
+        self._next_blueprint = new_blueprint
+
+    async def update_transition_state(self, next_state: TransitionState) -> None:
+        assert self._versioning is not None, "Run load() first."
+        assert (
+            self._versioning.transition_state is not TransitionState.Stable
+        ), "Can only update transition state during a transition."
+
+        next_versioning = self._versioning.copy()
+        next_versioning.transition_state = next_state
+        if next_state == TransitionState.Stable:
+            assert next_versioning.next_version is not None
+            next_versioning.version = next_versioning.next_version
+            next_versioning.next_version = None
+        await self._assets.persist(_VERSION_KEY, next_versioning.serialize())
+        self._versioning = next_versioning
+
+        if next_state == TransitionState.Stable:
+            self._current_blueprint = self._next_blueprint
+            self._next_blueprint = None
+
+    def force_new_blueprint_sync(self, blueprint: Blueprint) -> None:
         """
-        Persists the current blueprint to S3.
+        This is used when making manual changes to the blueprint. The provided
+        blueprint will be persisted as the next stable version.
         """
-        assert self._blueprint is not None
-        serialized = serialize_blueprint(self._blueprint)
+        assert self._versioning is not None
+        serialized = serialize_blueprint(blueprint)
+        versioning = self._versioning.copy()
+        versioning.version += 1
+        versioning.transition_state = TransitionState.Stable
+        versioning.next_version = None
         self._assets.persist_sync(
-            _METADATA_KEY_TEMPLATE.format(self._schema_name), serialized
+            _METADATA_KEY_TEMPLATE.format(
+                schema_name=self._schema_name, version=versioning.version
+            ),
+            serialized,
         )
+        self._assets.persist_sync(
+            _VERSION_KEY.format(schema_name=self._schema_name), versioning.serialize()
+        )
+        self._versioning = versioning
+        self._current_blueprint = blueprint
+        self._next_blueprint = None
 
     def delete_sync(self) -> None:
         """
-        Deletes the persisted blueprint from S3.
+        Logically deletes this entire schema.
         """
-        self._assets.delete_sync(_LEGACY_METADATA_KEY_TEMPLATE.format(self._schema_name))
+        self._assets.delete_sync(
+            _LEGACY_METADATA_KEY_TEMPLATE.format(self._schema_name)
+        )
         self._assets.delete_sync(_VERSION_KEY.format(self._schema_name))
 
     @property
@@ -104,11 +171,13 @@ class BlueprintManager:
         return self._schema_name
 
     def get_blueprint(self) -> Blueprint:
-        assert self._blueprint is not None
-        return self._blueprint
-
-    def set_blueprint(self, blueprint: Blueprint) -> None:
-        self._blueprint = blueprint
+        assert self._versioning is not None
+        if self._versioning.transition_state is not TransitionState.CleaningUp:
+            assert self._current_blueprint is not None
+            return self._current_blueprint
+        else:
+            assert self._next_blueprint is not None
+            return self._next_blueprint
 
     def get_directory(self) -> Directory:
         return self._directory
@@ -185,6 +254,11 @@ class BlueprintVersioning:
             int(parts[0]),
             TransitionState.from_str(parts[1]),
             int(parts[2]) if parts[2] is not None else None,
+        )
+
+    def copy(self) -> "BlueprintVersioning":
+        return BlueprintVersioning(
+            self.version, self.transition_state, self.next_version
         )
 
 
