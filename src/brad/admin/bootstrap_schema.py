@@ -133,8 +133,6 @@ def bootstrap_schema(args):
     # 11. Persist the data blueprint.
     if not args.skip_persisting_blueprint:
         assets = AssetManager(config)
-        blueprint_mgr = BlueprintManager(config, assets, blueprint.schema_name())
-        blueprint_mgr.set_blueprint(blueprint)
-        blueprint_mgr.persist_sync()
+        BlueprintManager.initialize_schema(assets, blueprint)
 
     logger.info("Done!")

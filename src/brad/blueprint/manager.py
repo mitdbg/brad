@@ -34,7 +34,6 @@ class BlueprintManager:
     @staticmethod
     def initialize_schema(
         assets: AssetManager,
-        schema_name: str,
         blueprint: Blueprint,
     ) -> None:
         """
@@ -44,11 +43,14 @@ class BlueprintManager:
         serialized = serialize_blueprint(blueprint)
         versioning = BlueprintVersioning(0, TransitionState.Stable, None)
         assets.persist_sync(
-            _METADATA_KEY_TEMPLATE.format(schema_name=schema_name, version=0),
+            _METADATA_KEY_TEMPLATE.format(
+                schema_name=blueprint.schema_name(), version=0
+            ),
             serialized,
         )
         assets.persist_sync(
-            _VERSION_KEY.format(schema_name=schema_name), versioning.serialize()
+            _VERSION_KEY.format(schema_name=blueprint.schema_name()),
+            versioning.serialize(),
         )
 
     async def load(self) -> None:

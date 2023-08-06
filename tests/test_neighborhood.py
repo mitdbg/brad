@@ -49,7 +49,8 @@ def test_neighborhood_change():
     )  # TODO: Support configs in tests. This will not work.
     assets = AssetManager(config)
     blueprint_mgr = BlueprintManager(config, assets, "test")
-    blueprint_mgr.set_blueprint(initial)
+    # N.B. This may not work.
+    blueprint_mgr._current_blueprint = initial  # pylint: disable=protected-access
     monitor = Monitor(config, blueprint_mgr)
     asyncio.run(monitor.fetch_latest())  # Same effect as running for a long time.
     physical = PhysicalProvisioning(monitor=monitor, initial_blueprint=initial)

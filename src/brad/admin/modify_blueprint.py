@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from brad.asset_manager import AssetManager
@@ -73,6 +74,12 @@ def register_admin_action(subparser) -> None:
         type=str,
         help="Path to an updated database schema.",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Set to force persist the blueprint and treat it as stable. "
+        "If not set, this tool will prepare to transition to the modified blueprint.",
+    )
     parser.set_defaults(admin_action=modify_blueprint)
 
 
@@ -134,7 +141,6 @@ def add_indexes(args, config: ConfigFile, mgr: BlueprintManager) -> None:
             )
 
         cursor.commit_sync()
-        mgr.persist_sync()
         logger.info("Done!")
 
     finally:
@@ -189,7 +195,9 @@ def modify_blueprint(args):
 
     # 3. Write the changes back.
     modified_blueprint = enum_blueprint.to_blueprint()
-    blueprint_mgr.set_blueprint(modified_blueprint)
-    blueprint_mgr.persist_sync()
+    if args.force:
+        blueprint_mgr.force_new_blueprint_sync(modified_blueprint)
+    else:
+        asyncio.run(blueprint_mgr.start_transition(modified_blueprint))
 
     logger.info("Done!")
