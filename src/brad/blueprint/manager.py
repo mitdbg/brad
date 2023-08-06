@@ -43,8 +43,8 @@ class BlueprintManager:
         serialized = serialize_blueprint(blueprint)
         versioning = BlueprintVersioning(0, TransitionState.Stable, None)
         assets.persist_sync(
-            _METADATA_KEY_TEMPLATE.format(
-                schema_name=blueprint.schema_name(), version=0
+            BlueprintManager._blueprint_key_for_version(
+                blueprint.schema_name(), version=0
             ),
             serialized,
         )
@@ -74,6 +74,7 @@ class BlueprintManager:
         else:
             self._next_blueprint = None
         await self._directory.refresh()
+        logger.debug("Loaded %s", self._versioning)
 
     def load_sync(self) -> None:
         try:
@@ -93,6 +94,7 @@ class BlueprintManager:
         else:
             self._next_blueprint = None
         asyncio.run(self._directory.refresh())
+        logger.debug("Loaded %s", self._versioning)
 
     async def start_transition(self, new_blueprint: Blueprint) -> None:
         assert self._versioning is not None, "Run load() first."
@@ -103,9 +105,7 @@ class BlueprintManager:
         next_version = self._versioning.version + 1
         serialized = serialize_blueprint(new_blueprint)
         await self._assets.persist(
-            _METADATA_KEY_TEMPLATE.format(
-                schema_name=self._schema_name, version=next_version
-            ),
+            self._blueprint_key_for_version(self._schema_name, next_version),
             serialized,
         )
 
@@ -153,9 +153,7 @@ class BlueprintManager:
         versioning.transition_state = TransitionState.Stable
         versioning.next_version = None
         self._assets.persist_sync(
-            _METADATA_KEY_TEMPLATE.format(
-                schema_name=self._schema_name, version=versioning.version
-            ),
+            self._blueprint_key_for_version(self._schema_name, versioning.version),
             serialized,
         )
         self._assets.persist_sync(
@@ -198,9 +196,7 @@ class BlueprintManager:
 
     async def _load_blueprint_version(self, version: int) -> Blueprint:
         serialized = await self._assets.load(
-            _METADATA_KEY_TEMPLATE.format(
-                schema_name=self._schema_name, version=version
-            )
+            self._blueprint_key_for_version(self._schema_name, version)
         )
         return deserialize_blueprint(serialized)
 
@@ -212,9 +208,7 @@ class BlueprintManager:
 
     def _load_blueprint_version_sync(self, version: int) -> Blueprint:
         serialized = self._assets.load_sync(
-            _METADATA_KEY_TEMPLATE.format(
-                schema_name=self._schema_name, version=version
-            )
+            self._blueprint_key_for_version(self._schema_name, version)
         )
         return deserialize_blueprint(serialized)
 
@@ -235,7 +229,7 @@ class BlueprintManager:
 
         versioning = BlueprintVersioning(0, TransitionState.Stable, None)
         self._assets.persist_sync(
-            _METADATA_KEY_TEMPLATE.format(schema_name=self._schema_name, version=0),
+            self._blueprint_key_for_version(self._schema_name, version=0),
             serialized,
         )
         self._assets.persist_sync(
@@ -244,6 +238,12 @@ class BlueprintManager:
         logger.info("Completed upgrading the persisted blueprint format.")
 
         # NOTE: We do not delete the existing blueprint.
+
+    @staticmethod
+    def _blueprint_key_for_version(schema_name: str, version: int) -> str:
+        return _METADATA_KEY_TEMPLATE.format(
+            schema_name=schema_name, version=str(version).zfill(5)
+        )
 
 
 class BlueprintVersioning:
@@ -270,6 +270,19 @@ class BlueprintVersioning:
             int(parts[2]) if parts[2] is not None else None,
         )
 
+    def __repr__(self) -> str:
+        return "".join(
+            [
+                "BlueprintVersioning(version=",
+                str(self.version),
+                ", transition_state=",
+                str(self.transition_state),
+                ", next_version=",
+                str(self.next_version),
+                ")",
+            ]
+        )
+
     def copy(self) -> "BlueprintVersioning":
         return BlueprintVersioning(
             self.version, self.transition_state, self.next_version
@@ -278,5 +291,5 @@ class BlueprintVersioning:
 
 _LEGACY_METADATA_KEY_TEMPLATE = "{}.brad"
 
-_VERSION_KEY = "{schema_name}/blueprints/VERSION"
-_METADATA_KEY_TEMPLATE = "{schema_name}/blueprints/bp_{version}"
+_VERSION_KEY = "{schema_name}/blueprints/BRAD"
+_METADATA_KEY_TEMPLATE = "{schema_name}/blueprints/BRAD-BP-{version}"
