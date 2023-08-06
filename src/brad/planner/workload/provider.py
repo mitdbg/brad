@@ -2,7 +2,7 @@ import logging
 from typing import Optional, Tuple
 from datetime import datetime, timedelta
 
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.planner.workload import Workload

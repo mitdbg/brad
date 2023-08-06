@@ -9,7 +9,8 @@ from datetime import datetime
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
+from brad.blueprint.state import TransitionState
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.config.temp_config import TempConfig
@@ -280,10 +281,12 @@ class BradDaemon:
 
         if PERSIST_BLUEPRINT_VAR in os.environ:
             logger.info(
-                "Persisting the new blueprint. Restart BRAD to load the new blueprint."
+                "Force-persisting the new blueprint. Restart BRAD to load the new blueprint."
             )
-            self._blueprint_mgr.set_blueprint(blueprint)
-            await self._blueprint_mgr.persist()
+            await self._blueprint_mgr.start_transition(blueprint)
+            await self._blueprint_mgr.update_transition_state(TransitionState.Stable)
+            assert self._planner is not None
+            self._planner.update_blueprint(blueprint)
 
     async def _run_sync_periodically(self) -> None:
         while True:

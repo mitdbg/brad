@@ -3,7 +3,7 @@ import logging
 from itertools import chain
 from typing import List, Optional
 
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.daemon.messages import MetricsReport
 from brad.daemon.metrics_source import MetricsSourceWithForecasting

@@ -13,7 +13,7 @@ import pyodbc
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
 
 from brad.asset_manager import AssetManager
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.monitor import Monitor

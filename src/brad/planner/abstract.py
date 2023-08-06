@@ -1,5 +1,5 @@
 import asyncio
-from typing import Coroutine, Callable, List
+from typing import Coroutine, Callable, List, Optional
 
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
@@ -38,6 +38,7 @@ class BlueprintPlanner:
     ) -> None:
         self._planner_config = planner_config
         self._current_blueprint = current_blueprint
+        self._last_suggested_blueprint: Optional[Blueprint] = None
         self._monitor = monitor
         self._config = config
         self._schema_name = schema_name
@@ -65,6 +66,17 @@ class BlueprintPlanner:
         Use `window_multiplier` to expand the window used for planning.
         """
         raise NotImplementedError
+
+    def update_blueprint(self, blueprint: Blueprint) -> None:
+        """
+        Use this method to inform the planner of a new blueprint being
+        transitioned to successfully.
+
+        We need this method because the blueprints emitted by the planner are
+        not immediately transitioned to (it takes time to transition
+        blueprints).
+        """
+        self._current_blueprint = blueprint
 
     # NOTE: In the future we will implement an abstraction that will allow for a
     # generic planner to subscribe to a stream of events, used to detect when to

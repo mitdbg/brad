@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import Dict, Tuple, Optional
 
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.session import SessionId
 from .engine_connections import EngineConnections

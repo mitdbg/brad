@@ -32,7 +32,7 @@ from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import FixedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 
@@ -246,16 +246,22 @@ def run_planner(args) -> None:
         logger.info("%s", blueprint)
 
         while True:
-            response = input("Do you want to persist this blueprint? (y/n): ").lower()
+            response = input(
+                "Do you want to persist this blueprint? Use 'f' to force-persist the blueprint. (y/f/n): "
+            ).lower()
             if response == "y":
-                blueprint_mgr.set_blueprint(blueprint)
-                blueprint_mgr.persist_sync()
+                await blueprint_mgr.start_transition(blueprint)
+                print("Done!")
+                break
+            elif response == "f":
+                print("Forcing the blueprint...")
+                blueprint_mgr.force_new_blueprint_sync(blueprint)
                 print("Done!")
                 break
             elif response == "n":
                 break
             else:
-                print("Invalid input. Please enter 'y' or 'n'.")
+                print("Invalid input. Please enter 'y', 'f', or 'n'.")
 
     planner.register_new_blueprint_callback(on_new_blueprint)
 

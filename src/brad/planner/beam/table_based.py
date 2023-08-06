@@ -286,7 +286,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         # 8. Output the new blueprint.
         best_blueprint = best_candidate.to_blueprint()
-        self._current_blueprint = best_blueprint
+        self._last_suggested_blueprint = best_blueprint
 
         logger.info("Selected blueprint:")
         logger.info("%s", best_blueprint)

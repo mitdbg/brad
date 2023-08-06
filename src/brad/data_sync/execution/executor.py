@@ -11,7 +11,7 @@ from brad.data_sync.execution.table_sync_bounds import TableSyncBounds
 from brad.data_sync.logical_plan import LogicalDataSyncPlan
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
 from brad.data_sync.planner import make_logical_data_sync_plan
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
