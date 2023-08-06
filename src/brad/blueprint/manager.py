@@ -112,7 +112,10 @@ class BlueprintManager:
         next_versioning = self._versioning.copy()
         next_versioning.next_version = next_version
         next_versioning.transition_state = TransitionState.TransitioningButAbortable
-        await self._assets.persist(_VERSION_KEY, next_versioning.serialize())
+        await self._assets.persist(
+            _VERSION_KEY.format(schema_name=self._schema_name),
+            next_versioning.serialize(),
+        )
         self._versioning = next_versioning
         self._next_blueprint = new_blueprint
 
@@ -128,7 +131,10 @@ class BlueprintManager:
             assert next_versioning.next_version is not None
             next_versioning.version = next_versioning.next_version
             next_versioning.next_version = None
-        await self._assets.persist(_VERSION_KEY, next_versioning.serialize())
+        await self._assets.persist(
+            _VERSION_KEY.format(schema_name=self._schema_name),
+            next_versioning.serialize(),
+        )
         self._versioning = next_versioning
 
         if next_state == TransitionState.Stable:
@@ -166,7 +172,7 @@ class BlueprintManager:
         self._assets.delete_sync(
             _LEGACY_METADATA_KEY_TEMPLATE.format(self._schema_name)
         )
-        self._assets.delete_sync(_VERSION_KEY.format(self._schema_name))
+        self._assets.delete_sync(_VERSION_KEY.format(schema_name=self._schema_name))
 
     @property
     def schema_name(self) -> str:
@@ -185,7 +191,9 @@ class BlueprintManager:
         return self._directory
 
     async def _load_versioning(self) -> "BlueprintVersioning":
-        version_data = await self._assets.load(_VERSION_KEY.format(self._schema_name))
+        version_data = await self._assets.load(
+            _VERSION_KEY.format(schema_name=self._schema_name)
+        )
         return BlueprintVersioning.deserialize(version_data)
 
     async def _load_blueprint_version(self, version: int) -> Blueprint:
@@ -197,7 +205,9 @@ class BlueprintManager:
         return deserialize_blueprint(serialized)
 
     def _load_versioning_sync(self) -> "BlueprintVersioning":
-        version_data = self._assets.load_sync(_VERSION_KEY.format(self._schema_name))
+        version_data = self._assets.load_sync(
+            _VERSION_KEY.format(schema_name=self._schema_name)
+        )
         return BlueprintVersioning.deserialize(version_data)
 
     def _load_blueprint_version_sync(self, version: int) -> Blueprint:
@@ -228,7 +238,9 @@ class BlueprintManager:
             _METADATA_KEY_TEMPLATE.format(schema_name=self._schema_name, version=0),
             serialized,
         )
-        self._assets.persist_sync(_VERSION_KEY, versioning.serialize())
+        self._assets.persist_sync(
+            _VERSION_KEY.format(schema_name=self._schema_name), versioning.serialize()
+        )
         logger.info("Completed upgrading the persisted blueprint format.")
 
         # NOTE: We do not delete the existing blueprint.
