@@ -1,8 +1,9 @@
 from typing import Dict, Optional
 
 from .connection import Connection
-from .redshift_connection import RedshiftConnection
 from .odbc_connection import OdbcConnection
+from .pyathena_connection import PyAthenaConnection
+from .redshift_connection import RedshiftConnection
 from brad.config.file import ConfigFile
 from brad.config.engine import Engine
 from brad.provisioning.directory import Directory
@@ -31,26 +32,28 @@ class ConnectionFactory:
                 schema_name=schema_name,
                 autocommit=autocommit,
             )
-        else:
-            if engine == Engine.Aurora:
-                # N.B. The caller needs to specify a valid replica index.
-                instance = (
-                    directory.aurora_writer()
-                    if aurora_read_replica is None
-                    else directory.aurora_readers()[aurora_read_replica]
-                )
-                address, port = instance.endpoint()
-                cstr = cls._pg_aurora_odbc_connection_string(
-                    address, port, connection_details, schema_name
-                )
-            elif engine == Engine.Athena:
-                cstr = cls._athena_odbc_connection_string(
-                    connection_details, schema_name
-                )
-            else:
-                raise RuntimeError("Unsupported engine: {}".format(engine))
-
+        elif engine == Engine.Aurora:
+            # N.B. The caller needs to specify a valid replica index.
+            instance = (
+                directory.aurora_writer()
+                if aurora_read_replica is None
+                else directory.aurora_readers()[aurora_read_replica]
+            )
+            address, port = instance.endpoint()
+            cstr = cls._pg_aurora_odbc_connection_string(
+                address, port, connection_details, schema_name
+            )
             return await OdbcConnection.connect(cstr, autocommit)
+        elif engine == Engine.Athena:
+            return await PyAthenaConnection.connect(
+                aws_region=connection_details["aws_region"],
+                s3_output_path=connection_details["s3_output_path"],
+                access_key=connection_details["access_key"],
+                access_key_secret=connection_details["access_key_secret"],
+                schema_name=schema_name,
+            )
+        else:
+            raise RuntimeError("Unsupported engine: {}".format(engine))
 
     @classmethod
     def connect_to_sync(
@@ -74,25 +77,27 @@ class ConnectionFactory:
                 schema_name=schema_name,
                 autocommit=autocommit,
             )
-        else:
-            if engine == Engine.Aurora:
-                instance = (
-                    directory.aurora_writer()
-                    if aurora_read_replica is None
-                    else directory.aurora_readers()[aurora_read_replica]
-                )
-                address, port = instance.endpoint()
-                cstr = cls._pg_aurora_odbc_connection_string(
-                    address, port, connection_details, schema_name
-                )
-            elif engine == Engine.Athena:
-                cstr = cls._athena_odbc_connection_string(
-                    connection_details, schema_name
-                )
-            else:
-                raise RuntimeError("Unsupported engine: {}".format(engine))
-
+        elif engine == Engine.Aurora:
+            instance = (
+                directory.aurora_writer()
+                if aurora_read_replica is None
+                else directory.aurora_readers()[aurora_read_replica]
+            )
+            address, port = instance.endpoint()
+            cstr = cls._pg_aurora_odbc_connection_string(
+                address, port, connection_details, schema_name
+            )
             return OdbcConnection.connect_sync(cstr, autocommit)
+        elif engine == Engine.Athena:
+            return PyAthenaConnection.connect_sync(
+                aws_region=connection_details["aws_region"],
+                s3_output_path=connection_details["s3_output_path"],
+                access_key=connection_details["access_key"],
+                access_key_secret=connection_details["access_key_secret"],
+                schema_name=schema_name,
+            )
+        else:
+            raise RuntimeError("Unsupported engine: {}".format(engine))
 
     @classmethod
     async def connect_to_sidecar(
