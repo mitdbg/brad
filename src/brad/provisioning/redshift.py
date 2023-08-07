@@ -1,9 +1,152 @@
+import asyncio
 import boto3
 import time
 import logging
-import os
+from typing import Dict, Any
 
-logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+from brad.config.file import ConfigFile
+from brad.blueprint.diff.provisioning import ProvisioningDiff
+from brad.blueprint.provisioning import Provisioning
+
+
+class RedshiftProvisioningManager:
+    """
+    Used to execute provisioning changes.
+    """
+
+    def __init__(self, config: ConfigFile):
+        self._redshift = boto3.client(
+            "redshift",
+            aws_access_key=config.aws_access_key,
+            aws_secret_access_key=config.aws_access_key_secret,
+        )
+
+    @staticmethod
+    def must_use_classic_resize(old: Provisioning, new: Provisioning) -> bool:
+        """
+        Resize method depends on target instance type, and old instance count,
+        and the new instance count.
+        """
+        if old.num_nodes() == 1 or new.num_nodes() == 1:
+            return True
+        if old.instance_type() != new.instance_type():
+            return True
+
+        if new.instance_type() in ["ra3.16xlarge", "ra3.4xlarge"]:
+            return (
+                new.num_nodes() < old.num_nodes() / 4
+                or new.num_nodes() > 4 * old.num_nodes()
+            )
+        if new.instance_type() in ["ra3.xlplus"]:
+            return (
+                new.num_nodes() < old.num_nodes() / 4
+                or new.num_nodes() > 2 * old.num_nodes()
+            )
+        # For all other types, must be within double or half.
+        return (
+            new.num_nodes() < old.num_nodes() / 2
+            or new.num_nodes() > 2 * old.num_nodes()
+        )
+
+    async def resize(
+        self, cluster_id: str, old: Provisioning, new: Provisioning
+    ) -> None:
+        """
+        Rescale a cluster. This will block until the cluster's new state is
+        avalaible.
+        """
+        diff = ProvisioningDiff.of(old, new)
+        if diff is None:
+            # Nothing to do.
+            return
+
+        # Handle special cases: Starting up from 0 or going to 0.
+        if diff.new_num_nodes() == 0:
+            await self._resize_to_zero(cluster_id)
+            return
+
+        if old.num_nodes() == 0:
+            existing = await self._resume_and_fetch_existing_provisioning(cluster_id)
+            if existing == new:
+                return
+
+            # We shut down clusters by pausing them. On restart, they resume
+            # with their old provisioning.
+            old = existing
+
+        loop = asyncio.get_running_loop()
+        is_classic = self.must_use_classic_resize(old, new)
+        if is_classic:
+            cluster_type = "multi-node" if new.num_nodes() > 1 else "single-node"
+
+            # TODO: Classic resize is sometimes disasterously slow. It might be
+            # better to manually create a new cluster.
+            def do_classic_resize():
+                self._redshift.modify_cluster(
+                    ClusterIdentifier=cluster_id,
+                    ClusterType=cluster_type,
+                    NodeType=new.instance_type(),
+                    NumberOfNodes=new.num_nodes(),
+                )
+
+            await loop.run_in_executor(None, do_classic_resize)
+
+        else:
+
+            def do_elastic_resize():
+                self._redshift.resize_cluster(
+                    ClusterIdentifier=cluster_id,
+                    NodeType=new.instance_type(),
+                    NumberOfNodes=new.num_nodes(),
+                    Classic=False,
+                )
+
+            await loop.run_in_executor(None, do_elastic_resize)
+
+        # Wait until the resize has completed.
+        await self._wait_until_ready(cluster_id)
+
+    async def _resize_to_zero(self, cluster_id: str) -> None:
+        def do_pause():
+            self._redshift.pause_cluster(ClusterIdentifier=cluster_id)
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, do_pause)
+        # No need to wait for the pause to complete.
+
+    async def _resume_and_fetch_existing_provisioning(
+        self, cluster_id: str
+    ) -> Provisioning:
+        def do_resume():
+            self._redshift.resume_cluster(ClusterIdentifier=cluster_id)
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, do_resume)
+
+        await self._wait_until_ready(cluster_id)
+
+        response = await loop.run_in_executor(None, self._get_cluster_state, cluster_id)
+        cluster = response["Clusters"][0]
+        instance_type = cluster["NodeType"]
+        num_nodes = cluster["NumberOfNodes"]
+        return Provisioning(instance_type, num_nodes)
+
+    async def _wait_until_ready(self, cluster_id: str) -> None:
+        loop = asyncio.get_running_loop()
+
+        while True:
+            response = await loop.run_in_executor(
+                None, self._get_cluster_state, cluster_id
+            )
+            cluster = response["Clusters"][0]
+            modifying = cluster["ClusterAvailabilityStatus"] == "Modifying"
+            status = cluster["ClusterStatus"]
+            if status == "available" and not modifying:
+                break
+            await asyncio.sleep(20)
+
+    def _get_cluster_state(self, cluster_id: str) -> Dict[str, Any]:
+        return self._redshift.describe_clusters(ClusterIdentifier=cluster_id)
 
 
 class RedshiftProvisioning:
