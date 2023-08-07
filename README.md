@@ -95,6 +95,8 @@ files.
   Redshift; BRAD now resolves endpoints for the engines from AWS.
 - (07/27/2023) Update the logging configs in `config.yml` (see the
   `config_sample.yml` file).
+- (08/07/2023) Re-run `./tools/install-dev.sh` to update your dependencies. We
+  added `PyAthena`.
 
 
 ### Generate IMDB workload
