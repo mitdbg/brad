@@ -48,12 +48,12 @@ class RedshiftProvisioningManager:
             or new.num_nodes() > 2 * old.num_nodes()
         )
 
-    async def resize(
+    async def run_pre_transition_resize(
         self, cluster_id: str, old: Provisioning, new: Provisioning
     ) -> None:
         """
-        Rescale a cluster. This will block until the cluster's new state is
-        avalaible.
+        Runs resize tasks that should complete before switching to a blueprint
+        that has the `new` provisioning.
         """
         diff = ProvisioningDiff.of(old, new)
         if diff is None:
@@ -62,7 +62,7 @@ class RedshiftProvisioningManager:
 
         # Handle special cases: Starting up from 0 or going to 0.
         if diff.new_num_nodes() == 0:
-            await self._resize_to_zero(cluster_id)
+            # This is a post-transition task.
             return
 
         if old.num_nodes() == 0:
@@ -74,6 +74,8 @@ class RedshiftProvisioningManager:
             # with their old provisioning.
             old = existing
 
+        # Resizes are OK because Redshift maintains read-availability during the
+        # resize.
         loop = asyncio.get_running_loop()
         is_classic = self.must_use_classic_resize(old, new)
         if is_classic:
@@ -105,6 +107,22 @@ class RedshiftProvisioningManager:
 
         # Wait until the resize has completed.
         await self._wait_until_ready(cluster_id)
+
+    async def run_post_transition_resize(
+        self, cluster_id: str, old: Provisioning, new: Provisioning
+    ) -> None:
+        """
+        Runs resize tasks that should run after switching to a blueprint
+        that has the `new` provisioning.
+        """
+        diff = ProvisioningDiff.of(old, new)
+        if diff is None:
+            # Nothing to do.
+            return
+
+        if diff.new_num_nodes() == 0:
+            await self._resize_to_zero(cluster_id)
+            # No need to wait for the pause to complete.
 
     async def _resize_to_zero(self, cluster_id: str) -> None:
         def do_pause():
