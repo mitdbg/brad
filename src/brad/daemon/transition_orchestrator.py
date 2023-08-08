@@ -20,47 +20,68 @@ class TransitionOrchestrator:
         self,
         config: ConfigFile,
         blueprint_mgr: BlueprintManager,
+        curr_blueprint: Blueprint,
         next_blueprint: Blueprint,
     ) -> None:
         self._config = config
         self._blueprint_mgr = blueprint_mgr
+        self._curr_blueprint = curr_blueprint
         self._next_blueprint = next_blueprint
+        self._diff = BlueprintDiff.of(self._curr_blueprint, self._next_blueprint)
         self._rds = RdsProvisioningManager(config)
         self._redshift = RedshiftProvisioningManager(config)
 
     async def run_pre_transition(self) -> None:
-        curr_blueprint = self._blueprint_mgr.get_blueprint()
-        diff = BlueprintDiff.of(curr_blueprint, self._next_blueprint)
-        if diff is None:
+        if self._diff is None:
             # Nothing to do.
             return
 
         next_version = await self._blueprint_mgr.start_transition(self._next_blueprint)
 
-        aurora_diff = diff.aurora_diff()
-        redshift_diff = diff.redshift_diff()
+        aurora_diff = self._diff.aurora_diff()
+        redshift_diff = self._diff.redshift_diff()
 
         aurora_awaitable = self._run_aurora_pre_transition(
-            curr_blueprint.aurora_provisioning(),
+            self._curr_blueprint.aurora_provisioning(),
             self._next_blueprint.aurora_provisioning(),
             aurora_diff,
             next_version,
         )
         redshift_awaitable = self._run_redshift_pre_transition(
-            curr_blueprint.redshift_provisioning(),
+            self._curr_blueprint.redshift_provisioning(),
             self._next_blueprint.redshift_provisioning(),
             redshift_diff,
         )
         await asyncio.gather(aurora_awaitable, redshift_awaitable)
         logger.debug("Pre-transition steps complete.")
 
+        # N.B. We do not yet execute any table movements (assume they are
+        # available everywhere).
+
     async def advance_blueprint(self) -> None:
+        if self._diff is None:
+            return
+
         await self._blueprint_mgr.update_transition_state(
             TransitionState.TransitionedPreCleanUp
         )
 
     async def run_post_transition(self) -> None:
+        if self._diff is None:
+            return
+
         await self._blueprint_mgr.update_transition_state(TransitionState.CleaningUp)
+
+        aurora_awaitable = self._run_aurora_post_transition(
+            self._curr_blueprint.aurora_provisioning(),
+            self._next_blueprint.aurora_provisioning(),
+            self._diff.aurora_diff(),
+        )
+        redshift_awaitable = self._run_redshift_post_transition(
+            self._diff.redshift_diff(),
+        )
+        await asyncio.gather(aurora_awaitable, redshift_awaitable)
+        logger.debug("Post-transition steps complete.")
 
     async def _run_aurora_pre_transition(
         self,
@@ -161,6 +182,35 @@ class TransitionOrchestrator:
 
         # Aurora's pre-transition work is complete!
 
+    async def _run_aurora_post_transition(
+        self, old: Provisioning, new: Provisioning, diff: Optional[ProvisioningDiff]
+    ) -> None:
+        if diff is None:
+            # Nothing to do.
+            return
+
+        if new.num_nodes() == 0:
+            # Special case (shutting down the cluster).
+            await self._rds.pause_cluster(self._config.aurora_cluster_id)
+            return
+
+        old_replica_count = old.num_nodes() - 1
+        new_replica_count = new.num_nodes() - 1
+
+        if old_replica_count > 0 and new_replica_count < old_replica_count:
+            await self._blueprint_mgr.refresh_directory()
+            replicas = self._blueprint_mgr.get_directory().aurora_readers()
+            delete_index = old_replica_count - 1
+            while delete_index >= new_replica_count:
+                logger.debug(
+                    "Deleting Aurora replica %s...",
+                    replicas[delete_index].instance_id(),
+                )
+                await self._rds.delete_replica(replicas[delete_index].instance_id())
+                delete_index -= 1
+
+        # Aurora's post-transition work is complete!
+
     async def _run_redshift_pre_transition(
         self,
         old: Provisioning,
@@ -200,6 +250,17 @@ class TransitionOrchestrator:
             )
 
         # Redshift's pre-transition work is complete!
+
+    async def _run_redshift_post_transition(
+        self,
+        diff: Optional[ProvisioningDiff],
+    ) -> None:
+        if diff is None:
+            # Nothing to do.
+            return
+
+        if diff.new_num_nodes() == 0:
+            await self._redshift.pause_cluster(self._config.redshift_cluster_id)
 
 
 # Note that `version` is the blueprint version when the instance was created. It

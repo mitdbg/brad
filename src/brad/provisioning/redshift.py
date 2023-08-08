@@ -5,7 +5,6 @@ import logging
 from typing import Dict, Any
 
 from brad.config.file import ConfigFile
-from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.provisioning import Provisioning
 
 
@@ -48,23 +47,7 @@ class RedshiftProvisioningManager:
             or new.num_nodes() > 2 * old.num_nodes()
         )
 
-    async def run_post_transition_resize(
-        self, cluster_id: str, old: Provisioning, new: Provisioning
-    ) -> None:
-        """
-        Runs resize tasks that should run after switching to a blueprint
-        that has the `new` provisioning.
-        """
-        diff = ProvisioningDiff.of(old, new)
-        if diff is None:
-            # Nothing to do.
-            return
-
-        if diff.new_num_nodes() == 0:
-            await self._resize_to_zero(cluster_id)
-            # No need to wait for the pause to complete.
-
-    async def _resize_to_zero(self, cluster_id: str) -> None:
+    async def pause_cluster(self, cluster_id: str) -> None:
         def do_pause():
             self._redshift.pause_cluster(ClusterIdentifier=cluster_id)
 
