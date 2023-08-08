@@ -2,16 +2,18 @@ import asyncio
 import logging
 
 from brad.asset_manager import AssetManager
+from brad.blueprint import Blueprint
 from brad.blueprint.user import UserProvidedBlueprint
+from brad.blueprint.manager import BlueprintManager
 from brad.blueprint.sql_gen.table import (
     generate_create_index_sql,
     generate_drop_index_sql,
 )
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
-from brad.planner.enumeration.blueprint import EnumeratedBlueprint
-from brad.blueprint.manager import BlueprintManager
+from brad.daemon.transition_orchestrator import TransitionOrchestrator
 from brad.front_end.engine_connections import EngineConnections
+from brad.planner.enumeration.blueprint import EnumeratedBlueprint
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +149,24 @@ def add_indexes(args, config: ConfigFile, mgr: BlueprintManager) -> None:
         engines.close_sync()
 
 
+async def run_transition(
+    config: ConfigFile,
+    blueprint_mgr: BlueprintManager,
+    curr_blueprint: Blueprint,
+    next_blueprint: Blueprint,
+) -> None:
+    orchestrator = TransitionOrchestrator(
+        config, blueprint_mgr, curr_blueprint, next_blueprint
+    )
+    logger.info("Starting the pre-transition...")
+    await orchestrator.run_pre_transition()
+    logger.info("Advancing the blueprint...")
+    await orchestrator.advance_blueprint()
+    logger.info("Starting the post-transition...")
+    await orchestrator.run_post_transition()
+    logger.info("Done!")
+
+
 # This method is called by `brad.exec.admin.main`.
 def modify_blueprint(args):
     # 1. Load the config.
@@ -198,6 +218,8 @@ def modify_blueprint(args):
     if args.force:
         blueprint_mgr.force_new_blueprint_sync(modified_blueprint)
     else:
-        asyncio.run(blueprint_mgr.start_transition(modified_blueprint))
+        asyncio.run(
+            run_transition(config, blueprint_mgr, blueprint, modified_blueprint)
+        )
 
     logger.info("Done!")

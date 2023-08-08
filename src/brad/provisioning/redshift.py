@@ -16,7 +16,7 @@ class RedshiftProvisioningManager:
     def __init__(self, config: ConfigFile):
         self._redshift = boto3.client(
             "redshift",
-            aws_access_key=config.aws_access_key,
+            aws_access_key_id=config.aws_access_key,
             aws_secret_access_key=config.aws_access_key_secret,
         )
 

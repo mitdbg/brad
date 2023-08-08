@@ -14,7 +14,7 @@ class RdsProvisioningManager:
     def __init__(self, config: ConfigFile) -> None:
         self._rds = boto3.client(
             "rds",
-            aws_access_key=config.aws_access_key,
+            aws_access_key_id=config.aws_access_key,
             aws_secret_access_key=config.aws_access_key_secret,
         )
 
@@ -44,6 +44,8 @@ class RdsProvisioningManager:
                 PubliclyAccessible=True,
                 DBInstanceClass=provisioning.instance_type(),
                 Engine="aurora-postgresql",
+                EnablePerformanceInsights=True,
+                MonitoringInterval=60,
             )
 
         loop = asyncio.get_running_loop()
