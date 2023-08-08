@@ -1,9 +1,11 @@
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, TYPE_CHECKING
 
-from brad.blueprint import Blueprint
 from brad.data_stats.estimator import Estimator
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.query_rep import QueryRep
+
+if TYPE_CHECKING:
+    from brad.blueprint import Blueprint
 
 
 class Router:
@@ -15,7 +17,7 @@ class Router:
         If the routing policy needs an estimator, one should be provided here.
         """
 
-    def update_blueprint(self, blueprint: Blueprint) -> None:
+    def update_blueprint(self, blueprint: "Blueprint") -> None:
         """
         Used to update any cached state that depends on the blueprint (e.g.,
         location bitmaps).
