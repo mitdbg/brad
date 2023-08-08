@@ -20,8 +20,11 @@ from brad.daemon.messages import (
     MetricsReport,
     InternalCommandRequest,
     InternalCommandResponse,
+    NewBlueprint,
+    NewBlueprintAck,
 )
 from brad.daemon.monitor import Monitor
+from brad.daemon.transition_orchestrator import TransitionOrchestrator
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
@@ -89,6 +92,9 @@ class BradDaemon:
 
         self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
         self._timed_sync_task: Optional[asyncio.Task[None]] = None
+
+        self._transition_orchestrator: Optional[TransitionOrchestrator] = None
+        self._transition_task: Optional[asyncio.Task[None]] = None
 
     async def run_forever(self) -> None:
         """
@@ -260,6 +266,32 @@ class BradDaemon:
                     self._run_internal_command_request_response(message)
                 )
 
+            elif isinstance(message, NewBlueprintAck):
+                if self._transition_orchestrator is None:
+                    logger.error(
+                        "Received blueprint ack message but no transition is in progress. Version: %d, Front end: %d",
+                        message.version,
+                        message.fe_index,
+                    )
+                    continue
+
+                # Sanity check.
+                next_version = self._transition_orchestrator.next_version()
+                if next_version != message.version:
+                    logger.error(
+                        "Received a blueprint ack for a mismatched version. Received %d, Expected %d",
+                        message.version,
+                        next_version,
+                    )
+                    continue
+
+                self._transition_orchestrator.decrement_waiting_for_front_ends()
+                if self._transition_orchestrator.waiting_for_front_ends() == 0:
+                    # Schedule the second half of the transition.
+                    self._transition_task = asyncio.create_task(
+                        self._run_transition_part_two()
+                    )
+
             else:
                 logger.debug(
                     "Received unexpected message from front end %d: %s",
@@ -271,9 +303,12 @@ class BradDaemon:
         """
         Informs the server about a new blueprint.
         """
-        # TODO: Need to persist the blueprint and notify the front ends to
-        # transition.
-        logger.info("Planner selected new blueprint: %s", blueprint)
+        if self._transition_orchestrator is not None:
+            logger.warning(
+                "Planner selected a new blueprint, but we are still transitioning to a blueprint. New blueprint: %s",
+                blueprint,
+            )
+            return
 
         if PERSIST_BLUEPRINT_VAR in os.environ:
             logger.info(
@@ -283,6 +318,18 @@ class BradDaemon:
             await self._blueprint_mgr.update_transition_state(TransitionState.Stable)
             assert self._planner is not None
             self._planner.update_blueprint(blueprint)
+        else:
+            logger.info(
+                "Planner selected a new blueprint. Transition is starting. New blueprint: %s",
+                blueprint,
+            )
+            self._transition_orchestrator = TransitionOrchestrator(
+                self._config,
+                self._blueprint_mgr,
+                self._blueprint_mgr.get_blueprint(),
+                blueprint,
+            )
+            self._transition_task = asyncio.create_task(self._run_transition_part_one())
 
     async def _run_sync_periodically(self) -> None:
         while True:
@@ -385,6 +432,37 @@ class BradDaemon:
         else:
             logger.warning("Received unknown internal command: %s", command)
             return []
+
+    async def _run_transition_part_one(self) -> None:
+        assert self._transition_orchestrator is not None
+        await self._transition_orchestrator.run_pre_transition()
+        await self._transition_orchestrator.advance_blueprint()
+
+        # Inform all front ends about the new blueprint.
+        logger.debug(
+            "Notifying %d front ends about the new blueprint.", len(self._front_ends)
+        )
+        self._transition_orchestrator.set_waiting_for_front_ends(len(self._front_ends))
+        version = self._blueprint_mgr.get_blueprint_version()
+        for fe in self._front_ends:
+            fe.input_queue.put(NewBlueprint(fe.fe_index, version))
+
+        self._transition_task = None
+
+        # We finish the transition after all front ends acknowledge that they
+        # have transitioned to the new blueprint.
+
+    async def _run_transition_part_two(self) -> None:
+        assert self._transition_orchestrator is not None
+        await self._transition_orchestrator.run_post_transition()
+
+        # Done.
+        logger.info(
+            "Completed the transition to blueprint version %d",
+            self._blueprint_mgr.get_blueprint_version(),
+        )
+        self._transition_task = None
+        self._transition_orchestrator = None
 
 
 class _NoopAnalyticsScorer(AnalyticsLatencyScorer):
