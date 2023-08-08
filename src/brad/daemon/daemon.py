@@ -213,10 +213,10 @@ class BradDaemon:
         # 2. Input sentinel messages to unblock our reader tasks.
         # 3. Wait for the processes to shut down.
         logger.info("Telling %d front end(s) to shut down...", len(self._front_ends))
-        for fe in self._front_ends:
-            fe.input_queue.put(ShutdownFrontEnd())
+        for fe_index, fe in enumerate(self._front_ends):
+            fe.input_queue.put(ShutdownFrontEnd(fe_index))
             if fe.message_reader_task is not None:
-                fe.output_queue.put(Sentinel())
+                fe.output_queue.put(Sentinel(fe_index))
 
         if self._timed_sync_task is not None:
             self._timed_sync_task.cancel()
@@ -244,26 +244,22 @@ class BradDaemon:
         loop = asyncio.get_running_loop()
         while True:
             message = await loop.run_in_executor(None, front_end.output_queue.get)
+            if message.fe_index != front_end.fe_index:
+                logger.warning(
+                    "Received message with invalid front end index. Expected %d. Received %d.",
+                    front_end.fe_index,
+                    message.fe_index,
+                )
+                continue
+
             if isinstance(message, MetricsReport):
-                if message.fe_index != front_end.fe_index:
-                    logger.warning(
-                        "Received MetricsReport with invalid front end index. Expected %d. Received %d.",
-                        front_end.fe_index,
-                        message.fe_index,
-                    )
-                    continue
                 self._monitor.handle_metric_report(message)
+
             elif isinstance(message, InternalCommandRequest):
-                if message.fe_index != front_end.fe_index:
-                    logger.warning(
-                        "Received InternalCommandRequest with invalid front end index. Expected %d. Received %d.",
-                        front_end.fe_index,
-                        message.fe_index,
-                    )
-                    continue
                 asyncio.create_task(
                     self._run_internal_command_request_response(message)
                 )
+
             else:
                 logger.debug(
                     "Received unexpected message from front end %d: %s",
