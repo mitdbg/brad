@@ -96,7 +96,7 @@ class BlueprintManager:
         asyncio.run(self._directory.refresh())
         logger.debug("Loaded %s", self._versioning)
 
-    async def start_transition(self, new_blueprint: Blueprint) -> None:
+    async def start_transition(self, new_blueprint: Blueprint) -> int:
         assert self._versioning is not None, "Run load() first."
         assert (
             self._versioning.transition_state == TransitionState.Stable
@@ -118,6 +118,7 @@ class BlueprintManager:
         )
         self._versioning = next_versioning
         self._next_blueprint = new_blueprint
+        return next_version
 
     async def update_transition_state(self, next_state: TransitionState) -> None:
         assert self._versioning is not None, "Run load() first."
@@ -191,6 +192,9 @@ class BlueprintManager:
 
     def get_directory(self) -> Directory:
         return self._directory
+
+    async def refresh_directory(self) -> None:
+        await self._directory.refresh()
 
     async def _load_versioning(self) -> "BlueprintVersioning":
         version_data = await self._assets.load(

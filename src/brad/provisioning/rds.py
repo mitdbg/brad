@@ -77,10 +77,76 @@ class RdsProvisioningManager:
             )
             await asyncio.sleep(polling_interval)
 
+    async def wait_until_cluster_is_available(
+        self, cluster_id: str, polling_interval: float = 20
+    ) -> None:
+        while True:
+            response = await self._describe_db_cluster(cluster_id)
+            cluster = response["DBClusters"][0]
+            status = cluster["Status"]
+            # Check if status is stable.
+            if status == "available":
+                break
+            logger.debug(
+                "Waiting for Aurora cluster %s to become available...", cluster_id
+            )
+            await asyncio.sleep(polling_interval)
+
+    async def start_cluster(
+        self, cluster_id: str, wait_until_available: bool = True
+    ) -> None:
+        def do_start():
+            self._rds.start_db_cluster(
+                DBClusterIdentifier=cluster_id,
+            )
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, do_start)
+
+        if wait_until_available:
+            await self.wait_until_cluster_is_available(cluster_id)
+
+    async def pause_cluster(self, cluster_id: str) -> None:
+        def do_pause():
+            self._rds.pause_db_cluster(
+                DBClusterIdentifier=cluster_id,
+            )
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, do_pause)
+
+    async def change_instance_type(
+        self,
+        instance_id: str,
+        provisioning: Provisioning,
+        wait_until_available: bool = True,
+    ) -> None:
+        def do_change():
+            self._rds.modify_db_instance(
+                DBInstanceIdentifier=instance_id,
+                DBInstanceClass=provisioning.instance_type(),
+                ApplyImmediately=True,
+            )
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, do_change)
+
+        if wait_until_available:
+            await self.wait_until_instance_is_available(instance_id)
+
     async def _describe_db_instance(self, instance_id: str) -> Dict[str, Any]:
         def do_describe():
             return self._rds.describe_db_instances(
                 DBInstanceIdentifier=instance_id,
+            )
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, do_describe)
+
+    async def _describe_db_cluster(self, cluster_id: str) -> Dict[str, Any]:
+        def do_describe():
+            return self._rds.describe_db_clusters(
+                DBClusterIdentifier=cluster_id,
             )
 
         loop = asyncio.get_running_loop()
