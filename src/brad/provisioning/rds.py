@@ -1,9 +1,90 @@
+import asyncio
 import boto3
 import time
 import logging
-import os
+from typing import Any, Dict
 
-logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+from brad.config.file import ConfigFile
+from brad.blueprint.provisioning import Provisioning
+
+logger = logging.getLogger(__name__)
+
+
+class RdsProvisioningManager:
+    def __init__(self, config: ConfigFile) -> None:
+        self._rds = boto3.client(
+            "rds",
+            aws_access_key=config.aws_access_key,
+            aws_secret_access_key=config.aws_access_key_secret,
+        )
+
+    async def run_primary_failover(
+        self, cluster_id: str, new_primary_identifier: str
+    ) -> None:
+        def do_failover():
+            self._rds.failover_db_cluster(
+                DBClusterIdentifier=cluster_id,
+                TargetDBInstanceIdentifier=new_primary_identifier,
+            )
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, do_failover)
+
+    async def create_replica(
+        self,
+        cluster_id: str,
+        instance_id: str,
+        provisioning: Provisioning,
+        wait_until_available: bool = True,
+    ) -> None:
+        def do_create_replica():
+            self._rds.create_db_instance(
+                DBClusterIdentifier=cluster_id,
+                DBInstanceIdentifier=instance_id,
+                PubliclyAccessible=True,
+                DBInstanceClass=provisioning.instance_type(),
+                Engine="aurora-postgresql",
+            )
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, do_create_replica)
+
+        if wait_until_available:
+            await self.wait_until_instance_is_available(instance_id)
+
+    async def delete_replica(self, instance_id: str) -> None:
+        def do_delete():
+            self._rds.delete_db_instance(
+                DBInstanceIdentifier=instance_id,
+                SkipFinalSnapshot=True,
+                DeleteAutomatedBackups=True,
+            )
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, do_delete)
+
+    async def wait_until_instance_is_available(
+        self, instance_id: str, polling_interval: float = 20
+    ) -> None:
+        while True:
+            response = await self._describe_db_instance(instance_id)
+            instance = response["DBInstances"][0]
+            status = instance["DBInstanceStatus"]
+            if status == "available":
+                break
+            logger.debug(
+                "Waiting for Aurora instance %s to become available...", instance_id
+            )
+            await asyncio.sleep(polling_interval)
+
+    async def _describe_db_instance(self, instance_id: str) -> Dict[str, Any]:
+        def do_describe():
+            return self._rds.describe_db_instances(
+                DBInstanceIdentifier=instance_id,
+            )
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, do_describe)
 
 
 class RdsProvisioning:

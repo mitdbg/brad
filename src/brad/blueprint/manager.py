@@ -111,7 +111,7 @@ class BlueprintManager:
 
         next_versioning = self._versioning.copy()
         next_versioning.next_version = next_version
-        next_versioning.transition_state = TransitionState.TransitioningButAbortable
+        next_versioning.transition_state = TransitionState.Transitioning
         await self._assets.persist(
             _VERSION_KEY.format(schema_name=self._schema_name),
             next_versioning.serialize(),
@@ -178,7 +178,11 @@ class BlueprintManager:
 
     def get_blueprint(self) -> Blueprint:
         assert self._versioning is not None
-        if self._versioning.transition_state is not TransitionState.CleaningUp:
+        if (
+            self._versioning.transition_state is not TransitionState.CleaningUp
+            and self._versioning.transition_state
+            is not TransitionState.TransitionedPreCleanUp
+        ):
             assert self._current_blueprint is not None
             return self._current_blueprint
         else:
