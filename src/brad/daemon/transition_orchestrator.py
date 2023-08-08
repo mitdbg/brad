@@ -122,6 +122,13 @@ class TransitionOrchestrator:
             )
             await self._blueprint_mgr.refresh_directory()
 
+            # When "shutting down" a cluster, we pause it instead of deleting
+            # instances. So on startup, the actual number of replicas will not
+            # match what is passed in.
+            directory = self._blueprint_mgr.get_directory()
+            paused_aurora_nodes = 1 + len(directory.aurora_readers())
+            old = Provisioning(old.instance_type(), paused_aurora_nodes)
+
         # NOTE: We will need a more robust process to deal with cases where we
         # are at the replica limit (max. 15 replicas).
 
@@ -175,13 +182,9 @@ class TransitionOrchestrator:
                     replica.instance_id(), new, wait_until_available=True
                 )
 
-        new_replica_count = new.num_nodes() - 1
-        old_replica_count = old.num_nodes() - 1
-        if (
-            new_replica_count > 0
-            and old_replica_count > 0
-            and new_replica_count > old_replica_count
-        ):
+        new_replica_count = max(new.num_nodes() - 1, 0)
+        old_replica_count = max(old.num_nodes() - 1, 0)
+        if new_replica_count > 0 and new_replica_count > old_replica_count:
             next_index = old_replica_count
             while next_index < new_replica_count:
                 new_replica_id = _AURORA_REPLICA_FORMAT.format(
@@ -213,8 +216,8 @@ class TransitionOrchestrator:
             await self._rds.pause_cluster(self._config.aurora_cluster_id)
             return
 
-        old_replica_count = old.num_nodes() - 1
-        new_replica_count = new.num_nodes() - 1
+        old_replica_count = max(old.num_nodes() - 1, 0)
+        new_replica_count = max(new.num_nodes() - 1, 0)
 
         if old_replica_count > 0 and new_replica_count < old_replica_count:
             await self._blueprint_mgr.refresh_directory()

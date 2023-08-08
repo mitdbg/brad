@@ -86,6 +86,7 @@ aurora:
   odbc_driver: PostgreSQL
   user: postgres
   password: postgres_password
+  monitoring_role_arn: arn:aws:iam:123
 
 redshift:
   cluster_id: redshift-brad

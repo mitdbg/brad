@@ -4,6 +4,7 @@ import time
 import logging
 from typing import Any, Dict
 
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.blueprint.provisioning import Provisioning
 
@@ -12,9 +13,10 @@ logger = logging.getLogger(__name__)
 
 class RdsProvisioningManager:
     def __init__(self, config: ConfigFile) -> None:
+        self._config = config
         self._rds = boto3.client(
             "rds",
-            aws_access_key=config.aws_access_key,
+            aws_access_key_id=config.aws_access_key,
             aws_secret_access_key=config.aws_access_key_secret,
         )
 
@@ -38,12 +40,18 @@ class RdsProvisioningManager:
         wait_until_available: bool = True,
     ) -> None:
         def do_create_replica():
+            monitoring_role_arn = self._config.get_connection_details(Engine.Aurora)[
+                "monitoring_role_arn"
+            ]
             self._rds.create_db_instance(
                 DBClusterIdentifier=cluster_id,
                 DBInstanceIdentifier=instance_id,
                 PubliclyAccessible=True,
                 DBInstanceClass=provisioning.instance_type(),
                 Engine="aurora-postgresql",
+                EnablePerformanceInsights=True,
+                MonitoringInterval=60,
+                MonitoringRoleArn=monitoring_role_arn,
             )
 
         loop = asyncio.get_running_loop()
