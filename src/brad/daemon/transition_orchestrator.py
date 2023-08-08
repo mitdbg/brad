@@ -7,6 +7,7 @@ from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.manager import BlueprintManager
 from brad.blueprint.provisioning import Provisioning
+from brad.blueprint.state import TransitionState
 from brad.config.file import ConfigFile
 from brad.provisioning.rds import RdsProvisioningManager
 from brad.provisioning.redshift import RedshiftProvisioningManager
@@ -45,18 +46,21 @@ class TransitionOrchestrator:
             aurora_diff,
             next_version,
         )
-        redshift_awaitable = self._run_redshift_pre_transition(redshift_diff)
+        redshift_awaitable = self._run_redshift_pre_transition(
+            curr_blueprint.redshift_provisioning(),
+            self._next_blueprint.redshift_provisioning(),
+            redshift_diff,
+        )
         await asyncio.gather(aurora_awaitable, redshift_awaitable)
+        logger.debug("Pre-transition steps complete.")
+
+    async def advance_blueprint(self) -> None:
+        await self._blueprint_mgr.update_transition_state(
+            TransitionState.TransitionedPreCleanUp
+        )
 
     async def run_post_transition(self) -> None:
-        pass
-
-    def _requires_aurora_failover(
-        self, aurora_diff: Optional[ProvisioningDiff]
-    ) -> bool:
-        if aurora_diff is None:
-            return False
-        return aurora_diff.new_instance_type() is not None
+        await self._blueprint_mgr.update_transition_state(TransitionState.CleaningUp)
 
     async def _run_aurora_pre_transition(
         self,
@@ -83,6 +87,9 @@ class TransitionOrchestrator:
 
         if old.instance_type() != new.instance_type():
             # Handle the primary first.
+            old_primary_instance = (
+                self._blueprint_mgr.get_directory().aurora_writer().instance_id()
+            )
             new_primary_instance = _AURORA_PRIMARY_FORMAT.format(
                 cluster_id=self._config.aurora_cluster_id,
                 version=str(next_version),
@@ -104,6 +111,10 @@ class TransitionOrchestrator:
             )
             logger.debug("Failover complete for %s", self._config.aurora_cluster_id)
             await self._blueprint_mgr.refresh_directory()
+
+            logger.debug("Deleting the old primary: %s", old_primary_instance)
+            await self._rds.delete_replica(old_primary_instance)
+            logger.debug("Done deleting the old primary: %s", old_primary_instance)
 
             replicas_to_modify = min(new.num_nodes() - 1, old.num_nodes() - 1)
 
@@ -151,10 +162,44 @@ class TransitionOrchestrator:
         # Aurora's pre-transition work is complete!
 
     async def _run_redshift_pre_transition(
-        self, diff: Optional[ProvisioningDiff]
+        self,
+        old: Provisioning,
+        new: Provisioning,
+        diff: Optional[ProvisioningDiff],
     ) -> None:
         if diff is None:
+            # Nothing to do.
             return
+
+        # Handle special cases: Starting up from 0 or going to 0.
+        if diff.new_num_nodes() == 0:
+            # This is handled post-transition.
+            return
+
+        if old.num_nodes() == 0:
+            existing = await self._redshift.resume_and_fetch_existing_provisioning(
+                self._config.redshift_cluster_id
+            )
+            if existing == new:
+                return
+
+            # We shut down clusters by pausing them. On restart, they resume
+            # with their old provisioning.
+            old = existing
+
+        # Resizes are OK because Redshift maintains read-availability during the
+        # resize.
+        is_classic = self._redshift.must_use_classic_resize(old, new)
+        if is_classic:
+            await self._redshift.classic_resize(
+                self._config.redshift_cluster_id, new, wait_until_available=True
+            )
+        else:
+            await self._redshift.elastic_resize(
+                self._config.redshift_cluster_id, new, wait_until_available=True
+            )
+
+        # Redshift's pre-transition work is complete!
 
 
 # Note that `version` is the blueprint version when the instance was created. It
