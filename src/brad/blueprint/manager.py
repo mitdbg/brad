@@ -96,7 +96,7 @@ class BlueprintManager:
         asyncio.run(self._directory.refresh())
         logger.debug("Loaded %s", self._versioning)
 
-    async def start_transition(self, new_blueprint: Blueprint) -> None:
+    async def start_transition(self, new_blueprint: Blueprint) -> int:
         assert self._versioning is not None, "Run load() first."
         assert (
             self._versioning.transition_state == TransitionState.Stable
@@ -111,13 +111,14 @@ class BlueprintManager:
 
         next_versioning = self._versioning.copy()
         next_versioning.next_version = next_version
-        next_versioning.transition_state = TransitionState.TransitioningButAbortable
+        next_versioning.transition_state = TransitionState.Transitioning
         await self._assets.persist(
             _VERSION_KEY.format(schema_name=self._schema_name),
             next_versioning.serialize(),
         )
         self._versioning = next_versioning
         self._next_blueprint = new_blueprint
+        return next_version
 
     async def update_transition_state(self, next_state: TransitionState) -> None:
         assert self._versioning is not None, "Run load() first."
@@ -178,7 +179,11 @@ class BlueprintManager:
 
     def get_blueprint(self) -> Blueprint:
         assert self._versioning is not None
-        if self._versioning.transition_state is not TransitionState.CleaningUp:
+        if (
+            self._versioning.transition_state is not TransitionState.CleaningUp
+            and self._versioning.transition_state
+            is not TransitionState.TransitionedPreCleanUp
+        ):
             assert self._current_blueprint is not None
             return self._current_blueprint
         else:
@@ -187,6 +192,9 @@ class BlueprintManager:
 
     def get_directory(self) -> Directory:
         return self._directory
+
+    async def refresh_directory(self) -> None:
+        await self._directory.refresh()
 
     async def _load_versioning(self) -> "BlueprintVersioning":
         version_data = await self._assets.load(
