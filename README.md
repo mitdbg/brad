@@ -97,6 +97,9 @@ files.
   `config_sample.yml` file).
 - (08/07/2023) Re-run `./tools/install-dev.sh` to update your dependencies. We
   added `PyAthena`.
+- (08/08/2023) Add `monitoring_role_arn` to your Aurora connection
+  configuration. This should be set to the ARN of the `rds-monitoring-role`
+  found in your AWS IAM console.
 
 
 ### Generate IMDB workload
