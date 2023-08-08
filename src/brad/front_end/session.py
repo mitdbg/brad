@@ -2,6 +2,7 @@ import asyncio
 import logging
 from typing import Dict, Tuple, Optional
 
+from brad.config.engine import Engine
 from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.session import SessionId
@@ -89,3 +90,37 @@ class SessionManager:
             logger.debug("Ended session %s", session_id)
         await asyncio.gather(*end_tasks)
         self._sessions.clear()
+
+    async def add_connections(self) -> None:
+        """
+        Used during blueprint transitions to add connections to newly started
+        engines.
+        """
+        blueprint = self._blueprint_mgr.get_blueprint()
+        directory = self._blueprint_mgr.get_directory()
+
+        expected_engines = {Engine.Athena}
+        if blueprint.aurora_provisioning().num_nodes() > 0:
+            expected_engines.add(Engine.Aurora)
+        if blueprint.redshift_provisioning().num_nodes() > 0:
+            expected_engines.add(Engine.Redshift)
+
+        for session in self._sessions.values():
+            await session.engines.add_connections(
+                self._config, directory, expected_engines
+            )
+
+    async def remove_connections(self) -> None:
+        """
+        Used during blueprint transitions to remove connections to stopped engines.
+        """
+        blueprint = self._blueprint_mgr.get_blueprint()
+
+        expected_engines = {Engine.Athena}
+        if blueprint.aurora_provisioning().num_nodes() > 0:
+            expected_engines.add(Engine.Aurora)
+        if blueprint.redshift_provisioning().num_nodes() > 0:
+            expected_engines.add(Engine.Redshift)
+
+        for session in self._sessions.values():
+            await session.engines.remove_connections(expected_engines)

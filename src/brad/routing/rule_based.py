@@ -85,6 +85,10 @@ class RuleBased(Router):
         self._deterministic = deterministic
         self._params = RuleBasedParams()
 
+    def update_blueprint(self, blueprint: Blueprint) -> None:
+        self._blueprint = blueprint
+        self._table_placement_bitmap = blueprint.table_locations_bitmap()
+
     async def recollect_catalog(self, sessions: SessionManager) -> None:
         # recollect catalog stats; happens every maintenance window
         if self._catalog is None:

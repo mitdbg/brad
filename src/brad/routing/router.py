@@ -1,5 +1,6 @@
 from typing import Dict, Tuple, Optional
 
+from brad.blueprint import Blueprint
 from brad.data_stats.estimator import Estimator
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.query_rep import QueryRep
@@ -12,6 +13,12 @@ class Router:
         dynamic state.
 
         If the routing policy needs an estimator, one should be provided here.
+        """
+
+    def update_blueprint(self, blueprint: Blueprint) -> None:
+        """
+        Used to update any cached state that depends on the blueprint (e.g.,
+        location bitmaps).
         """
 
     async def engine_for(self, query: QueryRep) -> Engine:

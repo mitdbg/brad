@@ -23,6 +23,8 @@ from brad.daemon.messages import (
     MetricsReport,
     InternalCommandRequest,
     InternalCommandResponse,
+    NewBlueprint,
+    NewBlueprintAck,
 )
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
@@ -386,6 +388,18 @@ class BradFrontEnd(BradInterface):
                     continue
                 self._daemon_request_mailbox.on_new_message(message.response)
 
+            elif isinstance(message, NewBlueprint):
+                logger.info(
+                    "Received notification to update to blueprint version %d",
+                    message.version,
+                )
+                # This refreshes any cached state that depends on the old blueprint.
+                await self._run_blueprint_update(message.version)
+                # Tell the daemon that we have updated.
+                self._output_queue.put(
+                    NewBlueprintAck(self._fe_index, message.version), block=False
+                )
+
             else:
                 logger.info("Received message from the daemon: %s", message)
 
@@ -432,6 +446,25 @@ class BradFrontEnd(BradInterface):
             # Run one last refresh before exiting to ensure any remaining log
             # files are uploaded.
             await self._qhandler.refresh()
+
+    async def _run_blueprint_update(self, version: int) -> None:
+        await self._blueprint_mgr.load()
+        curr_version = self._blueprint_mgr.get_blueprint_version()
+        if version != curr_version:
+            logger.error(
+                "Retrieved blueprint version (%d) is not the same as the notified version (%d).",
+                curr_version,
+                version,
+            )
+            return
+
+        await self._sessions.add_connections()
+        blueprint = self._blueprint_mgr.get_blueprint()
+        self._router.update_blueprint(blueprint)
+        # NOTE: This will cause any pending queries on the to-be-removed
+        # connections to be cancelled. We consider this behavior to be
+        # acceptable.
+        await self._sessions.remove_connections()
 
 
 async def _orchestrate_shutdown() -> None:
