@@ -132,7 +132,7 @@ class TransitionOrchestrator:
             )
             new_primary_instance = _AURORA_PRIMARY_FORMAT.format(
                 cluster_id=self._config.aurora_cluster_id,
-                version=str(next_version),
+                version=str(next_version).zfill(5),
             )
             logger.debug("Creating new Aurora replica: %s", new_primary_instance)
             await self._rds.create_replica(
@@ -186,8 +186,8 @@ class TransitionOrchestrator:
             while next_index < new_replica_count:
                 new_replica_id = _AURORA_REPLICA_FORMAT.format(
                     cluster_id=self._config.aurora_cluster_id,
-                    version=next_version,
-                    index=next_index,
+                    version=str(next_version).zfill(5),
+                    index=str(next_index).zfill(2),
                 )
                 logger.debug("Creating replica %s", new_replica_id)
                 await self._rds.create_replica(

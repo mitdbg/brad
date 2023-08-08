@@ -464,7 +464,8 @@ class BradDaemon:
     async def _run_transition_part_two(self) -> None:
         assert self._transition_orchestrator is not None
         await self._transition_orchestrator.run_post_transition()
-        self._planner.update_blueprint(self._blueprint_mgr.get_blueprint())
+        if self._planner is not None:
+            self._planner.update_blueprint(self._blueprint_mgr.get_blueprint())
 
         # Done.
         logger.info(
