@@ -58,21 +58,24 @@ class BlueprintManager:
         Loads the persisted version of the blueprint from S3.
         """
         try:
-            self._versioning = await self._load_versioning()
+            versioning = await self._load_versioning()
         except ValueError:
             self._upgrade_legacy_format()
-            self._versioning = await self._load_versioning()
+            versioning = await self._load_versioning()
             # If there is still a problem, we want the exception to stop BRAD.
 
-        self._current_blueprint = await self._load_blueprint_version(
-            self._versioning.version
-        )
-        if self._versioning.next_version is not None:
-            self._next_blueprint = await self._load_blueprint_version(
-                self._versioning.next_version
-            )
+        current_blueprint = await self._load_blueprint_version(versioning.version)
+        if versioning.next_version is not None:
+            next_blueprint = await self._load_blueprint_version(versioning.next_version)
         else:
-            self._next_blueprint = None
+            next_blueprint = None
+
+        # We want these values to be set together (i.e., not across `await`
+        # boundaries).
+        self._versioning = versioning
+        self._current_blueprint = current_blueprint
+        self._next_blueprint = next_blueprint
+
         await self._directory.refresh()
         logger.debug("Loaded %s", self._versioning)
 
@@ -189,6 +192,18 @@ class BlueprintManager:
         else:
             assert self._next_blueprint is not None
             return self._next_blueprint
+
+    def get_blueprint_version(self) -> int:
+        assert self._versioning is not None
+        if (
+            self._versioning.transition_state is not TransitionState.CleaningUp
+            and self._versioning.transition_state
+            is not TransitionState.TransitionedPreCleanUp
+        ):
+            return self._versioning.version
+        else:
+            assert self._versioning.next_version is not None
+            return self._versioning.next_version
 
     def get_directory(self) -> Directory:
         return self._directory

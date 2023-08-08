@@ -51,7 +51,7 @@ class EngineConnections:
                 cursor = await conn.cursor()
                 await cursor.execute("SET enable_result_cache_for_session = off")
 
-        return cls(connection_map, schema_name)
+        return cls(connection_map, schema_name, autocommit)
 
     @classmethod
     def connect_sync(
@@ -88,14 +88,18 @@ class EngineConnections:
                 cursor = conn.cursor_sync()
                 cursor.execute_sync("SET enable_result_cache_for_session = off")
 
-        return cls(connection_map, schema_name)
+        return cls(connection_map, schema_name, autocommit)
 
     def __init__(
-        self, connection_map: Dict[Engine, Connection], schema_name: Optional[str]
+        self,
+        connection_map: Dict[Engine, Connection],
+        schema_name: Optional[str],
+        autocommit: bool,
     ):
         # NOTE: Need to set the appropriate isolation levels.
         self._connection_map = connection_map
         self._schema_name = schema_name
+        self._autocommit = autocommit
 
     def __del__(self) -> None:
         self.close_sync()
@@ -103,6 +107,35 @@ class EngineConnections:
     @property
     def schema_name(self) -> Optional[str]:
         return self._schema_name
+
+    async def add_connections(
+        self, config: ConfigFile, directory: Directory, expected_engines: Set[Engine]
+    ) -> None:
+        """
+        Adds connections to engines that are in `expected_engines` but not
+        currently connected to.
+        """
+        for engine in expected_engines:
+            if engine in self._connection_map:
+                continue
+            self._connection_map[engine] = await ConnectionFactory.connect_to(
+                engine, self._schema_name, config, directory, self._autocommit
+            )
+
+    async def remove_connections(self, expected_engines: Set[Engine]) -> None:
+        """
+        Removes connections from engines that are not in `expected_engines` but
+        are currently connected to.
+        """
+        to_remove = []
+        for engine, conn in self._connection_map.items():
+            if engine in expected_engines:
+                continue
+            await conn.close()
+            to_remove.append(engine)
+
+        for engine in to_remove:
+            del self._connection_map[engine]
 
     def get_connection(self, engine: Engine) -> Connection:
         try:

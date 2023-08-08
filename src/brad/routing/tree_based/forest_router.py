@@ -78,6 +78,10 @@ class ForestRouter(Router):
 
             self._table_placement_bitmap = self._blueprint.table_locations_bitmap()
 
+    def update_blueprint(self, blueprint: Blueprint) -> None:
+        self._blueprint = blueprint
+        self._table_placement_bitmap = blueprint.table_locations_bitmap()
+
     async def engine_for(self, query: QueryRep) -> Engine:
         # Compute valid locations.
         assert self._table_placement_bitmap is not None

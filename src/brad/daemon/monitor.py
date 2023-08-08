@@ -70,6 +70,46 @@ class Monitor:
             self._config, self._forecasting_method, self._forecasting_window_size
         )
 
+    def update_metrics_sources(self) -> None:
+        """
+        Updates the metrics sources when the blueprint changes.
+        """
+
+        # We only need to refresh the Aurora metric sources. We never change the
+        # Redshift cluster ID during provisioning changes.
+        blueprint = self._blueprint_mgr.get_blueprint()
+        num_replicas = blueprint.aurora_provisioning().num_nodes() - 1
+
+        if self._aurora_writer_metrics is not None:
+            self._aurora_writer_metrics.update_clients()
+
+        if num_replicas <= 0:
+            self._aurora_reader_metrics.clear()
+            return
+
+        # Remove any unneeded sources.
+        while len(self._aurora_reader_metrics) > num_replicas:
+            self._aurora_reader_metrics.pop()
+
+        # Refresh existing sources.
+        for source in self._aurora_reader_metrics:
+            source.update_clients()
+
+        # Add new sources if needed.
+        if len(self._aurora_reader_metrics) < num_replicas:
+            next_index = len(self._aurora_reader_metrics)
+            while next_index < num_replicas:
+                self._aurora_reader_metrics.append(
+                    AuroraMetrics(
+                        self._config,
+                        self._blueprint_mgr,
+                        reader_instance_index=next_index,
+                        forecasting_method=self._forecasting_method,
+                        forecasting_window_size=self._forecasting_window_size,
+                    )
+                )
+                next_index += 1
+
     async def fetch_latest(self) -> None:
         """
         Fetches the latest metrics from our metrics sources.

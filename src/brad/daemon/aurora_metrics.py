@@ -31,6 +31,7 @@ class AuroraMetrics(MetricsSourceWithForecasting):
     ) -> None:
         self._config = config
         self._blueprint_mgr = blueprint_mgr
+        self._reader_instance_index = reader_instance_index
 
         self._pi_metrics, self._cw_metrics = self._load_metric_defs()
         self._values = pd.DataFrame(
@@ -40,30 +41,7 @@ class AuroraMetrics(MetricsSourceWithForecasting):
             ]
         )
 
-        # TODO: This metrics engine needs to be adjusted on blueprint changes.
-        directory = blueprint_mgr.get_directory()
-        resource_id = (
-            directory.aurora_writer().resource_id()
-            if reader_instance_index is None
-            else directory.aurora_readers()[reader_instance_index].resource_id()
-        )
-        self._pi_client = PerfInsightsClient(resource_id, config)
-        if reader_instance_index is None:
-            self._cw_client = CloudWatchClient(
-                Engine.Aurora,
-                cluster_identifier=None,
-                instance_identifier=directory.aurora_writer().instance_id(),
-                config=config,
-            )
-        else:
-            self._cw_client = CloudWatchClient(
-                Engine.Aurora,
-                cluster_identifier=None,
-                instance_identifier=directory.aurora_readers()[
-                    reader_instance_index
-                ].instance_id(),
-                config=config,
-            )
+        self.update_clients()
         self._logger = MetricsLogger.create_from_config(
             self._config, self._metrics_logger_name(reader_instance_index)
         )
@@ -71,6 +49,31 @@ class AuroraMetrics(MetricsSourceWithForecasting):
         super().__init__(
             self._config.epoch_length, forecasting_method, forecasting_window_size
         )
+
+    def update_clients(self) -> None:
+        directory = self._blueprint_mgr.get_directory()
+        resource_id = (
+            directory.aurora_writer().resource_id()
+            if self._reader_instance_index is None
+            else directory.aurora_readers()[self._reader_instance_index].resource_id()
+        )
+        self._pi_client = PerfInsightsClient(resource_id, self._config)
+        if self._reader_instance_index is None:
+            self._cw_client = CloudWatchClient(
+                Engine.Aurora,
+                cluster_identifier=None,
+                instance_identifier=directory.aurora_writer().instance_id(),
+                config=self._config,
+            )
+        else:
+            self._cw_client = CloudWatchClient(
+                Engine.Aurora,
+                cluster_identifier=None,
+                instance_identifier=directory.aurora_readers()[
+                    self._reader_instance_index
+                ].instance_id(),
+                config=self._config,
+            )
 
     async def fetch_latest(self) -> None:
         loop = asyncio.get_running_loop()

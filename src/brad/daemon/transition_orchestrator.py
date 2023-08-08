@@ -31,12 +31,17 @@ class TransitionOrchestrator:
         self._rds = RdsProvisioningManager(config)
         self._redshift = RedshiftProvisioningManager(config)
 
+        self._waiting_for_front_ends = 0
+        self._next_version: Optional[int] = None
+
     async def run_pre_transition(self) -> None:
         if self._diff is None:
             # Nothing to do.
             return
 
-        next_version = await self._blueprint_mgr.start_transition(self._next_blueprint)
+        self._next_version = await self._blueprint_mgr.start_transition(
+            self._next_blueprint
+        )
 
         aurora_diff = self._diff.aurora_diff()
         redshift_diff = self._diff.redshift_diff()
@@ -45,7 +50,7 @@ class TransitionOrchestrator:
             self._curr_blueprint.aurora_provisioning(),
             self._next_blueprint.aurora_provisioning(),
             aurora_diff,
-            next_version,
+            self._next_version,
         )
         redshift_awaitable = self._run_redshift_pre_transition(
             self._curr_blueprint.redshift_provisioning(),
@@ -66,6 +71,18 @@ class TransitionOrchestrator:
             TransitionState.TransitionedPreCleanUp
         )
 
+    def set_waiting_for_front_ends(self, value: int) -> None:
+        self._waiting_for_front_ends = value
+
+    def waiting_for_front_ends(self) -> int:
+        return self._waiting_for_front_ends
+
+    def decrement_waiting_for_front_ends(self) -> None:
+        self._waiting_for_front_ends -= 1
+
+    def next_version(self) -> Optional[int]:
+        return self._next_version
+
     async def run_post_transition(self) -> None:
         if self._diff is None:
             return
@@ -82,6 +99,8 @@ class TransitionOrchestrator:
         )
         await asyncio.gather(aurora_awaitable, redshift_awaitable)
         logger.debug("Post-transition steps complete.")
+
+        await self._blueprint_mgr.update_transition_state(TransitionState.Stable)
 
     async def _run_aurora_pre_transition(
         self,
@@ -113,7 +132,7 @@ class TransitionOrchestrator:
             )
             new_primary_instance = _AURORA_PRIMARY_FORMAT.format(
                 cluster_id=self._config.aurora_cluster_id,
-                version=str(next_version),
+                version=str(next_version).zfill(5),
             )
             logger.debug("Creating new Aurora replica: %s", new_primary_instance)
             await self._rds.create_replica(
@@ -167,8 +186,8 @@ class TransitionOrchestrator:
             while next_index < new_replica_count:
                 new_replica_id = _AURORA_REPLICA_FORMAT.format(
                     cluster_id=self._config.aurora_cluster_id,
-                    version=next_version,
-                    index=next_index,
+                    version=str(next_version).zfill(5),
+                    index=str(next_index).zfill(2),
                 )
                 logger.debug("Creating replica %s", new_replica_id)
                 await self._rds.create_replica(
