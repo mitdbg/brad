@@ -458,8 +458,10 @@ class BradFrontEnd(BradInterface):
             )
             return
 
-        await self._sessions.add_connections()
         blueprint = self._blueprint_mgr.get_blueprint()
+        if self._monitor is not None:
+            self._monitor.update_metrics_sources()
+        await self._sessions.add_connections()
         self._router.update_blueprint(blueprint)
         # NOTE: This will cause any pending queries on the to-be-removed
         # connections to be cancelled. We consider this behavior to be

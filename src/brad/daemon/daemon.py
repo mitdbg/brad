@@ -438,6 +438,11 @@ class BradDaemon:
         await self._transition_orchestrator.run_pre_transition()
         await self._transition_orchestrator.advance_blueprint()
 
+        # Important because the instance IDs may have changed.
+        self._monitor.update_metrics_sources()
+
+        await self._data_sync_executor.update_connections()
+
         # Inform all front ends about the new blueprint.
         logger.debug(
             "Notifying %d front ends about the new blueprint.", len(self._front_ends)

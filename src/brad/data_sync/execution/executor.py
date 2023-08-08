@@ -41,6 +41,22 @@ class DataSyncExecutor:
             "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE"
         )
 
+    async def update_connections(self) -> None:
+        if self._engines is None:
+            return
+
+        blueprint = self._blueprint_mgr.get_blueprint()
+        directory = self._blueprint_mgr.get_directory()
+        expected_engines = {Engine.Athena}
+
+        if blueprint.aurora_provisioning().num_nodes() > 0:
+            expected_engines.add(Engine.Aurora)
+        if blueprint.redshift_provisioning().num_nodes() > 0:
+            expected_engines.add(Engine.Redshift)
+
+        await self._engines.add_connections(self._config, directory, expected_engines)
+        await self._engines.remove_connections(expected_engines)
+
     async def shutdown(self) -> None:
         if self._engines is None:
             return
