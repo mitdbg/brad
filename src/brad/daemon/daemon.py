@@ -323,6 +323,10 @@ class BradDaemon:
                 "Planner selected a new blueprint. Transition is starting. New blueprint: %s",
                 blueprint,
             )
+            logger.info("Ignoring the blueprint (temporarily) for stability.")
+            return
+
+            # pylint: disable-next=unreachable
             self._transition_orchestrator = TransitionOrchestrator(
                 self._config,
                 self._blueprint_mgr,
