@@ -74,6 +74,7 @@ class SessionManager:
             self._config,
             self._blueprint_mgr.get_directory(),
             self._schema_name,
+            specific_engines=engines,
         )
         session = Session(session_id, connections)
         self._sessions[session_id] = session
