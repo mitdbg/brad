@@ -31,7 +31,7 @@ from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.front_end.brad_interface import BradInterface
 from brad.front_end.errors import QueryError
 from brad.front_end.grpc import BradGrpc
-from brad.front_end.session import SessionManager, SessionId
+from brad.front_end.session import SessionManager, SessionId, Session
 from brad.query_rep import QueryRep
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.rule_based import RuleBased
@@ -265,7 +265,7 @@ class BradFrontEnd(BradInterface):
 
             # Handle internal commands separately.
             if query.startswith("BRAD_"):
-                return await self._handle_internal_command(query)
+                return await self._handle_internal_command(session, query)
 
             # 2. Select an engine for the query.
             query_rep = QueryRep(query)
@@ -326,7 +326,9 @@ class BradFrontEnd(BradInterface):
             logger.exception("Encountered unexpected exception when handling request.")
             raise QueryError.from_exception(ex)
 
-    async def _handle_internal_command(self, command_raw: str) -> RowList:
+    async def _handle_internal_command(
+        self, session: Session, command_raw: str
+    ) -> RowList:
         """
         This method is used to handle BRAD_ prefixed "queries" (i.e., commands
         to run custom functionality like syncing data across the engines).
@@ -357,6 +359,34 @@ class BradFrontEnd(BradInterface):
         elif command == "BRAD_NOOP":
             # Used to measure the overhead of accessing BRAD.
             return [("OK",)]
+
+        elif command.startswith("BRAD_RUN_ON"):
+            # BRAD_RUN_ON <engine> <query or command>
+            # This is useful for commands used to set up experiments (e.g.,
+            # running ANALYZE).
+            parts = command_raw.split(" ")
+            try:
+                engine = Engine.from_str(parts[1])
+            except ValueError as ex:
+                return [(str(ex),)]
+
+            query = " ".join(parts[2:])
+            if len(query) == 0:
+                return [("Empty query/command.",)]
+
+            try:
+                connection = session.engines.get_connection(engine)
+                cursor = await connection.cursor()
+                logger.debug("Requested to run on %s: %s", str(engine), query)
+                await cursor.execute(query)
+            except RuntimeError as ex:
+                return [(str(ex),)]
+
+            # Extract and return the results, if any.
+            try:
+                return [tuple(row) for row in cursor.fetchall_sync()]
+            except pyodbc.ProgrammingError:
+                return []
 
         else:
             return [("Unknown internal command: {}".format(command),)]
