@@ -331,6 +331,9 @@ class TransitionOrchestrator:
             return
 
         if diff.new_num_nodes() == 0:
+            logger.debug(
+                "Pausing Redshift cluster %s", self._config.redshift_cluster_id
+            )
             await self._redshift.pause_cluster(self._config.redshift_cluster_id)
 
 
