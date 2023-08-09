@@ -1,8 +1,13 @@
 import asyncio
 import boto3
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from .rds_status import RdsStatus
+from .redshift_status import RedshiftAvailabilityStatus
 from brad.config.file import ConfigFile
+
+logger = logging.getLogger(__name__)
 
 
 class Directory:
@@ -34,6 +39,9 @@ class Directory:
         self._aurora_readers: List["AuroraInstanceMetadata"] = []
         self._redshift_cluster: Optional["RedshiftClusterMetadata"] = None
 
+        self._aurora_writer_endpoint: Optional[str] = None
+        self._aurora_reader_endpoint: Optional[str] = None
+
     def aurora_writer(self) -> "AuroraInstanceMetadata":
         assert self._aurora_writer is not None
         return self._aurora_writer
@@ -45,8 +53,21 @@ class Directory:
         assert self._redshift_cluster is not None
         return self._redshift_cluster
 
+    def aurora_writer_endpoint(self) -> str:
+        assert self._aurora_writer_endpoint is not None
+        return self._aurora_writer_endpoint
+
+    def aurora_reader_endpoint(self) -> str:
+        assert self._aurora_reader_endpoint is not None
+        return self._aurora_reader_endpoint
+
     async def refresh(self) -> None:
-        aurora_writer, aurora_readers = await self._refresh_aurora()
+        (
+            aurora_writer,
+            aurora_readers,
+            writer_endpoint,
+            reader_endpoint,
+        ) = await self._refresh_aurora()
         redshift = await self._refresh_redshift()
 
         self._aurora_writer = aurora_writer
@@ -54,30 +75,56 @@ class Directory:
         self._aurora_readers.extend(aurora_readers)
         self._redshift_cluster = redshift
 
+        self._aurora_writer_endpoint = writer_endpoint
+        self._aurora_reader_endpoint = reader_endpoint
+
     async def _refresh_aurora(
         self,
-    ) -> Tuple["AuroraInstanceMetadata", List["AuroraInstanceMetadata"]]:
+    ) -> Tuple["AuroraInstanceMetadata", List["AuroraInstanceMetadata"], str, str]:
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(None, self._call_describe_aurora_cluster)
 
         new_writer: Optional[AuroraInstanceMetadata] = None
         new_readers: List[AuroraInstanceMetadata] = []
+        cluster_info = response["DBClusters"][0]
 
-        for cluster_info in response["DBClusters"]:
-            for instance_info in cluster_info["DBClusterMembers"]:
-                instance_id = instance_info["DBInstanceIdentifier"]
-                is_writer = instance_info["IsClusterWriter"]
+        for instance_info in cluster_info["DBClusterMembers"]:
+            instance_id = instance_info["DBInstanceIdentifier"]
+            is_writer = instance_info["IsClusterWriter"]
 
-                if is_writer:
-                    assert new_writer is None
-                    new_writer = await self._refresh_aurora_instance(instance_id)
-                else:
-                    new_readers.append(await self._refresh_aurora_instance(instance_id))
+            if is_writer:
+                assert new_writer is None
+                new_writer = await self._refresh_aurora_instance(instance_id)
+            else:
+                if "-replica-" not in instance_id:
+                    logger.debug(
+                        "Ignoring Aurora instance %s because it is not named as a replica.",
+                        instance_id,
+                    )
+                    continue
+
+                reader_info = await self._refresh_aurora_instance(instance_id)
+                reader_status = reader_info.status()
+                if (
+                    reader_status == RdsStatus.Deleting
+                    or reader_status == RdsStatus.DeletePrecheck
+                    or reader_status == RdsStatus.Failed
+                ):
+                    logger.debug(
+                        "Ignoring Aurora instance %s because it has an invalid status %s",
+                        instance_id,
+                        str(reader_status),
+                    )
+                    continue
+                new_readers.append(reader_info)
 
         assert new_writer is not None
         new_readers.sort()
 
-        return (new_writer, new_readers)
+        writer_endpoint = cluster_info["Endpoint"]
+        reader_endpoint = cluster_info["ReaderEndpoint"]
+
+        return (new_writer, new_readers, writer_endpoint, reader_endpoint)
 
     async def _refresh_aurora_instance(
         self, instance_id: str
@@ -86,13 +133,13 @@ class Directory:
         response = await loop.run_in_executor(
             None, self._call_describe_aurora_instance, instance_id
         )
-        # NOTE: This might also include instances being deleted (?).
         instance_data = response["DBInstances"][0]
         kwargs = {
             "instance_id": instance_id,
             "resource_id": instance_data["DbiResourceId"],
             "endpoint_address": instance_data["Endpoint"]["Address"],
             "endpoint_port": instance_data["Endpoint"]["Port"],
+            "status": RdsStatus.from_str(instance_data["DBInstanceStatus"]),
         }
         return AuroraInstanceMetadata(**kwargs)
 
@@ -106,6 +153,11 @@ class Directory:
         kwargs = {
             "endpoint_address": cluster["Endpoint"]["Address"],
             "endpoint_port": cluster["Endpoint"]["Port"],
+            "instance_type": cluster["NodeType"],
+            "num_nodes": cluster["NumberOfNodes"],
+            "availability_status": RedshiftAvailabilityStatus.from_str(
+                cluster["ClusterAvailabilityStatus"]
+            ),
         }
         return RedshiftClusterMetadata(**kwargs)
 
@@ -132,11 +184,13 @@ class AuroraInstanceMetadata:
         resource_id: str,
         endpoint_address: str,
         endpoint_port: int,
+        status: RdsStatus,
     ) -> None:
         self._instance_id = instance_id
         self._resource_id = resource_id
         self._endpoint_address = endpoint_address
         self._endpoint_port = endpoint_port
+        self._status = status
 
     def instance_id(self) -> str:
         return self._instance_id
@@ -147,14 +201,36 @@ class AuroraInstanceMetadata:
     def endpoint(self) -> Tuple[str, int]:
         return (self._endpoint_address, self._endpoint_port)
 
+    def status(self) -> RdsStatus:
+        return self._status
+
     def __lt__(self, other: "AuroraInstanceMetadata") -> bool:
         return self.instance_id() < other.instance_id()
 
 
 class RedshiftClusterMetadata:
-    def __init__(self, endpoint_address: str, endpoint_port: int) -> None:
+    def __init__(
+        self,
+        endpoint_address: str,
+        endpoint_port: int,
+        instance_type: str,
+        num_nodes: int,
+        availability_status: RedshiftAvailabilityStatus,
+    ) -> None:
         self._endpoint_address = endpoint_address
         self._endpoint_port = endpoint_port
+        self._instance_type = instance_type
+        self._num_nodes = num_nodes
+        self._availability_status = availability_status
 
     def endpoint(self) -> Tuple[str, int]:
         return (self._endpoint_address, self._endpoint_port)
+
+    def instance_type(self) -> str:
+        return self._instance_type
+
+    def num_nodes(self) -> int:
+        return self._num_nodes
+
+    def availability_status(self) -> RedshiftAvailabilityStatus:
+        return self._availability_status

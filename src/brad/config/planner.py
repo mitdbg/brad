@@ -59,6 +59,9 @@ class PlannerConfig:
     def aurora_provisioning_change_time_s(self) -> int:
         return int(self._raw["aurora_provisioning_change_time_s"])
 
+    def aurora_per_instance_change_time_s(self) -> int:
+        return int(self._raw["aurora_per_instance_change_time_s"])
+
     def redshift_extract_rate_mb_per_s(self) -> float:
         return float(self._raw["redshift_extract_rate_mb_per_s"])
 

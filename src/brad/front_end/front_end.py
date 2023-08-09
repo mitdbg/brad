@@ -449,11 +449,11 @@ class BradFrontEnd(BradInterface):
 
     async def _run_blueprint_update(self, version: int) -> None:
         await self._blueprint_mgr.load()
-        curr_version = self._blueprint_mgr.get_blueprint_version()
-        if version != curr_version:
+        active_version = self._blueprint_mgr.get_active_blueprint_version()
+        if version != active_version:
             logger.error(
-                "Retrieved blueprint version (%d) is not the same as the notified version (%d).",
-                curr_version,
+                "Retrieved active blueprint version (%d) is not the same as the notified version (%d).",
+                active_version,
                 version,
             )
             return

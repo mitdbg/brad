@@ -61,6 +61,15 @@ class SessionManager:
         logger.debug("Creating a new session...")
         session_id = SessionId(self._next_id_value)
         self._next_id_value += 1
+
+        # Only connect to running engines.
+        engines = {Engine.Athena}
+        blueprint = self._blueprint_mgr.get_blueprint()
+        if blueprint.aurora_provisioning().num_nodes() > 0:
+            engines.add(Engine.Aurora)
+        if blueprint.redshift_provisioning().num_nodes() > 0:
+            engines.add(Engine.Redshift)
+
         connections = await EngineConnections.connect(
             self._config,
             self._blueprint_mgr.get_directory(),
