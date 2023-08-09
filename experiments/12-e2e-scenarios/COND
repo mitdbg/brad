@@ -94,3 +94,12 @@ run_experiment(
     "skip-replan": 1,
   },
 )
+
+group(
+  name="baseline",
+  deps=[
+    ":baseline-light_start",
+    ":baseline-increase_txns_1",
+    ":baseline-increase_txns_2",
+  ],
+)

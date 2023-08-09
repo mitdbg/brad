@@ -80,15 +80,16 @@ python3 ana_runner.py \
   &
 ana_pid=$!
 
-if [ -z $skip_replan ]; then
-  sleep $run_for_s
+sleep $run_for_s
 
+if [ -z $skip_replan ]; then
   # Invoke the planner and wait for it to complete.
   log_workload_point "invoke_planner"
   brad cli --command "BRAD_RUN_PLANNER;"
 fi
 
 # Send SIGINT to the runner processes.
+>&2 echo "Done. Telling runners to stop"
 kill -INT $txn_pid
 kill -INT $ana_pid
 
