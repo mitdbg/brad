@@ -197,12 +197,12 @@ class TransitionOrchestrator:
                 self._config.aurora_cluster_id, new_primary_instance
             )
             logger.debug("Failover complete for %s", self._config.aurora_cluster_id)
-            await self._blueprint_mgr.refresh_directory()
 
             logger.debug("Deleting the old primary: %s", old_primary_instance)
             await self._rds.delete_replica(old_primary_instance)
             logger.debug("Done deleting the old primary: %s", old_primary_instance)
 
+            await self._blueprint_mgr.refresh_directory()
             replicas_to_modify = min(new.num_nodes() - 1, old.num_nodes() - 1)
 
             # Modify replicas one-by-one. Note that this logic causes the reader

@@ -96,6 +96,13 @@ class Directory:
                 assert new_writer is None
                 new_writer = await self._refresh_aurora_instance(instance_id)
             else:
+                if "-replica-" not in instance_id:
+                    logger.debug(
+                        "Ignoring Aurora instance %s because it is not named as a replica.",
+                        instance_id,
+                    )
+                    continue
+
                 reader_info = await self._refresh_aurora_instance(instance_id)
                 reader_status = reader_info.status()
                 if (
