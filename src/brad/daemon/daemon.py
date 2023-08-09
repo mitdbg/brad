@@ -312,12 +312,10 @@ class BradDaemon:
 
         if PERSIST_BLUEPRINT_VAR in os.environ:
             logger.info(
-                "Force-persisting the new blueprint. Restart BRAD to load the new blueprint."
+                "Force-persisting the new blueprint. Run a manual transition and "
+                "then restart BRAD to load the new blueprint."
             )
             await self._blueprint_mgr.start_transition(blueprint)
-            await self._blueprint_mgr.update_transition_state(TransitionState.Stable)
-            assert self._planner is not None
-            self._planner.update_blueprint(blueprint)
         else:
             logger.info(
                 "Planner selected a new blueprint. Transition is starting. New blueprint: %s",
