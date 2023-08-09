@@ -27,11 +27,21 @@ class DataSyncExecutor:
         logger.debug(
             "Data sync executor is establishing connections to the underlying engines..."
         )
+        blueprint = self._blueprint_mgr.get_blueprint()
+        engines = {Engine.Athena, Engine.Aurora}
+        assert (
+            blueprint.aurora_provisioning().num_nodes() > 0
+        ), "The data sync executor must be able to connect to Aurora."
+
+        if blueprint.redshift_provisioning().num_nodes() > 0:
+            engines.add(Engine.Redshift)
+
         self._engines = await EngineConnections.connect(
             self._config,
             self._blueprint_mgr.get_directory(),
             self._blueprint_mgr.schema_name,
             autocommit=False,
+            specific_engines=engines,
         )
         # Reads/writes to the data sync metadata are handled by this Aurora connection.
         # We need serializable isolation for correctness.

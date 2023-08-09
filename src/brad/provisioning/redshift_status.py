@@ -8,6 +8,7 @@ class RedshiftAvailabilityStatus(enum.Enum):
     Maintenance = "Maintenance"
     Modifying = "Modifying"
     Failed = "Failed"
+    Paused = "Paused"
 
     @staticmethod
     def from_str(candidate: str) -> "RedshiftAvailabilityStatus":

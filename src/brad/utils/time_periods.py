@@ -21,7 +21,8 @@ def impute_old_missing_metrics(
     Replaces any NaN metric values that have a timestamp older than `cutoff`.
     """
     cpy = metrics.copy()
-    cpy.loc[cpy.index < cutoff] = cpy.loc[cpy.index < cutoff].fillna(value)
+    pd_cutoff = pd.to_datetime(cutoff, utc=True, unit="ns")
+    cpy.loc[cpy.index < pd_cutoff] = cpy.loc[cpy.index < pd_cutoff].fillna(value)
     return cpy
 
 
