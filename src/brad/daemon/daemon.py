@@ -327,11 +327,9 @@ class BradDaemon:
             return
 
             # pylint: disable-next=unreachable
+            await self._blueprint_mgr.start_transition(blueprint)
             self._transition_orchestrator = TransitionOrchestrator(
-                self._config,
-                self._blueprint_mgr,
-                self._blueprint_mgr.get_blueprint(),
-                blueprint,
+                self._config, self._blueprint_mgr
             )
             self._transition_task = asyncio.create_task(self._run_transition_part_one())
 
@@ -439,8 +437,14 @@ class BradDaemon:
 
     async def _run_transition_part_one(self) -> None:
         assert self._transition_orchestrator is not None
-        await self._transition_orchestrator.run_pre_transition()
-        await self._transition_orchestrator.advance_blueprint()
+        await self._transition_orchestrator.run_prepare_then_transition()
+
+        # Switch to the transitioned state.
+        tm = self._blueprint_mgr.get_transition_metadata()
+        assert (
+            tm.state == TransitionState.TransitionedPreCleanUp
+        ), "Incorrect transition state."
+        assert tm.next_version is not None, "Missing next version."
 
         # Important because the instance IDs may have changed.
         self._monitor.update_metrics_sources()
@@ -452,9 +456,8 @@ class BradDaemon:
             "Notifying %d front ends about the new blueprint.", len(self._front_ends)
         )
         self._transition_orchestrator.set_waiting_for_front_ends(len(self._front_ends))
-        version = self._blueprint_mgr.get_blueprint_version()
         for fe in self._front_ends:
-            fe.input_queue.put(NewBlueprint(fe.fe_index, version))
+            fe.input_queue.put(NewBlueprint(fe.fe_index, tm.next_version))
 
         self._transition_task = None
 
@@ -463,15 +466,16 @@ class BradDaemon:
 
     async def _run_transition_part_two(self) -> None:
         assert self._transition_orchestrator is not None
-        await self._transition_orchestrator.run_post_transition()
+        await self._transition_orchestrator.run_clean_up_after_transition()
         if self._planner is not None:
             self._planner.update_blueprint(self._blueprint_mgr.get_blueprint())
 
         # Done.
-        logger.info(
-            "Completed the transition to blueprint version %d",
-            self._blueprint_mgr.get_blueprint_version(),
-        )
+        tm = self._blueprint_mgr.get_transition_metadata()
+        assert (
+            tm.state == TransitionState.Stable
+        ), "Incorrect transition state after completion."
+        logger.info("Completed the transition to blueprint version %d", tm.curr_version)
         self._transition_task = None
         self._transition_orchestrator = None
 

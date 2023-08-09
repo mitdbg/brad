@@ -181,6 +181,9 @@ class BlueprintManager:
         return self._schema_name
 
     def get_blueprint(self) -> Blueprint:
+        """
+        This is used to retrieve the **active** blueprint.
+        """
         assert self._versioning is not None
         if (
             self._versioning.transition_state is not TransitionState.CleaningUp
@@ -193,7 +196,11 @@ class BlueprintManager:
             assert self._next_blueprint is not None
             return self._next_blueprint
 
-    def get_blueprint_version(self) -> int:
+    def get_active_blueprint_version(self) -> int:
+        """
+        This is used to retrieve the version associated with the **active**
+        blueprint.
+        """
         assert self._versioning is not None
         if (
             self._versioning.transition_state is not TransitionState.CleaningUp
@@ -204,6 +211,18 @@ class BlueprintManager:
         else:
             assert self._versioning.next_version is not None
             return self._versioning.next_version
+
+    def get_transition_metadata(self) -> "TransitionMetadata":
+        assert self._versioning is not None
+        assert self._current_blueprint is not None
+        # Store versioned blueprints here too.
+        return TransitionMetadata(
+            state=self._versioning.transition_state,
+            curr_version=self._versioning.version,
+            curr_blueprint=self._current_blueprint,
+            next_version=self._versioning.next_version,
+            next_blueprint=self._next_blueprint,
+        )
 
     def get_directory(self) -> Directory:
         return self._directory
@@ -310,6 +329,26 @@ class BlueprintVersioning:
         return BlueprintVersioning(
             self.version, self.transition_state, self.next_version
         )
+
+
+class TransitionMetadata:
+    """
+    Holds information about a blueprint transition.
+    """
+
+    def __init__(
+        self,
+        state: TransitionState,
+        curr_version: int,
+        curr_blueprint: Blueprint,
+        next_version: Optional[int],
+        next_blueprint: Optional[Blueprint],
+    ) -> None:
+        self.state = state
+        self.curr_version = curr_version
+        self.curr_blueprint = curr_blueprint
+        self.next_version = next_version
+        self.next_blueprint = next_blueprint
 
 
 _LEGACY_METADATA_KEY_TEMPLATE = "{}.brad"

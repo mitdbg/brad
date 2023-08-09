@@ -2,7 +2,6 @@ import asyncio
 import logging
 from typing import Optional
 
-from brad.blueprint import Blueprint
 from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.manager import BlueprintManager
@@ -20,28 +19,45 @@ class TransitionOrchestrator:
         self,
         config: ConfigFile,
         blueprint_mgr: BlueprintManager,
-        curr_blueprint: Blueprint,
-        next_blueprint: Blueprint,
     ) -> None:
         self._config = config
         self._blueprint_mgr = blueprint_mgr
-        self._curr_blueprint = curr_blueprint
-        self._next_blueprint = next_blueprint
-        self._diff = BlueprintDiff.of(self._curr_blueprint, self._next_blueprint)
         self._rds = RdsProvisioningManager(config)
         self._redshift = RedshiftProvisioningManager(config)
-
         self._waiting_for_front_ends = 0
-        self._next_version: Optional[int] = None
 
-    async def run_pre_transition(self) -> None:
-        if self._diff is None:
-            # Nothing to do.
+        self._refresh_transition_metadata()
+
+    def next_version(self) -> Optional[int]:
+        """
+        Returns the version this class is transitioning to. If `None`, it
+        indicates no transition is in progress.
+        """
+        return self._next_version
+
+    async def run_prepare_then_transition(self) -> None:
+        """
+        Prepares the provisioning for a graceful transition, and then executes
+        the transition. After this method returns, the next blueprint will be
+        active. Clients (i.e., front ends) should switch to the next blueprint.
+        After all clients have switched, run `run_post_transition()` to clean up
+        any old provisionings.
+        """
+
+        if self._tm.state != TransitionState.Transitioning:
             return
 
-        self._next_version = await self._blueprint_mgr.start_transition(
-            self._next_blueprint
-        )
+        if self._diff is None:
+            # Nothing to do.
+            await self._blueprint_mgr.update_transition_state(
+                TransitionState.TransitionedPreCleanUp
+            )
+            self._refresh_transition_metadata()
+            return
+
+        assert self._curr_blueprint is not None
+        assert self._next_blueprint is not None
+        assert self._next_version is not None
 
         aurora_diff = self._diff.aurora_diff()
         redshift_diff = self._diff.redshift_diff()
@@ -63,13 +79,10 @@ class TransitionOrchestrator:
         # N.B. We do not yet execute any table movements (assume they are
         # available everywhere).
 
-    async def advance_blueprint(self) -> None:
-        if self._diff is None:
-            return
-
         await self._blueprint_mgr.update_transition_state(
             TransitionState.TransitionedPreCleanUp
         )
+        self._refresh_transition_metadata()
 
     def set_waiting_for_front_ends(self, value: int) -> None:
         self._waiting_for_front_ends = value
@@ -80,14 +93,25 @@ class TransitionOrchestrator:
     def decrement_waiting_for_front_ends(self) -> None:
         self._waiting_for_front_ends -= 1
 
-    def next_version(self) -> Optional[int]:
-        return self._next_version
-
-    async def run_post_transition(self) -> None:
-        if self._diff is None:
+    async def run_clean_up_after_transition(self) -> None:
+        if (
+            self._tm.state != TransitionState.TransitionedPreCleanUp
+            and self._tm.state != TransitionState.CleaningUp
+        ):
             return
 
-        await self._blueprint_mgr.update_transition_state(TransitionState.CleaningUp)
+        if self._tm.state == TransitionState.TransitionedPreCleanUp:
+            await self._blueprint_mgr.update_transition_state(
+                TransitionState.CleaningUp
+            )
+            self._refresh_transition_metadata()
+
+        if self._diff is None:
+            await self._blueprint_mgr.update_transition_state(TransitionState.Stable)
+            return
+
+        assert self._curr_blueprint is not None
+        assert self._next_blueprint is not None
 
         aurora_awaitable = self._run_aurora_post_transition(
             self._curr_blueprint.aurora_provisioning(),
@@ -101,6 +125,22 @@ class TransitionOrchestrator:
         logger.debug("Post-transition steps complete.")
 
         await self._blueprint_mgr.update_transition_state(TransitionState.Stable)
+
+    def _refresh_transition_metadata(self) -> None:
+        self._tm = self._blueprint_mgr.get_transition_metadata()
+        if self._tm.state == TransitionState.Stable:
+            self._diff = None
+            self._curr_blueprint = None
+            self._next_blueprint = None
+            self._next_version = None
+            return
+
+        assert self._tm.next_blueprint is not None
+        assert self._tm.next_version is not None
+        self._diff = BlueprintDiff.of(self._tm.curr_blueprint, self._tm.next_blueprint)
+        self._curr_blueprint = self._tm.curr_blueprint
+        self._next_blueprint = self._tm.next_blueprint
+        self._next_version = self._tm.next_version
 
     async def _run_aurora_pre_transition(
         self,
