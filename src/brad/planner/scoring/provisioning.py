@@ -10,6 +10,7 @@ from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.provisioning import Provisioning
 from brad.config.planner import PlannerConfig
 from brad.planner.workload.query import Query
+from brad.provisioning.redshift import RedshiftProvisioningManager
 
 
 ProvisioningResources = namedtuple(
@@ -133,10 +134,19 @@ def compute_redshift_transition_time_s(
         # Special case: Shutting down an engine is "free".
         return 0.0
 
+    if old.num_nodes() == 0 and new.num_nodes() > 0:
+        # Special case: Starting up a paused cluster. For now, we estimate this
+        # as an elastic resize.
+        return planner_config.redshift_elastic_resize_time_s()
+
     # Some provisioning changes may take longer than others (classic vs. elastic
-    # resize and also the time it takes to transfer data). To start, we use one
-    # fixed time.
-    return planner_config.redshift_provisioning_change_time_s()
+    # resize and also the time it takes to transfer data).
+    must_use_classic = RedshiftProvisioningManager.must_use_classic_resize(old, new)
+
+    if must_use_classic:
+        return planner_config.redshift_classic_resize_time_s()
+    else:
+        return planner_config.redshift_elastic_resize_time_s()
 
 
 def aurora_resource_value(prov: Provisioning) -> float:

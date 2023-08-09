@@ -62,6 +62,13 @@ class PlannerConfig:
     def aurora_per_instance_change_time_s(self) -> int:
         return int(self._raw["aurora_per_instance_change_time_s"])
 
+    def redshift_elastic_resize_time_s(self) -> int:
+        return int(self._raw["redshift_elastic_resize_time_s"])
+
+    def redshift_classic_resize_time_s(self) -> int:
+        # We may replace this with our own resize operation.
+        return int(self._raw["redshift_classic_resize_time_s"])
+
     def redshift_extract_rate_mb_per_s(self) -> float:
         return float(self._raw["redshift_extract_rate_mb_per_s"])
 
