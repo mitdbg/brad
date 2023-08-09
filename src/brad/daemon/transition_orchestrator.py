@@ -289,6 +289,9 @@ class TransitionOrchestrator:
             return
 
         if old.num_nodes() == 0:
+            logger.debug(
+                "Resuming Redshift cluster %s", self._config.redshift_cluster_id
+            )
             existing = await self._redshift.resume_and_fetch_existing_provisioning(
                 self._config.redshift_cluster_id
             )
@@ -303,10 +306,16 @@ class TransitionOrchestrator:
         # resize.
         is_classic = self._redshift.must_use_classic_resize(old, new)
         if is_classic:
+            logger.debug(
+                "Running Redshift classic resize. Old: %s, New: %s", str(old), str(new)
+            )
             await self._redshift.classic_resize(
                 self._config.redshift_cluster_id, new, wait_until_available=True
             )
         else:
+            logger.debug(
+                "Running Redshift elastic resize. Old: %s, New: %s", str(old), str(new)
+            )
             await self._redshift.elastic_resize(
                 self._config.redshift_cluster_id, new, wait_until_available=True
             )
