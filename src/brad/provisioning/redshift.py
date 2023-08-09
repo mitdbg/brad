@@ -66,6 +66,7 @@ class RedshiftProvisioningManager:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, do_resume)
 
+        await asyncio.sleep(20)
         await self.wait_until_available(cluster_id)
 
         response = await loop.run_in_executor(None, self._get_cluster_state, cluster_id)
@@ -96,6 +97,7 @@ class RedshiftProvisioningManager:
         await loop.run_in_executor(None, do_classic_resize)
 
         if wait_until_available:
+            await asyncio.sleep(20)
             await self.wait_until_available(cluster_id)
 
     async def elastic_resize(
@@ -116,6 +118,7 @@ class RedshiftProvisioningManager:
         await loop.run_in_executor(None, do_elastic_resize)
 
         if wait_until_available:
+            await asyncio.sleep(20)
             await self.wait_until_available(cluster_id)
 
     async def wait_until_available(

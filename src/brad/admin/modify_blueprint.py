@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Optional
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -83,6 +84,12 @@ def register_admin_action(subparser) -> None:
         help="Set to force persist the blueprint and treat it as stable. "
         "If not set, this tool will prepare to transition to the modified blueprint.",
     )
+    parser.add_argument(
+        "--continue-transition",
+        action="store_true",
+        help="Set to resume a transition that was already started but not "
+        "necessarily completed.",
+    )
     parser.set_defaults(admin_action=modify_blueprint)
 
 
@@ -153,10 +160,15 @@ def add_indexes(args, config: ConfigFile, mgr: BlueprintManager) -> None:
 async def run_transition(
     config: ConfigFile,
     blueprint_mgr: BlueprintManager,
-    next_blueprint: Blueprint,
+    is_continuing: bool,
+    next_blueprint: Optional[Blueprint],
 ) -> None:
-    logger.info("Starting the transition...")
-    await blueprint_mgr.start_transition(next_blueprint)
+    if not is_continuing:
+        logger.info("Starting the transition...")
+        assert next_blueprint is not None
+        await blueprint_mgr.start_transition(next_blueprint)
+    else:
+        logger.info("Continuing the transition...")
     orchestrator = TransitionOrchestrator(config, blueprint_mgr)
     logger.info("Running the transition...")
     await orchestrator.run_prepare_then_transition()
@@ -182,6 +194,14 @@ def modify_blueprint(args):
 
     if args.add_indexes:
         add_indexes(args, config, blueprint_mgr)
+        return
+
+    if args.continue_transition:
+        asyncio.run(
+            run_transition(
+                config, blueprint_mgr, is_continuing=True, next_blueprint=None
+            )
+        )
         return
 
     tm = blueprint_mgr.get_transition_metadata()
@@ -226,6 +246,13 @@ def modify_blueprint(args):
     if args.force:
         blueprint_mgr.force_new_blueprint_sync(modified_blueprint)
     else:
-        asyncio.run(run_transition(config, blueprint_mgr, modified_blueprint))
+        asyncio.run(
+            run_transition(
+                config,
+                blueprint_mgr,
+                is_continuing=False,
+                next_blueprint=modified_blueprint,
+            )
+        )
 
     logger.info("Done!")

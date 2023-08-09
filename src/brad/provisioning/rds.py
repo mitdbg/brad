@@ -60,7 +60,7 @@ class RdsProvisioningManager:
         if wait_until_available:
             # Need a slight delay to ensure the instance's state change is
             # updated.
-            await asyncio.sleep(5)
+            await asyncio.sleep(20)
             await self.wait_until_instance_is_available(instance_id)
 
     async def delete_replica(self, instance_id: str) -> None:
@@ -145,7 +145,7 @@ class RdsProvisioningManager:
         if wait_until_available:
             # Need a slight delay to ensure the instance's state change is
             # updated.
-            await asyncio.sleep(5)
+            await asyncio.sleep(20)
             await self.wait_until_instance_is_available(instance_id)
 
     async def _describe_db_instance(self, instance_id: str) -> Dict[str, Any]:
