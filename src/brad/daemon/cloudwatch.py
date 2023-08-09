@@ -135,7 +135,7 @@ class CloudWatchClient:
 
             df = pd.DataFrame(resp_dict)
             df = df.sort_index()
-            df.index = pd.to_datetime(df.index)
+            df.index = pd.to_datetime(df.index, utc=True, unit="ns")
 
             for metric_def in metrics_list:
                 metric_name = "{}_{}".format(*metric_def)

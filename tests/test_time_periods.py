@@ -37,6 +37,7 @@ def test_impute():
         columns=["timestamp", "value"],
         index="timestamp",
     )
+    df.index = pd.to_datetime(df.index, utc=True, unit="ns")
 
     ndf = impute_old_missing_metrics(df, ts + timedelta(seconds=30), value=0.0)
     ndf = ndf.dropna()

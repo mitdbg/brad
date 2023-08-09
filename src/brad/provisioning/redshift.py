@@ -7,6 +7,8 @@ from typing import Dict, Any
 from brad.config.file import ConfigFile
 from brad.blueprint.provisioning import Provisioning
 
+logger = logging.getLogger(__name__)
+
 
 class RedshiftProvisioningManager:
     """
@@ -130,6 +132,9 @@ class RedshiftProvisioningManager:
             status = cluster["ClusterStatus"]
             if status == "available" and not modifying:
                 break
+            logger.debug(
+                "Waiting for Redshift cluster %s to become available...", cluster_id
+            )
             await asyncio.sleep(polling_interval)
 
     def _get_cluster_state(self, cluster_id: str) -> Dict[str, Any]:
