@@ -246,6 +246,7 @@ def modify_blueprint(args):
     if args.force:
         blueprint_mgr.force_new_blueprint_sync(modified_blueprint)
     else:
+        logger.info("Transitioning to the following blueprint: %s", modified_blueprint)
         asyncio.run(
             run_transition(
                 config,
