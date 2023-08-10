@@ -1,5 +1,6 @@
 import json
 import logging
+import pyodbc
 
 from brad.asset_manager import AssetManager
 from brad.blueprint.manager import BlueprintManager
@@ -53,10 +54,14 @@ def run_on(args):
         autocommit=True,
     )
 
-    conn = cxns.get_connection(engine)
-    cursor = conn.cursor_sync()
-    cursor.execute_sync(args.query_or_command)
-    results = cursor.fetchall_sync()
+    try:
+        conn = cxns.get_connection(engine)
+        cursor = conn.cursor_sync()
+        cursor.execute_sync(args.query_or_command)
+        results = cursor.fetchall_sync()
 
-    print(json.dumps(results, indent=2, default=str))
-    cxns.close_sync()
+        print(json.dumps(results, indent=2, default=str))
+    except pyodbc.ProgrammingError:
+        print("No rows produced.")
+    finally:
+        cxns.close_sync()
