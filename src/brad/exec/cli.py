@@ -85,6 +85,7 @@ class BradShell(cmd.Cmd):
 
     def default(self, line: str) -> None:
         if line == "EOF":
+            print()
             return True  # type: ignore
 
         line = line.strip()

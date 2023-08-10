@@ -43,6 +43,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
         # 1. Fetch the next workload and apply predictions.
         metrics, metrics_timestamp = self._metrics_provider.get_metrics()
+        logger.debug("Using metrics: %s", str(metrics))
         current_workload, next_workload = self._workload_provider.get_workloads(
             metrics_timestamp, window_multiplier, desired_period=timedelta(hours=1)
         )

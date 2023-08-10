@@ -43,6 +43,9 @@ class BlueprintPlanningDebugLogger:
 
         row = []
         for key in self._key_order:
-            row.append(values[key])
+            if key not in values:
+                row.append("")
+            else:
+                row.append(values[key])
         writer.writerow(row)
         self._out_file.flush()
