@@ -41,7 +41,7 @@ class BlueprintPlanningDebugLogger:
             self._key_order = list(values.keys())
             writer.writerow(self._key_order)
 
-        row = []
+        row: List[int | float | str] = []
         for key in self._key_order:
             if key not in values:
                 row.append("")
