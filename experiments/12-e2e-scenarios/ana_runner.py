@@ -93,7 +93,7 @@ def runner(
                     flush=True,
                 )
             except BradClientError as ex:
-                print("Query error:", str(ex), flush=True, file=sys.stderr)
+                print("Query error:", ex.message(), flush=True, file=sys.stderr)
 
             try:
                 _ = stop_queue.get_nowait()
@@ -108,30 +108,33 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
     ) as file:
         print("timestamp,query_idx,run_time_s,engine", file=file)
         for idx, qidx in enumerate(queries):
-            engine = None
-            query = query_bank[qidx]
-            now = datetime.now().astimezone(pytz.utc)
-            start = time.time()
-            _, engine = brad_client.run_query_json(query)
-            end = time.time()
-            run_time_s = end - start
-            print(
-                "Warmed up {} of {}. Run time (s): {}".format(
-                    idx + 1, len(queries), run_time_s
+            try:
+                engine = None
+                query = query_bank[qidx]
+                now = datetime.now().astimezone(pytz.utc)
+                start = time.time()
+                _, engine = brad_client.run_query_json(query)
+                end = time.time()
+                run_time_s = end - start
+                print(
+                    "Warmed up {} of {}. Run time (s): {}".format(
+                        idx + 1, len(queries), run_time_s
+                    )
                 )
-            )
-            if run_time_s >= 29:
-                print("Warning: Query index {} takes longer than 30 s".format(idx))
-            print(
-                "{},{},{},{}".format(
-                    now,
-                    qidx,
-                    run_time_s,
-                    engine.value if engine is not None else "unknown",
-                ),
-                file=file,
-                flush=True,
-            )
+                if run_time_s >= 29:
+                    print("Warning: Query index {} takes longer than 30 s".format(idx))
+                print(
+                    "{},{},{},{}".format(
+                        now,
+                        qidx,
+                        run_time_s,
+                        engine.value if engine is not None else "unknown",
+                    ),
+                    file=file,
+                    flush=True,
+                )
+            except BradClientError as ex:
+                print("Query error:", ex.message(), flush=True, file=sys.stderr)
 
 
 def main():

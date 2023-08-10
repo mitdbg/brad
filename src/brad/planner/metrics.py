@@ -154,7 +154,7 @@ class MetricsFromMonitor(MetricsProvider):
         self, to_fill: pd.DataFrame, guide: pd.DataFrame
     ) -> pd.DataFrame:
         num_rows = guide.shape[0]
-        num_cols = guide.shape[1]
+        num_cols = len(to_fill.columns)
         return pd.DataFrame(
             np.zeros((num_rows, num_cols)), columns=to_fill.columns, index=guide.index
         )

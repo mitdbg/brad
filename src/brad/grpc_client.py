@@ -196,3 +196,6 @@ class BradClientError(Exception):
 
     def message(self) -> str:
         return self._message
+
+    def __repr__(self) -> str:
+        return self._message
