@@ -1,6 +1,8 @@
 import logging
 import math
 import pytz
+import pandas as pd
+import numpy as np
 from datetime import datetime
 from collections import namedtuple
 from typing import Tuple
@@ -82,15 +84,21 @@ class MetricsFromMonitor(MetricsProvider):
             k=max_available_after_epochs, metric_ids=_FRONT_END_METRICS
         )
 
-        if redshift.empty or aurora.empty or front_end.empty:
-            logger.warning(
-                "Empty metrics. Redshift empty: %r, Aurora empty: %r, Front end empty: %r",
-                redshift.empty,
-                aurora.empty,
-                front_end.empty,
-            )
+        if redshift.empty and aurora.empty and front_end.empty:
+            logger.warning("All metrics are empty.")
             now = datetime.now().astimezone(pytz.utc)
             return (Metrics(1.0, 1.0, 100.0, 1.0, 1.0), now)
+
+        assert not front_end.empty, "Front end metrics are empty."
+
+        # These metrics may be empty if the engine is "off" (paused).
+        # We fill them with 0s just to simplify the rest of the code. The
+        # metrics of "turned off" engines are not used during the rest of the
+        # planning process.
+        if redshift.empty:
+            redshift = self._fill_empty_metrics(redshift, front_end)
+        if aurora.empty:
+            aurora = self._fill_empty_metrics(aurora, front_end)
 
         # Align timestamps across the metrics.
         common_timestamps = redshift.index.intersection(aurora.index).intersection(
@@ -140,6 +148,15 @@ class MetricsFromMonitor(MetricsProvider):
                 txn_completions_per_s=txn_per_s,
             ),
             most_recent_common.to_pydatetime(),
+        )
+
+    def _fill_empty_metrics(
+        self, to_fill: pd.DataFrame, guide: pd.DataFrame
+    ) -> pd.DataFrame:
+        num_rows = guide.shape[0]
+        num_cols = guide.shape[1]
+        return pd.DataFrame(
+            np.zeros((num_rows, num_cols)), columns=to_fill.columns, index=guide.index
         )
 
 

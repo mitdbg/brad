@@ -118,6 +118,7 @@ class PostgresEstimator(Estimator):
             logger.debug("Table stats are all zero.")
             return None
 
+        logger.debug("Using table sizes from pg_stat_user_tables.")
         return table_counts
 
     async def _get_table_sizes_direct(self) -> Dict[str, int]:
