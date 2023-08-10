@@ -138,6 +138,7 @@ run_experiment(
     "a-gap-std-s": 1,
     "run-for-s": 60 * 6,
     "config-file": "config/config_cond_baseline.yml",
+    "skip-replan": 1,
   },
 )
 
