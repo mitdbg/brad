@@ -10,7 +10,7 @@ function run_transition() {
 
 function gather_stats() {
   brad admin run_on aurora ANALYZE \
-    --config-file config/config.yml \
+    --config-file ../../config/config.yml \
     --schema-name imdb_extended
 }
 

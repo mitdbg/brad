@@ -3,6 +3,7 @@ from typing import Optional, Tuple
 from datetime import datetime, timedelta
 
 from brad.blueprint.manager import BlueprintManager
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.planner.workload import Workload
@@ -92,8 +93,19 @@ class LoggedWorkloadProvider(WorkloadProvider):
             window_length,
         )
 
+        bp = self._blueprint_mgr.get_blueprint()
+        engines = {Engine.Athena}
+
+        if bp.aurora_provisioning().num_nodes() > 0:
+            engines.add(Engine.Aurora)
+        if bp.redshift_provisioning().num_nodes() > 0:
+            engines.add(Engine.Redshift)
+
         ec = EngineConnections.connect_sync(
-            self._config, self._blueprint_mgr.get_directory(), self._schema_name
+            self._config,
+            self._blueprint_mgr.get_directory(),
+            self._schema_name,
+            specific_engines=engines,
         )
         try:
             table_sizer = TableSizer(ec, self._config)
