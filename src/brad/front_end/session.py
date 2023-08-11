@@ -134,3 +134,26 @@ class SessionManager:
 
         for session in self._sessions.values():
             await session.engines.remove_connections(expected_engines)
+
+    async def reestablish_connections(self) -> bool:
+        """
+        Used to reconnect to engines when a connection has been lost. Lost
+        connections may occur during blueprint transitions when the provisioning
+        changes (e.g., an Aurora failover). This method returns `True` iff all
+        of the lost connections were re-established.
+
+        Callers should take care to not call this method repeatedly to avoid
+        overwhelming the underlying engines. Use randomized exponential backoff
+        instead.
+        """
+        directory = self._blueprint_mgr.get_directory()
+        all_connected = True
+        for session in self._sessions.values():
+            connected = await session.engines.reestablish_connections(
+                self._config, directory
+            )
+            if not connected:
+                all_connected = False
+            # Continue running since we still want to try connecting other
+            # sessions.
+        return all_connected

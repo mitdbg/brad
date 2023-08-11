@@ -122,6 +122,11 @@ class EngineConnections:
                 engine, self._schema_name, config, directory, self._autocommit
             )
 
+            # TODO: We may want this to be configurable.
+            if engine == Engine.Redshift:
+                cursor = self._connection_map[engine].cursor_sync()
+                cursor.execute_sync("SET enable_result_cache_for_session = off")
+
     async def remove_connections(self, expected_engines: Set[Engine]) -> None:
         """
         Removes connections from engines that are not in `expected_engines` but

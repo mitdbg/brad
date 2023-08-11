@@ -5,7 +5,7 @@ import random
 import time
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import grpc
 import pyodbc
@@ -43,6 +43,7 @@ from brad.row_list import RowList
 from brad.utils.counter import Counter
 from brad.utils.json_decimal_encoder import DecimalEncoder
 from brad.utils.mailbox import Mailbox
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from brad.workload_logging.epoch_file_handler import EpochFileHandler
 
 logger = logging.getLogger(__name__)
@@ -147,6 +148,9 @@ class BradFrontEnd(BradInterface):
 
         # Used to close a logging epoch when needed.
         self._qlogger_refresh_task: Optional[asyncio.Task[None]] = None
+
+        # Used to re-establish engine connections.
+        self._reestablish_connections_task: Optional[asyncio.Task[None]] = None
 
     async def serve_forever(self):
         await self._run_setup()
@@ -296,6 +300,7 @@ class BradFrontEnd(BradInterface):
             ) as ex:
                 if connection.is_connection_lost_error(ex):
                     connection.mark_connection_lost()
+                    self._schedule_reestablish_connections()
                     # N.B. We still pass the error to the client. The client
                     # should retry the query (later on we can add more graceful
                     # handling here).
@@ -330,6 +335,7 @@ class BradFrontEnd(BradInterface):
             except (pyodbc.Error, pyodbc.OperationalError) as ex:
                 if connection.is_connection_lost_error(ex):
                     connection.mark_connection_lost()
+                    self._schedule_reestablish_connections()
 
                 raise QueryError.from_exception(ex)
 
@@ -517,6 +523,41 @@ class BradFrontEnd(BradInterface):
         # acceptable.
         await self._sessions.remove_connections()
         logger.info("Completed transition to blueprint version %d", version)
+
+    def _schedule_reestablish_connections(self) -> None:
+        if self._reestablish_connections_task is not None:
+            return
+        self._reestablish_connections_task = asyncio.create_task(
+            self._do_reestablish_connections()
+        )
+
+    async def _do_reestablish_connections(self) -> None:
+        rand_backoff = None
+
+        while True:
+            succeeded = await self._sessions.reestablish_connections()
+            if succeeded:
+                logger.debug("Re-established connections successfully.")
+                self._reestablish_connections_task = None
+                break
+
+            if rand_backoff is None:
+                rand_backoff = RandomizedExponentialBackoff(
+                    max_retries=10,
+                    base_delay_s=2.0,
+                    max_delay_s=timedelta(minutes=10).total_seconds(),
+                )
+
+            wait_time = rand_backoff.wait_time_s()
+            if wait_time is None:
+                logger.warning(
+                    "Abandoning connection re-establishment due to too many failures"
+                )
+                # N.B. We purposefully do not clear the
+                # `_reestablish_connections_task` variable.
+                break
+            else:
+                await asyncio.sleep(wait_time)
 
 
 async def _orchestrate_shutdown() -> None:
