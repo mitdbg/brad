@@ -318,9 +318,10 @@ class BradFrontEnd(BradInterface):
                 logger.debug("No rows produced.")
                 return []
 
-        except QueryError:
+        except QueryError as ex:
             # This is an expected exception. We catch and re-raise it here to
             # avoid triggering the handler below.
+            logger.debug("Query error: %s", repr(ex))
             raise
         except Exception as ex:
             logger.exception("Encountered unexpected exception when handling request.")
@@ -429,6 +430,9 @@ class BradFrontEnd(BradInterface):
                 self._output_queue.put(
                     NewBlueprintAck(self._fe_index, message.version), block=False
                 )
+                logger.info(
+                    "Acknowledged update to blueprint version %d", message.version
+                )
 
             else:
                 logger.info("Received message from the daemon: %s", message)
@@ -497,6 +501,7 @@ class BradFrontEnd(BradInterface):
         # connections to be cancelled. We consider this behavior to be
         # acceptable.
         await self._sessions.remove_connections()
+        logger.info("Completed transition to blueprint version %d", version)
 
 
 async def _orchestrate_shutdown() -> None:
