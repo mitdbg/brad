@@ -289,7 +289,17 @@ class BradFrontEnd(BradInterface):
                 start = datetime.now(tz=timezone.utc)
                 await cursor.execute(query_rep.raw_query)
                 end = datetime.now(tz=timezone.utc)
-            except (pyodbc.ProgrammingError, pyodbc.Error) as ex:
+            except (
+                pyodbc.ProgrammingError,
+                pyodbc.Error,
+                pyodbc.OperationalError,
+            ) as ex:
+                if connection.is_connection_lost_error(ex):
+                    connection.mark_connection_lost()
+                    # N.B. We still pass the error to the client. The client
+                    # should retry the query (later on we can add more graceful
+                    # handling here).
+
                 # Error when executing the query.
                 raise QueryError.from_exception(ex)
 
@@ -317,6 +327,11 @@ class BradFrontEnd(BradInterface):
             except pyodbc.ProgrammingError:
                 logger.debug("No rows produced.")
                 return []
+            except (pyodbc.Error, pyodbc.OperationalError) as ex:
+                if connection.is_connection_lost_error(ex):
+                    connection.mark_connection_lost()
+
+                raise QueryError.from_exception(ex)
 
         except QueryError as ex:
             # This is an expected exception. We catch and re-raise it here to

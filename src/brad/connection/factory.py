@@ -19,6 +19,7 @@ class ConnectionFactory:
         directory: Directory,
         autocommit: bool = True,
         aurora_read_replica: Optional[int] = None,
+        timeout_s: int = 10,
     ) -> Connection:
         connection_details = config.get_connection_details(engine)
         if engine == Engine.Redshift:
@@ -31,6 +32,7 @@ class ConnectionFactory:
                 password=connection_details["password"],
                 schema_name=schema_name,
                 autocommit=autocommit,
+                timeout_s=timeout_s,
             )
         elif engine == Engine.Aurora:
             # N.B. The caller needs to specify a valid replica index.
@@ -43,7 +45,7 @@ class ConnectionFactory:
             cstr = cls._pg_aurora_odbc_connection_string(
                 address, port, connection_details, schema_name
             )
-            return await OdbcConnection.connect(cstr, autocommit)
+            return await OdbcConnection.connect(cstr, autocommit, timeout_s)
         elif engine == Engine.Athena:
             return await PyAthenaConnection.connect(
                 aws_region=connection_details["aws_region"],
@@ -64,6 +66,7 @@ class ConnectionFactory:
         directory: Directory,
         autocommit: bool = True,
         aurora_read_replica: Optional[int] = None,
+        timeout_s: int = 10,
     ) -> Connection:
         connection_details = config.get_connection_details(engine)
         if engine == Engine.Redshift:
@@ -76,6 +79,7 @@ class ConnectionFactory:
                 password=connection_details["password"],
                 schema_name=schema_name,
                 autocommit=autocommit,
+                timeout_s=timeout_s,
             )
         elif engine == Engine.Aurora:
             instance = (
@@ -87,7 +91,7 @@ class ConnectionFactory:
             cstr = cls._pg_aurora_odbc_connection_string(
                 address, port, connection_details, schema_name
             )
-            return OdbcConnection.connect_sync(cstr, autocommit)
+            return OdbcConnection.connect_sync(cstr, autocommit, timeout_s)
         elif engine == Engine.Athena:
             return PyAthenaConnection.connect_sync(
                 aws_region=connection_details["aws_region"],
@@ -110,7 +114,7 @@ class ConnectionFactory:
             connection_details,
             schema_name,
         )
-        return await OdbcConnection.connect(cstr, autocommit=True)
+        return await OdbcConnection.connect(cstr, autocommit=True, timeout_s=10)
 
     @staticmethod
     def _pg_aurora_odbc_connection_string(

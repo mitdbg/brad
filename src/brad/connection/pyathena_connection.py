@@ -67,3 +67,8 @@ class PyAthenaConnection(Connection):
 
     def close_sync(self) -> None:
         self._connection.close()
+
+    def is_connection_lost_error(self, ex: Exception) -> bool:
+        # PyAthena uses the AWS API. There should not be a connection lost
+        # error.
+        return False

@@ -4,7 +4,7 @@ from typing import Optional, Dict, Set
 
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
-from brad.connection.connection import Connection
+from brad.connection.connection import Connection, ConnectionFailed
 from brad.connection.factory import ConnectionFactory
 from brad.provisioning.directory import Directory
 
@@ -136,6 +136,42 @@ class EngineConnections:
 
         for engine in to_remove:
             del self._connection_map[engine]
+
+    async def reestablish_connections(
+        self, config: ConfigFile, directory: Directory
+    ) -> bool:
+        """
+        Used to reconnect to engines when a connection has been lost. Lost
+        connections may occur during blueprint transitions when the provisioning
+        changes (e.g., an Aurora failover). This method returns `True` iff all
+        of the lost connections were re-established.
+
+        Callers should take care to not call this method repeatedly to avoid
+        overwhelming the underlying engines. Use randomized exponential backoff
+        instead.
+        """
+        new_connections = []
+        all_succeeded = True
+
+        for engine, conn in self._connection_map.items():
+            if conn.is_connected():
+                continue
+            try:
+                new_conn = await ConnectionFactory.connect_to(
+                    engine, self._schema_name, config, directory, self._autocommit
+                )
+                # TODO: We may want this to be configurable.
+                if engine == Engine.Redshift:
+                    cursor = new_conn.cursor_sync()
+                    cursor.execute_sync("SET enable_result_cache_for_session = off")
+                new_connections.append((engine, new_conn))
+            except ConnectionFailed:
+                all_succeeded = False
+
+        for engine, conn in new_connections:
+            self._connection_map[engine] = conn
+
+        return all_succeeded
 
     def get_connection(self, engine: Engine) -> Connection:
         try:
