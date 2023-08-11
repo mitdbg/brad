@@ -60,6 +60,11 @@ class BradGrpcClient:
 
     def run_query_json(self, query: str) -> Tuple[RowList, Optional[Engine]]:
         assert self._session_id is not None
+        results, executor, _ = self._impl.run_query_json(self._session_id, query)
+        return results, executor
+
+    def run_query_json_cli(self, query: str) -> Tuple[RowList, Optional[Engine], bool]:
+        assert self._session_id is not None
         return self._impl.run_query_json(self._session_id, query)
 
     def run_query_ignore_results(self, query: str) -> None:
@@ -158,7 +163,7 @@ class BradRawGrpcClient:
 
     def run_query_json(
         self, session_id: SessionId, query: str, ignore_results: bool = False
-    ) -> Tuple[RowList, Optional[Engine]]:
+    ) -> Tuple[RowList, Optional[Engine], bool]:
         assert self._stub is not None
         response = self._stub.RunQueryJson(
             b.RunQueryRequest(id=b.SessionId(id_value=session_id.value()), query=query)
@@ -174,11 +179,12 @@ class BradRawGrpcClient:
         elif msg_kind == "results":
             executor = response.results.executor
             if ignore_results:
-                return ([], executor)
+                return ([], executor, response.results.not_tabular)
             else:
                 return (
                     json.loads(response.results.results_json),
                     self._convert_engine(executor),
+                    response.results.not_tabular,
                 )
         else:
             raise BradClientError(

@@ -39,6 +39,8 @@ class BradGrpc(rpc.BradServicer):
                 response = b.RunQueryResponse(row=b.QueryResultRow(row_data=row))
                 if "executor" in debug_info:
                     response.executor = self._convert_engine(debug_info["executor"])
+                if "not_tabular" in debug_info:
+                    response.not_tabular = debug_info["not_tabular"]
                 yield response
 
         except QueryError as ex:
@@ -58,6 +60,8 @@ class BradGrpc(rpc.BradServicer):
             response = b.QueryJsonResponse(results_json=result)
             if "executor" in debug_info:
                 response.executor = self._convert_engine(debug_info["executor"])
+            if "not_tabular" in debug_info:
+                response.not_tabular = debug_info["not_tabular"]
             return b.RunQueryJsonResponse(results=response)
 
         except QueryError as ex:

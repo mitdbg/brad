@@ -271,7 +271,7 @@ class BradFrontEnd(BradInterface):
 
             # Handle internal commands separately.
             if query.startswith("BRAD_"):
-                return await self._handle_internal_command(session, query)
+                return await self._handle_internal_command(session, query, debug_info)
 
             # 2. Select an engine for the query.
             query_rep = QueryRep(query)
@@ -355,13 +355,15 @@ class BradFrontEnd(BradInterface):
             raise QueryError.from_exception(ex)
 
     async def _handle_internal_command(
-        self, session: Session, command_raw: str
+        self, session: Session, command_raw: str, debug_info: Dict[str, Any]
     ) -> RowList:
         """
         This method is used to handle BRAD_ prefixed "queries" (i.e., commands
         to run custom functionality like syncing data across the engines).
         """
         command = command_raw.upper()
+        if not command.startswith("BRAD_INSPECT_WORKLOAD"):
+            debug_info["not_tabular"] = True
 
         if (
             command == "BRAD_SYNC"

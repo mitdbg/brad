@@ -146,6 +146,7 @@ class SessionManager:
         overwhelming the underlying engines. Use randomized exponential backoff
         instead.
         """
+        logger.debug("Attempting to reestablish connections...")
         directory = self._blueprint_mgr.get_directory()
         all_connected = True
         for session in self._sessions.values():
@@ -156,4 +157,5 @@ class SessionManager:
                 all_connected = False
             # Continue running since we still want to try connecting other
             # sessions.
+        logger.debug("Reestablish connections succeeded? %s", str(all_connected))
         return all_connected

@@ -30,12 +30,14 @@ class QueryError(_message.Message):
     def __init__(self, error_msg: _Optional[str] = ..., is_transient: bool = ...) -> None: ...
 
 class QueryJsonResponse(_message.Message):
-    __slots__ = ["executor", "results_json"]
+    __slots__ = ["executor", "not_tabular", "results_json"]
     EXECUTOR_FIELD_NUMBER: _ClassVar[int]
+    NOT_TABULAR_FIELD_NUMBER: _ClassVar[int]
     RESULTS_JSON_FIELD_NUMBER: _ClassVar[int]
     executor: ExecutionEngine
+    not_tabular: bool
     results_json: str
-    def __init__(self, results_json: _Optional[str] = ..., executor: _Optional[_Union[ExecutionEngine, str]] = ...) -> None: ...
+    def __init__(self, results_json: _Optional[str] = ..., executor: _Optional[_Union[ExecutionEngine, str]] = ..., not_tabular: bool = ...) -> None: ...
 
 class QueryResultRow(_message.Message):
     __slots__ = ["row_data"]
