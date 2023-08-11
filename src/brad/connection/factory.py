@@ -35,13 +35,12 @@ class ConnectionFactory:
                 timeout_s=timeout_s,
             )
         elif engine == Engine.Aurora:
-            # N.B. The caller needs to specify a valid replica index.
-            instance = (
-                directory.aurora_writer()
-                if aurora_read_replica is None
-                else directory.aurora_readers()[aurora_read_replica]
-            )
-            address, port = instance.endpoint()
+            if aurora_read_replica is None:
+                address, port = directory.aurora_writer_endpoint()
+            else:
+                # N.B. The caller needs to specify a valid replica index.
+                instance = directory.aurora_readers()[aurora_read_replica]
+                address, port = instance.endpoint()
             cstr = cls._pg_aurora_odbc_connection_string(
                 address, port, connection_details, schema_name
             )

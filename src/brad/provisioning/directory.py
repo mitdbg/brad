@@ -39,8 +39,8 @@ class Directory:
         self._aurora_readers: List["AuroraInstanceMetadata"] = []
         self._redshift_cluster: Optional["RedshiftClusterMetadata"] = None
 
-        self._aurora_writer_endpoint: Optional[str] = None
-        self._aurora_reader_endpoint: Optional[str] = None
+        self._aurora_writer_endpoint: Optional[Tuple[str, int]] = None
+        self._aurora_reader_endpoint: Optional[Tuple[str, int]] = None
 
     def aurora_writer(self) -> "AuroraInstanceMetadata":
         assert self._aurora_writer is not None
@@ -53,11 +53,11 @@ class Directory:
         assert self._redshift_cluster is not None
         return self._redshift_cluster
 
-    def aurora_writer_endpoint(self) -> str:
+    def aurora_writer_endpoint(self) -> Tuple[str, int]:
         assert self._aurora_writer_endpoint is not None
         return self._aurora_writer_endpoint
 
-    def aurora_reader_endpoint(self) -> str:
+    def aurora_reader_endpoint(self) -> Tuple[str, int]:
         assert self._aurora_reader_endpoint is not None
         return self._aurora_reader_endpoint
 
@@ -80,7 +80,12 @@ class Directory:
 
     async def _refresh_aurora(
         self,
-    ) -> Tuple["AuroraInstanceMetadata", List["AuroraInstanceMetadata"], str, str]:
+    ) -> Tuple[
+        "AuroraInstanceMetadata",
+        List["AuroraInstanceMetadata"],
+        Tuple[str, int],
+        Tuple[str, int],
+    ]:
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(None, self._call_describe_aurora_cluster)
 
@@ -123,8 +128,14 @@ class Directory:
 
         writer_endpoint = cluster_info["Endpoint"]
         reader_endpoint = cluster_info["ReaderEndpoint"]
+        port = int(cluster_info["Port"])
 
-        return (new_writer, new_readers, writer_endpoint, reader_endpoint)
+        return (
+            new_writer,
+            new_readers,
+            (writer_endpoint, port),
+            (reader_endpoint, port),
+        )
 
     async def _refresh_aurora_instance(
         self, instance_id: str
