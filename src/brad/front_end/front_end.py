@@ -567,6 +567,12 @@ class BradFrontEnd(BradInterface):
             else:
                 await asyncio.sleep(wait_time)
 
+            # Refresh the blueprint and directory again.
+            logger.debug(
+                "Refreshing the blueprint before attempting to re-establish connections again."
+            )
+            await self._blueprint_mgr.load()
+
 
 async def _orchestrate_shutdown() -> None:
     tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]

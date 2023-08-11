@@ -193,7 +193,6 @@ class EngineConnections:
         for conn in self._connection_map.values():
             futures.append(conn.close())
         await asyncio.gather(*futures)
-        self._connection_map.clear()
 
     def close_sync(self):
         """
@@ -202,4 +201,3 @@ class EngineConnections:
         """
         for conn in self._connection_map.values():
             conn.close_sync()
-        self._connection_map.clear()
