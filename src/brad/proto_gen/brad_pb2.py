@@ -13,15 +13,15 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nbrad.proto\x12\x04\x62rad\"\x1d\n\tSessionId\x12\x10\n\x08id_value\x18\x01 \x01(\x04\"%\n\x13StartSessionRequest\x12\x0e\n\x06unused\x18\x64 \x01(\x04\"3\n\x14StartSessionResponse\x12\x1b\n\x02id\x18\x01 \x01(\x0b\x32\x0f.brad.SessionId\"=\n\x0fRunQueryRequest\x12\x1b\n\x02id\x18\x01 \x01(\x0b\x32\x0f.brad.SessionId\x12\r\n\x05query\x18\x02 \x01(\t\"\x8d\x01\n\x10RunQueryResponse\x12#\n\x03row\x18\x01 \x01(\x0b\x32\x14.brad.QueryResultRowH\x00\x12!\n\x05\x65rror\x18\x02 \x01(\x0b\x32\x10.brad.QueryErrorH\x00\x12\'\n\x08\x65xecutor\x18\x64 \x01(\x0e\x32\x15.brad.ExecutionEngineB\x08\n\x06result\"o\n\x14RunQueryJsonResponse\x12*\n\x07results\x18\x01 \x01(\x0b\x32\x17.brad.QueryJsonResponseH\x00\x12!\n\x05\x65rror\x18\x02 \x01(\x0b\x32\x10.brad.QueryErrorH\x00\x42\x08\n\x06result\"\"\n\x0eQueryResultRow\x12\x10\n\x08row_data\x18\x01 \x01(\x0c\"\x1f\n\nQueryError\x12\x11\n\terror_msg\x18\x01 \x01(\t\"R\n\x11QueryJsonResponse\x12\x14\n\x0cresults_json\x18\x01 \x01(\t\x12\'\n\x08\x65xecutor\x18\x02 \x01(\x0e\x32\x15.brad.ExecutionEngine\"0\n\x11\x45ndSessionRequest\x12\x1b\n\x02id\x18\x01 \x01(\x0b\x32\x0f.brad.SessionId\"$\n\x12\x45ndSessionResponse\x12\x0e\n\x06unused\x18\x64 \x01(\x04*T\n\x0f\x45xecutionEngine\x12\x0f\n\x0b\x45NG_UNKNOWN\x10\x00\x12\x0e\n\nENG_AURORA\x10\x01\x12\x10\n\x0c\x45NG_REDSHIFT\x10\x02\x12\x0e\n\nENG_ATHENA\x10\x03\x32\x96\x02\n\x04\x42rad\x12G\n\x0cStartSession\x12\x19.brad.StartSessionRequest\x1a\x1a.brad.StartSessionResponse\"\x00\x12=\n\x08RunQuery\x12\x15.brad.RunQueryRequest\x1a\x16.brad.RunQueryResponse\"\x00\x30\x01\x12\x43\n\x0cRunQueryJson\x12\x15.brad.RunQueryRequest\x1a\x1a.brad.RunQueryJsonResponse\"\x00\x12\x41\n\nEndSession\x12\x17.brad.EndSessionRequest\x1a\x18.brad.EndSessionResponse\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nbrad.proto\x12\x04\x62rad\"\x1d\n\tSessionId\x12\x10\n\x08id_value\x18\x01 \x01(\x04\"%\n\x13StartSessionRequest\x12\x0e\n\x06unused\x18\x64 \x01(\x04\"3\n\x14StartSessionResponse\x12\x1b\n\x02id\x18\x01 \x01(\x0b\x32\x0f.brad.SessionId\"=\n\x0fRunQueryRequest\x12\x1b\n\x02id\x18\x01 \x01(\x0b\x32\x0f.brad.SessionId\x12\r\n\x05query\x18\x02 \x01(\t\"\xa2\x01\n\x10RunQueryResponse\x12#\n\x03row\x18\x01 \x01(\x0b\x32\x14.brad.QueryResultRowH\x00\x12!\n\x05\x65rror\x18\x02 \x01(\x0b\x32\x10.brad.QueryErrorH\x00\x12\'\n\x08\x65xecutor\x18\x64 \x01(\x0e\x32\x15.brad.ExecutionEngine\x12\x13\n\x0bnot_tabular\x18\x65 \x01(\x08\x42\x08\n\x06result\"o\n\x14RunQueryJsonResponse\x12*\n\x07results\x18\x01 \x01(\x0b\x32\x17.brad.QueryJsonResponseH\x00\x12!\n\x05\x65rror\x18\x02 \x01(\x0b\x32\x10.brad.QueryErrorH\x00\x42\x08\n\x06result\"\"\n\x0eQueryResultRow\x12\x10\n\x08row_data\x18\x01 \x01(\x0c\"5\n\nQueryError\x12\x11\n\terror_msg\x18\x01 \x01(\t\x12\x14\n\x0cis_transient\x18\x02 \x01(\x08\"R\n\x11QueryJsonResponse\x12\x14\n\x0cresults_json\x18\x01 \x01(\t\x12\'\n\x08\x65xecutor\x18\x02 \x01(\x0e\x32\x15.brad.ExecutionEngine\"0\n\x11\x45ndSessionRequest\x12\x1b\n\x02id\x18\x01 \x01(\x0b\x32\x0f.brad.SessionId\"$\n\x12\x45ndSessionResponse\x12\x0e\n\x06unused\x18\x64 \x01(\x04*T\n\x0f\x45xecutionEngine\x12\x0f\n\x0b\x45NG_UNKNOWN\x10\x00\x12\x0e\n\nENG_AURORA\x10\x01\x12\x10\n\x0c\x45NG_REDSHIFT\x10\x02\x12\x0e\n\nENG_ATHENA\x10\x03\x32\x96\x02\n\x04\x42rad\x12G\n\x0cStartSession\x12\x19.brad.StartSessionRequest\x1a\x1a.brad.StartSessionResponse\"\x00\x12=\n\x08RunQuery\x12\x15.brad.RunQueryRequest\x1a\x16.brad.RunQueryResponse\"\x00\x30\x01\x12\x43\n\x0cRunQueryJson\x12\x15.brad.RunQueryRequest\x1a\x1a.brad.RunQueryJsonResponse\"\x00\x12\x41\n\nEndSession\x12\x17.brad.EndSessionRequest\x1a\x18.brad.EndSessionResponse\"\x00\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'brad_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _EXECUTIONENGINE._serialized_start=704
-  _EXECUTIONENGINE._serialized_end=788
+  _EXECUTIONENGINE._serialized_start=747
+  _EXECUTIONENGINE._serialized_end=831
   _SESSIONID._serialized_start=20
   _SESSIONID._serialized_end=49
   _STARTSESSIONREQUEST._serialized_start=51
@@ -31,19 +31,19 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _RUNQUERYREQUEST._serialized_start=143
   _RUNQUERYREQUEST._serialized_end=204
   _RUNQUERYRESPONSE._serialized_start=207
-  _RUNQUERYRESPONSE._serialized_end=348
-  _RUNQUERYJSONRESPONSE._serialized_start=350
-  _RUNQUERYJSONRESPONSE._serialized_end=461
-  _QUERYRESULTROW._serialized_start=463
-  _QUERYRESULTROW._serialized_end=497
-  _QUERYERROR._serialized_start=499
-  _QUERYERROR._serialized_end=530
-  _QUERYJSONRESPONSE._serialized_start=532
-  _QUERYJSONRESPONSE._serialized_end=614
-  _ENDSESSIONREQUEST._serialized_start=616
-  _ENDSESSIONREQUEST._serialized_end=664
-  _ENDSESSIONRESPONSE._serialized_start=666
-  _ENDSESSIONRESPONSE._serialized_end=702
-  _BRAD._serialized_start=791
-  _BRAD._serialized_end=1069
+  _RUNQUERYRESPONSE._serialized_end=369
+  _RUNQUERYJSONRESPONSE._serialized_start=371
+  _RUNQUERYJSONRESPONSE._serialized_end=482
+  _QUERYRESULTROW._serialized_start=484
+  _QUERYRESULTROW._serialized_end=518
+  _QUERYERROR._serialized_start=520
+  _QUERYERROR._serialized_end=573
+  _QUERYJSONRESPONSE._serialized_start=575
+  _QUERYJSONRESPONSE._serialized_end=657
+  _ENDSESSIONREQUEST._serialized_start=659
+  _ENDSESSIONREQUEST._serialized_end=707
+  _ENDSESSIONRESPONSE._serialized_start=709
+  _ENDSESSIONRESPONSE._serialized_end=745
+  _BRAD._serialized_start=834
+  _BRAD._serialized_end=1112
 # @@protoc_insertion_point(module_scope)

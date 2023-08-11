@@ -258,7 +258,9 @@ class BradFrontEnd(BradInterface):
     ) -> RowList:
         session = self._sessions.get_session(session_id)
         if session is None:
-            raise QueryError("Invalid session id {}".format(str(session_id)))
+            raise QueryError(
+                "Invalid session id {}".format(str(session_id)), is_transient=False
+            )
 
         try:
             # Remove any trailing or leading whitespace. Remove the trailing
@@ -298,15 +300,17 @@ class BradFrontEnd(BradInterface):
                 pyodbc.Error,
                 pyodbc.OperationalError,
             ) as ex:
+                is_transient_error = False
                 if connection.is_connection_lost_error(ex):
                     connection.mark_connection_lost()
                     self._schedule_reestablish_connections()
+                    is_transient_error = True
                     # N.B. We still pass the error to the client. The client
                     # should retry the query (later on we can add more graceful
                     # handling here).
 
                 # Error when executing the query.
-                raise QueryError.from_exception(ex)
+                raise QueryError.from_exception(ex, is_transient_error)
 
             # We keep track of transactional state after executing the query in
             # case the query failed.
@@ -333,11 +337,13 @@ class BradFrontEnd(BradInterface):
                 logger.debug("No rows produced.")
                 return []
             except (pyodbc.Error, pyodbc.OperationalError) as ex:
+                is_transient_error = False
                 if connection.is_connection_lost_error(ex):
                     connection.mark_connection_lost()
                     self._schedule_reestablish_connections()
+                    is_transient_error = True
 
-                raise QueryError.from_exception(ex)
+                raise QueryError.from_exception(ex, is_transient_error)
 
         except QueryError as ex:
             # This is an expected exception. We catch and re-raise it here to

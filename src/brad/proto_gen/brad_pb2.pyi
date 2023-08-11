@@ -22,10 +22,12 @@ class EndSessionResponse(_message.Message):
     def __init__(self, unused: _Optional[int] = ...) -> None: ...
 
 class QueryError(_message.Message):
-    __slots__ = ["error_msg"]
+    __slots__ = ["error_msg", "is_transient"]
     ERROR_MSG_FIELD_NUMBER: _ClassVar[int]
+    IS_TRANSIENT_FIELD_NUMBER: _ClassVar[int]
     error_msg: str
-    def __init__(self, error_msg: _Optional[str] = ...) -> None: ...
+    is_transient: bool
+    def __init__(self, error_msg: _Optional[str] = ..., is_transient: bool = ...) -> None: ...
 
 class QueryJsonResponse(_message.Message):
     __slots__ = ["executor", "results_json"]
@@ -58,14 +60,16 @@ class RunQueryRequest(_message.Message):
     def __init__(self, id: _Optional[_Union[SessionId, _Mapping]] = ..., query: _Optional[str] = ...) -> None: ...
 
 class RunQueryResponse(_message.Message):
-    __slots__ = ["error", "executor", "row"]
+    __slots__ = ["error", "executor", "not_tabular", "row"]
     ERROR_FIELD_NUMBER: _ClassVar[int]
     EXECUTOR_FIELD_NUMBER: _ClassVar[int]
+    NOT_TABULAR_FIELD_NUMBER: _ClassVar[int]
     ROW_FIELD_NUMBER: _ClassVar[int]
     error: QueryError
     executor: ExecutionEngine
+    not_tabular: bool
     row: QueryResultRow
-    def __init__(self, row: _Optional[_Union[QueryResultRow, _Mapping]] = ..., error: _Optional[_Union[QueryError, _Mapping]] = ..., executor: _Optional[_Union[ExecutionEngine, str]] = ...) -> None: ...
+    def __init__(self, row: _Optional[_Union[QueryResultRow, _Mapping]] = ..., error: _Optional[_Union[QueryError, _Mapping]] = ..., executor: _Optional[_Union[ExecutionEngine, str]] = ..., not_tabular: bool = ...) -> None: ...
 
 class SessionId(_message.Message):
     __slots__ = ["id_value"]

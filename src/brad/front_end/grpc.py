@@ -42,7 +42,9 @@ class BradGrpc(rpc.BradServicer):
                 yield response
 
         except QueryError as ex:
-            yield b.RunQueryResponse(error=b.QueryError(error_msg=repr(ex)))
+            yield b.RunQueryResponse(
+                error=b.QueryError(error_msg=repr(ex), is_transient=ex.is_transient())
+            )
 
     async def RunQueryJson(
         self, request: b.RunQueryRequest, _context
@@ -59,7 +61,9 @@ class BradGrpc(rpc.BradServicer):
             return b.RunQueryJsonResponse(results=response)
 
         except QueryError as ex:
-            return b.RunQueryJsonResponse(error=b.QueryError(error_msg=repr(ex)))
+            return b.RunQueryJsonResponse(
+                error=b.QueryError(error_msg=repr(ex), is_transient=ex.is_transient())
+            )
 
     async def EndSession(
         self, request: b.EndSessionRequest, _context

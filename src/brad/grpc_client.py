@@ -144,7 +144,10 @@ class BradRawGrpcClient:
                     message="BRAD RPC error: Unspecified query result."
                 )
             elif msg_kind == "error":
-                raise BradClientError(message=response_msg.error.error_msg)
+                raise BradClientError(
+                    message=response_msg.error.error_msg,
+                    is_transient=response_msg.error.is_transient,
+                )
             elif msg_kind == "row":
                 executor = response_msg.executor
                 yield (response_msg.row.row_data, self._convert_engine(executor))
@@ -164,7 +167,10 @@ class BradRawGrpcClient:
         if msg_kind is None:
             raise BradClientError(message="BRAD RPC error: Unspecified query result.")
         elif msg_kind == "error":
-            raise BradClientError(message=response.error.error_msg)
+            raise BradClientError(
+                message=response.error.error_msg,
+                is_transient=response.error.is_transient,
+            )
         elif msg_kind == "results":
             executor = response.results.executor
             if ignore_results:
@@ -191,11 +197,15 @@ class BradRawGrpcClient:
 
 
 class BradClientError(Exception):
-    def __init__(self, message: str):
+    def __init__(self, message: str, is_transient: bool = False):
         self._message = message
+        self._is_transient = is_transient
 
     def message(self) -> str:
         return self._message
+
+    def is_transient(self) -> bool:
+        return self._is_transient
 
     def __repr__(self) -> str:
         return self._message
