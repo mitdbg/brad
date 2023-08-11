@@ -100,6 +100,7 @@ class EngineConnections:
         self._connection_map = connection_map
         self._schema_name = schema_name
         self._autocommit = autocommit
+        self._closed = False
 
     def __del__(self) -> None:
         self.close_sync()
@@ -189,15 +190,23 @@ class EngineConnections:
         Close the underlying connections. This instance can no longer be used after
         calling this method.
         """
+        if self._closed:
+            return
+
         futures = []
         for conn in self._connection_map.values():
             futures.append(conn.close())
         await asyncio.gather(*futures)
+        self._closed = True
 
     def close_sync(self):
         """
         Close the underlying connections. This instance can no longer be used after
         calling this method.
         """
+        if self._closed:
+            return
+
         for conn in self._connection_map.values():
             conn.close_sync()
+        self._closed = True
