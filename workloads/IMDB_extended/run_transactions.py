@@ -87,13 +87,29 @@ def runner(
                     )
                 else:
                     succeeded = txn(db)
+            except BradClientError as ex:
+                succeeded = False
+                if ex.is_transient():
+                    print(
+                        "Encountered transient error (probably engine change). Will retry...",
+                        flush=True,
+                        file=sys.stderr,
+                    )
+
+                else:
+                    print(
+                        "Encountered an unexpected `BradClientError`. Aborting the workload...",
+                        flush=True,
+                        file=sys.stderr,
+                    )
+                    raise
             except:
+                succeeded = False
                 print(
                     "Encountered an unexpected error. Aborting the workload...",
                     flush=True,
                     file=sys.stderr,
                 )
-                succeeded = False
                 raise
             txn_end = time.time()
 
