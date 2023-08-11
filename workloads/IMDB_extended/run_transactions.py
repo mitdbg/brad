@@ -12,7 +12,7 @@ import pytz
 import multiprocessing as mp
 from datetime import datetime
 
-from brad.grpc_client import BradGrpcClient
+from brad.grpc_client import BradGrpcClient, BradClientError
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
 from workload_utils.transaction_worker import TransactionWorker
 
@@ -51,27 +51,27 @@ def runner(
     commits = [0 for _ in range(len(transactions))]
     aborts = [0 for _ in range(len(transactions))]
 
-    try:
-        # Connect.
-        if args.cstr_var is not None:
-            db: Database = PyodbcDatabase(
-                pyodbc.connect(os.environ[args.cstr_var], autocommit=True)
-            )
-        else:
-            port_offset = worker_idx % args.num_front_ends
-            brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
-            brad.connect()
-            db = BradDatabase(brad)
-
-        # Set the isolation level.
-        db.execute_sync(
-            f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
+    # Connect.
+    if args.cstr_var is not None:
+        db: Database = PyodbcDatabase(
+            pyodbc.connect(os.environ[args.cstr_var], autocommit=True)
         )
+    else:
+        port_offset = worker_idx % args.num_front_ends
+        brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
+        brad.connect()
+        db = BradDatabase(brad)
 
-        # Signal that we are ready to start and wait for other clients.
-        start_queue.put("")
-        _ = stop_queue.get()
+    # Set the isolation level.
+    db.execute_sync(
+        f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
+    )
 
+    # Signal that we are ready to start and wait for other clients.
+    start_queue.put("")
+    _ = stop_queue.get()
+
+    try:
         overall_start = time.time()
         while True:
             txn_idx = txn_prng.choices(txn_indexes, weights=transaction_weights, k=1)[0]
@@ -79,12 +79,22 @@ def runner(
 
             now = datetime.now().astimezone(pytz.utc)
             txn_start = time.time()
-            if txn == worker.purchase_tickets:
-                succeeded = txn(
-                    db, select_using_name=txn_prng.random() < lookup_theatre_id_by_name
+            try:
+                if txn == worker.purchase_tickets:
+                    succeeded = txn(
+                        db,
+                        select_using_name=txn_prng.random() < lookup_theatre_id_by_name,
+                    )
+                else:
+                    succeeded = txn(db)
+            except:
+                print(
+                    "Encountered an unexpected error. Aborting the workload...",
+                    flush=True,
+                    file=sys.stderr,
                 )
-            else:
-                succeeded = txn(db)
+                succeeded = False
+                raise
             txn_end = time.time()
 
             # Record metrics.
@@ -99,10 +109,11 @@ def runner(
                 break
             except queue.Empty:
                 pass
+
+    finally:
         overall_end = time.time()
         print(f"[{worker_idx}] Done running transactions.", flush=True, file=sys.stderr)
 
-    finally:
         # For printing out results.
         if "COND_OUT" in os.environ:
             import conductor.lib as cond
