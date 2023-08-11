@@ -53,7 +53,10 @@ def run_query(client: BradGrpcClient, query: str) -> None:
 
         if not_tabular:
             for line in results:
-                print(line)
+                if len(line) == 1:
+                    print(line[0])
+                else:
+                    print(line)
         else:
             print(tabulate(results, tablefmt="simple_grid"))
         print()
