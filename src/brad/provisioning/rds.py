@@ -35,11 +35,7 @@ class RdsProvisioningManager:
             )
 
         loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(None, do_failover)
-
-        # Print the result of the failover
-        print("Failover result")
-        print(json.dumps(result, default=str, indent=2))
+        await loop.run_in_executor(None, do_failover)
 
         if wait_until_complete:
             while True:
@@ -51,7 +47,10 @@ class RdsProvisioningManager:
                         and instance_info["IsClusterWriter"]
                     ):
                         return
-                logger.debug("Waiting for %s to be reflected as the primary...")
+                logger.debug(
+                    "Waiting for %s to be reflected as the primary...",
+                    new_primary_identifier,
+                )
                 await asyncio.sleep(polling_interval)
 
     async def create_replica(
