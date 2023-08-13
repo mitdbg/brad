@@ -2,7 +2,6 @@ import asyncio
 import boto3
 import time
 import logging
-import json
 from typing import Any, Dict
 
 from brad.config.engine import Engine

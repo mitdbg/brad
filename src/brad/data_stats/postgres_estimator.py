@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Dict, List, Optional
 
@@ -6,7 +7,7 @@ from .estimator import Estimator
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.strings import base_table_name_from_source, source_table_name
-from brad.connection.connection import Connection
+from brad.connection.connection import Connection, ConnectionFailed
 from brad.connection.cursor import Cursor
 from brad.connection.factory import ConnectionFactory
 from brad.data_stats.estimator import AccessInfo
@@ -15,6 +16,7 @@ from brad.data_stats.plan_parsing import (
     extract_base_cardinalities,
 )
 from brad.query_rep import QueryRep
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 
 logger = logging.getLogger(__name__)
 
@@ -27,17 +29,23 @@ class PostgresEstimator(Estimator):
         config: ConfigFile,
     ) -> "PostgresEstimator":
         connection = await ConnectionFactory.connect_to_sidecar(schema_name, config)
-        return cls(connection, await connection.cursor(), schema_name)
+        return cls(connection, await connection.cursor(), schema_name, config)
 
     def __init__(
-        self, connection: Connection, cursor: Cursor, schema_name: str
+        self,
+        connection: Connection,
+        cursor: Cursor,
+        schema_name: str,
+        config: ConfigFile,
     ) -> None:
         self._connection = connection
         self._cursor = cursor
         self._schema_name = schema_name
+        self._config = config
 
         self._blueprint: Optional[Blueprint] = None
         self._table_sizes: Dict[str, int] = {}
+        self._reconnect_lock = asyncio.Lock()
 
     async def analyze(self, blueprint: Blueprint) -> None:
         self._blueprint = blueprint
@@ -45,6 +53,19 @@ class PostgresEstimator(Estimator):
         self._table_sizes.update(await self._get_table_sizes())
 
     async def get_access_info(self, query: QueryRep) -> List[AccessInfo]:
+        while True:
+            try:
+                return await self._get_access_info_impl(query)
+            except Exception as ex:
+                if not self._connection.is_connection_lost_error(ex):
+                    raise
+                else:
+                    self._connection.mark_connection_lost()
+
+            # Try to reconnect.
+            await self._try_reconnect()
+
+    async def _get_access_info_impl(self, query: QueryRep) -> List[AccessInfo]:
         explain_query = f"EXPLAIN VERBOSE {query.raw_query}"
         await self._cursor.execute(explain_query)
         plan_lines = [row[0] async for row in self._cursor]
@@ -58,6 +79,35 @@ class PostgresEstimator(Estimator):
 
     async def close(self) -> None:
         await self._connection.close()
+
+    async def _try_reconnect(self) -> None:
+        # This is meant to deal with intermittent lost connections. This may
+        # happen if the sidecar is also the main Aurora DB, which is restarted
+        # during a provisioning change.
+        async with self._reconnect_lock:
+            if self._connection.is_connected():
+                return
+
+            backoff = None
+            while True:
+                try:
+                    logger.debug("Attempting to reconnect to the sidecar DB...")
+                    connection = await ConnectionFactory.connect_to_sidecar(
+                        self._schema_name, self._config
+                    )
+                    self._connection = connection
+                    return
+                except ConnectionFailed:
+                    pass
+
+                if backoff is None:
+                    backoff = RandomizedExponentialBackoff(
+                        max_retries=10, base_delay_s=2, max_delay_s=5 * 60
+                    )
+                wait_s = backoff.wait_time_s()
+                if wait_s is None:
+                    raise RuntimeError("Failed to reconnect to the sidecar DB.")
+                await asyncio.sleep(wait_s)
 
     async def _get_table_sizes(self) -> Dict[str, int]:
         # Try using PostgreSQL stats directly (faster).
