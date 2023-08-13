@@ -547,6 +547,8 @@ class BradFrontEnd(BradInterface):
         )
 
     async def _do_reestablish_connections(self) -> None:
+        # FIXME: This approach is not ideal because we introduce concurrent
+        # access to the session manager.
         rand_backoff = None
 
         while True:

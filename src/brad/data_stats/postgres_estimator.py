@@ -53,7 +53,8 @@ class PostgresEstimator(Estimator):
         self._table_sizes.update(await self._get_table_sizes())
 
     async def get_access_info(self, query: QueryRep) -> List[AccessInfo]:
-        while True:
+        attempts = 0
+        while attempts < 10:
             try:
                 return await self._get_access_info_impl(query)
             except Exception as ex:
@@ -63,7 +64,12 @@ class PostgresEstimator(Estimator):
                     self._connection.mark_connection_lost()
 
             # Try to reconnect.
+            attempts += 1
             await self._try_reconnect()
+
+        raise RuntimeError(
+            "Fatal error: Unable to estimate cardinalities due to a lost connection to the sidecar DB."
+        )
 
     async def _get_access_info_impl(self, query: QueryRep) -> List[AccessInfo]:
         explain_query = f"EXPLAIN VERBOSE {query.raw_query}"
@@ -95,7 +101,9 @@ class PostgresEstimator(Estimator):
                     connection = await ConnectionFactory.connect_to_sidecar(
                         self._schema_name, self._config
                     )
+                    cursor = await connection.cursor()
                     self._connection = connection
+                    self._cursor = cursor
                     return
                 except ConnectionFailed:
                     pass
