@@ -321,10 +321,6 @@ class BradDaemon:
                 "Planner selected a new blueprint. Transition is starting. New blueprint: %s",
                 blueprint,
             )
-            logger.info("Ignoring the blueprint (temporarily) for stability.")
-            return
-
-            # pylint: disable-next=unreachable
             await self._blueprint_mgr.start_transition(blueprint)
             self._transition_orchestrator = TransitionOrchestrator(
                 self._config, self._blueprint_mgr
@@ -443,6 +439,9 @@ class BradDaemon:
             tm.state == TransitionState.TransitionedPreCleanUp
         ), "Incorrect transition state."
         assert tm.next_version is not None, "Missing next version."
+
+        directory = self._blueprint_mgr.get_directory()
+        logger.debug("Using new directory: %s", directory)
 
         # Important because the instance IDs may have changed.
         self._monitor.update_metrics_sources()

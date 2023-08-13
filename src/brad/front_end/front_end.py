@@ -40,6 +40,7 @@ from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
 from brad.routing.tree_based.forest_router import ForestRouter
 from brad.row_list import RowList
+from brad.utils import log_verbose
 from brad.utils.counter import Counter
 from brad.utils.json_decimal_encoder import DecimalEncoder
 from brad.utils.mailbox import Mailbox
@@ -283,8 +284,12 @@ class BradFrontEnd(BradInterface):
             else:
                 engine_to_use = await self._router.engine_for(query_rep)
 
-            logger.debug(
-                "[S%d] Routing '%s' to %s", session_id.value(), query, engine_to_use
+            log_verbose(
+                logger,
+                "[S%d] Routing '%s' to %s",
+                session_id.value(),
+                query,
+                engine_to_use,
             )
             debug_info["executor"] = engine_to_use
 
@@ -331,10 +336,10 @@ class BradFrontEnd(BradInterface):
             try:
                 # Using `fetchall_sync()` is lower overhead than the async interface.
                 results = [tuple(row) for row in cursor.fetchall_sync()]
-                logger.debug("Responded with %d rows.", len(results))
+                log_verbose(logger, "Responded with %d rows.", len(results))
                 return results
             except pyodbc.ProgrammingError:
-                logger.debug("No rows produced.")
+                log_verbose(logger, "No rows produced.")
                 return []
             except (pyodbc.Error, pyodbc.OperationalError) as ex:
                 is_transient_error = False
@@ -522,6 +527,8 @@ class BradFrontEnd(BradInterface):
             return
 
         blueprint = self._blueprint_mgr.get_blueprint()
+        directory = self._blueprint_mgr.get_directory()
+        logger.debug("Loaded new directory: %s", directory)
         if self._monitor is not None:
             self._monitor.update_metrics_sources()
         await self._sessions.add_connections()

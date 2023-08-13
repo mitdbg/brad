@@ -2,6 +2,7 @@ import asyncio
 import boto3
 import time
 import logging
+import json
 from typing import Any, Dict
 
 from brad.config.engine import Engine
@@ -24,13 +25,17 @@ class RdsProvisioningManager:
         self, cluster_id: str, new_primary_identifier: str
     ) -> None:
         def do_failover():
-            self._rds.failover_db_cluster(
+            return self._rds.failover_db_cluster(
                 DBClusterIdentifier=cluster_id,
                 TargetDBInstanceIdentifier=new_primary_identifier,
             )
 
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, do_failover)
+        result = await loop.run_in_executor(None, do_failover)
+
+        # Print the result of the failover
+        print("Failover result")
+        print(json.dumps(result, default=str, indent=2))
 
     async def create_replica(
         self,

@@ -42,6 +42,21 @@ class Directory:
         self._aurora_writer_endpoint: Optional[Tuple[str, int]] = None
         self._aurora_reader_endpoint: Optional[Tuple[str, int]] = None
 
+    def __repr__(self) -> str:
+        return "\n".join(
+            [
+                "[[Directory]]",
+                "[Aurora Writer]",
+                repr(self._aurora_writer),
+                "",
+                "[Aurora Readers]",
+                *map(repr, self._aurora_readers),
+                "",
+                "[Redshift]",
+                repr(self._redshift_cluster),
+            ]
+        )
+
     def aurora_writer(self) -> "AuroraInstanceMetadata":
         assert self._aurora_writer is not None
         return self._aurora_writer
@@ -203,6 +218,19 @@ class AuroraInstanceMetadata:
         self._endpoint_port = endpoint_port
         self._status = status
 
+    def __repr__(self) -> str:
+        return "\n".join(
+            [
+                "AuroraInstanceMetadata",
+                "  Instance ID: {}".format(self._instance_id),
+                "  Resource ID: {}".format(self._resource_id),
+                "  Endpoint: {}:{}".format(
+                    self._endpoint_address, str(self._endpoint_port)
+                ),
+                "  Status: {}".format(self._status),
+            ]
+        )
+
     def instance_id(self) -> str:
         return self._instance_id
 
@@ -233,6 +261,19 @@ class RedshiftClusterMetadata:
         self._instance_type = instance_type
         self._num_nodes = num_nodes
         self._availability_status = availability_status
+
+    def __repr__(self) -> str:
+        return "\n".join(
+            [
+                "RedshiftClusterMetadata",
+                "  Endpoint: {}:{}".format(
+                    self._endpoint_address, str(self._endpoint_port)
+                ),
+                "  Instance Type: {}".format(self._instance_type),
+                "  Num. of Nodes: {}".format(self._num_nodes),
+                "  Status: {}".format(self._availability_status),
+            ]
+        )
 
     def endpoint(self) -> Tuple[str, int]:
         return (self._endpoint_address, self._endpoint_port)
