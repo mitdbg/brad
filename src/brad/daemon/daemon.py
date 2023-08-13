@@ -431,7 +431,13 @@ class BradDaemon:
 
     async def _run_transition_part_one(self) -> None:
         assert self._transition_orchestrator is not None
-        await self._transition_orchestrator.run_prepare_then_transition()
+
+        def update_monitor_sources():
+            self._monitor.update_metrics_sources()
+
+        await self._transition_orchestrator.run_prepare_then_transition(
+            update_monitor_sources
+        )
 
         # Switch to the transitioned state.
         tm = self._blueprint_mgr.get_transition_metadata()
@@ -442,8 +448,6 @@ class BradDaemon:
 
         directory = self._blueprint_mgr.get_directory()
         logger.debug("Using new directory: %s", directory)
-
-        # Important because the instance IDs may have changed.
         self._monitor.update_metrics_sources()
 
         await self._data_sync_executor.update_connections()

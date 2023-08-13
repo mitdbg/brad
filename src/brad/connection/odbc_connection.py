@@ -77,7 +77,10 @@ class OdbcConnection(Connection):
         return False
 
 
-_CONNECTION_LOST_ERR_CODES = ["08001", "57P02", "08S01"]
+# Error code 25006 is used when running DML statements on a read replica. This
+# happens during the transient period when we failover to a new Aurora primary.
+# The solution is to re-connect, so we treat this as a lost connection.
+_CONNECTION_LOST_ERR_CODES = ["08001", "57P02", "08S01", "25006"]
 
 
 _CONNECTION_LOST_PHRASES = [
