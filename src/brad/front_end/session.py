@@ -22,6 +22,7 @@ class Session:
         self._session_id = session_id
         self._engines = engines
         self._in_txn = False
+        self._closed = False
 
     @property
     def identifier(self) -> SessionId:
@@ -35,10 +36,15 @@ class Session:
     def in_transaction(self) -> bool:
         return self._in_txn
 
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
     def set_in_transaction(self, in_txn: bool) -> None:
         self._in_txn = in_txn
 
     async def close(self):
+        self._closed = True
         await self._engines.close()
 
 
@@ -134,3 +140,32 @@ class SessionManager:
 
         for session in self._sessions.values():
             await session.engines.remove_connections(expected_engines)
+
+    async def reestablish_connections(self) -> bool:
+        """
+        Used to reconnect to engines when a connection has been lost. Lost
+        connections may occur during blueprint transitions when the provisioning
+        changes (e.g., an Aurora failover). This method returns `True` iff all
+        of the lost connections were re-established.
+
+        Callers should take care to not call this method repeatedly to avoid
+        overwhelming the underlying engines. Use randomized exponential backoff
+        instead.
+        """
+        logger.debug("Attempting to reestablish connections...")
+        directory = self._blueprint_mgr.get_directory()
+        all_connected = True
+        sessions = [session for session in self._sessions.values()]
+        for session in sessions:
+            if session.closed:
+                continue
+
+            connected = await session.engines.reestablish_connections(
+                self._config, directory
+            )
+            if not connected and not session.closed:
+                all_connected = False
+            # Continue running since we still want to try connecting other
+            # sessions.
+        logger.debug("Reestablish connections succeeded? %s", str(all_connected))
+        return all_connected

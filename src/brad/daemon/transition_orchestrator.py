@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Optional
+from typing import Optional, Callable
 
 from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.blueprint.diff.provisioning import ProvisioningDiff
@@ -35,7 +35,9 @@ class TransitionOrchestrator:
         """
         return self._next_version
 
-    async def run_prepare_then_transition(self) -> None:
+    async def run_prepare_then_transition(
+        self, on_instance_identity_change: Optional[Callable[[], None]] = None
+    ) -> None:
         """
         Prepares the provisioning for a graceful transition, and then executes
         the transition. After this method returns, the next blueprint will be
@@ -67,6 +69,7 @@ class TransitionOrchestrator:
             self._next_blueprint.aurora_provisioning(),
             aurora_diff,
             self._next_version,
+            on_instance_identity_change,
         )
         redshift_awaitable = self._run_redshift_pre_transition(
             self._curr_blueprint.redshift_provisioning(),
@@ -148,6 +151,7 @@ class TransitionOrchestrator:
         new: Provisioning,
         diff: Optional[ProvisioningDiff],
         next_version: int,
+        on_instance_identity_change: Optional[Callable[[], None]],
     ) -> None:
         if diff is None:
             return
@@ -194,7 +198,9 @@ class TransitionOrchestrator:
                 new_primary_instance,
             )
             await self._rds.run_primary_failover(
-                self._config.aurora_cluster_id, new_primary_instance
+                self._config.aurora_cluster_id,
+                new_primary_instance,
+                wait_until_complete=True,
             )
             logger.debug("Failover complete for %s", self._config.aurora_cluster_id)
 
@@ -203,6 +209,12 @@ class TransitionOrchestrator:
             logger.debug("Done deleting the old primary: %s", old_primary_instance)
 
             await self._blueprint_mgr.refresh_directory()
+            if on_instance_identity_change is not None:
+                # The primary changed. We run the callback so that clients can
+                # update any cached state that relies on instance identities
+                # (e.g., Performance Insights metrics).
+                on_instance_identity_change()
+
             replicas_to_modify = min(new.num_nodes() - 1, old.num_nodes() - 1)
 
             # Modify replicas one-by-one. Note that this logic causes the reader

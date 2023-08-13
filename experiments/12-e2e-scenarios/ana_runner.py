@@ -93,7 +93,20 @@ def runner(
                     flush=True,
                 )
             except BradClientError as ex:
-                print("Query error:", ex.message(), flush=True, file=sys.stderr)
+                if ex.is_transient():
+                    print(
+                        "Transient query error:",
+                        ex.message(),
+                        flush=True,
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        "Unexpected query error:",
+                        ex.message(),
+                        flush=True,
+                        file=sys.stderr,
+                    )
 
             try:
                 _ = stop_queue.get_nowait()
@@ -134,7 +147,20 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
                     flush=True,
                 )
             except BradClientError as ex:
-                print("Query error:", ex.message(), flush=True, file=sys.stderr)
+                if ex.is_transient():
+                    print(
+                        "Transient query error:",
+                        ex.message(),
+                        flush=True,
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        "Unexpected query error:",
+                        ex.message(),
+                        flush=True,
+                        file=sys.stderr,
+                    )
 
 
 def main():

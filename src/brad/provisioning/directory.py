@@ -39,8 +39,23 @@ class Directory:
         self._aurora_readers: List["AuroraInstanceMetadata"] = []
         self._redshift_cluster: Optional["RedshiftClusterMetadata"] = None
 
-        self._aurora_writer_endpoint: Optional[str] = None
-        self._aurora_reader_endpoint: Optional[str] = None
+        self._aurora_writer_endpoint: Optional[Tuple[str, int]] = None
+        self._aurora_reader_endpoint: Optional[Tuple[str, int]] = None
+
+    def __repr__(self) -> str:
+        return "\n".join(
+            [
+                "[[Directory]]",
+                "[Aurora Writer]",
+                repr(self._aurora_writer),
+                "",
+                "[Aurora Readers]",
+                *map(repr, self._aurora_readers),
+                "",
+                "[Redshift]",
+                repr(self._redshift_cluster),
+            ]
+        )
 
     def aurora_writer(self) -> "AuroraInstanceMetadata":
         assert self._aurora_writer is not None
@@ -53,11 +68,11 @@ class Directory:
         assert self._redshift_cluster is not None
         return self._redshift_cluster
 
-    def aurora_writer_endpoint(self) -> str:
+    def aurora_writer_endpoint(self) -> Tuple[str, int]:
         assert self._aurora_writer_endpoint is not None
         return self._aurora_writer_endpoint
 
-    def aurora_reader_endpoint(self) -> str:
+    def aurora_reader_endpoint(self) -> Tuple[str, int]:
         assert self._aurora_reader_endpoint is not None
         return self._aurora_reader_endpoint
 
@@ -80,7 +95,12 @@ class Directory:
 
     async def _refresh_aurora(
         self,
-    ) -> Tuple["AuroraInstanceMetadata", List["AuroraInstanceMetadata"], str, str]:
+    ) -> Tuple[
+        "AuroraInstanceMetadata",
+        List["AuroraInstanceMetadata"],
+        Tuple[str, int],
+        Tuple[str, int],
+    ]:
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(None, self._call_describe_aurora_cluster)
 
@@ -123,8 +143,14 @@ class Directory:
 
         writer_endpoint = cluster_info["Endpoint"]
         reader_endpoint = cluster_info["ReaderEndpoint"]
+        port = int(cluster_info["Port"])
 
-        return (new_writer, new_readers, writer_endpoint, reader_endpoint)
+        return (
+            new_writer,
+            new_readers,
+            (writer_endpoint, port),
+            (reader_endpoint, port),
+        )
 
     async def _refresh_aurora_instance(
         self, instance_id: str
@@ -192,6 +218,19 @@ class AuroraInstanceMetadata:
         self._endpoint_port = endpoint_port
         self._status = status
 
+    def __repr__(self) -> str:
+        return "\n".join(
+            [
+                "AuroraInstanceMetadata",
+                "  Instance ID: {}".format(self._instance_id),
+                "  Resource ID: {}".format(self._resource_id),
+                "  Endpoint: {}:{}".format(
+                    self._endpoint_address, str(self._endpoint_port)
+                ),
+                "  Status: {}".format(self._status),
+            ]
+        )
+
     def instance_id(self) -> str:
         return self._instance_id
 
@@ -222,6 +261,19 @@ class RedshiftClusterMetadata:
         self._instance_type = instance_type
         self._num_nodes = num_nodes
         self._availability_status = availability_status
+
+    def __repr__(self) -> str:
+        return "\n".join(
+            [
+                "RedshiftClusterMetadata",
+                "  Endpoint: {}:{}".format(
+                    self._endpoint_address, str(self._endpoint_port)
+                ),
+                "  Instance Type: {}".format(self._instance_type),
+                "  Num. of Nodes: {}".format(self._num_nodes),
+                "  Status: {}".format(self._availability_status),
+            ]
+        )
 
     def endpoint(self) -> Tuple[str, int]:
         return (self._endpoint_address, self._endpoint_port)

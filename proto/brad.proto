@@ -46,6 +46,10 @@ message RunQueryResponse {
 
   // The engine that was used to actually run the query.
   ExecutionEngine executor = 100;
+
+  // If true, this indicates that the response is not meant to be displayed in a
+  // table. This is usually set when fetching debug or internal state.
+  bool not_tabular = 101;
 }
 
 message RunQueryJsonResponse {
@@ -62,6 +66,10 @@ message QueryResultRow {
 
 message QueryError {
   string error_msg = 1;
+
+  // If true, the client should retry the query. Transient errors are usually
+  // due to underlying engine provisioning changes.
+  bool is_transient = 2;
 }
 
 message QueryJsonResponse {
@@ -70,6 +78,10 @@ message QueryJsonResponse {
 
   // The engine that was used to actually run the query.
   ExecutionEngine executor = 2;
+
+  // If true, this indicates that the response is not meant to be displayed in a
+  // table. This is usually set when fetching debug or internal state.
+  bool not_tabular = 3;
 }
 
 message EndSessionRequest {

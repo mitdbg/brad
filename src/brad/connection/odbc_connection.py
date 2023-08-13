@@ -2,26 +2,40 @@ import asyncio
 import pyodbc
 from typing import Any, Optional
 
-from .connection import Connection
+from .connection import Connection, ConnectionFailed
 from .cursor import Cursor
 from .odbc_cursor import OdbcCursor
 
 
 class OdbcConnection(Connection):
     @classmethod
-    async def connect(cls, connection_str: str, autocommit: bool) -> Connection:
+    async def connect(
+        cls, connection_str: str, autocommit: bool, timeout_s: int
+    ) -> Connection:
         loop = asyncio.get_running_loop()
 
         def make_connection():
-            return pyodbc.connect(connection_str, autocommit=autocommit)
+            return pyodbc.connect(
+                connection_str, autocommit=autocommit, timeout=timeout_s
+            )
 
-        connection = await loop.run_in_executor(None, make_connection)
-        return cls(connection)
+        try:
+            connection = await loop.run_in_executor(None, make_connection)
+            return cls(connection)
+        except pyodbc.OperationalError as ex:
+            raise ConnectionFailed() from ex
 
     @classmethod
-    def connect_sync(cls, connection_str: str, autocommit: bool) -> Connection:
-        connection = pyodbc.connect(connection_str, autocommit=autocommit)
-        return cls(connection)
+    def connect_sync(
+        cls, connection_str: str, autocommit: bool, timeout_s: int
+    ) -> Connection:
+        try:
+            connection = pyodbc.connect(
+                connection_str, autocommit=autocommit, timeout=timeout_s
+            )
+            return cls(connection)
+        except pyodbc.OperationalError as ex:
+            raise ConnectionFailed() from ex
 
     def __init__(self, connection_impl: Any) -> None:
         super().__init__()
@@ -46,3 +60,31 @@ class OdbcConnection(Connection):
 
     def close_sync(self) -> None:
         self._connection.close()
+
+    def is_connection_lost_error(self, ex: Exception) -> bool:
+        if isinstance(ex, pyodbc.Error) or isinstance(ex, pyodbc.OperationalError):
+            err_code = ex.args[0]
+            if err_code in _CONNECTION_LOST_ERR_CODES:
+                return True
+
+        # Unfortunately, there is no nice exception type. So we fall back to
+        # substring search.
+        message = repr(ex)
+        for phrase in _CONNECTION_LOST_PHRASES:
+            if phrase in message:
+                return True
+
+        return False
+
+
+# Error code 25006 is used when running DML statements on a read replica. This
+# happens during the transient period when we failover to a new Aurora primary.
+# The solution is to re-connect, so we treat this as a lost connection.
+_CONNECTION_LOST_ERR_CODES = ["08001", "57P02", "08S01", "25006"]
+
+
+_CONNECTION_LOST_PHRASES = [
+    "server closed the connection unexpectedly",
+    "connection has been lost",
+    "connection lost",
+]

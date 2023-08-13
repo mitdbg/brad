@@ -60,6 +60,11 @@ class BradGrpcClient:
 
     def run_query_json(self, query: str) -> Tuple[RowList, Optional[Engine]]:
         assert self._session_id is not None
+        results, executor, _ = self._impl.run_query_json(self._session_id, query)
+        return results, executor
+
+    def run_query_json_cli(self, query: str) -> Tuple[RowList, Optional[Engine], bool]:
+        assert self._session_id is not None
         return self._impl.run_query_json(self._session_id, query)
 
     def run_query_ignore_results(self, query: str) -> None:
@@ -144,7 +149,10 @@ class BradRawGrpcClient:
                     message="BRAD RPC error: Unspecified query result."
                 )
             elif msg_kind == "error":
-                raise BradClientError(message=response_msg.error.error_msg)
+                raise BradClientError(
+                    message=response_msg.error.error_msg,
+                    is_transient=response_msg.error.is_transient,
+                )
             elif msg_kind == "row":
                 executor = response_msg.executor
                 yield (response_msg.row.row_data, self._convert_engine(executor))
@@ -155,7 +163,7 @@ class BradRawGrpcClient:
 
     def run_query_json(
         self, session_id: SessionId, query: str, ignore_results: bool = False
-    ) -> Tuple[RowList, Optional[Engine]]:
+    ) -> Tuple[RowList, Optional[Engine], bool]:
         assert self._stub is not None
         response = self._stub.RunQueryJson(
             b.RunQueryRequest(id=b.SessionId(id_value=session_id.value()), query=query)
@@ -164,15 +172,19 @@ class BradRawGrpcClient:
         if msg_kind is None:
             raise BradClientError(message="BRAD RPC error: Unspecified query result.")
         elif msg_kind == "error":
-            raise BradClientError(message=response.error.error_msg)
+            raise BradClientError(
+                message=response.error.error_msg,
+                is_transient=response.error.is_transient,
+            )
         elif msg_kind == "results":
             executor = response.results.executor
             if ignore_results:
-                return ([], executor)
+                return ([], executor, response.results.not_tabular)
             else:
                 return (
                     json.loads(response.results.results_json),
                     self._convert_engine(executor),
+                    response.results.not_tabular,
                 )
         else:
             raise BradClientError(
@@ -191,11 +203,15 @@ class BradRawGrpcClient:
 
 
 class BradClientError(Exception):
-    def __init__(self, message: str):
+    def __init__(self, message: str, is_transient: bool = False):
         self._message = message
+        self._is_transient = is_transient
 
     def message(self) -> str:
         return self._message
+
+    def is_transient(self) -> bool:
+        return self._is_transient
 
     def __repr__(self) -> str:
         return self._message

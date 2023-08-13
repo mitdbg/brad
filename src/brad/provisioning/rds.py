@@ -21,16 +21,36 @@ class RdsProvisioningManager:
         )
 
     async def run_primary_failover(
-        self, cluster_id: str, new_primary_identifier: str
+        self,
+        cluster_id: str,
+        new_primary_identifier: str,
+        wait_until_complete: bool = True,
+        polling_interval: float = 20.0,
     ) -> None:
         def do_failover():
-            self._rds.failover_db_cluster(
+            return self._rds.failover_db_cluster(
                 DBClusterIdentifier=cluster_id,
                 TargetDBInstanceIdentifier=new_primary_identifier,
             )
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, do_failover)
+
+        if wait_until_complete:
+            while True:
+                response = await self._describe_db_cluster(cluster_id)
+                cluster = response["DBClusters"][0]
+                for instance_info in cluster["DBClusterMembers"]:
+                    if (
+                        instance_info["DBInstanceIdentifier"] == new_primary_identifier
+                        and instance_info["IsClusterWriter"]
+                    ):
+                        return
+                logger.debug(
+                    "Waiting for %s to be reflected as the primary...",
+                    new_primary_identifier,
+                )
+                await asyncio.sleep(polling_interval)
 
     async def create_replica(
         self,
