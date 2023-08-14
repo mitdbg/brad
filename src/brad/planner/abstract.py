@@ -1,5 +1,6 @@
 import asyncio
-from typing import Coroutine, Callable, List, Optional
+import logging
+from typing import Coroutine, Callable, List, Optional, Iterable
 
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
@@ -11,7 +12,10 @@ from brad.planner.metrics import MetricsProvider
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 from brad.planner.scoring.score import Score
+from brad.planner.triggers.trigger import Trigger
 from brad.planner.workload.provider import WorkloadProvider
+
+logger = logging.getLogger(__name__)
 
 NewBlueprintCallback = Callable[[Blueprint, Score], Coroutine[None, None, None]]
 
@@ -61,13 +65,38 @@ class BlueprintPlanner:
         Called to start the planner. The planner is meant to run until its task
         is cancelled.
         """
-        raise NotImplementedError
+        if not self._planner_config.triggers_enabled():
+            logger.info("Blueprint planner triggers are disabled.")
+            # No need to do any further checks. Only manually triggered replans
+            # are possible.
+            return
+
+        trigger_configs = self._planner_config.trigger_configs()
+        check_offset = trigger_configs["check_period_offset_s"]
+        check_period = trigger_configs["check_period_s"]
+
+        await asyncio.sleep(check_offset + check_period)
+        while True:
+            logger.debug("Planner is checking if a replan is needed...")
+            for t in self.get_triggers():
+                if await t.should_replan():
+                    logger.info("Starting a triggered replan...")
+                    await self.run_replan()
+                    break
+            await asyncio.sleep(check_period)
 
     async def run_replan(self, window_multiplier: int = 1) -> None:
         """
         Triggers a "forced" replan. Used for debugging.
 
         Use `window_multiplier` to expand the window used for planning.
+        """
+        raise NotImplementedError
+
+    def get_triggers(self) -> Iterable[Trigger]:
+        """
+        Implementers should return the triggers used to trigger blueprint
+        replanning.
         """
         raise NotImplementedError
 
@@ -82,6 +111,9 @@ class BlueprintPlanner:
         """
         self._current_blueprint = blueprint
         self._current_blueprint_score = score
+
+        for t in self.get_triggers():
+            t.update_blueprint(blueprint, score)
 
     # NOTE: In the future we will implement an abstraction that will allow for a
     # generic planner to subscribe to a stream of events, used to detect when to

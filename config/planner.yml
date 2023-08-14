@@ -8,6 +8,32 @@ planning_window:
   hours: 0
   minutes: 3
 
+
+###
+### Trigger configs.
+###
+
+triggers:
+  enabled: true
+  check_period_s: 60  # Triggers are checked every X seconds.
+  check_period_offset_s: 20
+
+  elapsed_time:
+    multiplier: 10  # Multiplier over `planning_window`.
+
+  redshift_cpu:
+    lo: 20
+    hi: 90
+    sustained_epochs: 3
+
+  aurora_cpu:
+    lo: 20
+    hi: 90
+    sustained_epochs: 3
+
+  variable_costs:
+    threshold: 0.2
+
 ###
 ### Beam planning constants.
 ###

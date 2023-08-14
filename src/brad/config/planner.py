@@ -2,7 +2,7 @@ import yaml
 import numpy as np
 import numpy.typing as npt
 from datetime import timedelta
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from brad.planner.strategy import PlanningStrategy
 
 
@@ -31,6 +31,12 @@ class PlannerConfig:
             hours=epoch["hours"],
             minutes=epoch["minutes"],
         )
+
+    def trigger_configs(self) -> Dict[str, Any]:
+        return self._raw["triggers"]
+
+    def triggers_enabled(self) -> bool:
+        return self._raw["triggers"]["enabled"]
 
     def beam_size(self) -> int:
         return int(self._raw["beam_size"])

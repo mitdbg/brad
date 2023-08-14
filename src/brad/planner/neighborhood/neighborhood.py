@@ -3,7 +3,7 @@ import logging
 import pytz
 import pandas as pd
 from io import TextIOWrapper
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 from datetime import datetime
 
 from brad.config.engine import Engine
@@ -25,6 +25,7 @@ from brad.planner.neighborhood.sampled_neighborhood import (
 )
 from brad.planner.scoring.score import Score
 from brad.planner.strategy import PlanningStrategy
+from brad.planner.triggers.trigger import Trigger
 from brad.planner.workload import Workload
 from brad.provisioning.directory import Directory
 from brad.routing.rule_based import RuleBased
@@ -82,6 +83,10 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         finally:
             if self._metrics_out is not None:
                 self._metrics_out.close()
+
+    def get_triggers(self) -> Iterable[Trigger]:
+        # TODO: Add triggers if needed.
+        return []
 
     async def run_replan(self, window_multiplier: int = 1) -> None:
         # This will be long-running and will block the event loop. For our

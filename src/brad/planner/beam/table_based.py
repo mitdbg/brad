@@ -1,20 +1,21 @@
-import asyncio
 import heapq
 import itertools
 import json
 import logging
 from datetime import timedelta
-from typing import List, Tuple, Dict
+from typing import Iterable, List, Tuple, Dict
 
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.abstract import BlueprintPlanner
 from brad.planner.beam.feasibility import BlueprintFeasibility
+from brad.planner.beam.triggers import get_beam_triggers
 from brad.planner.router_provider import RouterProvider
 from brad.planner.beam.table_based_candidate import BlueprintCandidate
 from brad.planner.debug_logger import BlueprintPlanningDebugLogger
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
+from brad.planner.triggers.trigger import Trigger
 from brad.planner.workload import Workload
 
 logger = logging.getLogger(__name__)
@@ -26,13 +27,16 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         self._router_provider = RouterProvider(
             self._schema_name, self._config, self._estimator_provider
         )
+        self._triggers = get_beam_triggers(
+            self._config,
+            self._planner_config,
+            self._monitor,
+            self._data_access_provider,
+            self._router_provider,
+        )
 
-    async def run_forever(self) -> None:
-        while True:
-            await asyncio.sleep(30)
-            logger.debug("Planner is checking if a replan is needed...")
-            if self._check_if_metrics_warrant_replanning():
-                await self.run_replan()
+    def get_triggers(self) -> Iterable[Trigger]:
+        return self._triggers
 
     def _check_if_metrics_warrant_replanning(self) -> bool:
         # See if the metrics indicate that we should trigger the planning

@@ -15,7 +15,7 @@ class Trigger:
         """
         raise NotImplementedError
 
-    def update_blueprint(self, blueprint: Blueprint, score: Score) -> None:
+    def update_blueprint(self, blueprint: Blueprint, score: Optional[Score]) -> None:
         self._current_blueprint = blueprint
         self._current_score = score
 
