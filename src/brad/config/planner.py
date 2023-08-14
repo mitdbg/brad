@@ -38,6 +38,9 @@ class PlannerConfig:
     def triggers_enabled(self) -> bool:
         return self._raw["triggers"]["enabled"]
 
+    def query_dist_change_frac(self) -> float:
+        return float(self._raw["query_dist_change_frac"])
+
     def beam_size(self) -> int:
         return int(self._raw["beam_size"])
 

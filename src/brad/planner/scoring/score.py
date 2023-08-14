@@ -1,4 +1,5 @@
 import pickle
+import numpy as np
 import numpy.typing as npt
 from typing import Dict, Optional, TYPE_CHECKING
 
@@ -41,3 +42,11 @@ class Score:
     @classmethod
     def deserialize(cls, raw: bytes) -> "Score":
         return pickle.loads(raw)
+
+    def normalized_query_count_distribution(self) -> npt.NDArray:
+        counts = np.array(
+            [self.aurora_queries, self.athena_queries, self.redshift_queries],
+            dtype=float,
+        )
+        total_count = counts.sum()
+        return counts / total_count

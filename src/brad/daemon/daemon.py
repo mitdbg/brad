@@ -4,11 +4,13 @@ import queue
 import pytz
 import os
 import multiprocessing as mp
+import numpy as np
 from typing import Optional, List
 from datetime import datetime
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
+from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.blueprint.manager import BlueprintManager
 from brad.blueprint.state import TransitionState
 from brad.config.file import ConfigFile
@@ -305,11 +307,7 @@ class BradDaemon:
         """
         Informs the server about a new blueprint.
         """
-        if self._transition_orchestrator is not None:
-            logger.warning(
-                "Planner selected a new blueprint, but we are still transitioning to a blueprint. New blueprint: %s",
-                blueprint,
-            )
+        if self._should_skip_blueprint(blueprint, score):
             return
 
         if PERSIST_BLUEPRINT_VAR in os.environ:
@@ -330,6 +328,53 @@ class BradDaemon:
                 self._config, self._blueprint_mgr
             )
             self._transition_task = asyncio.create_task(self._run_transition_part_one())
+
+    def _should_skip_blueprint(self, blueprint: Blueprint, score: Score) -> bool:
+        """
+        This is called whenever the planner chooses a new blueprint. The purpose
+        is to avoid transitioning to blueprints with few changes.
+
+        We always skip the blueprint if a transition is currently in progress.
+
+        We do not skip the blueprint if:
+        - If there is a provisioning change
+        - The change in query routing is above a threshold
+        """
+        if self._transition_orchestrator is not None:
+            logger.warning(
+                "Planner selected a new blueprint, but we are still transitioning to a blueprint. Skipping new blueprint: %s",
+                blueprint,
+            )
+            return True
+
+        current_blueprint = self._blueprint_mgr.get_blueprint()
+        diff = BlueprintDiff.of(current_blueprint, blueprint)
+        if diff is None:
+            logger.info("Planner selected an identical blueprint - skipping.")
+            return True
+
+        if diff.aurora_diff() is not None or diff.redshift_diff() is not None:
+            return False
+
+        current_score = self._blueprint_mgr.get_active_score()
+        if current_score is None:
+            # Do not skip - we are currently missing the score of the active
+            # blueprint, so there is nothing to compare to.
+            return False
+
+        current_dist = current_score.normalized_query_count_distribution()
+        next_dist = score.normalized_query_count_distribution()
+        abs_delta = np.abs(next_dist - current_dist).sum()
+
+        if abs_delta >= self._planner_config.query_dist_change_frac():
+            return False
+        else:
+            logger.info(
+                "Skipping blueprint because the query distribution change (%.4f) falls under the threshold (%.4f).",
+                abs_delta,
+                self._planner_config.query_dist_change_frac(),
+            )
+            return True
 
     async def _run_sync_periodically(self) -> None:
         while True:

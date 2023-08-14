@@ -8,6 +8,9 @@ planning_window:
   hours: 0
   minutes: 3
 
+# The query distribution must change by at least this much for a new blueprint
+# to be accepted.
+query_dist_change_frac: 0.1
 
 ###
 ### Trigger configs.
