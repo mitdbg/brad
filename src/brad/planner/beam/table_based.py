@@ -34,6 +34,8 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             self._data_access_provider,
             self._router_provider,
         )
+        for t in self._triggers:
+            t.update_blueprint(self._current_blueprint, self._current_blueprint_score)
 
     def get_triggers(self) -> Iterable[Trigger]:
         return self._triggers

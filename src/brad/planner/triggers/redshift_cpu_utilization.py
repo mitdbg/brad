@@ -1,8 +1,11 @@
+import logging
 from typing import Optional
 
 from .metrics_thresholds import MetricsThresholds
 from .trigger import Trigger
 from brad.daemon.monitor import Monitor
+
+logger = logging.getLogger(__name__)
 
 
 class RedshiftCpuUtilization(Trigger):
@@ -21,6 +24,18 @@ class RedshiftCpuUtilization(Trigger):
         self._lookahead_epochs = lookahead_epochs
 
     async def should_replan(self) -> bool:
+        if self._current_blueprint is None:
+            logger.info(
+                "Redshift CPU utilization not running because of missing blueprint."
+            )
+            return False
+
+        if self._current_blueprint.redshift_provisioning().num_nodes() == 0:
+            logger.debug(
+                "Redshift is off, so the Redshift CPU utilization trigger is inactive."
+            )
+            return False
+
         past = self._monitor.redshift_metrics().read_k_most_recent(
             k=self._sustained_epochs, metric_ids=[_UTILIZATION_METRIC]
         )
