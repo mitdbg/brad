@@ -127,6 +127,10 @@ class BlueprintCandidate(ComparableBlueprint):
         score.aurora_score = self.aurora_score
         score.redshift_score = self.redshift_score
 
+        score.aurora_queries = len(self.query_locations[Engine.Aurora])
+        score.athena_queries = len(self.query_locations[Engine.Athena])
+        score.redshift_queries = len(self.query_locations[Engine.Redshift])
+
         return score
 
     def to_debug_values(self) -> Dict[str, int | float | str]:

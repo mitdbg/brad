@@ -31,6 +31,10 @@ class Score:
         self.aurora_score: Optional["AuroraProvisioningScore"] = None
         self.redshift_score: Optional["RedshiftProvisioningScore"] = None
 
+        self.aurora_queries = 0
+        self.athena_queries = 0
+        self.redshift_queries = 0
+
     def serialize(self) -> bytes:
         return pickle.dumps(self)
 
