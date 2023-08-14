@@ -7,7 +7,7 @@ from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning, MutableProvisioning
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.beam.feasibility import BlueprintFeasibility
-from brad.planner.beam.router_provider import RouterProvider
+from brad.planner.router_provider import RouterProvider
 from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator

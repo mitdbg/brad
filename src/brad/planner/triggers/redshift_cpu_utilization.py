@@ -20,7 +20,7 @@ class RedshiftCpuUtilization(Trigger):
         self._sustained_epochs = sustained_epochs
         self._lookahead_epochs = lookahead_epochs
 
-    def should_replan(self) -> bool:
+    async def should_replan(self) -> bool:
         past = self._monitor.redshift_metrics().read_k_most_recent(
             k=self._sustained_epochs, metric_ids=[_UTILIZATION_METRIC]
         )

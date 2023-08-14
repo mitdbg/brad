@@ -12,7 +12,7 @@ class ElapsedTimeTrigger(Trigger):
         self._period = period
         self._reset_trigger_next()
 
-    def should_replan(self) -> bool:
+    async def should_replan(self) -> bool:
         now = datetime.now()
         if now >= self._trigger_next:
             self._reset_trigger_next()
