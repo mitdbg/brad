@@ -115,7 +115,7 @@ class VariableCosts(Trigger):
         )
 
         for idx, q in enumerate(workload.analytical_queries()):
-            engine = router.engine_for(q)
+            engine = await router.engine_for(q)
             if engine == Engine.Aurora:
                 aurora_query_indices.append(idx)
                 aurora_queries.append(q)
