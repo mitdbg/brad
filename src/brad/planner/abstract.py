@@ -59,6 +59,7 @@ class BlueprintPlanner:
         self._estimator_provider = estimator_provider
 
         self._callbacks: List[NewBlueprintCallback] = []
+        self._replan_in_progress = False
 
     async def run_forever(self) -> None:
         """
@@ -72,9 +73,9 @@ class BlueprintPlanner:
             return
 
         triggers = self.get_triggers()
-        logger.info("Planner running with %d triggers.", len(triggers))
+        logger.info("Planner triggers:")
         for t in triggers:
-            logger.info("Trigger: %s", t.name())
+            logger.info("- Trigger: %s", t.name())
 
         trigger_configs = self._planner_config.trigger_configs()
         check_offset = trigger_configs["check_period_offset_s"]
@@ -83,11 +84,16 @@ class BlueprintPlanner:
         await asyncio.sleep(check_offset + check_period)
         while True:
             logger.debug("Planner is checking if a replan is needed...")
-            for t in self.get_triggers():
-                if await t.should_replan():
-                    logger.info("Starting a triggered replan...")
-                    await self.run_replan()
-                    break
+            if not self._replan_in_progress:
+                for t in self.get_triggers():
+                    if await t.should_replan():
+                        logger.info("Starting a triggered replan...")
+                        await self.run_replan()
+                        break
+            else:
+                logger.debug(
+                    "A replan is already in progress. Skipping the trigger check."
+                )
             await asyncio.sleep(check_period)
 
     async def run_replan(self, window_multiplier: int = 1) -> None:
@@ -95,6 +101,17 @@ class BlueprintPlanner:
         Triggers a "forced" replan. Used for debugging.
 
         Use `window_multiplier` to expand the window used for planning.
+        """
+        try:
+            self._replan_in_progress = True
+            await self._run_replan_impl(window_multiplier)
+        finally:
+            self._replan_in_progress = False
+
+    async def _run_replan_impl(self, window_multiplier: int = 1) -> None:
+        """
+        Implementers should override this method to define the blueprint
+        optimization algorithm.
         """
         raise NotImplementedError
 

@@ -22,13 +22,13 @@ triggers:
     multiplier: 10  # Multiplier over `planning_window`.
 
   redshift_cpu:
-    lo: 20
+    lo: 10
     hi: 90
     sustained_epochs: 3
 
   aurora_cpu:
-    lo: 20
-    hi: 90
+    lo: 10
+    hi: 85
     sustained_epochs: 3
 
   variable_costs:

@@ -39,7 +39,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
     def get_triggers(self) -> Iterable[Trigger]:
         return self._triggers
 
-    async def run_replan(self, window_multiplier: int = 1) -> None:
+    async def _run_replan_impl(self, window_multiplier: int = 1) -> None:
         logger.info("Running a replan...")
 
         # 1. Fetch the next workload and apply predictions.

@@ -45,7 +45,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         # process.
         return False
 
-    async def run_replan(self, window_multiplier: int = 1) -> None:
+    async def _run_replan_impl(self, window_multiplier: int = 1) -> None:
         logger.info("Running a replan...")
 
         # 1. Fetch metrics and the next workload and then apply predictions.

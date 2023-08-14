@@ -88,7 +88,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         # TODO: Add triggers if needed.
         return []
 
-    async def run_replan(self, window_multiplier: int = 1) -> None:
+    async def _run_replan_impl(self, window_multiplier: int = 1) -> None:
         # This will be long-running and will block the event loop. For our
         # current needs, this is fine since the planner is the main component in
         # the daemon process.
