@@ -89,7 +89,7 @@ class VariableCosts(Trigger):
 
         # Extract the queries seen in the last window.
         window_end = datetime.now()
-        window_end.astimezone(pytz.utc)
+        window_end = window_end.astimezone(pytz.utc)
         window_start = (
             window_end
             - self._planner_config.planning_window()
