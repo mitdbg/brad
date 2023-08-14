@@ -1,10 +1,12 @@
 import pickle
 import numpy.typing as npt
-from typing import Dict, Optional
+from typing import Dict, Optional, TYPE_CHECKING
 
-from .performance.unified_aurora import AuroraProvisioningScore
-from .performance.unified_redshift import RedshiftProvisioningScore
 from brad.config.engine import Engine
+
+if TYPE_CHECKING:
+    from .performance.unified_aurora import AuroraProvisioningScore
+    from .performance.unified_redshift import RedshiftProvisioningScore
 
 
 class Score:
@@ -26,8 +28,8 @@ class Score:
         self.provisioning_trans_time_s = 0.0
 
         self.scaled_query_latencies: Dict[Engine, npt.NDArray] = {}
-        self.aurora_score: Optional[AuroraProvisioningScore] = None
-        self.redshift_score: Optional[RedshiftProvisioningScore] = None
+        self.aurora_score: Optional["AuroraProvisioningScore"] = None
+        self.redshift_score: Optional["RedshiftProvisioningScore"] = None
 
     def serialize(self) -> bytes:
         return pickle.dumps(self)
