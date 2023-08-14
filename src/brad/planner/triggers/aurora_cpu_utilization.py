@@ -1,8 +1,11 @@
+import logging
 from typing import Optional
 
 from .metrics_thresholds import MetricsThresholds
 from .trigger import Trigger
 from brad.daemon.monitor import Monitor
+
+logger = logging.getLogger(__name__)
 
 
 class AuroraCpuUtilization(Trigger):
@@ -21,6 +24,18 @@ class AuroraCpuUtilization(Trigger):
         self._lookahead_epochs = lookahead_epochs
 
     async def should_replan(self) -> bool:
+        if self._current_blueprint is None:
+            logger.info(
+                "Aurora CPU utilization trigger not running because of missing blueprint."
+            )
+            return False
+
+        if self._current_blueprint.aurora_provisioning().num_nodes() == 0:
+            logger.debug(
+                "Aurora is off, so the Aurora CPU utilization trigger is inactive."
+            )
+            return False
+
         # TODO: May want to consider read replica metrics too.
         past = self._monitor.aurora_metrics(reader_index=None).read_k_most_recent(
             k=self._sustained_epochs, metric_ids=[_UTILIZATION_METRIC]

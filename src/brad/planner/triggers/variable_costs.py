@@ -79,12 +79,13 @@ class VariableCosts(Trigger):
 
         # Extract the queries seen in the last window.
         window_end = datetime.now()
-        window_end.replace(tzinfo=pytz.utc)
+        window_end.astimezone(pytz.utc)
         window_start = (
             window_end
             - self._planner_config.planning_window()
             - self._config.epoch_length
         )
+        logger.debug("Variable costs range: %s -- %s", window_start, window_end)
         workload = (
             WorkloadBuilder()
             .add_queries_from_s3_logs(self._config, window_start, window_end)

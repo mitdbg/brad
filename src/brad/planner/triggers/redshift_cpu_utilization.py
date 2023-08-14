@@ -26,7 +26,7 @@ class RedshiftCpuUtilization(Trigger):
     async def should_replan(self) -> bool:
         if self._current_blueprint is None:
             logger.info(
-                "Redshift CPU utilization not running because of missing blueprint."
+                "Redshift CPU utilization trigger not running because of missing blueprint."
             )
             return False
 
