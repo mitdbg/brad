@@ -23,6 +23,7 @@ from brad.planner.neighborhood.full_neighborhood import FullNeighborhoodSearchPl
 from brad.planner.neighborhood.sampled_neighborhood import (
     SampledNeighborhoodSearchPlanner,
 )
+from brad.planner.scoring.score import Score
 from brad.planner.strategy import PlanningStrategy
 from brad.planner.workload import Workload
 from brad.provisioning.directory import Directory
@@ -172,8 +173,11 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 self._impl.on_enumerated_blueprint(bp, scoring_ctx)
 
             selected_blueprint = self._impl.on_enumeration_complete(scoring_ctx)
+            # TODO: Populate the score if needed.
+            selected_score = Score()
             self._last_suggested_blueprint = selected_blueprint
-            await self._notify_new_blueprint(selected_blueprint)
+            self._last_suggested_blueprint_score = selected_score
+            await self._notify_new_blueprint(selected_blueprint, selected_score)
 
         finally:
             engines.close_sync()

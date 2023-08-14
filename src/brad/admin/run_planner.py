@@ -16,6 +16,7 @@ from brad.planner.compare.cost import (
 )
 from brad.planner.estimator import EstimatorProvider, FixedEstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
+from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.precomputed_values import (
     PrecomputedDataAccessProvider,
 )
@@ -241,7 +242,7 @@ def run_planner(args) -> None:
     )
     asyncio.run(monitor.fetch_latest())
 
-    async def on_new_blueprint(blueprint: Blueprint):
+    async def on_new_blueprint(blueprint: Blueprint, score: Score):
         logger.info("Selected new blueprint")
         logger.info("%s", blueprint)
 
@@ -250,12 +251,12 @@ def run_planner(args) -> None:
                 "Do you want to persist this blueprint? Use 'f' to force-persist the blueprint. (y/f/n): "
             ).lower()
             if response == "y":
-                await blueprint_mgr.start_transition(blueprint)
+                await blueprint_mgr.start_transition(blueprint, score)
                 print("Done!")
                 break
             elif response == "f":
                 print("Forcing the blueprint...")
-                blueprint_mgr.force_new_blueprint_sync(blueprint)
+                blueprint_mgr.force_new_blueprint_sync(blueprint, score)
                 print("Done!")
                 break
             elif response == "n":

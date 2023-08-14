@@ -307,7 +307,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
         # 9. Output the new blueprint.
         best_blueprint = best_candidate.to_blueprint()
+        best_blueprint_score = best_candidate.to_score()
         self._last_suggested_blueprint = best_blueprint
+        self._last_suggested_blueprint_score = best_blueprint_score
 
         logger.info("Selected blueprint:")
         logger.info("%s", best_blueprint)
@@ -320,4 +322,4 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             "Metrics used during planning: %s", json.dumps(metrics._asdict(), indent=2)
         )
 
-        await self._notify_new_blueprint(best_blueprint)
+        await self._notify_new_blueprint(best_blueprint, best_blueprint_score)

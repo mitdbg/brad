@@ -10,9 +10,10 @@ from brad.planner.estimator import EstimatorProvider
 from brad.planner.metrics import MetricsProvider
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
+from brad.planner.scoring.score import Score
 from brad.planner.workload.provider import WorkloadProvider
 
-NewBlueprintCallback = Callable[[Blueprint], Coroutine[None, None, None]]
+NewBlueprintCallback = Callable[[Blueprint, Score], Coroutine[None, None, None]]
 
 
 class BlueprintPlanner:
@@ -38,7 +39,10 @@ class BlueprintPlanner:
     ) -> None:
         self._planner_config = planner_config
         self._current_blueprint = current_blueprint
+        # TODO: Ideally we persist and load the previous score as well.
+        self._current_blueprint_score: Optional[Score] = None
         self._last_suggested_blueprint: Optional[Blueprint] = None
+        self._last_suggested_blueprint_score: Optional[Score] = None
         self._monitor = monitor
         self._config = config
         self._schema_name = schema_name
@@ -67,7 +71,7 @@ class BlueprintPlanner:
         """
         raise NotImplementedError
 
-    def update_blueprint(self, blueprint: Blueprint) -> None:
+    def update_blueprint(self, blueprint: Blueprint, score: Optional[Score]) -> None:
         """
         Use this method to inform the planner of a new blueprint being
         transitioned to successfully.
@@ -77,6 +81,7 @@ class BlueprintPlanner:
         blueprints).
         """
         self._current_blueprint = blueprint
+        self._current_blueprint_score = score
 
     # NOTE: In the future we will implement an abstraction that will allow for a
     # generic planner to subscribe to a stream of events, used to detect when to
@@ -89,12 +94,12 @@ class BlueprintPlanner:
         """
         self._callbacks.append(callback)
 
-    async def _notify_new_blueprint(self, blueprint: Blueprint) -> None:
+    async def _notify_new_blueprint(self, blueprint: Blueprint, score: Score) -> None:
         """
         Concrete planners should call this method to notify subscribers about
         the next blueprint.
         """
         tasks = []
         for callback in self._callbacks:
-            tasks.append(asyncio.create_task(callback(blueprint)))
+            tasks.append(asyncio.create_task(callback(blueprint, score)))
         await asyncio.gather(*tasks)

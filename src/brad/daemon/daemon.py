@@ -34,6 +34,7 @@ from brad.planner.compare.cost import best_cost_under_p99_latency
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import MetricsFromMonitor
+from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.data_access.precomputed_values import (
     PrecomputedDataAccessProvider,
@@ -299,7 +300,7 @@ class BradDaemon:
                     str(message),
                 )
 
-    async def _handle_new_blueprint(self, blueprint: Blueprint) -> None:
+    async def _handle_new_blueprint(self, blueprint: Blueprint, score: Score) -> None:
         """
         Informs the server about a new blueprint.
         """
@@ -315,13 +316,13 @@ class BradDaemon:
                 "Force-persisting the new blueprint. Run a manual transition and "
                 "then restart BRAD to load the new blueprint."
             )
-            await self._blueprint_mgr.start_transition(blueprint)
+            await self._blueprint_mgr.start_transition(blueprint, score)
         else:
             logger.info(
                 "Planner selected a new blueprint. Transition is starting. New blueprint: %s",
                 blueprint,
             )
-            await self._blueprint_mgr.start_transition(blueprint)
+            await self._blueprint_mgr.start_transition(blueprint, score)
             self._transition_orchestrator = TransitionOrchestrator(
                 self._config, self._blueprint_mgr
             )
@@ -469,7 +470,10 @@ class BradDaemon:
         assert self._transition_orchestrator is not None
         await self._transition_orchestrator.run_clean_up_after_transition()
         if self._planner is not None:
-            self._planner.update_blueprint(self._blueprint_mgr.get_blueprint())
+            self._planner.update_blueprint(
+                self._blueprint_mgr.get_blueprint(),
+                self._blueprint_mgr.get_active_score(),
+            )
 
         # Done.
         tm = self._blueprint_mgr.get_transition_metadata()

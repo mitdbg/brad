@@ -166,7 +166,7 @@ async def run_transition(
     if not is_continuing:
         logger.info("Starting the transition...")
         assert next_blueprint is not None
-        await blueprint_mgr.start_transition(next_blueprint)
+        await blueprint_mgr.start_transition(next_blueprint, new_score=None)
     else:
         logger.info("Continuing the transition...")
     orchestrator = TransitionOrchestrator(config, blueprint_mgr)
@@ -244,7 +244,8 @@ def modify_blueprint(args):
     # 3. Write the changes back.
     modified_blueprint = enum_blueprint.to_blueprint()
     if args.force:
-        blueprint_mgr.force_new_blueprint_sync(modified_blueprint)
+        # TODO: If we have an external way to compute the score, we should do it here.
+        blueprint_mgr.force_new_blueprint_sync(modified_blueprint, score=None)
     else:
         logger.info("Transitioning to the following blueprint: %s", modified_blueprint)
         asyncio.run(

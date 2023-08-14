@@ -1,3 +1,4 @@
+import pickle
 import numpy.typing as npt
 from typing import Dict, Optional
 
@@ -27,3 +28,10 @@ class Score:
         self.scaled_query_latencies: Dict[Engine, npt.NDArray] = {}
         self.aurora_score: Optional[AuroraProvisioningScore] = None
         self.redshift_score: Optional[RedshiftProvisioningScore] = None
+
+    def serialize(self) -> bytes:
+        return pickle.dumps(self)
+
+    @classmethod
+    def deserialize(cls, raw: bytes) -> "Score":
+        return pickle.loads(raw)
