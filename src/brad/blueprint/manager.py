@@ -11,6 +11,7 @@ from brad.blueprint.serde import (
 )
 from brad.blueprint.state import TransitionState
 from brad.config.file import ConfigFile
+from brad.planner.scoring.score import Score
 from brad.provisioning.directory import Directory
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,9 @@ class BlueprintManager:
         self._schema_name = schema_name
         self._versioning: Optional[BlueprintVersioning] = None
         self._current_blueprint: Optional[Blueprint] = None
+        self._current_blueprint_score: Optional[Score] = None
         self._next_blueprint: Optional[Blueprint] = None
+        self._next_blueprint_score: Optional[Score] = None
         self._directory = Directory(config)
 
     @staticmethod
@@ -65,16 +68,22 @@ class BlueprintManager:
             # If there is still a problem, we want the exception to stop BRAD.
 
         current_blueprint = await self._load_blueprint_version(versioning.version)
+        current_score = await self._load_score(versioning.version)
+
         if versioning.next_version is not None:
             next_blueprint = await self._load_blueprint_version(versioning.next_version)
+            next_score = await self._load_score(versioning.next_version)
         else:
             next_blueprint = None
+            next_score = None
 
         # We want these values to be set together (i.e., not across `await`
         # boundaries).
         self._versioning = versioning
         self._current_blueprint = current_blueprint
+        self._current_blueprint_score = current_score
         self._next_blueprint = next_blueprint
+        self._next_blueprint_score = next_score
 
         await self._directory.refresh()
         logger.debug("Loaded %s", self._versioning)
@@ -90,16 +99,23 @@ class BlueprintManager:
         self._current_blueprint = self._load_blueprint_version_sync(
             self._versioning.version
         )
+        self._current_blueprint_score = self._load_score_sync(self._versioning.version)
         if self._versioning.next_version is not None:
             self._next_blueprint = self._load_blueprint_version_sync(
                 self._versioning.next_version
             )
+            self._next_blueprint_score = self._load_score_sync(
+                self._versioning.next_version
+            )
         else:
             self._next_blueprint = None
+            self._next_blueprint_score = None
         asyncio.run(self._directory.refresh())
         logger.debug("Loaded %s", self._versioning)
 
-    async def start_transition(self, new_blueprint: Blueprint) -> int:
+    async def start_transition(
+        self, new_blueprint: Blueprint, new_score: Optional[Score]
+    ) -> int:
         assert self._versioning is not None, "Run load() first."
         assert (
             self._versioning.transition_state == TransitionState.Stable
@@ -111,6 +127,11 @@ class BlueprintManager:
             self._blueprint_key_for_version(self._schema_name, next_version),
             serialized,
         )
+        if new_score is not None:
+            serialized_score = new_score.serialize()
+            await self._assets.persist(
+                self._score_key_for_version(next_version), serialized_score
+            )
 
         next_versioning = self._versioning.copy()
         next_versioning.next_version = next_version
@@ -121,6 +142,7 @@ class BlueprintManager:
         )
         self._versioning = next_versioning
         self._next_blueprint = new_blueprint
+        self._next_blueprint_score = new_score
         return next_version
 
     async def update_transition_state(self, next_state: TransitionState) -> None:
@@ -143,9 +165,13 @@ class BlueprintManager:
 
         if next_state == TransitionState.Stable:
             self._current_blueprint = self._next_blueprint
+            self._current_blueprint_score = self._next_blueprint_score
             self._next_blueprint = None
+            self._next_blueprint_score = None
 
-    def force_new_blueprint_sync(self, blueprint: Blueprint) -> None:
+    def force_new_blueprint_sync(
+        self, blueprint: Blueprint, score: Optional[Score]
+    ) -> None:
         """
         This is used when making manual changes to the blueprint. The provided
         blueprint will be persisted as the next stable version.
@@ -160,6 +186,10 @@ class BlueprintManager:
             self._blueprint_key_for_version(self._schema_name, versioning.version),
             serialized,
         )
+        if score is not None:
+            self._assets.persist_sync(
+                self._score_key_for_version(versioning.version), score.serialize()
+            )
         self._assets.persist_sync(
             _VERSION_KEY.format(schema_name=self._schema_name), versioning.serialize()
         )
@@ -212,6 +242,22 @@ class BlueprintManager:
             assert self._versioning.next_version is not None
             return self._versioning.next_version
 
+    def get_active_score(self) -> Optional[Score]:
+        """
+        This is used to retrieve the score associated with the **active**
+        blueprint.
+        """
+        assert self._versioning is not None
+        if (
+            self._versioning.transition_state is not TransitionState.CleaningUp
+            and self._versioning.transition_state
+            is not TransitionState.TransitionedPreCleanUp
+        ):
+            return self._current_blueprint_score
+        else:
+            assert self._versioning.next_version is not None
+            return self._next_blueprint_score
+
     def get_transition_metadata(self) -> "TransitionMetadata":
         assert self._versioning is not None
         assert self._current_blueprint is not None
@@ -254,6 +300,20 @@ class BlueprintManager:
         )
         return deserialize_blueprint(serialized)
 
+    async def _load_score(self, version: int) -> Optional[Score]:
+        try:
+            serialized = await self._assets.load(self._score_key_for_version(version))
+            return Score.deserialize(serialized)
+        except ValueError:
+            return None
+
+    def _load_score_sync(self, version: int) -> Optional[Score]:
+        try:
+            serialized = self._assets.load_sync(self._score_key_for_version(version))
+            return Score.deserialize(serialized)
+        except ValueError:
+            return None
+
     def _upgrade_legacy_format(self) -> None:
         logger.info(
             "Detected possible legacy blueprint format. Attempting an upgrade now..."
@@ -266,7 +326,7 @@ class BlueprintManager:
             )
         except ValueError as ex:
             raise RuntimeError(
-                "Failed to load the blueprint. Check if you have bootstraped this schema."
+                "Failed to load the blueprint. Check if you have bootstrapped this schema."
             ) from ex
 
         versioning = BlueprintVersioning(0, TransitionState.Stable, None)
@@ -285,6 +345,11 @@ class BlueprintManager:
     def _blueprint_key_for_version(schema_name: str, version: int) -> str:
         return _METADATA_KEY_TEMPLATE.format(
             schema_name=schema_name, version=str(version).zfill(5)
+        )
+
+    def _score_key_for_version(self, version: int) -> str:
+        return _SCORE_KEY_TEMPLATE.format(
+            schema_name=self._schema_name, version=str(version).zfill(5)
         )
 
 
@@ -355,3 +420,4 @@ _LEGACY_METADATA_KEY_TEMPLATE = "{}.brad"
 
 _VERSION_KEY = "{schema_name}/blueprints/BRAD"
 _METADATA_KEY_TEMPLATE = "{schema_name}/blueprints/BRAD-BP-{version}"
+_SCORE_KEY_TEMPLATE = "{schema_name}/scores/BRAD-SCORE-{version}.pickle"

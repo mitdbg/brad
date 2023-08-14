@@ -3,7 +3,7 @@ import logging
 import pytz
 import pandas as pd
 from io import TextIOWrapper
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 from datetime import datetime
 
 from brad.config.engine import Engine
@@ -23,7 +23,9 @@ from brad.planner.neighborhood.full_neighborhood import FullNeighborhoodSearchPl
 from brad.planner.neighborhood.sampled_neighborhood import (
     SampledNeighborhoodSearchPlanner,
 )
+from brad.planner.scoring.score import Score
 from brad.planner.strategy import PlanningStrategy
+from brad.planner.triggers.trigger import Trigger
 from brad.planner.workload import Workload
 from brad.provisioning.directory import Directory
 from brad.routing.rule_based import RuleBased
@@ -82,7 +84,11 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             if self._metrics_out is not None:
                 self._metrics_out.close()
 
-    async def run_replan(self, window_multiplier: int = 1) -> None:
+    def get_triggers(self) -> Iterable[Trigger]:
+        # TODO: Add triggers if needed.
+        return []
+
+    async def _run_replan_impl(self, window_multiplier: int = 1) -> None:
         # This will be long-running and will block the event loop. For our
         # current needs, this is fine since the planner is the main component in
         # the daemon process.
@@ -172,8 +178,11 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 self._impl.on_enumerated_blueprint(bp, scoring_ctx)
 
             selected_blueprint = self._impl.on_enumeration_complete(scoring_ctx)
+            # TODO: Populate the score if needed.
+            selected_score = Score()
             self._last_suggested_blueprint = selected_blueprint
-            await self._notify_new_blueprint(selected_blueprint)
+            self._last_suggested_blueprint_score = selected_score
+            await self._notify_new_blueprint(selected_blueprint, selected_score)
 
         finally:
             engines.close_sync()

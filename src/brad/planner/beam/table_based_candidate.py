@@ -7,7 +7,7 @@ from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning, MutableProvisioning
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.beam.feasibility import BlueprintFeasibility
-from brad.planner.beam.router_provider import RouterProvider
+from brad.planner.router_provider import RouterProvider
 from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
@@ -24,6 +24,7 @@ from brad.planner.scoring.provisioning import (
     compute_aurora_transition_time_s,
     compute_redshift_transition_time_s,
 )
+from brad.planner.scoring.score import Score
 from brad.planner.scoring.table_placement import (
     compute_single_athena_table_cost,
     compute_single_table_movement_time_and_cost,
@@ -108,6 +109,29 @@ class BlueprintCandidate(ComparableBlueprint):
             self.redshift_provisioning.clone(),
             self._source_blueprint.router_provider(),
         )
+
+    def to_score(self) -> Score:
+        score = Score()
+        score.provisioning_cost = self.provisioning_cost
+        score.storage_cost = self.storage_cost
+        score.table_movement_trans_cost = self.table_movement_trans_cost
+
+        score.workload_scan_cost = self.workload_scan_cost
+        score.athena_scanned_bytes = self.athena_scanned_bytes
+        score.aurora_accessed_pages = self.aurora_accessed_pages
+
+        score.table_movement_trans_time_s = self.table_movement_trans_time_s
+        score.provisioning_trans_time_s = self.provisioning_trans_time_s
+
+        score.scaled_query_latencies = self.scaled_query_latencies
+        score.aurora_score = self.aurora_score
+        score.redshift_score = self.redshift_score
+
+        score.aurora_queries = len(self.query_locations[Engine.Aurora])
+        score.athena_queries = len(self.query_locations[Engine.Athena])
+        score.redshift_queries = len(self.query_locations[Engine.Redshift])
+
+        return score
 
     def to_debug_values(self) -> Dict[str, int | float | str]:
         values: Dict[str, int | float | str] = self._memoized.copy()
