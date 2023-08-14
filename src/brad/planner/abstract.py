@@ -71,6 +71,11 @@ class BlueprintPlanner:
             # are possible.
             return
 
+        triggers = self.get_triggers()
+        logger.info("Planner running with %d triggers.", len(triggers))
+        for t in triggers:
+            logger.info("Trigger: %s", t.name())
+
         trigger_configs = self._planner_config.trigger_configs()
         check_offset = trigger_configs["check_period_offset_s"]
         check_period = trigger_configs["check_period_s"]
