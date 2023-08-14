@@ -53,9 +53,19 @@ class VariableCosts(Trigger):
         if self._current_blueprint is None or self._current_score is None:
             # We have no reference point for what the expected variable cost
             # should be.
+            logger.debug(
+                "VariableCosts trigger not running because there is no reference point."
+            )
             return False
 
         current_hourly_cost = await self._estimate_current_scan_hourly_cost()
+        if current_hourly_cost <= 1e-5:
+            # Treated as 0.
+            logger.debug(
+                "Current hourly scan cost computed to be 0. VariableCosts not triggering."
+            )
+            return False
+
         estimated_hourly_cost = self._current_score.workload_scan_cost
         ratio = max(
             current_hourly_cost / estimated_hourly_cost,
@@ -91,6 +101,8 @@ class VariableCosts(Trigger):
             .add_queries_from_s3_logs(self._config, window_start, window_end)
             .build(rescale_to_period=timedelta(hours=1))
         )
+        if len(workload.analytical_queries()) == 0:
+            return 0.0
         self._data_access_provider.apply_access_statistics(workload)
 
         # Compute the scan cost of this last window of queries.

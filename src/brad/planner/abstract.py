@@ -31,6 +31,7 @@ class BlueprintPlanner:
         self,
         planner_config: PlannerConfig,
         current_blueprint: Blueprint,
+        current_blueprint_score: Optional[Score],
         monitor: Monitor,
         config: ConfigFile,
         schema_name: str,
@@ -43,8 +44,7 @@ class BlueprintPlanner:
     ) -> None:
         self._planner_config = planner_config
         self._current_blueprint = current_blueprint
-        # TODO: Ideally we persist and load the previous score as well.
-        self._current_blueprint_score: Optional[Score] = None
+        self._current_blueprint_score = current_blueprint_score
         self._last_suggested_blueprint: Optional[Blueprint] = None
         self._last_suggested_blueprint_score: Optional[Score] = None
         self._monitor = monitor
@@ -60,6 +60,7 @@ class BlueprintPlanner:
 
         self._callbacks: List[NewBlueprintCallback] = []
         self._replan_in_progress = False
+        self._disable_triggers = False
 
     async def run_forever(self) -> None:
         """
@@ -84,7 +85,7 @@ class BlueprintPlanner:
         await asyncio.sleep(check_offset + check_period)
         while True:
             logger.debug("Planner is checking if a replan is needed...")
-            if not self._replan_in_progress:
+            if not self._replan_in_progress and not self._disable_triggers:
                 for t in self.get_triggers():
                     if await t.should_replan():
                         logger.info("Starting a triggered replan...")
@@ -92,7 +93,7 @@ class BlueprintPlanner:
                         break
             else:
                 logger.debug(
-                    "A replan is already in progress. Skipping the trigger check."
+                    "A replan is already in progress or triggers are temporarily disabled. Skipping the trigger check."
                 )
             await asyncio.sleep(check_period)
 
@@ -121,6 +122,14 @@ class BlueprintPlanner:
         replanning.
         """
         raise NotImplementedError
+
+    def set_disable_triggers(self, disable: bool) -> None:
+        """
+        Used to pause automatic replan triggers. This is used during a blueprint
+        transition.
+        """
+        logger.info("Setting disable planner triggers: %s", str(disable))
+        self._disable_triggers = disable
 
     def update_blueprint(self, blueprint: Blueprint, score: Optional[Score]) -> None:
         """

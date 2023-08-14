@@ -224,6 +224,7 @@ def run_planner(args) -> None:
 
     planner = BlueprintPlannerFactory.create(
         current_blueprint=blueprint_mgr.get_blueprint(),
+        current_blueprint_score=blueprint_mgr.get_active_score(),
         planner_config=planner_config,
         monitor=monitor,
         config=config,

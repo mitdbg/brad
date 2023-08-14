@@ -1,3 +1,5 @@
+from typing import Optional
+
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
@@ -9,6 +11,7 @@ from brad.planner.neighborhood.neighborhood import NeighborhoodSearchPlanner
 from brad.planner.beam.query_based import QueryBasedBeamPlanner
 from brad.planner.beam.table_based import TableBasedBeamPlanner
 from brad.planner.metrics import MetricsProvider
+from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 from brad.planner.strategy import PlanningStrategy
@@ -20,6 +23,7 @@ class BlueprintPlannerFactory:
     def create(
         planner_config: PlannerConfig,
         current_blueprint: Blueprint,
+        current_blueprint_score: Optional[Score],
         monitor: Monitor,
         config: ConfigFile,
         schema_name: str,
@@ -37,6 +41,7 @@ class BlueprintPlannerFactory:
         ):
             return NeighborhoodSearchPlanner(
                 current_blueprint=current_blueprint,
+                current_blueprint_score=current_blueprint_score,
                 planner_config=planner_config,
                 monitor=monitor,
                 config=config,
@@ -52,6 +57,7 @@ class BlueprintPlannerFactory:
         elif strategy == PlanningStrategy.QueryBasedBeam:
             return QueryBasedBeamPlanner(
                 current_blueprint=current_blueprint,
+                current_blueprint_score=current_blueprint_score,
                 planner_config=planner_config,
                 monitor=monitor,
                 config=config,
@@ -67,6 +73,7 @@ class BlueprintPlannerFactory:
         elif strategy == PlanningStrategy.TableBasedBeam:
             return TableBasedBeamPlanner(
                 current_blueprint=current_blueprint,
+                current_blueprint_score=current_blueprint_score,
                 planner_config=planner_config,
                 monitor=monitor,
                 config=config,

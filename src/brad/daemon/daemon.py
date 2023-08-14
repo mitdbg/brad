@@ -163,6 +163,7 @@ class BradDaemon:
         self._planner = BlueprintPlannerFactory.create(
             planner_config=self._planner_config,
             current_blueprint=self._blueprint_mgr.get_blueprint(),
+            current_blueprint_score=self._blueprint_mgr.get_active_score(),
             monitor=self._monitor,
             config=self._config,
             schema_name=self._schema_name,
@@ -323,6 +324,8 @@ class BradDaemon:
                 blueprint,
             )
             await self._blueprint_mgr.start_transition(blueprint, score)
+            if self._planner is not None:
+                self._planner.set_disable_triggers(disable=True)
             self._transition_orchestrator = TransitionOrchestrator(
                 self._config, self._blueprint_mgr
             )
@@ -480,6 +483,8 @@ class BradDaemon:
         assert (
             tm.state == TransitionState.Stable
         ), "Incorrect transition state after completion."
+        if self._planner is not None:
+            self._planner.set_disable_triggers(disable=False)
         logger.info("Completed the transition to blueprint version %d", tm.curr_version)
         self._transition_task = None
         self._transition_orchestrator = None
