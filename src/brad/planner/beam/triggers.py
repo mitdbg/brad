@@ -30,7 +30,7 @@ def get_beam_triggers(
     if "disabled" not in et_config:
         trigger_list.append(
             ElapsedTimeTrigger(
-                planning_window * trigger_config["elapsed_time_multiplier"]
+                planning_window * et_config["multiplier"]
             )
         )
 

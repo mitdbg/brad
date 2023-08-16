@@ -37,6 +37,18 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
                 StreamingMetric[float](sm_window_size)
                 for _ in range(self._config.num_front_ends)
             ],
+            FrontEndMetric.QueryLatencySumSecond: [
+                StreamingMetric[float](sm_window_size)
+                for _ in range(self._config.num_front_ends)
+            ],
+            FrontEndMetric.NumQueries: [
+                StreamingMetric[float](sm_window_size)
+                for _ in range(self._config.num_front_ends)
+            ],
+            FrontEndMetric.QueryLatencyMaxSecond: [
+                StreamingMetric[float](sm_window_size)
+                for _ in range(self._config.num_front_ends)
+            ],
         }
         self._ordered_metrics = list(self._front_end_metrics.keys())
         self._values_df = pd.DataFrame(
