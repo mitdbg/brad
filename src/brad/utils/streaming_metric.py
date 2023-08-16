@@ -95,6 +95,34 @@ class StreamingMetric(Generic[T]):
         else:
             return total / num_samples
 
+    def sum_in_window(self, start: datetime, end: datetime) -> float:
+        if len(self._metric_data) == 0:
+            return 0.0
+
+        total = None
+        collecting = False
+
+        # Assumption is that `metric_data` is sorted in ascending timestamp order.
+        for value, val_timestamp in self._metric_data:
+            if collecting:
+                assert total is not None
+                total += value
+
+                if val_timestamp >= end:
+                    break
+
+            else:
+                if val_timestamp >= start:
+                    collecting = True
+                    total = value
+
+                    if val_timestamp >= end:
+                        # Edge case, when a window falls inside a single
+                        # sample's range.
+                        break
+
+        return total if total is not None else 0.0
+
     def max_in_window(self, start: datetime, end: datetime) -> float:
         if len(self._metric_data) == 0:
             return 0.0

@@ -92,13 +92,14 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
                     metric == FrontEndMetric.QueryLatencySumSecond
                     or metric == FrontEndMetric.NumQueries
                 ):
-                    relevant = []
-                    for val in values:
-                        value = val.most_recent_in_window(window_start, window_end)
-                        if value is not None:
-                            relevant.append(value)
-                    latest_val = sum(relevant) if len(relevant) > 0 else 0.0
-                    data_cols[metric.value].append(latest_val)
+                    total = sum(
+                        map(
+                            # pylint: disable-next=cell-var-from-loop
+                            lambda val: val.sum_in_window(window_start, window_end),
+                            values,
+                        )
+                    )
+                    data_cols[metric.value].append(total)
                 elif metric == FrontEndMetric.QueryLatencyMaxSecond:
                     max_val = max(
                         map(
