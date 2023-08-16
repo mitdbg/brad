@@ -494,7 +494,7 @@ class BradFrontEnd(BradInterface):
             logger.debug(
                 "Sending metrics report: txn_completions_per_s: %.2f, max_query_run_time_s: %.2f",
                 sampled_thpt,
-                max(rt_summary.top_k),
+                max(rt_summary.top_k) if len(rt_summary.top_k) > 0 else 0.0,
             )
             self._output_queue.put_nowait(metrics_report)
 

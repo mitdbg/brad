@@ -138,7 +138,9 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
         query_lat_max = self._front_end_metrics[FrontEndMetric.QueryLatencyMaxSecond][
             fe_index
         ]
-        query_lat_max.add_sample(max(report.latency.top_k), now)
+        query_lat_max.add_sample(
+            max(report.latency.top_k) if len(report.latency.top_k) > 0 else 0.0, now
+        )
 
         logger.debug(
             "Received metrics report: [%d] %f (ts: %s)",
