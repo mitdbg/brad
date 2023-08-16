@@ -79,15 +79,23 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             window_start = start_time + offset * self._epoch_length
             window_end = window_start + self._epoch_length
             for metric, values in self._front_end_metrics.items():
-                if (
-                    metric == FrontEndMetric.TxnEndPerSecond
-                    or metric == FrontEndMetric.QueryLatencySumSecond
+                if metric == FrontEndMetric.TxnEndPerSecond:
+                    total = sum(
+                        map(
+                            # pylint: disable-next=cell-var-from-loop
+                            lambda val: val.average_in_window(window_start, window_end),
+                            values,
+                        )
+                    )
+                    data_cols[metric.value].append(total)
+                elif (
+                    metric == FrontEndMetric.QueryLatencySumSecond
                     or metric == FrontEndMetric.NumQueries
                 ):
                     total = sum(
                         map(
                             # pylint: disable-next=cell-var-from-loop
-                            lambda val: val.average_in_window(window_start, window_end),
+                            lambda val: val.sum_in_window(window_start, window_end),
                             values,
                         )
                     )
