@@ -490,6 +490,7 @@ class BradFrontEnd(BradInterface):
             # If the input queue is full, we just drop this message.
             sampled_thpt = txn_value / elapsed_time_s
             rt_summary = self._query_run_times.get_summary(k=1)
+            self._query_run_times.clear()  # Only keep the unreported samples.
             metrics_report = MetricsReport(self._fe_index, sampled_thpt, rt_summary)
             logger.debug(
                 "Sending metrics report: txn_completions_per_s: %.2f, max_query_run_time_s: %.2f",
