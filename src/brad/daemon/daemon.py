@@ -188,6 +188,7 @@ class BradDaemon:
             metrics_provider=MetricsFromMonitor(self._monitor),
             data_access_provider=data_access_provider,
             estimator_provider=self._estimator_provider,
+            system_event_logger=self._system_event_logger,
         )
         self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
 
@@ -492,6 +493,8 @@ class BradDaemon:
                 window_multiplier = 1
 
             logger.info("Triggering the planner based on an external request...")
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(SystemEvent.ManuallyTriggeredReplan)
             try:
                 await self._planner.run_replan(window_multiplier)
                 return [("Planner completed. See the daemon's logs for more details.",)]

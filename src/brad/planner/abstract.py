@@ -5,7 +5,9 @@ from typing import Coroutine, Callable, List, Optional, Iterable
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
+from brad.config.system_event import SystemEvent
 from brad.daemon.monitor import Monitor
+from brad.daemon.system_event_logger import SystemEventLogger
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.metrics import MetricsProvider
@@ -41,6 +43,7 @@ class BlueprintPlanner:
         metrics_provider: MetricsProvider,
         data_access_provider: DataAccessProvider,
         estimator_provider: EstimatorProvider,
+        system_event_logger: Optional[SystemEventLogger],
     ) -> None:
         self._planner_config = planner_config
         self._current_blueprint = current_blueprint
@@ -57,6 +60,7 @@ class BlueprintPlanner:
         self._metrics_provider = metrics_provider
         self._data_access_provider = data_access_provider
         self._estimator_provider = estimator_provider
+        self._system_event_logger = system_event_logger
 
         self._callbacks: List[NewBlueprintCallback] = []
         self._replan_in_progress = False
@@ -89,6 +93,11 @@ class BlueprintPlanner:
                 for t in self.get_triggers():
                     if await t.should_replan():
                         logger.info("Starting a triggered replan...")
+                        if self._system_event_logger is not None:
+                            self._system_event_logger.log(
+                                SystemEvent.TriggeredReplan,
+                                "trigger={}".format(t.name()),
+                            )
                         await self.run_replan()
                         break
             else:

@@ -4,6 +4,7 @@ from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
+from brad.daemon.system_event_logger import SystemEventLogger
 from brad.planner.abstract import BlueprintPlanner
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.estimator import EstimatorProvider
@@ -33,6 +34,7 @@ class BlueprintPlannerFactory:
         metrics_provider: MetricsProvider,
         data_access_provider: DataAccessProvider,
         estimator_provider: EstimatorProvider,
+        system_event_logger: Optional[SystemEventLogger] = None,
     ) -> BlueprintPlanner:
         strategy = planner_config.strategy()
         if (
@@ -52,6 +54,7 @@ class BlueprintPlannerFactory:
                 metrics_provider=metrics_provider,
                 data_access_provider=data_access_provider,
                 estimator_provider=estimator_provider,
+                system_event_logger=system_event_logger,
             )
 
         elif strategy == PlanningStrategy.QueryBasedBeam:
@@ -68,6 +71,7 @@ class BlueprintPlannerFactory:
                 metrics_provider=metrics_provider,
                 data_access_provider=data_access_provider,
                 estimator_provider=estimator_provider,
+                system_event_logger=system_event_logger,
             )
 
         elif strategy == PlanningStrategy.TableBasedBeam:
@@ -84,6 +88,7 @@ class BlueprintPlannerFactory:
                 metrics_provider=metrics_provider,
                 data_access_provider=data_access_provider,
                 estimator_provider=estimator_provider,
+                system_event_logger=system_event_logger,
             )
 
         else:
