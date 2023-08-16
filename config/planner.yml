@@ -37,6 +37,10 @@ triggers:
   variable_costs:
     threshold: 0.2
 
+  query_latency_ceiling:
+    ceiling_s: 30.0
+    sustained_epochs: 3
+
 ###
 ### Beam planning constants.
 ###

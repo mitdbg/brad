@@ -8,6 +8,7 @@ from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.triggers.aurora_cpu_utilization import AuroraCpuUtilization
 from brad.planner.triggers.redshift_cpu_utilization import RedshiftCpuUtilization
 from brad.planner.triggers.elapsed_time import ElapsedTimeTrigger
+from brad.planner.triggers.query_latency_ceiling import QueryLatencyCeiling
 from brad.planner.triggers.trigger import Trigger
 from brad.planner.triggers.variable_costs import VariableCosts
 
@@ -50,6 +51,16 @@ def get_beam_triggers(
                 data_access_provider,
                 router_provider,
                 var_costs["threshold"],
+            )
+        )
+
+    latency_ceiling = trigger_config["query_latency_ceiling"]
+    if "disabled" not in latency_ceiling:
+        trigger_list.append(
+            QueryLatencyCeiling(
+                monitor,
+                latency_ceiling["ceiling_s"],
+                latency_ceiling["sustained_epochs"],
             )
         )
 

@@ -17,6 +17,9 @@ class MetricsThresholds:
 
     def exceeds_thresholds(self, metric_values: pd.Series, log_desc: str) -> bool:
         rel = metric_values[-self._sustained_epochs :]
+        if len(rel) < self._sustained_epochs:
+            # Not enough data.
+            return False
 
         if (rel < self._lo).all():
             logger.info(
