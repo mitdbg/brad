@@ -17,12 +17,11 @@ query_dist_change_frac: 0.1
 ###
 
 triggers:
-  enabled: true
+  enabled: false
   check_period_s: 60  # Triggers are checked every X seconds.
   check_period_offset_s: 20
 
   elapsed_time:
-    disabled: true
     multiplier: 60  # Multiplier over `planning_window`.
 
   redshift_cpu:

@@ -15,6 +15,7 @@ from brad.blueprint.manager import BlueprintManager
 from brad.blueprint.state import TransitionState
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
+from brad.config.system_event import SystemEvent
 from brad.config.temp_config import TempConfig
 from brad.daemon.messages import (
     ShutdownFrontEnd,
@@ -26,6 +27,7 @@ from brad.daemon.messages import (
     NewBlueprintAck,
 )
 from brad.daemon.monitor import Monitor
+from brad.daemon.system_event_logger import SystemEventLogger
 from brad.daemon.transition_orchestrator import TransitionOrchestrator
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
@@ -62,9 +64,9 @@ class BradDaemon:
     """
     Represents BRAD's controller process.
 
-    This code is written with the assumption that this daemon is spawned by the
-    BRAD server. In the future, we may want the daemon to be launched
-    independently and for it to communicate with the server via RPCs.
+    This code is written with the assumption that this daemon spawns the BRAD
+    front end servers. In the future, we may want the servers to be launched
+    independently and for them to communicate with the daemon via RPCs.
     """
 
     def __init__(
@@ -99,6 +101,8 @@ class BradDaemon:
         self._transition_orchestrator: Optional[TransitionOrchestrator] = None
         self._transition_task: Optional[asyncio.Task[None]] = None
 
+        self._system_event_logger = SystemEventLogger.create_if_requested(self._config)
+
     async def run_forever(self) -> None:
         """
         Starts running the daemon.
@@ -113,6 +117,8 @@ class BradDaemon:
                 if fe.message_reader_task is not None
             ]
             logger.info("The BRAD daemon is running.")
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(SystemEvent.StartUp)
             await asyncio.gather(
                 self._planner.run_forever(),
                 self._monitor.run_forever(),
@@ -124,6 +130,8 @@ class BradDaemon:
         finally:
             logger.info("The BRAD daemon is shutting down...")
             await self._run_teardown()
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(SystemEvent.ShutDown)
             logger.info("The BRAD daemon has shut down.")
 
     async def _run_setup(self) -> None:
@@ -180,6 +188,7 @@ class BradDaemon:
             metrics_provider=MetricsFromMonitor(self._monitor),
             data_access_provider=data_access_provider,
             estimator_provider=self._estimator_provider,
+            system_event_logger=self._system_event_logger,
         )
         self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
 
@@ -214,7 +223,11 @@ class BradDaemon:
         if self._config.routing_policy == RoutingPolicy.ForestTableSelectivity:
             logger.info("Setting up the cardinality estimator...")
             estimator = await PostgresEstimator.connect(self._schema_name, self._config)
-            await estimator.analyze(self._blueprint_mgr.get_blueprint())
+            await estimator.analyze(
+                self._blueprint_mgr.get_blueprint(),
+                # N.B. Only the daemon attempts to repopulate the cache.
+                populate_cache_if_missing=True,
+            )
             self._estimator_provider.set_estimator(estimator)
 
     async def _run_teardown(self) -> None:
@@ -307,7 +320,12 @@ class BradDaemon:
         """
         Informs the server about a new blueprint.
         """
+        if self._system_event_logger is not None:
+            self._system_event_logger.log(SystemEvent.NewBlueprintProposed)
+
         if self._should_skip_blueprint(blueprint, score):
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(SystemEvent.NewBlueprintSkipped)
             return
 
         if PERSIST_BLUEPRINT_VAR in os.environ:
@@ -315,13 +333,21 @@ class BradDaemon:
                 "Force-persisting the new blueprint. Run a manual transition and "
                 "then restart BRAD to load the new blueprint."
             )
-            await self._blueprint_mgr.start_transition(blueprint, score)
+            new_version = await self._blueprint_mgr.start_transition(blueprint, score)
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.NewBlueprintAccepted, "version={}".format(new_version)
+                )
         else:
             logger.info(
                 "Planner selected a new blueprint. Transition is starting. New blueprint: %s",
                 blueprint,
             )
-            await self._blueprint_mgr.start_transition(blueprint, score)
+            new_version = await self._blueprint_mgr.start_transition(blueprint, score)
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.NewBlueprintAccepted, "version={}".format(new_version)
+                )
             if self._planner is not None:
                 self._planner.set_disable_triggers(disable=True)
             self._transition_orchestrator = TransitionOrchestrator(
@@ -467,6 +493,8 @@ class BradDaemon:
                 window_multiplier = 1
 
             logger.info("Triggering the planner based on an external request...")
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(SystemEvent.ManuallyTriggeredReplan)
             try:
                 await self._planner.run_replan(window_multiplier)
                 return [("Planner completed. See the daemon's logs for more details.",)]
@@ -480,6 +508,14 @@ class BradDaemon:
 
     async def _run_transition_part_one(self) -> None:
         assert self._transition_orchestrator is not None
+        tm = self._blueprint_mgr.get_transition_metadata()
+        transitioning_to_version = tm.next_version
+
+        if self._system_event_logger is not None:
+            self._system_event_logger.log(
+                SystemEvent.PreTransitionStarted,
+                "version={}".format(transitioning_to_version),
+            )
 
         def update_monitor_sources():
             self._monitor.update_metrics_sources()
@@ -501,6 +537,12 @@ class BradDaemon:
 
         await self._data_sync_executor.update_connections()
 
+        if self._system_event_logger is not None:
+            self._system_event_logger.log(
+                SystemEvent.PreTransitionCompleted,
+                "version={}".format(transitioning_to_version),
+            )
+
         # Inform all front ends about the new blueprint.
         logger.debug(
             "Notifying %d front ends about the new blueprint.", len(self._front_ends)
@@ -516,6 +558,14 @@ class BradDaemon:
 
     async def _run_transition_part_two(self) -> None:
         assert self._transition_orchestrator is not None
+        tm = self._blueprint_mgr.get_transition_metadata()
+        transitioning_to_version = tm.next_version
+        if self._system_event_logger is not None:
+            self._system_event_logger.log(
+                SystemEvent.PostTransitionStarted,
+                "version={}".format(transitioning_to_version),
+            )
+
         await self._transition_orchestrator.run_clean_up_after_transition()
         if self._planner is not None:
             self._planner.update_blueprint(
@@ -533,6 +583,12 @@ class BradDaemon:
         logger.info("Completed the transition to blueprint version %d", tm.curr_version)
         self._transition_task = None
         self._transition_orchestrator = None
+
+        if self._system_event_logger is not None:
+            self._system_event_logger.log(
+                SystemEvent.PostTransitionCompleted,
+                "version={}".format(transitioning_to_version),
+            )
 
 
 class _NoopAnalyticsScorer(AnalyticsLatencyScorer):
