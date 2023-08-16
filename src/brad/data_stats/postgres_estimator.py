@@ -230,7 +230,7 @@ class PostgresEstimator(Estimator):
             await cursor.execute("TRUNCATE TABLE {}".format(SIDECAR_DB_SIZE_TABLE))
             for table_name, row_count in table_sizes.items():
                 await cursor.execute(
-                    "INSERT INTO {} (table_name, row_count) VALUES ({}, {})".format(
+                    "INSERT INTO {} (table_name, row_count) VALUES ('{}', {})".format(
                         SIDECAR_DB_SIZE_TABLE, table_name, row_count
                     )
                 )
