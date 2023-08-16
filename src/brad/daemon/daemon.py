@@ -214,7 +214,11 @@ class BradDaemon:
         if self._config.routing_policy == RoutingPolicy.ForestTableSelectivity:
             logger.info("Setting up the cardinality estimator...")
             estimator = await PostgresEstimator.connect(self._schema_name, self._config)
-            await estimator.analyze(self._blueprint_mgr.get_blueprint())
+            await estimator.analyze(
+                self._blueprint_mgr.get_blueprint(),
+                # N.B. Only the daemon attempts to repopulate the cache.
+                populate_cache_if_missing=True,
+            )
             self._estimator_provider.set_estimator(estimator)
 
     async def _run_teardown(self) -> None:
