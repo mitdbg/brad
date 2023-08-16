@@ -41,3 +41,4 @@ class SystemEventLogger:
                 extra_details if extra_details is not None else "",
             ]
         )
+        self._file.flush()
