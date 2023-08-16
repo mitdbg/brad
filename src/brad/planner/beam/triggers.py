@@ -29,9 +29,7 @@ def get_beam_triggers(
     et_config = trigger_config["elapsed_time"]
     if "disabled" not in et_config:
         trigger_list.append(
-            ElapsedTimeTrigger(
-                planning_window * trigger_config["elapsed_time_multiplier"]
-            )
+            ElapsedTimeTrigger(planning_window * et_config["multiplier"])
         )
 
     aurora_cpu = trigger_config["aurora_cpu"]

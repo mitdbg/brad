@@ -82,6 +82,37 @@ class StreamingMetric(Generic[T]):
         else:
             return total / num_samples
 
+    def max_in_window(self, start: datetime, end: datetime) -> float:
+        if len(self._metric_data) == 0:
+            return 0.0
+
+        largest = None
+        collecting = False
+
+        # Assumption is that `metric_data` is sorted in ascending timestamp order.
+        for value, val_timestamp in self._metric_data:
+            if collecting:
+                assert largest is not None
+                largest = max(largest, value)
+
+                if val_timestamp >= end:
+                    break
+
+            else:
+                if val_timestamp >= start:
+                    collecting = True
+                    largest = value
+
+                    if val_timestamp >= end:
+                        # Edge case, when a window falls inside a single
+                        # sample's range.
+                        break
+
+        if largest is None:
+            return 0.0
+        else:
+            return largest
+
     def _trim_metric_data(self) -> None:
         while len(self._metric_data) > self._window_size:
             self._metric_data.popleft()

@@ -68,6 +68,10 @@ data_sync_period_seconds: 0
 # BRAD's front end servers will report their metrics at regular intervals.
 front_end_metrics_reporting_period_seconds: 30
 
+# The number of query latency values to keep around, for performance tracking
+# and blueprint planning trigger purposes.
+front_end_query_latency_buffer_size: 100
+
 # Set to always_{aurora, athena, redshift} to force BRAD to route all queries
 # to the specified engine. The `default` routing policy uses a predictor to
 # select the most suitable engine.
