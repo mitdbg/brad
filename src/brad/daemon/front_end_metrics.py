@@ -95,7 +95,7 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
                     latest_val = sum(
                         map(
                             # pylint: disable-next=cell-var-from-loop
-                            lambda val: val.max_in_window(window_start, window_end),
+                            lambda val: val.most_recent_in_window(window_start, window_end),
                             values,
                         )
                     )
