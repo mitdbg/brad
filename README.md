@@ -100,6 +100,7 @@ files.
 - (08/08/2023) Add `monitoring_role_arn` to your Aurora connection
   configuration. This should be set to the ARN of the `rds-monitoring-role`
   found in your AWS IAM console.
+- (08/15/2023) Add `front_end_query_latency_buffer_size` to your `config.yml`.
 
 
 ### Generate IMDB workload

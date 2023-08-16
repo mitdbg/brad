@@ -127,6 +127,10 @@ class ConfigFile:
         return float(self._raw["front_end_metrics_reporting_period_seconds"])
 
     @property
+    def front_end_query_latency_buffer_size(self) -> int:
+        return int(self._raw["front_end_query_latency_buffer_size"])
+
+    @property
     def routing_policy(self) -> RoutingPolicy:
         return RoutingPolicy.from_str(self._raw["routing_policy"])
 

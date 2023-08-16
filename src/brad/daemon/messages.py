@@ -1,4 +1,5 @@
 from brad.row_list import RowList
+from brad.utils.run_time_reservoir import RunTimeSummary
 
 
 class IpcMessage:
@@ -39,9 +40,12 @@ class MetricsReport(IpcMessage):
     Sent from the front end to the daemon to report BRAD's client-side metrics.
     """
 
-    def __init__(self, fe_index: int, txn_completions_per_s: float) -> None:
+    def __init__(
+        self, fe_index: int, txn_completions_per_s: float, latency: RunTimeSummary
+    ) -> None:
         super().__init__(fe_index)
         self.txn_completions_per_s = txn_completions_per_s
+        self.latency = latency
 
 
 class InternalCommandRequest(IpcMessage):

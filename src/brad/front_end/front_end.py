@@ -45,6 +45,7 @@ from brad.utils.counter import Counter
 from brad.utils.json_decimal_encoder import DecimalEncoder
 from brad.utils.mailbox import Mailbox
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
+from brad.utils.run_time_reservoir import RunTimeReservoir
 from brad.workload_logging.epoch_file_handler import EpochFileHandler
 
 logger = logging.getLogger(__name__)
@@ -99,6 +100,11 @@ class BradFrontEnd(BradInterface):
         self._qhandler.setFormatter(formatter)
         self._qlogger.addHandler(self._qhandler)
         self._qlogger.propagate = False  # Avoids printing to stdout
+
+        # Used to track query performance.
+        self._query_run_times = RunTimeReservoir[float](
+            self._config.front_end_query_latency_buffer_size
+        )
 
         # We have different routing policies for performance evaluation and
         # testing purposes.
@@ -327,10 +333,12 @@ class BradFrontEnd(BradInterface):
                 self._transaction_end_counter.bump()
 
             # Decide whether to log the query.
+            run_time_s = end - start
             if not transactional_query or (random.random() < self._config.txn_log_prob):
                 self._qlogger.info(
-                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {end-start}s IsTransaction: {transactional_query}"
+                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {run_time_s}s IsTransaction: {transactional_query}"
                 )
+            self._query_run_times.add_value(run_time_s.total_seconds())
 
             # Extract and return the results, if any.
             try:
@@ -481,9 +489,12 @@ class BradFrontEnd(BradInterface):
 
             # If the input queue is full, we just drop this message.
             sampled_thpt = txn_value / elapsed_time_s
-            metrics_report = MetricsReport(self._fe_index, sampled_thpt)
+            rt_summary = self._query_run_times.get_summary(k=10)
+            metrics_report = MetricsReport(self._fe_index, sampled_thpt, rt_summary)
             logger.debug(
-                "Sending metrics report: txn_completions_per_s: %.2f", sampled_thpt
+                "Sending metrics report: txn_completions_per_s: %.2f, max_query_run_time_s: %.2f",
+                sampled_thpt,
+                max(rt_summary.top_k),
             )
             self._output_queue.put_nowait(metrics_report)
 
