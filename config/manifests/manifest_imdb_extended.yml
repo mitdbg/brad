@@ -1,4 +1,4 @@
-s3_bucket: imdb-data-brad
+s3_bucket: geoffxy-research
 s3_bucket_region: us-east-1
 schema_name: imdb_extended
 

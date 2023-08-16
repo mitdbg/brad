@@ -159,5 +159,17 @@ run_experiment(
     "query-indexes": "81,108,133",
     "num-front-ends": 8,
     "config-file": "config/config_cond.yml",
+    "planner-config-file": "config/planner.yml",
+  },
+)
+
+run_experiment(
+  name="baseline-auto-e2e",
+  run="./run_e2e_full.sh",
+  options={
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
+    "config-file": "config/config_cond_baseline.yml",
+    "planner-config-file": "config/planner_baseline.yml",
   },
 )

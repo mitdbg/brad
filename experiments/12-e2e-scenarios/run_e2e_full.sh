@@ -37,18 +37,10 @@ trap "cancel_experiment" TERM
 start_auto_brad $config_file $planner_config_file
 sleep 30
 
-# Warm up.
-log_workload_point "warmup"
-python3 ana_runner.py \
-  --num-clients $a_clients \
-  --avg-gap-s $a_gap_s \
-  --avg-gap-std-s $a_gap_std_s \
-  --num-front-ends $num_front_ends \
-  --query-indexes $query_indexes \
-  --run-warmup
-
 # 1x A, 1x T
+log_workload_point "ana_1"
 start_ana_runner 1 30 5
+log_workload_point "txn_1"
 start_txn_runner 1
 
 # Wait until a re-plan and transition completes (15 minute timeout).
@@ -66,6 +58,7 @@ wait $txn_pid
 
 # Increase scale up to 10 clients.
 for num_t_clients in $(seq 2 2 10); do
+  >&2 echo "Running with $num_t_clients T clients..."
   log_workload_point "txn_${num_t_clients}"
   start_txn_runner $num_t_clients
   sleep 300  # Wait 5 minutes
@@ -83,6 +76,7 @@ log_workload_point "increasing_ana_clients_start"
 kill -INT $ana_pid
 wait $ana_pid
 
+>&2 echo "Scaled up to 3 A clients."
 log_workload_point "ana_3"
 start_ana_runner 3 3 1
 
@@ -91,10 +85,10 @@ poll_file_for_event $COND_OUT/brad_daemon_events.csv "post_transition_completed"
 log_workload_point "after_analytics_replan"
 
 sleep 600  # Wait 10 more minutes.
-log_workload_point "scenario_done"
+log_workload_point "experiment_done"
 
 # Shut down everything now.
->&2 echo "Scenario done. Shutting down runners..."
+>&2 echo "Experiment done. Shutting down runners..."
 
 kill -INT $txn_pid
 kill -INT $ana_pid
