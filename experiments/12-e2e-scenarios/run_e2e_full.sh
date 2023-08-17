@@ -38,9 +38,7 @@ start_auto_brad $config_file $planner_config_file
 sleep 30
 
 # 1x A, 1x T
-log_workload_point "ana_1"
 start_ana_runner 1 30 5
-log_workload_point "txn_1"
 start_txn_runner 1
 
 # Wait until a re-plan and transition completes (15 minute timeout).
@@ -77,7 +75,6 @@ kill -INT $ana_pid
 wait $ana_pid
 
 >&2 echo "Scaled up to 3 A clients."
-log_workload_point "ana_3"
 start_ana_runner 3 3 1
 
 # Wait until a re-plan and transition completes (20 minute timeout).

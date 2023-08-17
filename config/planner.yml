@@ -36,7 +36,7 @@ triggers:
     sustained_epochs: 3
 
   variable_costs:
-    threshold: 0.2
+    threshold: 0.5
 
   query_latency_ceiling:
     ceiling_s: 30.0

@@ -77,8 +77,12 @@ function start_ana_runner() {
   local a_gap_s=$2
   local a_gap_std_s=$3
 
+  >&2 echo "Running with $a_clients..."
+  results_dir=$COND_OUT/a_${a_clients}
+  mkdir $results_dir
+
   log_workload_point "ana_${a_clients}"
-  python3 ana_runner.py \
+  COND_OUT=$results_dir python3 ana_runner.py \
     --num-clients $a_clients \
     --avg-gap-s $a_gap_s \
     --avg-gap-std-s $a_gap_std_s \
