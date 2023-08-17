@@ -47,7 +47,7 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
 
     async def fetch_latest(self) -> None:
         loop = asyncio.get_running_loop()
-        new_metrics = await loop.run_in_executor(None, self._fetch_cw_metrics, 5)
+        new_metrics = await loop.run_in_executor(None, self._fetch_cw_metrics, 8)
 
         # CloudWatch has delayed metrics reporting, in particular for CPU
         # utilization (i.e., metrics for the last minute are not always

@@ -213,7 +213,7 @@ def run_planner(args) -> None:
             now,
         )
     else:
-        metrics_provider = MetricsFromMonitor(monitor)
+        metrics_provider = MetricsFromMonitor(monitor, blueprint_mgr)
 
     if config.routing_policy == RoutingPolicy.ForestTableSelectivity:
         pe = asyncio.run(PostgresEstimator.connect(args.schema_name, config))

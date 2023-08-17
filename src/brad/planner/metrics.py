@@ -7,6 +7,7 @@ from datetime import datetime
 from collections import namedtuple
 from typing import Tuple, Optional
 
+from brad.blueprint.manager import BlueprintManager
 from brad.config.metrics import FrontEndMetric
 from brad.daemon.monitor import Monitor
 
@@ -52,10 +53,15 @@ class FixedMetricsProvider(MetricsProvider):
 
 
 class MetricsFromMonitor(MetricsProvider):
-    def __init__(self, monitor: Monitor) -> None:
+    def __init__(self, monitor: Monitor, blueprint_mgr: BlueprintManager) -> None:
         self._monitor = monitor
+        self._blueprint_mgr = blueprint_mgr
 
     def get_metrics(self) -> Tuple[Metrics, datetime]:
+        blueprint = self._blueprint_mgr.get_blueprint()
+        aurora_on = blueprint.aurora_provisioning().num_nodes() > 0
+        redshift_on = blueprint.redshift_provisioning().num_nodes() > 0
+
         redshift_source = self._monitor.redshift_metrics()
         aurora_source = self._monitor.aurora_metrics(reader_index=None)
         front_end_source = self._monitor.front_end_metrics()
@@ -74,11 +80,19 @@ class MetricsFromMonitor(MetricsProvider):
         )
 
         # TODO: Need to support forecasted metrics.
-        redshift = redshift_source.read_k_most_recent(
-            k=max_available_after_epochs, metric_ids=_REDSHIFT_METRICS
+        redshift = (
+            redshift_source.read_k_most_recent(
+                k=max_available_after_epochs, metric_ids=_REDSHIFT_METRICS
+            )
+            if redshift_on
+            else pd.DataFrame([], columns=_REDSHIFT_METRICS)
         )
-        aurora = aurora_source.read_k_most_recent(
-            k=max_available_after_epochs + 1, metric_ids=_AURORA_METRICS
+        aurora = (
+            aurora_source.read_k_most_recent(
+                k=max_available_after_epochs + 1, metric_ids=_AURORA_METRICS
+            )
+            if aurora_on
+            else pd.DataFrame([], columns=_AURORA_METRICS)
         )
         front_end = front_end_source.read_k_most_recent(
             k=max_available_after_epochs, metric_ids=_FRONT_END_METRICS
@@ -101,10 +115,17 @@ class MetricsFromMonitor(MetricsProvider):
             aurora = self._fill_empty_metrics(aurora, front_end)
 
         # Align timestamps across the metrics.
-        common_timestamps = redshift.index.intersection(aurora.index).intersection(
-            front_end.index
+        common_timestamps = front_end.index.intersection(aurora.index).intersection(
+            redshift.index
         )
-        most_recent_common = common_timestamps.max()
+        if len(common_timestamps) == 0:
+            most_recent_common = front_end.index.max()
+            logger.warning(
+                "Metrics timestamp intersection is empty. Falling back to the front-end timestamps: %s",
+                str(most_recent_common),
+            )
+        else:
+            most_recent_common = common_timestamps.max()
         logger.debug(
             "MetricsFromMonitor using metrics starting at %s", str(most_recent_common)
         )

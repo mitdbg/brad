@@ -185,7 +185,7 @@ class BradDaemon:
             ),
             analytics_latency_scorer=latency_scorer,
             comparator=comparator,
-            metrics_provider=MetricsFromMonitor(self._monitor),
+            metrics_provider=MetricsFromMonitor(self._monitor, self._blueprint_mgr),
             data_access_provider=data_access_provider,
             estimator_provider=self._estimator_provider,
             system_event_logger=self._system_event_logger,
