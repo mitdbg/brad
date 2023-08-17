@@ -139,7 +139,7 @@ class RdsProvisioningManager:
 
     async def pause_cluster(self, cluster_id: str) -> None:
         def do_pause():
-            self._rds.pause_db_cluster(
+            self._rds.stop_db_cluster(
                 DBClusterIdentifier=cluster_id,
             )
 

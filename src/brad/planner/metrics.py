@@ -109,19 +109,25 @@ class MetricsFromMonitor(MetricsProvider):
             "MetricsFromMonitor using metrics starting at %s", str(most_recent_common)
         )
 
-        redshift_cpu = redshift.loc[
-            redshift.index <= most_recent_common, _REDSHIFT_METRICS[0]
-        ].iloc[-1]
-        txn_per_s = front_end.loc[
-            front_end.index <= most_recent_common, _FRONT_END_METRICS[0]
-        ].iloc[-1]
+        redshift_cpu = self._extract_most_recent_possibly_missing(
+            redshift.loc[redshift.index <= most_recent_common, _REDSHIFT_METRICS[0]],
+            default_value=0.0,
+        )
+        txn_per_s = self._extract_most_recent_possibly_missing(
+            front_end.loc[front_end.index <= most_recent_common, _FRONT_END_METRICS[0]],
+            default_value=0.0,
+        )
 
         aurora_rel = aurora.loc[aurora.index <= most_recent_common]
-        aurora_cpu = aurora_rel[_AURORA_METRICS[0]].iloc[-1]
+        aurora_cpu = self._extract_most_recent_possibly_missing(
+            aurora_rel[_AURORA_METRICS[0]], default_value=0.0
+        )
 
         if len(aurora_rel) < 2:
             logger.warning("Not enough Aurora metric entries to compute current load.")
-            load_minute = aurora_rel[_AURORA_METRICS[1]].iloc[-1]
+            load_minute = self._extract_most_recent_possibly_missing(
+                aurora_rel[_AURORA_METRICS[1]], default_value=0.0
+            )
         else:
             # Load averages are exponentially averaged. We do the following to
             # recover the load value for the last minute.
@@ -158,6 +164,14 @@ class MetricsFromMonitor(MetricsProvider):
         return pd.DataFrame(
             np.zeros((num_rows, num_cols)), columns=to_fill.columns, index=guide.index
         )
+
+    def _extract_most_recent_possibly_missing(
+        self, series: pd.Series, default_value: int | float
+    ) -> int | float:
+        if len(series) == 0:
+            return default_value
+        else:
+            return series.iloc[-1]
 
 
 _AURORA_METRICS = [
