@@ -193,7 +193,7 @@ class MetricsFromMonitor(MetricsProvider):
     def _extract_most_recent_possibly_missing(
         self, series: pd.Series, default_value: int | float, name: Optional[str] = None
     ) -> int | float:
-        if name is not None:
+        if name is not None and len(series) == 0:
             logger.warning(
                 "Using default metric value %s for %s", str(default_value), name
             )
