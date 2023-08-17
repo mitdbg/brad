@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from collections import namedtuple
-from typing import Tuple
+from typing import Tuple, Optional
 
 from brad.config.metrics import FrontEndMetric
 from brad.daemon.monitor import Monitor
@@ -112,21 +112,23 @@ class MetricsFromMonitor(MetricsProvider):
         redshift_cpu = self._extract_most_recent_possibly_missing(
             redshift.loc[redshift.index <= most_recent_common, _REDSHIFT_METRICS[0]],
             default_value=0.0,
+            name="redshift_cpu",
         )
         txn_per_s = self._extract_most_recent_possibly_missing(
             front_end.loc[front_end.index <= most_recent_common, _FRONT_END_METRICS[0]],
             default_value=0.0,
+            name="txn_per_s",
         )
 
         aurora_rel = aurora.loc[aurora.index <= most_recent_common]
         aurora_cpu = self._extract_most_recent_possibly_missing(
-            aurora_rel[_AURORA_METRICS[0]], default_value=0.0
+            aurora_rel[_AURORA_METRICS[0]], default_value=0.0, name="aurora_cpu"
         )
 
         if len(aurora_rel) < 2:
             logger.warning("Not enough Aurora metric entries to compute current load.")
             load_minute = self._extract_most_recent_possibly_missing(
-                aurora_rel[_AURORA_METRICS[1]], default_value=0.0
+                aurora_rel[_AURORA_METRICS[1]], default_value=0.0, name="load_minute"
             )
         else:
             # Load averages are exponentially averaged. We do the following to
@@ -143,7 +145,9 @@ class MetricsFromMonitor(MetricsProvider):
                 load_minute,
             )
 
-        hit_rate_pct = aurora_rel[_AURORA_METRICS[2]].iloc[-1]
+        hit_rate_pct = self._extract_most_recent_possibly_missing(
+            aurora_rel[_AURORA_METRICS[2]], default_value=0.0, name="hit_rate_pct"
+        )
 
         return (
             Metrics(
@@ -166,8 +170,13 @@ class MetricsFromMonitor(MetricsProvider):
         )
 
     def _extract_most_recent_possibly_missing(
-        self, series: pd.Series, default_value: int | float
+        self, series: pd.Series, default_value: int | float, name: Optional[str] = None
     ) -> int | float:
+        if name is not None:
+            logger.warning(
+                "Using default metric value %s for %s", str(default_value), name
+            )
+
         if len(series) == 0:
             return default_value
         else:

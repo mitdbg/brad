@@ -19,7 +19,7 @@ from brad.utils.time_periods import impute_old_missing_metrics
 
 
 class AuroraMetrics(MetricsSourceWithForecasting):
-    METRICS_DELAY = timedelta(minutes=1)
+    METRICS_DELAY = timedelta(minutes=2)
 
     def __init__(
         self,

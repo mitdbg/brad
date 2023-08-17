@@ -17,8 +17,8 @@ from brad.utils.time_periods import impute_old_missing_metrics
 
 
 class RedshiftMetrics(MetricsSourceWithForecasting):
-    # Indicates that metrics for the last 3 minutes may not be available.
-    METRICS_DELAY = timedelta(minutes=3)
+    # Indicates that metrics for the last 5 minutes may not be available.
+    METRICS_DELAY = timedelta(minutes=5)
 
     def __init__(
         self,
