@@ -1,0 +1,49 @@
+CLIENT_DELAY_CONFIGS = [
+  (1, 30),
+  (2, 30),
+  (3, 30),
+  (3, 15),
+  (3, 3),
+]
+
+BRAD_CONFIG = "../../config/config.yml"
+
+QUERY_INDEXES = "80,108,133"
+
+run_experiment_group(
+  name="redshift",
+  run="python3 ana_runner.py",
+  experiments=[
+    ExperimentInstance(
+      name="redshift-{}-{}".format(clients, avg_delay_s),
+      options={
+        "engine": "redshift",
+        "num_clients": clients,
+        "avg_gap_s": avg_delay_s,
+        "avg_gap_std_s": avg_delay_s / 4,
+        "config_file": BRAD_CONFIG,
+        "query_indexes": QUERY_INDEXES,
+      },
+    )
+    for clients, avg_delay_s in CLIENT_DELAY_CONFIGS
+  ]
+)
+
+run_experiment_group(
+  name="athena",
+  run="python3 ana_runner.py",
+  experiments=[
+    ExperimentInstance(
+      name="athena-{}-{}".format(clients, avg_delay_s),
+      options={
+        "engine": "athena",
+        "num_clients": clients,
+        "avg_gap_s": avg_delay_s,
+        "avg_gap_std_s": avg_delay_s / 4,
+        "config_file": BRAD_CONFIG,
+        "query_indexes": QUERY_INDEXES,
+      },
+    )
+    for clients, avg_delay_s in CLIENT_DELAY_CONFIGS
+  ]
+)
