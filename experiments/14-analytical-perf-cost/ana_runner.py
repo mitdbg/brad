@@ -7,7 +7,6 @@ import pathlib
 import random
 import queue
 import sys
-import threading
 import signal
 import pytz
 from typing import List
@@ -185,6 +184,7 @@ def main():
     parser.add_argument("--query-indexes", type=str, required=True)
     parser.add_argument("--config-file", type=str, required=True)
     parser.add_argument("--engine", type=str, required=True)
+    parser.add_argument("--run-for-s", type=float, required=True)
     args = parser.parse_args()
 
     engine = Engine.from_str(args.engine)
@@ -223,20 +223,7 @@ def main():
         stop_queue.put("")
 
     # Wait until requested to stop.
-    print(
-        "Analytics waiting until requested to stop... (hit Ctrl-C)",
-        flush=True,
-        file=sys.stderr,
-    )
-    should_shutdown = threading.Event()
-
-    def signal_handler(_signal, _frame):
-        should_shutdown.set()
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
-    should_shutdown.wait()
+    time.sleep(args.run_for_s)
 
     print("Stopping clients...", flush=True, file=sys.stderr)
     for _ in range(args.num_clients):

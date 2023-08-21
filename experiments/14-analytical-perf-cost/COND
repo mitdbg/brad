@@ -10,6 +10,8 @@ BRAD_CONFIG = "../../config/config.yml"
 
 QUERY_INDEXES = "80,108,133"
 
+RUN_FOR_S = 3 * 60  # 3 minutes
+
 run_experiment_group(
   name="redshift",
   run="python3 ana_runner.py",
@@ -23,6 +25,7 @@ run_experiment_group(
         "avg_gap_std_s": avg_delay_s / 4,
         "config_file": BRAD_CONFIG,
         "query_indexes": QUERY_INDEXES,
+        "run_for_s": RUN_FOR_S,
       },
     )
     for clients, avg_delay_s in CLIENT_DELAY_CONFIGS
@@ -42,6 +45,7 @@ run_experiment_group(
         "avg_gap_std_s": avg_delay_s / 4,
         "config_file": BRAD_CONFIG,
         "query_indexes": QUERY_INDEXES,
+        "run_for_s": RUN_FOR_S,
       },
     )
     for clients, avg_delay_s in CLIENT_DELAY_CONFIGS
