@@ -6,11 +6,21 @@ CLIENT_DELAY_CONFIGS = [
   (3, 3),
 ]
 
+LONGER_CLIENT_DELAY_CONFIGS = [
+  (1, 60),
+  (2, 60),
+  (3, 60),
+  (3, 30),
+  (3, 10),
+]
+
 BRAD_CONFIG = "../../config/config.yml"
 
 QUERY_INDEXES = "80,108,133"
+QUERY_INDEXES_LONGER = "106,159,223"
 
 RUN_FOR_S = 3 * 60  # 3 minutes
+LONGER_RUN_FOR_S = 10 * 60  # 10 minutes
 
 run_experiment_group(
   name="redshift",
@@ -50,4 +60,56 @@ run_experiment_group(
     )
     for clients, avg_delay_s in CLIENT_DELAY_CONFIGS
   ]
+)
+
+combine(
+  name="longer",
+  deps=[
+    ":redshift_longer",
+    ":athena_longer",
+  ]
+)
+
+run_experiment_group(
+  name="redshift_longer",
+  run="python3 ana_runner.py",
+  experiments=[
+    ExperimentInstance(
+      name="redshift_longer-{}-{}".format(clients, avg_delay_s),
+      options={
+        "engine": "redshift",
+        "num-clients": clients,
+        "avg-gap-s": avg_delay_s,
+        "avg-gap-std-s": avg_delay_s / 4,
+        "config-file": BRAD_CONFIG,
+        "query-indexes": QUERY_INDEXES_LONGER,
+        "run-for-s": LONGER_RUN_FOR_S,
+      },
+      parallelizable=True,
+    )
+    for clients, avg_delay_s in LONGER_CLIENT_DELAY_CONFIGS
+  ],
+  chain_experiments=True,
+)
+
+run_experiment_group(
+  name="athena_longer",
+  run="python3 ana_runner.py",
+  experiments=[
+    ExperimentInstance(
+      name="athena_longer-{}-{}".format(clients, avg_delay_s),
+      options={
+        "engine": "athena",
+        "num-clients": clients,
+        "avg-gap-s": avg_delay_s,
+        "avg-gap-std-s": avg_delay_s / 4,
+        "config-file": BRAD_CONFIG,
+        "query-indexes": QUERY_INDEXES_LONGER,
+        "run-for-s": LONGER_RUN_FOR_S,
+      },
+      parallelizable=True,
+    )
+    for clients, avg_delay_s in LONGER_CLIENT_DELAY_CONFIGS
+  ],
+  chain_experiments=True,
 )
