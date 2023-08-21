@@ -169,6 +169,28 @@ class BlueprintManager:
             self._next_blueprint = None
             self._next_blueprint_score = None
 
+    async def dangerously_abort_transition(self) -> None:
+        """
+        Used for debugging purposes only; only call if you know what you are
+        doing!
+        """
+        assert self._versioning is not None, "Run load() first."
+        assert (
+            self._versioning.transition_state is not TransitionState.Stable
+        ), "Can only update transition state during a transition."
+
+        next_versioning = self._versioning.copy()
+        next_versioning.transition_state = TransitionState.Stable
+        next_versioning.version = self._versioning.version
+        next_versioning.next_version = None
+        await self._assets.persist(
+            _VERSION_KEY.format(schema_name=self._schema_name),
+            next_versioning.serialize(),
+        )
+        self._versioning = next_versioning
+        self._next_blueprint = None
+        self._next_blueprint_score = None
+
     def force_new_blueprint_sync(
         self, blueprint: Blueprint, score: Optional[Score]
     ) -> None:

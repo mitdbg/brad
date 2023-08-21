@@ -90,6 +90,12 @@ def register_admin_action(subparser) -> None:
         help="Set to resume a transition that was already started but not "
         "necessarily completed.",
     )
+    parser.add_argument(
+        "--abort-transition",
+        action="store_true",
+        help="Set to abort an in-progress transition. "
+        "Only do this if you know what you are doing!",
+    )
     parser.set_defaults(admin_action=modify_blueprint)
 
 
@@ -202,6 +208,12 @@ def modify_blueprint(args):
                 config, blueprint_mgr, is_continuing=True, next_blueprint=None
             )
         )
+        logger.info("Done!")
+        return
+
+    if args.abort_transition:
+        asyncio.run(blueprint_mgr.dangerously_abort_transition())
+        logger.info("Done!")
         return
 
     tm = blueprint_mgr.get_transition_metadata()
