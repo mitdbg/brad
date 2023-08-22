@@ -18,7 +18,8 @@ class RedshiftConnection(Connection):
         password: str,
         schema_name: Optional[str],
         autocommit: bool,
-        timeout_s: int,
+        # TODO: Enforce connection timeouts, but not query timeouts.
+        timeout_s: int,  # pylint: disable=unused-argument
     ) -> Connection:
         loop = asyncio.get_running_loop()
 
@@ -29,7 +30,6 @@ class RedshiftConnection(Connection):
                 "user": user,
                 "password": password,
                 "database": schema_name if schema_name is not None else "dev",
-                "timeout": timeout_s,
             }
             return redshift_connector.connect(**kwargs)
 
@@ -49,7 +49,8 @@ class RedshiftConnection(Connection):
         password: str,
         schema_name: Optional[str],
         autocommit: bool,
-        timeout_s: int,
+        # TODO: Enforce connection timeouts, but not query timeouts.
+        timeout_s: int,  # pylint: disable=unused-argument
     ) -> Connection:
         kwargs = {
             "host": host,
@@ -57,7 +58,6 @@ class RedshiftConnection(Connection):
             "user": user,
             "password": password,
             "database": schema_name if schema_name is not None else "dev",
-            "timeout": timeout_s,
         }
 
         try:
