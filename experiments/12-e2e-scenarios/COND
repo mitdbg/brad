@@ -173,3 +173,14 @@ run_experiment(
     "planner-config-file": "config/planner_baseline.yml",
   },
 )
+
+run_experiment(
+  name="auto-e2e-prefix",
+  run="./run_e2e_prefix.sh",
+  options={
+    "query-indexes": "80,108,133",
+    "num-front-ends": 8,
+    "config-file": "config/config_cond.yml",
+    "planner-config-file": "config/planner.yml",
+  },
+)
