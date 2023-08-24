@@ -54,7 +54,7 @@ def extract_base_cardinalities(plan: ParsedPlan) -> List[BaseCardinality]:
 
         if len(op["children"]) == 0:
             if (
-                op["plan_parameters"]["table"].startswith("index_")
+                op["plan_parameters"]["table"].endswith("_index")
                 and parent is not None
             ):
                 # This is a straight scan of the index. We do not get table
