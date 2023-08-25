@@ -6,7 +6,7 @@ function start_brad() {
     --config-file $config_file \
     --schema-name imdb_extended \
     --planner-config-file config/planner.yml \
-    --temp-config-file config/temp_config.yml \
+    --temp-config-file config/temp_config_sample.yml \
     &
   brad_pid=$!
   popd
@@ -20,7 +20,7 @@ function start_auto_brad() {
     --config-file $config_file \
     --schema-name imdb_extended \
     --planner-config-file $planner_config_file \
-    --temp-config-file config/temp_config.yml \
+    --temp-config-file config/temp_config_sample.yml \
     &
   brad_pid=$!
   popd

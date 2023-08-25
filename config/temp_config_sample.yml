@@ -1,4 +1,4 @@
-latency_ceiling_s: 100.0
+latency_ceiling_s: 30.0
 
 aurora_preds_path: workloads/IMDB/OLAP_queries_new/pred_aurora_300.npy
 redshift_preds_path: workloads/IMDB/OLAP_queries_new/pred_redshift_300.npy
