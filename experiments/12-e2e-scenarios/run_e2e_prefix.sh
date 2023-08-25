@@ -39,14 +39,14 @@ sleep 30
 
 # 1x A, 1x T
 start_ana_runner 1 30 5
-start_txn_runner 8
+start_txn_runner 4
 
 # Wait until a re-plan and transition completes (15 minute timeout).
 poll_file_for_event $COND_OUT/brad_daemon_events.csv "post_transition_completed" 30
 log_workload_point "after_scale_down_replan"
 
-# Wait 5 more minutes before proceeding.
-sleep 300
+# Wait 10 more minutes before proceeding.
+sleep 600
 log_workload_point "experiment_done"
 
 # Shut down everything now.
