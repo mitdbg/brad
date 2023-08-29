@@ -45,6 +45,17 @@ class MetricsSourceWithForecasting:
         if logger is not None:
             logger.log_new_metrics(self._metrics_values())
 
+    def real_time_delay(self) -> int:
+        """
+        The number of epochs that this metrics source is usually delayed behind
+        real time.
+
+        Returning 0 means that there is no delay (the most recently completed is
+        available). Returning 1 means that the most recently completed epoch may
+        not be available until the next epoch completes. And so on.
+        """
+        return 0
+
     def _metrics_values(self) -> pd.DataFrame:
         raise NotImplementedError
 

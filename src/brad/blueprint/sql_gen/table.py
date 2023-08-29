@@ -26,6 +26,7 @@ from ._table_templates import (
     AURORA_BARE_OR_REDSHIFT_CREATE_TABLE_TEMPLATE,
     ATHENA_CREATE_TABLE_TEMPLATE,
     AURORA_UPDATE_TRIGGER_FN_TEMPLATE,
+    AURORA_2ND_INDEX_NAME_TEMPLATE,
 )
 
 
@@ -128,7 +129,7 @@ class TableSqlGenerator:
                     col_names = list(map(lambda col: col.name, index_cols))
                     create_indexes.append(
                         AURORA_CREATE_BTREE_INDEX_TEMPLATE.format(
-                            index_name="index_{}_{}".format(
+                            index_name=AURORA_2ND_INDEX_NAME_TEMPLATE.format(
                                 table.name, "_".join(col_names)
                             ),
                             table_name=source_table_name(table),
@@ -225,7 +226,9 @@ def generate_create_index_sql(
         col_names = list(map(lambda col: col.name, index_cols))
         create_indexes.append(
             AURORA_CREATE_BTREE_INDEX_TEMPLATE.format(
-                index_name="{}_{}_index".format(table.name, "_".join(col_names)),
+                index_name=AURORA_2ND_INDEX_NAME_TEMPLATE.format(
+                    table.name, "_".join(col_names)
+                ),
                 table_name=source_table_name(table),
                 columns=", ".join(col_names),
             )
@@ -241,7 +244,9 @@ def generate_drop_index_sql(
         col_names = list(map(lambda col: col.name, index_cols))
         drop_indexes.append(
             AURORA_DROP_INDEX_TEMPLATE.format(
-                index_name="{}_{}_index".format(table.name, "_".join(col_names)),
+                index_name=AURORA_2ND_INDEX_NAME_TEMPLATE.format(
+                    table.name, "_".join(col_names)
+                ),
             )
         )
     return drop_indexes

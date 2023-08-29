@@ -1,0 +1,7 @@
+run_experiment(
+  name="noop",
+  run="python3 measure_noop.py",
+  options={
+    "repetitions": 100_000,
+  },
+)

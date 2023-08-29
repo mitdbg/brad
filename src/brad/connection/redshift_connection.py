@@ -1,8 +1,9 @@
 import asyncio
 import redshift_connector
+import redshift_connector.error as redshift_errors
 from typing import Optional
 
-from .connection import Connection
+from .connection import Connection, ConnectionFailed
 from .cursor import Cursor
 from .redshift_cursor import RedshiftCursor
 
@@ -17,6 +18,8 @@ class RedshiftConnection(Connection):
         password: str,
         schema_name: Optional[str],
         autocommit: bool,
+        # TODO: Enforce connection timeouts, but not query timeouts.
+        timeout_s: int,  # pylint: disable=unused-argument
     ) -> Connection:
         loop = asyncio.get_running_loop()
 
@@ -30,9 +33,12 @@ class RedshiftConnection(Connection):
             }
             return redshift_connector.connect(**kwargs)
 
-        connection = await loop.run_in_executor(None, make_connection)
-        connection.autocommit = autocommit
-        return cls(connection)
+        try:
+            connection = await loop.run_in_executor(None, make_connection)
+            connection.autocommit = autocommit
+            return cls(connection)
+        except redshift_errors.InterfaceError as ex:
+            raise ConnectionFailed() from ex
 
     @classmethod
     def connect_sync(
@@ -43,6 +49,8 @@ class RedshiftConnection(Connection):
         password: str,
         schema_name: Optional[str],
         autocommit: bool,
+        # TODO: Enforce connection timeouts, but not query timeouts.
+        timeout_s: int,  # pylint: disable=unused-argument
     ) -> Connection:
         kwargs = {
             "host": host,
@@ -52,9 +60,12 @@ class RedshiftConnection(Connection):
             "database": schema_name if schema_name is not None else "dev",
         }
 
-        connection = redshift_connector.connect(**kwargs)
-        connection.autocommit = autocommit
-        return cls(connection)
+        try:
+            connection = redshift_connector.connect(**kwargs)
+            connection.autocommit = autocommit
+            return cls(connection)
+        except redshift_errors.InterfaceError as ex:
+            raise ConnectionFailed() from ex
 
     def __init__(self, connection_impl: redshift_connector.Connection) -> None:
         super().__init__()
@@ -79,3 +90,7 @@ class RedshiftConnection(Connection):
 
     def close_sync(self) -> None:
         self._connection.close()
+
+    def is_connection_lost_error(self, ex: Exception) -> bool:
+        # TODO: Determine how to check for lost connection errors.
+        return False

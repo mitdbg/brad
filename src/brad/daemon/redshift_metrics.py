@@ -17,6 +17,9 @@ from brad.utils.time_periods import impute_old_missing_metrics
 
 
 class RedshiftMetrics(MetricsSourceWithForecasting):
+    # Indicates that metrics for the last 5 minutes may not be available.
+    METRICS_DELAY = timedelta(minutes=5)
+
     def __init__(
         self,
         config: ConfigFile,
@@ -29,7 +32,10 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
             columns=CloudWatchClient.metric_names(self._metric_defs)
         )
         self._cw_client = CloudWatchClient(
-            Engine.Redshift, self._config.redshift_cluster_id, self._config
+            Engine.Redshift,
+            self._config.redshift_cluster_id,
+            instance_identifier=None,
+            config=self._config,
         )
         self._logger = MetricsLogger.create_from_config(
             self._config, "brad_metrics_redshift.log"
@@ -41,7 +47,7 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
 
     async def fetch_latest(self) -> None:
         loop = asyncio.get_running_loop()
-        new_metrics = await loop.run_in_executor(None, self._fetch_cw_metrics, 5)
+        new_metrics = await loop.run_in_executor(None, self._fetch_cw_metrics, 8)
 
         # CloudWatch has delayed metrics reporting, in particular for CPU
         # utilization (i.e., metrics for the last minute are not always
@@ -56,12 +62,17 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
         # to metrics (i.e., a set of metrics for a period will only appear in
         # the DataFrame once we are confident they are all available).
         now = datetime.now().astimezone(pytz.utc)
-        cutoff_ts = now - timedelta(minutes=3)
+        cutoff_ts = now - self.METRICS_DELAY
         new_metrics = impute_old_missing_metrics(new_metrics, cutoff_ts, value=0.0)
         new_metrics = new_metrics.dropna()
 
         self._values = self._get_updated_metrics(new_metrics)
         await super().fetch_latest()
+
+    def real_time_delay(self) -> int:
+        # Usually, Redshift metrics are delayed up to 3 minutes.
+        num_epochs = self.METRICS_DELAY / self._epoch_length
+        return int(num_epochs)  # Want to floor this number.
 
     def _metrics_values(self) -> pd.DataFrame:
         return self._values

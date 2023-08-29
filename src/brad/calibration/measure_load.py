@@ -172,7 +172,10 @@ def main() -> None:
 
     if engine == Engine.Redshift:
         cw: Optional[CloudWatchClient] = CloudWatchClient(
-            Engine.Redshift, config.redshift_cluster_id, config
+            Engine.Redshift,
+            config.redshift_cluster_id,
+            instance_identifier=None,
+            config=config,
         )
         pi: Optional[PerfInsightsClient] = None
     else:

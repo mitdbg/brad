@@ -1,11 +1,15 @@
 import boto3
 import pytz
+import logging
 import pandas as pd
+from botocore.exceptions import ClientError
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 
 from .metrics_def import MetricDef
 from brad.config.file import ConfigFile
+
+logger = logging.getLogger(__name__)
 
 
 class PerfInsightsClient:
@@ -93,10 +97,24 @@ class PerfInsightsClient:
             # Sort dataframe by timestamp
             return df.sort_index()
 
-        results = []
-        batch_size = 10
-        for i in range(0, len(metrics_list), batch_size):
-            df = fetch_batch(metrics_list[i : i + batch_size])
-            results.append(df)
+        try:
+            results = []
+            batch_size = 10
+            for i in range(0, len(metrics_list), batch_size):
+                df = fetch_batch(metrics_list[i : i + batch_size])
+                results.append(df)
 
-        return pd.concat(results, axis=1)
+            return pd.concat(results, axis=1)
+        except ClientError as ex:
+            if ex.response["Error"]["Code"] == "EntityAlreadyExists":
+                logger.info(
+                    "Received PerfInsights unauthorized error for %s. This might be due to a transition.",
+                    self._resource_id,
+                )
+            else:
+                logger.exception("Unexpected PerfInsights error.")
+
+            # Return an empty DataFrame.
+            return pd.DataFrame(
+                columns=list(map(lambda m: "{}.{}".format(*m), metrics_list))
+            )

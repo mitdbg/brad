@@ -107,3 +107,79 @@ def test_window_average():
         start + timedelta(seconds=45), start + timedelta(seconds=50)
     )
     assert val == 0.0
+
+
+def test_reverse_initial_iterator():
+    start = datetime(year=2023, month=7, day=26)
+    timestamps = [
+        start,
+        start + timedelta(seconds=10),
+        start + timedelta(seconds=20),
+        start + timedelta(seconds=30),
+        start + timedelta(seconds=40),
+    ]
+    expected = [
+        (40.0, timestamps[3], timestamps[4]),
+        (30.0, timestamps[2], timestamps[3]),
+        (20.0, timestamps[1], timestamps[2]),
+        (10.0, timestamps[0], timestamps[1]),
+        (3.0, datetime.min.replace(tzinfo=timestamps[0].tzinfo), timestamps[0]),
+    ]
+
+    sm = StreamingMetric[float]()
+    sm.add_sample(3.0, start)
+    sm.add_sample(10.0, start + timedelta(seconds=10))
+    sm.add_sample(20.0, start + timedelta(seconds=20))
+    sm.add_sample(30.0, start + timedelta(seconds=30))
+    sm.add_sample(40.0, start + timedelta(seconds=40))
+
+    # pylint: disable-next=protected-access
+    retrieved = list(sm._reverse_interval_iterator())
+    assert expected == retrieved
+
+    # Empty.
+    sm = StreamingMetric[float]()
+    # pylint: disable-next=protected-access
+    retrieved = list(sm._reverse_interval_iterator())
+    assert [] == retrieved
+
+    # Single metric.
+    sm = StreamingMetric[float]()
+    sm.add_sample(3.0, start)
+    # pylint: disable-next=protected-access
+    retrieved = list(sm._reverse_interval_iterator())
+    assert [expected[-1]] == retrieved
+
+
+def test_most_recent_in_window():
+    start = datetime(year=2023, month=7, day=26)
+    timestamps = [
+        start,
+        start + timedelta(seconds=10),
+        start + timedelta(seconds=20),
+    ]
+    sm = StreamingMetric[float]()
+    sm.add_sample(3.0, timestamps[0])
+    sm.add_sample(10.0, timestamps[1])
+    sm.add_sample(20.0, timestamps[2])
+
+    assert sm.most_recent_in_window(start - timedelta(seconds=10), start) == 3.0
+    assert (
+        sm.most_recent_in_window(
+            timestamps[-1] + timedelta(seconds=10),
+            timestamps[-1] + timedelta(seconds=30),
+        )
+        is None
+    )
+    assert (
+        sm.most_recent_in_window(
+            timestamps[1] + timedelta(seconds=1), timestamps[2] + timedelta(seconds=1)
+        )
+        == 20.0
+    )
+    assert (
+        sm.most_recent_in_window(
+            timestamps[0] + timedelta(seconds=5), timestamps[1] - timedelta(seconds=1)
+        )
+        == 10.0
+    )

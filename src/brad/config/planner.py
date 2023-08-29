@@ -2,7 +2,7 @@ import yaml
 import numpy as np
 import numpy.typing as npt
 from datetime import timedelta
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from brad.planner.strategy import PlanningStrategy
 
 
@@ -32,6 +32,15 @@ class PlannerConfig:
             minutes=epoch["minutes"],
         )
 
+    def trigger_configs(self) -> Dict[str, Any]:
+        return self._raw["triggers"]
+
+    def triggers_enabled(self) -> bool:
+        return self._raw["triggers"]["enabled"]
+
+    def query_dist_change_frac(self) -> float:
+        return float(self._raw["query_dist_change_frac"])
+
     def beam_size(self) -> int:
         return int(self._raw["beam_size"])
 
@@ -58,6 +67,16 @@ class PlannerConfig:
 
     def aurora_provisioning_change_time_s(self) -> int:
         return int(self._raw["aurora_provisioning_change_time_s"])
+
+    def aurora_per_instance_change_time_s(self) -> int:
+        return int(self._raw["aurora_per_instance_change_time_s"])
+
+    def redshift_elastic_resize_time_s(self) -> int:
+        return int(self._raw["redshift_elastic_resize_time_s"])
+
+    def redshift_classic_resize_time_s(self) -> int:
+        # We may replace this with our own resize operation.
+        return int(self._raw["redshift_classic_resize_time_s"])
 
     def redshift_extract_rate_mb_per_s(self) -> float:
         return float(self._raw["redshift_extract_rate_mb_per_s"])

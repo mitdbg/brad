@@ -4,7 +4,7 @@ import logging
 from brad.asset_manager import AssetManager
 from brad.blueprint.user import UserProvidedBlueprint
 from brad.blueprint.sql_gen.table import TableSqlGenerator
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.front_end.engine_connections import EngineConnections
@@ -133,8 +133,6 @@ def bootstrap_schema(args):
     # 11. Persist the data blueprint.
     if not args.skip_persisting_blueprint:
         assets = AssetManager(config)
-        blueprint_mgr = BlueprintManager(config, assets, blueprint.schema_name())
-        blueprint_mgr.set_blueprint(blueprint)
-        blueprint_mgr.persist_sync()
+        BlueprintManager.initialize_schema(assets, blueprint)
 
     logger.info("Done!")

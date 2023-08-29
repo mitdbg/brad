@@ -7,7 +7,7 @@ from typing import Any, Coroutine, Iterator, List, Set, Tuple, Dict
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.blueprint.sql_gen.table import (
     comma_separated_column_names_and_types,
     comma_separated_column_names,
@@ -19,6 +19,7 @@ from brad.config.strings import (
     AURORA_EXTRACT_PROGRESS_TABLE_NAME,
     AURORA_SEQ_COLUMN,
     source_table_name,
+    shadow_table_name,
 )
 from brad.front_end.engine_connections import EngineConnections
 
@@ -90,6 +91,11 @@ def register_admin_action(subparser) -> None:
         "--strict",
         action="store_true",
         help="If set, abort the bulk load if any tables are non-empty.",
+    )
+    parser.add_argument(
+        "--reload-aurora",
+        action="store_true",
+        help="If set, truncate the tables in Aurora and reload them.",
     )
     parser.set_defaults(admin_action=bulk_load)
 
@@ -302,6 +308,18 @@ def _try_add_task(
         pass
 
 
+async def _truncate_aurora_tables(
+    blueprint: Blueprint, aurora_connection: Connection
+) -> None:
+    cursor = await aurora_connection.cursor()
+    for table_name, locations in blueprint.table_locations().items():
+        if Engine.Aurora not in locations:
+            continue
+        logger.info("Truncating %s", table_name)
+        await cursor.execute("TRUNCATE TABLE {}".format(source_table_name(table_name)))
+        await cursor.execute("TRUNCATE TABLE {}".format(shadow_table_name(table_name)))
+
+
 async def bulk_load_impl(args, manifest: Dict[str, Any]) -> None:
     config = ConfigFile(args.config_file)
     assets = AssetManager(config)
@@ -312,6 +330,8 @@ async def bulk_load_impl(args, manifest: Dict[str, Any]) -> None:
     # Check for specific engines.
     if args.only_engines is not None and len(args.only_engines) > 0:
         engines_filter = {Engine.from_str(val) for val in args.only_engines}
+    elif args.reload_aurora:
+        engines_filter = {Engine.Aurora}
     else:
         engines_filter = {Engine.Aurora, Engine.Athena, Engine.Redshift}
 
@@ -323,7 +343,7 @@ async def bulk_load_impl(args, manifest: Dict[str, Any]) -> None:
             manifest["schema_name"],
             specific_engines=engines_filter,
         )
-        if not args.force:
+        if not args.force and not args.reload_aurora:
             logger.info("Checking for non-empty tables...")
             nonempty_tables = await _ensure_empty(
                 manifest, blueprint, engines, engines_filter
@@ -382,6 +402,9 @@ async def bulk_load_impl(args, manifest: Dict[str, Any]) -> None:
                         table_options,
                         engines.get_connection(Engine.Athena),
                     )
+
+        # If we are reloading Aurora, truncate the tables first.
+        await _truncate_aurora_tables(blueprint, engines.get_connection(Engine.Aurora))
 
         # 2. Execute the load tasks.
         # The intention is to have one in-flight load task for each engine

@@ -25,6 +25,8 @@ class QueryRep:
     In practice, this class is used to abstract away the internal representation
     so that its implementation details are not part of the interface of other
     BRAD classes (e.g., we want to avoid exposing the query's parsed representation).
+
+    Objects of this class are logically immutable.
     """
 
     def __init__(self, sql_query: str):

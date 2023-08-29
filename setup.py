@@ -39,6 +39,7 @@ INSTALL_REQUIRES = [
     "redshift_connector",
     "mysql-connector-python",
     "tabulate",
+    "PyAthena",
 ]
 
 DEV_REQUIRES = [

@@ -1,12 +1,186 @@
 run_experiment(
   name="light_start",
-  run="./run_workload.sh",
+  run="./run_steady_workload_then_replan.sh",
   options={
     "a-clients": 1,
     "t-clients": 1,
     "query-indexes": "81,108,133",
-    "num-front-ends": 2,
+    "num-front-ends": 8,
+    "a-gap-s": 30,
+    "a-gap-std-s": 5,
+    "run-for-s": 60 * 6,
+    "config-file": "config/config_cond.yml",
+  },
+)
+
+run_experiment(
+  name="baseline-light_start",
+  run="./run_steady_workload_then_replan.sh",
+  options={
+    "a-clients": 1,
+    "t-clients": 1,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
+    "a-gap-s": 30,
+    "a-gap-std-s": 5,
+    "run-for-s": 60 * 6,
+    "config-file": "config/config_cond_baseline.yml",
+    "skip-replan": 1,
+  },
+)
+
+run_experiment(
+  name="increase_txns_1",
+  run="./run_increasing_txn_workload.sh",
+  options={
+    "a-clients": 1,
+    "t-clients-lo": 1,
+    "t-clients-hi": 4,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
+    "a-gap-s": 30,
+    "a-gap-std-s": 5,
+    "run-for-s": 60 * 3,  # For each configuration.
+    "config-file": "config/config_cond.yml",
+  },
+)
+
+run_experiment(
+  name="baseline-increase_txns_1",
+  run="./run_increasing_txn_workload.sh",
+  options={
+    "a-clients": 1,
+    "t-clients-lo": 1,
+    "t-clients-hi": 4,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
+    "a-gap-s": 30,
+    "a-gap-std-s": 5,
+    "run-for-s": 60 * 3,  # For each configuration.
+    "config-file": "config/config_cond_baseline.yml",
+    "skip-replan": 1,
+  },
+)
+
+run_experiment(
+  name="increase_txns_2",
+  run="./run_increasing_txn_workload.sh",
+  options={
+    "a-clients": 1,
+    "t-clients-lo": 4,
+    "t-clients-hi": 8,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
+    "a-gap-s": 30,
+    "a-gap-std-s": 5,
+    "run-for-s": 60 * 2,  # For each configuration.
+    "config-file": "config/config_cond.yml",
+  },
+)
+
+run_experiment(
+  name="baseline-increase_txns_2",
+  run="./run_increasing_txn_workload.sh",
+  options={
+    "a-clients": 1,
+    "t-clients-lo": 4,
+    "t-clients-hi": 8,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
+    "a-gap-s": 30,
+    "a-gap-std-s": 5,
+    "run-for-s": 60 * 2,  # For each configuration.
+    "config-file": "config/config_cond_baseline.yml",
+    "skip-replan": 1,
+  },
+)
+
+run_experiment(
+  name="increase_analytics",
+  run="./run_steady_workload_then_replan.sh",
+  options={
+    "a-clients": 3,
+    "t-clients": 8,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
     "a-gap-s": 3,
-    "run-for-s": 60 * 5,
+    "a-gap-std-s": 1,
+    "run-for-s": 60 * 6,
+    "config-file": "config/config_cond.yml",
+  },
+)
+
+run_experiment(
+  name="increase_analytics_after",
+  run="./run_steady_workload_then_replan.sh",
+  options={
+    "a-clients": 3,
+    "t-clients": 8,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
+    "a-gap-s": 3,
+    "a-gap-std-s": 1,
+    "run-for-s": 60 * 6,
+    "config-file": "config/config_cond.yml",
+    "skip-replan": 1,
+  },
+)
+
+run_experiment(
+  name="baseline-increase_analytics",
+  run="./run_steady_workload_then_replan.sh",
+  options={
+    "a-clients": 3,
+    "t-clients": 8,
+    "query-indexes": "81,108,133",
+    "num-front-ends": 8,
+    "a-gap-s": 3,
+    "a-gap-std-s": 1,
+    "run-for-s": 60 * 6,
+    "config-file": "config/config_cond_baseline.yml",
+    "skip-replan": 1,
+  },
+)
+
+group(
+  name="baseline",
+  deps=[
+    ":baseline-light_start",
+    ":baseline-increase_txns_1",
+    ":baseline-increase_txns_2",
+    ":baseline-increase_analytics",
+  ],
+)
+
+run_experiment(
+  name="auto-e2e",
+  run="./run_e2e_full.sh",
+  options={
+    "query-indexes": "80,108,133",
+    "num-front-ends": 8,
+    "config-file": "config/config_cond.yml",
+    "planner-config-file": "config/planner.yml",
+  },
+)
+
+run_experiment(
+  name="baseline-auto-e2e",
+  run="./run_e2e_full.sh",
+  options={
+    "query-indexes": "80,108,133",
+    "num-front-ends": 8,
+    "config-file": "config/config_cond_baseline.yml",
+    "planner-config-file": "config/planner_baseline.yml",
+  },
+)
+
+run_experiment(
+  name="auto-e2e-prefix",
+  run="./run_e2e_prefix.sh",
+  options={
+    "query-indexes": "80,108,133",
+    "num-front-ends": 8,
+    "config-file": "config/config_cond.yml",
+    "planner-config-file": "config/planner.yml",
   },
 )

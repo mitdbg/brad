@@ -25,7 +25,15 @@ def encode(column, plan_params, feature_statistics):
         )
     elif feature_statistics[column].get("type") == str(FeatureType.categorical):
         value_dict = feature_statistics[column]["value_dict"]
-        enc_value = value_dict[str(value)]
+        if value == "bigint":
+            value = "integer"
+        try:
+            enc_value = value_dict[str(value)]
+        except KeyError:
+            print(value)
+            print(value_dict.keys())
+            raise
+
     elif feature_statistics[column].get("type") == str(FeatureType.boolean):
         enc_value = value
     else:
@@ -748,6 +756,8 @@ def query_collator(
 
 def postprocess_labels(labels):
     labels = np.array(labels, dtype=np.float32)
+    # TODO: See if we can remove the conversion from here. We should convert
+    # the units before feeding the data.
     labels /= 1000
     # we do this later
     # labels = torch.from_numpy(labels)

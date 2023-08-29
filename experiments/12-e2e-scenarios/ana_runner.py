@@ -8,7 +8,9 @@ import queue
 import sys
 import threading
 import signal
+import pytz
 from typing import List
+from datetime import datetime
 
 from brad.grpc_client import BradGrpcClient, BradClientError
 from typing import Dict
@@ -37,6 +39,11 @@ def runner(
     query_bank: List[str],
     queries: List[int],
 ) -> None:
+    def noop(_signal, _frame):
+        pass
+
+    signal.signal(signal.SIGINT, noop)
+
     # For printing out results.
     if "COND_OUT" in os.environ:
         import conductor.lib as cond
@@ -50,7 +57,7 @@ def runner(
     with BradGrpcClient(args.host, args.port + port_offset) as brad_client, open(
         out_dir / "olap_batch_{}.csv".format(runner_idx), "w"
     ) as file:
-        print("query_idx,run_time_s,engine", file=file, flush=True)
+        print("timestamp,query_idx,run_time_s,engine", file=file, flush=True)
 
         prng = random.Random(args.seed ^ runner_idx)
 
@@ -60,7 +67,7 @@ def runner(
 
         while True:
             if args.avg_gap_s is not None:
-                wait_for_s = prng.gauss(args.avg_gap_s, 0.5)
+                wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
                 if wait_for_s < 0.0:
                     wait_for_s = 0.0
                 time.sleep(wait_for_s)
@@ -71,11 +78,13 @@ def runner(
 
             try:
                 engine = None
+                now = datetime.now().astimezone(pytz.utc)
                 start = time.time()
                 _, engine = brad_client.run_query_json(query)
                 end = time.time()
                 print(
-                    "{},{},{}".format(
+                    "{},{},{},{}".format(
+                        now,
                         qidx,
                         end - start,
                         engine.value if engine is not None else "unknown",
@@ -84,7 +93,20 @@ def runner(
                     flush=True,
                 )
             except BradClientError as ex:
-                print("Query error:", str(ex), flush=True, file=sys.stderr)
+                if ex.is_transient():
+                    print(
+                        "Transient query error:",
+                        ex.message(),
+                        flush=True,
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        "Unexpected query error:",
+                        ex.message(),
+                        flush=True,
+                        file=sys.stderr,
+                    )
 
             try:
                 _ = stop_queue.get_nowait()
@@ -97,28 +119,48 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
     with BradGrpcClient(args.host, args.port) as brad_client, open(
         "olap_batch_warmup.csv", "w"
     ) as file:
-        print("query_idx,run_time_s,engine", file=file)
+        print("timestamp,query_idx,run_time_s,engine", file=file)
         for idx, qidx in enumerate(queries):
-            engine = None
-            query = query_bank[qidx]
-            start = time.time()
-            _, engine = brad_client.run_query_json(query)
-            end = time.time()
-            run_time_s = end - start
-            print(
-                "Warmed up {} of {}. Run time (s): {}".format(
-                    idx + 1, len(queries), run_time_s
+            try:
+                engine = None
+                query = query_bank[qidx]
+                now = datetime.now().astimezone(pytz.utc)
+                start = time.time()
+                _, engine = brad_client.run_query_json(query)
+                end = time.time()
+                run_time_s = end - start
+                print(
+                    "Warmed up {} of {}. Run time (s): {}".format(
+                        idx + 1, len(queries), run_time_s
+                    )
                 )
-            )
-            if run_time_s >= 29:
-                print("Warning: Query index {} takes longer than 30 s".format(idx))
-            print(
-                "{},{},{}".format(
-                    qidx, run_time_s, engine.value if engine is not None else "unknown"
-                ),
-                file=file,
-                flush=True,
-            )
+                if run_time_s >= 29:
+                    print("Warning: Query index {} takes longer than 30 s".format(idx))
+                print(
+                    "{},{},{},{}".format(
+                        now,
+                        qidx,
+                        run_time_s,
+                        engine.value if engine is not None else "unknown",
+                    ),
+                    file=file,
+                    flush=True,
+                )
+            except BradClientError as ex:
+                if ex.is_transient():
+                    print(
+                        "Transient query error:",
+                        ex.message(),
+                        flush=True,
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        "Unexpected query error:",
+                        ex.message(),
+                        flush=True,
+                        file=sys.stderr,
+                    )
 
 
 def main():
@@ -135,6 +177,7 @@ def main():
     )
     parser.add_argument("--num-clients", type=int, default=1)
     parser.add_argument("--avg-gap-s", type=float)
+    parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
     parser.add_argument("--query-indexes", type=str, required=True)
     args = parser.parse_args()
 

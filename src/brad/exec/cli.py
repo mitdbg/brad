@@ -48,10 +48,17 @@ def run_query(client: BradGrpcClient, query: str) -> None:
         # execution time (including network overheads).
         exec_engine = None
         start = time.time()
-        results, exec_engine = client.run_query_json(query)
+        results, exec_engine, not_tabular = client.run_query_json_cli(query)
         end = time.time()
 
-        print(tabulate(results, tablefmt="simple_grid"))
+        if not_tabular:
+            for line in results:
+                if len(line) == 1:
+                    print(line[0])
+                else:
+                    print(line)
+        else:
+            print(tabulate(results, tablefmt="simple_grid"))
         print()
         if exec_engine is not None:
             print("Took {:.3f} seconds. Ran on {}".format(end - start, exec_engine))
@@ -85,6 +92,7 @@ class BradShell(cmd.Cmd):
 
     def default(self, line: str) -> None:
         if line == "EOF":
+            print()
             return True  # type: ignore
 
         line = line.strip()

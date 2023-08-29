@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import pathlib
+import pytz
 from typing import Dict
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -15,6 +16,7 @@ from brad.planner.compare.cost import (
 )
 from brad.planner.estimator import EstimatorProvider, FixedEstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
+from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.precomputed_values import (
     PrecomputedDataAccessProvider,
 )
@@ -31,7 +33,7 @@ from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import FixedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 
@@ -205,11 +207,13 @@ def run_planner(args) -> None:
     monitor = Monitor(config, blueprint_mgr)
     monitor.set_up_metrics_sources()
     if args.use_fixed_metrics is not None:
+        now = datetime.now().astimezone(pytz.utc)
         metrics_provider: MetricsProvider = FixedMetricsProvider(
-            Metrics(**parse_metrics(args.use_fixed_metrics))
+            Metrics(**parse_metrics(args.use_fixed_metrics)),
+            now,
         )
     else:
-        metrics_provider = MetricsFromMonitor(monitor, forecasted=True)
+        metrics_provider = MetricsFromMonitor(monitor, blueprint_mgr)
 
     if config.routing_policy == RoutingPolicy.ForestTableSelectivity:
         pe = asyncio.run(PostgresEstimator.connect(args.schema_name, config))
@@ -220,7 +224,7 @@ def run_planner(args) -> None:
 
     planner = BlueprintPlannerFactory.create(
         current_blueprint=blueprint_mgr.get_blueprint(),
-        current_workload=workload,
+        current_blueprint_score=blueprint_mgr.get_active_score(),
         planner_config=planner_config,
         monitor=monitor,
         config=config,
@@ -239,21 +243,27 @@ def run_planner(args) -> None:
     )
     asyncio.run(monitor.fetch_latest())
 
-    async def on_new_blueprint(blueprint: Blueprint):
+    async def on_new_blueprint(blueprint: Blueprint, score: Score):
         logger.info("Selected new blueprint")
         logger.info("%s", blueprint)
 
         while True:
-            response = input("Do you want to persist this blueprint? (y/n): ").lower()
+            response = input(
+                "Do you want to persist this blueprint? Use 'f' to force-persist the blueprint. (y/f/n): "
+            ).lower()
             if response == "y":
-                blueprint_mgr.set_blueprint(blueprint)
-                blueprint_mgr.persist_sync()
+                await blueprint_mgr.start_transition(blueprint, score)
+                print("Done!")
+                break
+            elif response == "f":
+                print("Forcing the blueprint...")
+                blueprint_mgr.force_new_blueprint_sync(blueprint, score)
                 print("Done!")
                 break
             elif response == "n":
                 break
             else:
-                print("Invalid input. Please enter 'y' or 'n'.")
+                print("Invalid input. Please enter 'y', 'f', or 'n'.")
 
     planner.register_new_blueprint_callback(on_new_blueprint)
 

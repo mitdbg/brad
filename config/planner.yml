@@ -8,6 +8,40 @@ planning_window:
   hours: 0
   minutes: 3
 
+# The query distribution must change by at least this much for a new blueprint
+# to be accepted.
+query_dist_change_frac: 0.1
+
+###
+### Trigger configs.
+###
+
+triggers:
+  enabled: true
+  check_period_s: 60  # Triggers are checked every X seconds.
+  check_period_offset_s: 20
+
+  elapsed_time:
+    disabled: true
+    multiplier: 60  # Multiplier over `planning_window`.
+
+  redshift_cpu:
+    lo: 10
+    hi: 90
+    sustained_epochs: 3
+
+  aurora_cpu:
+    lo: 10
+    hi: 85
+    sustained_epochs: 3
+
+  variable_costs:
+    threshold: 0.5
+
+  query_latency_ceiling:
+    ceiling_s: 30.0
+    sustained_epochs: 3
+
 ###
 ### Beam planning constants.
 ###
@@ -45,6 +79,10 @@ aurora_usd_per_million_ios: 0.20
 # changed, number of nodes being added/removed, and amount of data stored.
 redshift_provisioning_change_time_s: 60
 aurora_provisioning_change_time_s: 60
+
+aurora_per_instance_change_time_s: 300  # 5 minutes
+redshift_elastic_resize_time_s: 900  # 15 minutes - https://repost.aws/knowledge-center/resize-redshift-cluster
+redshift_classic_resize_time_s: 7200  # 2 hours (This is very difficult to estimate; it depends on state we have no visibility into.)
 
 redshift_extract_rate_mb_per_s: 10.0
 redshift_load_rate_mb_per_s: 10.0

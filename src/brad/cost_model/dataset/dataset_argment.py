@@ -11,16 +11,20 @@ def argment_dataset(source, target):
     runs = load_json(source, namespace=False)
     new_parsed_queries = []
     new_sql_queries = []
+    new_parsed_plans = []
     for i, q in enumerate(runs["parsed_queries"]):
         sql = runs["sql_queries"][i]
         runtime = q["plan_runtime"] / 1000  # ms to s convertion
+        plan = runs["parsed_plans"][i]
         matched = False
         for upper_limit in DATA_ARG_DIST:
             if runtime <= upper_limit:
                 duplicated_query = [q] * DATA_ARG_DIST[upper_limit]
                 duplicated_sql = [sql] * DATA_ARG_DIST[upper_limit]
+                duplicated_plan = [plan] * DATA_ARG_DIST[upper_limit]
                 new_parsed_queries.extend(duplicated_query)
                 new_sql_queries.extend(duplicated_sql)
+                new_parsed_plans.extend(duplicated_plan)
                 matched = True
                 break
         if not matched:
@@ -32,6 +36,7 @@ def argment_dataset(source, target):
         "run_kwargs": runs["run_kwargs"],
         "parsed_queries": new_parsed_queries,
         "sql_queries": new_sql_queries,
+        "parsed_plans": new_parsed_plans,
     }
     with open(target, "w") as outfile:
         json.dump(argmented_runs, outfile, default=dumper)

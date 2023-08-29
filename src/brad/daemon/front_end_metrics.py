@@ -37,6 +37,18 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
                 StreamingMetric[float](sm_window_size)
                 for _ in range(self._config.num_front_ends)
             ],
+            FrontEndMetric.QueryLatencySumSecond: [
+                StreamingMetric[float](sm_window_size)
+                for _ in range(self._config.num_front_ends)
+            ],
+            FrontEndMetric.NumQueries: [
+                StreamingMetric[float](sm_window_size)
+                for _ in range(self._config.num_front_ends)
+            ],
+            FrontEndMetric.QueryLatencyMaxSecond: [
+                StreamingMetric[float](sm_window_size)
+                for _ in range(self._config.num_front_ends)
+            ],
         }
         self._ordered_metrics = list(self._front_end_metrics.keys())
         self._values_df = pd.DataFrame(
@@ -67,14 +79,39 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             window_start = start_time + offset * self._epoch_length
             window_end = window_start + self._epoch_length
             for metric, values in self._front_end_metrics.items():
-                total = sum(
-                    map(
-                        # pylint: disable-next=cell-var-from-loop
-                        lambda val: val.average_in_window(window_start, window_end),
-                        values,
+                if metric == FrontEndMetric.TxnEndPerSecond:
+                    total = sum(
+                        map(
+                            # pylint: disable-next=cell-var-from-loop
+                            lambda val: val.average_in_window(window_start, window_end),
+                            values,
+                        )
                     )
-                )
-                data_cols[metric.value].append(total)
+                    data_cols[metric.value].append(total)
+                elif (
+                    metric == FrontEndMetric.QueryLatencySumSecond
+                    or metric == FrontEndMetric.NumQueries
+                ):
+                    total = sum(
+                        map(
+                            # pylint: disable-next=cell-var-from-loop
+                            lambda val: val.sum_in_window(window_start, window_end),
+                            values,
+                        )
+                    )
+                    data_cols[metric.value].append(total)
+                elif metric == FrontEndMetric.QueryLatencyMaxSecond:
+                    max_val = max(
+                        map(
+                            # pylint: disable-next=cell-var-from-loop
+                            lambda val: val.max_in_window(window_start, window_end),
+                            values,
+                        )
+                    )
+                    data_cols[metric.value].append(max_val)
+                else:
+                    logger.warning("Unhandled front end metric: %s", metric)
+                    data_cols[metric.value].append(0.0)
             timestamps.append(window_end)
 
         # Sanity checks.
@@ -92,11 +129,27 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
 
     def handle_metric_report(self, report: MetricsReport) -> None:
         now = datetime.now(tz=timezone.utc)
-        # Each front end server reports this metric.
-        metric = self._front_end_metrics[FrontEndMetric.TxnEndPerSecond][
-            report.fe_index
+        fe_index = report.fe_index
+
+        # Each front end server reports these metrics.
+        txns = self._front_end_metrics[FrontEndMetric.TxnEndPerSecond][fe_index]
+        txns.add_sample(report.txn_completions_per_s, now)
+
+        query_lat = self._front_end_metrics[FrontEndMetric.QueryLatencySumSecond][
+            fe_index
         ]
-        metric.add_sample(report.txn_completions_per_s, now)
+        query_lat.add_sample(report.latency.sum, now)
+
+        query_count = self._front_end_metrics[FrontEndMetric.NumQueries][fe_index]
+        query_count.add_sample(report.latency.num_values, now)
+
+        query_lat_max = self._front_end_metrics[FrontEndMetric.QueryLatencyMaxSecond][
+            fe_index
+        ]
+        query_lat_max.add_sample(
+            max(report.latency.top_k) if len(report.latency.top_k) > 0 else 0.0, now
+        )
+
         logger.debug(
             "Received metrics report: [%d] %f (ts: %s)",
             report.fe_index,

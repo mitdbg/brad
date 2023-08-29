@@ -39,10 +39,14 @@ class BradGrpc(rpc.BradServicer):
                 response = b.RunQueryResponse(row=b.QueryResultRow(row_data=row))
                 if "executor" in debug_info:
                     response.executor = self._convert_engine(debug_info["executor"])
+                if "not_tabular" in debug_info:
+                    response.not_tabular = debug_info["not_tabular"]
                 yield response
 
         except QueryError as ex:
-            yield b.RunQueryResponse(error=b.QueryError(error_msg=str(ex)))
+            yield b.RunQueryResponse(
+                error=b.QueryError(error_msg=repr(ex), is_transient=ex.is_transient())
+            )
 
     async def RunQueryJson(
         self, request: b.RunQueryRequest, _context
@@ -56,10 +60,14 @@ class BradGrpc(rpc.BradServicer):
             response = b.QueryJsonResponse(results_json=result)
             if "executor" in debug_info:
                 response.executor = self._convert_engine(debug_info["executor"])
+            if "not_tabular" in debug_info:
+                response.not_tabular = debug_info["not_tabular"]
             return b.RunQueryJsonResponse(results=response)
 
         except QueryError as ex:
-            return b.RunQueryJsonResponse(error=b.QueryError(error_msg=str(ex)))
+            return b.RunQueryJsonResponse(
+                error=b.QueryError(error_msg=repr(ex), is_transient=ex.is_transient())
+            )
 
     async def EndSession(
         self, request: b.EndSessionRequest, _context

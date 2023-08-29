@@ -1,16 +1,21 @@
+import asyncio
 import logging
+from typing import Optional
 
 from brad.asset_manager import AssetManager
+from brad.blueprint import Blueprint
 from brad.blueprint.user import UserProvidedBlueprint
+from brad.blueprint.manager import BlueprintManager
 from brad.blueprint.sql_gen.table import (
     generate_create_index_sql,
     generate_drop_index_sql,
 )
+from brad.blueprint.state import TransitionState
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
-from brad.planner.enumeration.blueprint import EnumeratedBlueprint
-from brad.blueprint_manager import BlueprintManager
+from brad.daemon.transition_orchestrator import TransitionOrchestrator
 from brad.front_end.engine_connections import EngineConnections
+from brad.planner.enumeration.blueprint import EnumeratedBlueprint
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +78,24 @@ def register_admin_action(subparser) -> None:
         type=str,
         help="Path to an updated database schema.",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Set to force persist the blueprint and treat it as stable. "
+        "If not set, this tool will prepare to transition to the modified blueprint.",
+    )
+    parser.add_argument(
+        "--continue-transition",
+        action="store_true",
+        help="Set to resume a transition that was already started but not "
+        "necessarily completed.",
+    )
+    parser.add_argument(
+        "--abort-transition",
+        action="store_true",
+        help="Set to abort an in-progress transition. "
+        "Only do this if you know what you are doing!",
+    )
     parser.set_defaults(admin_action=modify_blueprint)
 
 
@@ -134,11 +157,30 @@ def add_indexes(args, config: ConfigFile, mgr: BlueprintManager) -> None:
             )
 
         cursor.commit_sync()
-        mgr.persist_sync()
         logger.info("Done!")
 
     finally:
         engines.close_sync()
+
+
+async def run_transition(
+    config: ConfigFile,
+    blueprint_mgr: BlueprintManager,
+    is_continuing: bool,
+    next_blueprint: Optional[Blueprint],
+) -> None:
+    if not is_continuing:
+        logger.info("Starting the transition...")
+        assert next_blueprint is not None
+        await blueprint_mgr.start_transition(next_blueprint, new_score=None)
+    else:
+        logger.info("Continuing the transition...")
+    orchestrator = TransitionOrchestrator(config, blueprint_mgr)
+    logger.info("Running the transition...")
+    await orchestrator.run_prepare_then_transition()
+    logger.info("Running the post-transition clean up...")
+    await orchestrator.run_clean_up_after_transition()
+    logger.info("Done!")
 
 
 # This method is called by `brad.exec.admin.main`.
@@ -159,6 +201,30 @@ def modify_blueprint(args):
     if args.add_indexes:
         add_indexes(args, config, blueprint_mgr)
         return
+
+    if args.continue_transition:
+        asyncio.run(
+            run_transition(
+                config, blueprint_mgr, is_continuing=True, next_blueprint=None
+            )
+        )
+        logger.info("Done!")
+        return
+
+    if args.abort_transition:
+        asyncio.run(blueprint_mgr.dangerously_abort_transition())
+        logger.info("Done!")
+        return
+
+    tm = blueprint_mgr.get_transition_metadata()
+    if tm.state != TransitionState.Stable:
+        logger.warning(
+            "A transition is already in progress (current state: %s)",
+            str(tm.state),
+        )
+        if not args.force:
+            logger.fatal("Not proceeding because --force is not set.")
+            return
 
     enum_blueprint = EnumeratedBlueprint(blueprint)
 
@@ -189,7 +255,18 @@ def modify_blueprint(args):
 
     # 3. Write the changes back.
     modified_blueprint = enum_blueprint.to_blueprint()
-    blueprint_mgr.set_blueprint(modified_blueprint)
-    blueprint_mgr.persist_sync()
+    if args.force:
+        # TODO: If we have an external way to compute the score, we should do it here.
+        blueprint_mgr.force_new_blueprint_sync(modified_blueprint, score=None)
+    else:
+        logger.info("Transitioning to the following blueprint: %s", modified_blueprint)
+        asyncio.run(
+            run_transition(
+                config,
+                blueprint_mgr,
+                is_continuing=False,
+                next_blueprint=modified_blueprint,
+            )
+        )
 
     logger.info("Done!")

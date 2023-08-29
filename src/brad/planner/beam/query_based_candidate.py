@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import numpy.typing as npt
+from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 from brad.blueprint import Blueprint
@@ -23,6 +24,7 @@ from brad.planner.scoring.provisioning import (
     compute_aurora_transition_time_s,
     compute_redshift_transition_time_s,
 )
+from brad.planner.scoring.score import Score
 from brad.planner.scoring.table_placement import (
     compute_single_athena_table_cost,
     compute_single_table_movement_time_and_cost,
@@ -116,6 +118,29 @@ class BlueprintCandidate(ComparableBlueprint):
             self.redshift_provisioning.clone(),
             self._source_blueprint.router_provider(),
         )
+
+    def to_score(self) -> Score:
+        score = Score()
+        score.provisioning_cost = self.provisioning_cost
+        score.storage_cost = self.storage_cost
+        score.table_movement_trans_cost = self.table_movement_trans_cost
+
+        score.workload_scan_cost = self.workload_scan_cost
+        score.athena_scanned_bytes = self.athena_scanned_bytes
+        score.aurora_accessed_pages = self.aurora_accessed_pages
+
+        score.table_movement_trans_time_s = self.table_movement_trans_time_s
+        score.provisioning_trans_time_s = self.provisioning_trans_time_s
+
+        score.scaled_query_latencies = self.scaled_query_latencies
+        score.aurora_score = self.aurora_score
+        score.redshift_score = self.redshift_score
+
+        score.aurora_queries = len(self.query_locations[Engine.Aurora])
+        score.athena_queries = len(self.query_locations[Engine.Athena])
+        score.redshift_queries = len(self.query_locations[Engine.Redshift])
+
+        return score
 
     def to_debug_values(self) -> Dict[str, int | float | str]:
         values: Dict[str, int | float | str] = self._memoized.copy()
@@ -352,6 +377,7 @@ class BlueprintCandidate(ComparableBlueprint):
         redshift_prov_cost = compute_redshift_hourly_operational_cost(
             self.redshift_provisioning
         )
+        cost_scale_factor = timedelta(hours=1) / ctx.next_workload.period()
 
         aurora_transition_time_s = compute_aurora_transition_time_s(
             ctx.current_blueprint.aurora_provisioning(),
@@ -364,7 +390,9 @@ class BlueprintCandidate(ComparableBlueprint):
             ctx.planner_config,
         )
 
-        self.provisioning_cost = aurora_prov_cost + redshift_prov_cost
+        self.provisioning_cost = (
+            aurora_prov_cost + redshift_prov_cost
+        ) * cost_scale_factor
         self.provisioning_trans_time_s = (
             aurora_transition_time_s + redshift_transition_time_s
         )

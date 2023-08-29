@@ -10,6 +10,7 @@ from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.provisioning import Provisioning
 from brad.config.planner import PlannerConfig
 from brad.planner.workload.query import Query
+from brad.provisioning.redshift import RedshiftProvisioningManager
 
 
 ProvisioningResources = namedtuple(
@@ -104,9 +105,22 @@ def compute_aurora_transition_time_s(
         # Special case: Shutting down an engine is "free".
         return 0.0
 
-    # Some provisioning changes may take longer than others. To start, we use
-    # one fixed time.
-    return planner_config.aurora_provisioning_change_time_s()
+    # We transition one instance at a time to minimize disruption.
+    num_nodes_to_create = new.num_nodes() - old.num_nodes()
+
+    if new.instance_type() != old.instance_type():
+        # We modify "overlapping" nodes. For the primary instance, we actually
+        # create a second replica and run a failover, but this is fast enough
+        # that we just treat it as one modification.
+        num_nodes_to_modify = min(old.num_nodes(), new.num_nodes())
+    else:
+        # Only adding/removing replicas. We only need to wait when creating
+        # replicas.
+        num_nodes_to_modify = 0
+
+    return planner_config.aurora_per_instance_change_time_s() * (
+        num_nodes_to_modify + num_nodes_to_create
+    )
 
 
 def compute_redshift_transition_time_s(
@@ -120,10 +134,19 @@ def compute_redshift_transition_time_s(
         # Special case: Shutting down an engine is "free".
         return 0.0
 
+    if old.num_nodes() == 0 and new.num_nodes() > 0:
+        # Special case: Starting up a paused cluster. For now, we estimate this
+        # as an elastic resize.
+        return planner_config.redshift_elastic_resize_time_s()
+
     # Some provisioning changes may take longer than others (classic vs. elastic
-    # resize and also the time it takes to transfer data). To start, we use one
-    # fixed time.
-    return planner_config.redshift_provisioning_change_time_s()
+    # resize and also the time it takes to transfer data).
+    must_use_classic = RedshiftProvisioningManager.must_use_classic_resize(old, new)
+
+    if must_use_classic:
+        return planner_config.redshift_classic_resize_time_s()
+    else:
+        return planner_config.redshift_elastic_resize_time_s()
 
 
 def aurora_resource_value(prov: Provisioning) -> float:

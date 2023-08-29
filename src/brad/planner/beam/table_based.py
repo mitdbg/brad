@@ -1,19 +1,21 @@
-import asyncio
 import heapq
 import itertools
 import json
 import logging
-from typing import List, Tuple, Dict
+from datetime import timedelta
+from typing import Iterable, List, Tuple, Dict
 
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.abstract import BlueprintPlanner
 from brad.planner.beam.feasibility import BlueprintFeasibility
-from brad.planner.beam.router_provider import RouterProvider
+from brad.planner.beam.triggers import get_beam_triggers
+from brad.planner.router_provider import RouterProvider
 from brad.planner.beam.table_based_candidate import BlueprintCandidate
 from brad.planner.debug_logger import BlueprintPlanningDebugLogger
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
+from brad.planner.triggers.trigger import Trigger
 from brad.planner.workload import Workload
 
 logger = logging.getLogger(__name__)
@@ -25,28 +27,36 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         self._router_provider = RouterProvider(
             self._schema_name, self._config, self._estimator_provider
         )
+        self._triggers = get_beam_triggers(
+            self._config,
+            self._planner_config,
+            self._monitor,
+            self._data_access_provider,
+            self._router_provider,
+        )
+        for t in self._triggers:
+            t.update_blueprint(self._current_blueprint, self._current_blueprint_score)
 
-    async def run_forever(self) -> None:
-        while True:
-            await asyncio.sleep(30)
-            logger.debug("Planner is checking if a replan is needed...")
-            if self._check_if_metrics_warrant_replanning():
-                await self.run_replan()
+    def get_triggers(self) -> Iterable[Trigger]:
+        return self._triggers
 
     def _check_if_metrics_warrant_replanning(self) -> bool:
         # See if the metrics indicate that we should trigger the planning
         # process.
         return False
 
-    async def run_replan(self, window_multiplier: int = 1) -> None:
+    async def _run_replan_impl(self, window_multiplier: int = 1) -> None:
         logger.info("Running a replan...")
 
-        # 1. Fetch the next workload and apply predictions.
-        next_workload = self._workload_provider.next_workload(window_multiplier)
+        # 1. Fetch metrics and the next workload and then apply predictions.
+        metrics, metrics_timestamp = self._metrics_provider.get_metrics()
+        current_workload, next_workload = self._workload_provider.get_workloads(
+            metrics_timestamp, window_multiplier, desired_period=timedelta(hours=1)
+        )
         self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
-        self._analytics_latency_scorer.apply_predicted_latencies(self._current_workload)
+        self._analytics_latency_scorer.apply_predicted_latencies(current_workload)
         self._data_access_provider.apply_access_statistics(next_workload)
-        self._data_access_provider.apply_access_statistics(self._current_workload)
+        self._data_access_provider.apply_access_statistics(current_workload)
 
         # 2. Cluster queries by tables and sort by gains (sum).
         clusters = self._preprocess_workload_queries(next_workload)
@@ -58,13 +68,18 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             logger.info("No queries in the workload. Cannot replan.")
             return
 
+        if len(next_workload.analytical_queries()) < 20:
+            logger.info("[Table-Based Planner] Query arrival counts")
+            for q in next_workload.analytical_queries():
+                logger.info("Query: %s -- Count: %d", q.raw_query, q.arrival_count())
+
         # 3. Initialize planning state.
         ctx = ScoringContext(
             self._schema_name,
             self._current_blueprint,
-            self._current_workload,
+            current_workload,
             next_workload,
-            self._metrics_provider.get_metrics(),
+            metrics,
             self._planner_config,
         )
         await ctx.simulate_current_workload_routing(
@@ -277,8 +292,9 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         # 8. Output the new blueprint.
         best_blueprint = best_candidate.to_blueprint()
-        self._current_blueprint = best_blueprint
-        self._current_workload = next_workload
+        best_blueprint_score = best_candidate.to_score()
+        self._last_suggested_blueprint = best_blueprint
+        self._last_suggested_blueprint_score = best_blueprint_score
 
         logger.info("Selected blueprint:")
         logger.info("%s", best_blueprint)
@@ -288,8 +304,11 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             "Selected blueprint details: %s",
             json.dumps(debug_values, indent=2, default=str),
         )
+        logger.info(
+            "Metrics used during planning: %s", json.dumps(metrics._asdict(), indent=2)
+        )
 
-        await self._notify_new_blueprint(best_blueprint)
+        await self._notify_new_blueprint(best_blueprint, best_blueprint_score)
 
     def _preprocess_workload_queries(
         self, workload: Workload

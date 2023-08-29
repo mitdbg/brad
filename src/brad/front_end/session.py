@@ -2,7 +2,8 @@ import asyncio
 import logging
 from typing import Dict, Tuple, Optional
 
-from brad.blueprint_manager import BlueprintManager
+from brad.config.engine import Engine
+from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.session import SessionId
 from .engine_connections import EngineConnections
@@ -21,6 +22,7 @@ class Session:
         self._session_id = session_id
         self._engines = engines
         self._in_txn = False
+        self._closed = False
 
     @property
     def identifier(self) -> SessionId:
@@ -34,10 +36,15 @@ class Session:
     def in_transaction(self) -> bool:
         return self._in_txn
 
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
     def set_in_transaction(self, in_txn: bool) -> None:
         self._in_txn = in_txn
 
     async def close(self):
+        self._closed = True
         await self._engines.close()
 
 
@@ -60,10 +67,20 @@ class SessionManager:
         logger.debug("Creating a new session...")
         session_id = SessionId(self._next_id_value)
         self._next_id_value += 1
+
+        # Only connect to running engines.
+        engines = {Engine.Athena}
+        blueprint = self._blueprint_mgr.get_blueprint()
+        if blueprint.aurora_provisioning().num_nodes() > 0:
+            engines.add(Engine.Aurora)
+        if blueprint.redshift_provisioning().num_nodes() > 0:
+            engines.add(Engine.Redshift)
+
         connections = await EngineConnections.connect(
             self._config,
             self._blueprint_mgr.get_directory(),
             self._schema_name,
+            specific_engines=engines,
         )
         session = Session(session_id, connections)
         self._sessions[session_id] = session
@@ -89,3 +106,66 @@ class SessionManager:
             logger.debug("Ended session %s", session_id)
         await asyncio.gather(*end_tasks)
         self._sessions.clear()
+
+    async def add_connections(self) -> None:
+        """
+        Used during blueprint transitions to add connections to newly started
+        engines.
+        """
+        blueprint = self._blueprint_mgr.get_blueprint()
+        directory = self._blueprint_mgr.get_directory()
+
+        expected_engines = {Engine.Athena}
+        if blueprint.aurora_provisioning().num_nodes() > 0:
+            expected_engines.add(Engine.Aurora)
+        if blueprint.redshift_provisioning().num_nodes() > 0:
+            expected_engines.add(Engine.Redshift)
+
+        for session in self._sessions.values():
+            await session.engines.add_connections(
+                self._config, directory, expected_engines
+            )
+
+    async def remove_connections(self) -> None:
+        """
+        Used during blueprint transitions to remove connections to stopped engines.
+        """
+        blueprint = self._blueprint_mgr.get_blueprint()
+
+        expected_engines = {Engine.Athena}
+        if blueprint.aurora_provisioning().num_nodes() > 0:
+            expected_engines.add(Engine.Aurora)
+        if blueprint.redshift_provisioning().num_nodes() > 0:
+            expected_engines.add(Engine.Redshift)
+
+        for session in self._sessions.values():
+            await session.engines.remove_connections(expected_engines)
+
+    async def reestablish_connections(self) -> bool:
+        """
+        Used to reconnect to engines when a connection has been lost. Lost
+        connections may occur during blueprint transitions when the provisioning
+        changes (e.g., an Aurora failover). This method returns `True` iff all
+        of the lost connections were re-established.
+
+        Callers should take care to not call this method repeatedly to avoid
+        overwhelming the underlying engines. Use randomized exponential backoff
+        instead.
+        """
+        logger.debug("Attempting to reestablish connections...")
+        directory = self._blueprint_mgr.get_directory()
+        all_connected = True
+        sessions = [session for session in self._sessions.values()]
+        for session in sessions:
+            if session.closed:
+                continue
+
+            connected = await session.engines.reestablish_connections(
+                self._config, directory
+            )
+            if not connected and not session.closed:
+                all_connected = False
+            # Continue running since we still want to try connecting other
+            # sessions.
+        logger.debug("Reestablish connections succeeded? %s", str(all_connected))
+        return all_connected

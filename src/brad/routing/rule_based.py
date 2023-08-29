@@ -7,7 +7,7 @@ from importlib.resources import files, as_file
 import brad.routing
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.daemon.monitor import Monitor
 from brad.routing.router import Router
 from brad.query_rep import QueryRep
@@ -84,6 +84,10 @@ class RuleBased(Router):
         # non-determinism will be used for offline training data exploration (not implemented)
         self._deterministic = deterministic
         self._params = RuleBasedParams()
+
+    def update_blueprint(self, blueprint: Blueprint) -> None:
+        self._blueprint = blueprint
+        self._table_placement_bitmap = blueprint.table_locations_bitmap()
 
     async def recollect_catalog(self, sessions: SessionManager) -> None:
         # recollect catalog stats; happens every maintenance window
