@@ -18,7 +18,6 @@ class TiDB:
     def __init__(self):
         self.conn: mysql.connector.MySQLConnection = self.reopen_connection()
         cur = self.conn.cursor()
-        cur.execute("SHOW VARIABLES LIKE 'local_infile';")
         cur.execute("SET GLOBAL local_infile = 1;")
         self.conn.commit()
 
