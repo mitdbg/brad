@@ -5,16 +5,12 @@ import yaml
 import pandas as pd
 import mysql.connector
 import platform
-import requests
 import pyodbc
-from requests.auth import HTTPDigestAuth
 
 
-from workloads.cross_db_benchmark.benchmark_tools.database import DatabaseConnection
 from workloads.cross_db_benchmark.benchmark_tools.utils import (
     load_schema_sql,
     load_schema_json,
-    load_column_statistics,
 )
 
 
@@ -26,8 +22,7 @@ class TiDB:
         cur.execute("SET GLOBAL local_infile = 1;")
         self.conn.commit()
 
-
-    def reopen_connection(self) -> mysql.connector.MySQLConnection:
+    def reopen_connection(self):
         config_file = "config/tidb.yml"
         with open(config_file, "r") as f:
             config = yaml.load(f, Loader=yaml.Loader)
@@ -64,37 +59,37 @@ class TiDB:
             replica_cmd = f"ALTER TABLE {t} SET TIFLASH REPLICA 1;"
             self.submit_query(replica_cmd, until_success=True)
 
-    def load_database(self, dataset, data_dir, force=False, load_from: str=''):
+    def load_database(self, dataset, data_dir, force=False, load_from: str = ""):
         # First, check existence.
         print(f"Checking existence. Force={force}")
         exists = self.check_exists(dataset)
-        if exists and not force and load_from == '':
+        if exists and not force and load_from == "":
             return
         # Create tables.
         print("Creating tables.")
-        if load_from == '':
+        if load_from == "":
             schema_sql = load_schema_sql(dataset, "mysql.sql")
             self.submit_query(schema_sql)
         # Load data.
         print("Loading data.")
         schema = load_schema_json(dataset)
-        start_loading = load_from == ''
+        start_loading = load_from == ""
         for t in schema.tables:
             if t == load_from:
                 start_loading = True
             if not start_loading:
                 continue
             start_t = time.perf_counter()
-            table_path = os.path.join(data_dir, f"{t}.csv")
-            table_path = Path(table_path).resolve()
+            p = os.path.join(data_dir, f"{t}.csv")
+            table_path = Path(p).resolve()
             tidb_path = os.path.join(data_dir, f"{t}_tidb0.csv")
             table = pd.read_csv(
-                table_path, 
-                delimiter=',', 
-                quotechar='"', 
-                escapechar='\\', 
-                na_values='', 
-                keep_default_na=False, 
+                table_path,
+                delimiter=",",
+                quotechar='"',
+                escapechar="\\",
+                na_values="",
+                keep_default_na=False,
                 header=0,
                 low_memory=False,
             )
@@ -105,7 +100,9 @@ class TiDB:
                 # Also need to rewrite nulls.
                 tidb_path = os.path.join(data_dir, f"{t}_tidb{i}.csv")
                 print(f"Writing {t} chunk {i}. ({chunk}/{len(table)}).")
-                table.iloc[chunk:chunk+chunksize].to_csv(tidb_path, sep='|', index=False, header=True, na_rep='\\N')
+                table.iloc[chunk : chunk + chunksize].to_csv(
+                    tidb_path, sep="|", index=False, header=True, na_rep="\\N"
+                )
                 load_cmd = f"LOAD DATA LOCAL INFILE '{tidb_path}' INTO TABLE {t} {schema.db_load_kwargs.mysql}"
                 print(f"LOAD CMD:\n{load_cmd}")
                 self.submit_query(load_cmd, until_success=True)
@@ -138,44 +135,17 @@ class TiDB:
             if len(res) == 0:
                 return False
         return True
-            
-
-    def api_test(self):
-        HOST = "https://api.tidbcloud.com"
-        url = f"{HOST}/api/v1beta/projects"
-        resp = requests.get(url=url, auth=HTTPDigestAuth(self.public_key, self.private_key))
-        if resp.status_code != 200:
-            print(f"request invalid, code : {resp.status_code}, message : {resp.text}")
-            raise Exception(f"request invalid, code : {resp.status_code}, message : {resp.text}")
-        resp = resp.json()
-        print(f"Projects: {resp}")
-        items = resp["items"]
-        for item in items:
-            project_id = item['id']
-            url = f"{HOST}/api/v1beta/projects/{project_id}/clusters"
-            resp = requests.get(url=url, auth=HTTPDigestAuth(self.public_key, self.private_key))
-            if resp.status_code != 200:
-                print(f"request invalid, code : {resp.status_code}, message : {resp.text}")
-                raise Exception(f"request invalid, code : {resp.status_code}, message : {resp.text}")
-            resp = resp.json()
-            # print(f"Project {project_id}. Clusters: {resp}.")
-            items = resp['items']
-            for item in items:
-                print(json.dumps(item, indent=2))
-
-
 
     def get_connection(self):
         self.conn
 
-
-    def submit_query(self, sql: str, until_success: bool=False, error_ok: str = ''):
+    def submit_query(self, sql: str, until_success: bool = False, error_ok: str = ""):
         while True:
             try:
                 cur = self.conn.cursor()
                 # cur.execute(sql)
                 commands = sql.split(";")
-                
+
                 for command in commands:
                     command = command.strip()
                     if len(command) > 0:
@@ -188,12 +158,11 @@ class TiDB:
 
                 if not until_success:
                     raise err
-                if 'Lost connection' in err_str:
+                if "Lost connection" in err_str:
                     self.conn = self.reopen_connection()
                     continue
                 print(f"Not a retryable error: {err}")
                 raise err
-                
 
     def run_query_with_results(self, sql: str):
         cur = self.conn.cursor()

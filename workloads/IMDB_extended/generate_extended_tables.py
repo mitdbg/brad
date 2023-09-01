@@ -68,7 +68,10 @@ def generate_showings(ctx: Context, total_theatres: int) -> int:
     total_showings = 0
     sep = ctx.sep
     with open(f"{ctx.target_dir}/showings.csv", "w", encoding="UTF-8") as out:
-        print(f"id{sep}theatre_id{sep}movie_id{sep}date_time{sep}total_capacity{sep}seats_left", file=out)
+        print(
+            f"id{sep}theatre_id{sep}movie_id{sep}date_time{sep}total_capacity{sep}seats_left",
+            file=out,
+        )
 
         movie_id_range = range(MIN_MOVIE_ID, MAX_MOVIE_ID + 1)
 
@@ -116,7 +119,10 @@ def generate_ticket_orders(ctx: Context, total_showings: int) -> int:
     weights[1] = 10
     sep = ctx.sep
     with open(f"{ctx.target_dir}/ticket_orders.csv", "w", encoding="UTF-8") as out:
-        print(f"id{sep}showing_id{sep}quantity{sep}contact_name{sep}location_x{sep}location_y", file=out)
+        print(
+            f"id{sep}showing_id{sep}quantity{sep}contact_name{sep}location_x{sep}location_y",
+            file=out,
+        )
 
         for showing_id in range(total_showings):
             num_orders_for_showing = ctx.prng.randint(

@@ -2,6 +2,7 @@ import yaml
 import platform
 import mysql.connector
 
+
 def make_tidb_odbc():
     config_file = "config/tidb.yml"
     with open(config_file, "r") as f:
@@ -15,7 +16,7 @@ def make_tidb_odbc():
             ssl_file = "/etc/ssl/cert.pem"
         else:
             ssl_file = "/etc/ssl/certs/ca-certificates.crt"
-        
+
         conn = mysql.connector.connect(
             host=host,
             port=port,

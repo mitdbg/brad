@@ -8,7 +8,7 @@ from brad.grpc_client import BradGrpcClient, RowList
 class Database:
     def execute_sync(self, query: str) -> RowList:
         raise NotImplementedError
-    
+
     def execute_sync_with_engine(self, query: str) -> (RowList, str):
         raise NotImplementedError
 
@@ -33,7 +33,7 @@ class PyodbcDatabase(Database):
 
     def execute_sync(self, query: str) -> RowList:
         # print(f"Running Query: {query}")
-        try:            
+        try:
             # Get cursor
             if self._cursor is None:
                 had_cursor = False
@@ -87,7 +87,7 @@ class BradDatabase(Database):
     def execute_sync(self, query: str) -> RowList:
         rows, _ = self._brad.run_query_json(query)
         return rows
-    
+
     def execute_sync_with_engine(self, query: str) -> (RowList, str):
         rows, engine = self._brad.run_query_json(query)
         return rows, engine

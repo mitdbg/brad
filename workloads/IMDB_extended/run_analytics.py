@@ -56,9 +56,7 @@ def runner(
         os.makedirs(f"{out_dir}", exist_ok=True)
 
     if args.tidb:
-        db: Database = PyodbcDatabase(
-            make_tidb_odbc()
-        )
+        db: Database = PyodbcDatabase(make_tidb_odbc())
     else:
         port_offset = runner_idx % args.num_front_ends
         brad = BradGrpcClient(args.host, args.port + port_offset)
@@ -129,9 +127,7 @@ def runner(
 
 def run_warmup(args, query_bank: List[str], queries: List[int]):
     if args.tidb:
-        db: Database = PyodbcDatabase(
-            make_tidb_odbc()
-        )
+        db: Database = PyodbcDatabase(make_tidb_odbc())
     else:
         brad = BradGrpcClient(args.host, args.port)
         brad.connect()
@@ -198,14 +194,14 @@ def main():
     parser.add_argument("--avg-gap-s", type=float)
     parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
     # parser.add_argument("--query-indexes", type=str, required=True)
-    parser.add_argument("--tidb", default=False, action='store_true')
-    parser.add_argument("--output-dir", type=str, default='.')
+    parser.add_argument("--tidb", default=False, action="store_true")
+    parser.add_argument("--output-dir", type=str, default=".")
     args = parser.parse_args()
 
     with open(args.query_bank_file, "r", encoding="UTF-8") as file:
         query_bank = [line.strip() for line in file]
 
-    queries = [80, 108, 133]# list(range(0, len(query_bank)))
+    queries = [80, 108, 133]  # list(range(0, len(query_bank)))
     for qidx in queries:
         assert qidx < len(query_bank)
         assert qidx >= 0

@@ -55,13 +55,9 @@ def runner(
 
     # Connect.
     if args.cstr_var is not None:
-        db: Database = PyodbcDatabase(
-            pyodbc.connect(os.environ[args.cstr_var])
-        )
+        db: Database = PyodbcDatabase(pyodbc.connect(os.environ[args.cstr_var]))
     elif args.tidb:
-        db: Database = PyodbcDatabase(
-            make_tidb_odbc()
-        )
+        db: Database = PyodbcDatabase(make_tidb_odbc())
     else:
         port_offset = worker_idx % args.num_front_ends
         brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
@@ -190,7 +186,7 @@ def main():
     parser.add_argument(
         "--tidb",
         default=False,
-        action='store_true',
+        action="store_true",
         help="Environment variable that whether to run a TIDB benchmark through ODBC or not",
     )
     parser.add_argument(
