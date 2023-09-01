@@ -9,12 +9,14 @@ import threading
 import time
 import os
 import pytz
+import yaml
 import multiprocessing as mp
 from datetime import datetime
 
 from brad.grpc_client import BradGrpcClient, BradClientError
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
 from workload_utils.transaction_worker import TransactionWorker
+from workload_utils.tidb import make_tidb_odbc
 
 
 def runner(
@@ -54,7 +56,11 @@ def runner(
     # Connect.
     if args.cstr_var is not None:
         db: Database = PyodbcDatabase(
-            pyodbc.connect(os.environ[args.cstr_var], autocommit=True)
+            pyodbc.connect(os.environ[args.cstr_var])
+        )
+    elif args.tidb:
+        db: Database = PyodbcDatabase(
+            make_tidb_odbc()
         )
     else:
         port_offset = worker_idx % args.num_front_ends
@@ -136,7 +142,8 @@ def runner(
 
             out_dir = cond.get_output_path()
         else:
-            out_dir = pathlib.Path(".")
+            out_dir = pathlib.Path(f"./{args.output_dir}")
+            os.makedirs(f"{out_dir}", exist_ok=True)
 
         with open(out_dir / "oltp_latency_{}.csv".format(worker_idx), "w") as file:
             print("txn_idx,timestamp,run_time_s", file=file)
@@ -179,6 +186,18 @@ def main():
         "--cstr-var",
         type=str,
         help="Environment variable that holds a ODBC connection string. Set to connect directly (i.e., not through BRAD)",
+    )
+    parser.add_argument(
+        "--tidb",
+        default=False,
+        action='store_true',
+        help="Environment variable that whether to run a TIDB benchmark through ODBC or not",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=".",
+        help="Environment variable that stores the output directory of tidb bench",
     )
     parser.add_argument(
         "--scale-factor",

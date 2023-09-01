@@ -44,7 +44,7 @@ class TransactionWorker:
 
         try:
             # Start the transaction.
-            db.execute_sync("BEGIN")
+            db.begin_sync()
 
             # 2. Select matching movie infos.
             infos = db.execute_sync(
@@ -98,7 +98,7 @@ class TransactionWorker:
 
         try:
             # Start the transaction.
-            db.execute_sync("BEGIN")
+            db.begin_sync()
 
             # 3. Verify that the movie actually exists.
             rows = db.execute_sync(f"SELECT id FROM title WHERE id = {movie_id}")
@@ -145,7 +145,7 @@ class TransactionWorker:
 
         try:
             # Start the transaction.
-            db.execute_sync("BEGIN")
+            db.begin_sync()
 
             if select_using_name:
                 results = db.execute_sync(

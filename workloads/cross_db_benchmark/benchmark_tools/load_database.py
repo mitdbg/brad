@@ -12,6 +12,9 @@ from workloads.cross_db_benchmark.benchmark_tools.redshift.database_connection i
 from workloads.cross_db_benchmark.benchmark_tools.athena.database_connection import (
     AthenaDatabaseConnection,
 )
+from workloads.cross_db_benchmark.benchmark_tools.tidb.database_connection import (
+    TiDB,
+)
 
 
 def create_db_conn(database, db_name, database_conn_args, database_kwarg_dict):
@@ -29,6 +32,8 @@ def create_db_conn(database, db_name, database_conn_args, database_kwarg_dict):
         )
     elif database == DatabaseSystem.ATHENA:
         return AthenaDatabaseConnection(db_name=db_name)
+    elif database == DatabaseSystem.TIDB:
+        return TiDB()
     else:
         raise NotImplementedError(f"Database {database} not yet supported.")
 

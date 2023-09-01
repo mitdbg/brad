@@ -7,6 +7,7 @@ class DatabaseSystem(Enum):
     AURORA = "aurora"
     REDSHIFT = "redshift"
     ATHENA = "athena"
+    TIDB = "tidb"
 
     def __str__(self):
         return self.value

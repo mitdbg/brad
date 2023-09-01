@@ -1,1 +1,1 @@
-from database_connection import TiDB
+from .database_connection import TiDB

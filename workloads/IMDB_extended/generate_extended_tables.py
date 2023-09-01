@@ -24,7 +24,8 @@ class Context:
         self.args = args
         self.prng = random.Random(args.seed)
         self.location_range = args.location_max - args.location_min
-
+        self.sep = args.sep
+        self.target_dir = args.target_dir
         datetime_parts = args.showing_start_date.split("-")
         self.start_datetime = datetime(
             int(datetime_parts[0]), int(datetime_parts[1]), int(datetime_parts[2])
@@ -33,14 +34,15 @@ class Context:
 
 def generate_homes(ctx: Context) -> int:
     total_homes = ctx.args.scale_factor * THEATRES_PER_SF
-    with open("homes.csv", "w", encoding="UTF-8") as out:
-        print("id|location_x|location_y", file=out)
+    sep = ctx.sep
+    with open(f"{ctx.target_dir}/homes.csv", "w", encoding="UTF-8") as out:
+        print(f"id{sep}location_x{sep}location_y", file=out)
 
         for t in range(HOMES_PER_SF * ctx.args.scale_factor):
             loc_x = ctx.prng.random() * ctx.location_range + ctx.args.location_min
             loc_y = ctx.prng.random() * ctx.location_range + ctx.args.location_min
             print(
-                "{}|{:.4f}|{:.4f}".format(t, loc_x, loc_y),
+                f"{t}{sep}{loc_x:.4f}{sep}{loc_y:.4f}",
                 file=out,
             )
     return total_homes
@@ -48,14 +50,15 @@ def generate_homes(ctx: Context) -> int:
 
 def generate_theatres(ctx: Context) -> int:
     total_theatres = ctx.args.scale_factor * THEATRES_PER_SF
-    with open("theatres.csv", "w", encoding="UTF-8") as out:
-        print("id|name|location_x|location_y", file=out)
+    sep = ctx.sep
+    with open(f"{ctx.target_dir}/theatres.csv", "w", encoding="UTF-8") as out:
+        print(f"id{sep}name{sep}location_x{sep}location_y", file=out)
 
         for t in range(THEATRES_PER_SF * ctx.args.scale_factor):
             loc_x = ctx.prng.random() * ctx.location_range + ctx.args.location_min
             loc_y = ctx.prng.random() * ctx.location_range + ctx.args.location_min
             print(
-                "{}|Theatre #{}|{:.4f}|{:.4f}".format(t, t, loc_x, loc_y),
+                f"{t}{sep}Theatre #{t}{sep}{loc_x:.4f}{sep}{loc_y:.4f}",
                 file=out,
             )
     return total_theatres
@@ -63,9 +66,9 @@ def generate_theatres(ctx: Context) -> int:
 
 def generate_showings(ctx: Context, total_theatres: int) -> int:
     total_showings = 0
-
-    with open("showings.csv", "w", encoding="UTF-8") as out:
-        print("id|theatre_id|movie_id|date_time|total_capacity|seats_left", file=out)
+    sep = ctx.sep
+    with open(f"{ctx.target_dir}/showings.csv", "w", encoding="UTF-8") as out:
+        print(f"id{sep}theatre_id{sep}movie_id{sep}date_time{sep}total_capacity{sep}seats_left", file=out)
 
         movie_id_range = range(MIN_MOVIE_ID, MAX_MOVIE_ID + 1)
 
@@ -84,7 +87,7 @@ def generate_showings(ctx: Context, total_theatres: int) -> int:
                         )
                         capacity = ctx.prng.randint(MIN_CAPACITY, MAX_CAPACITY)
                         print(
-                            "|".join(
+                            sep.join(
                                 [
                                     str(total_showings),  # A proxy for ID
                                     str(t),
@@ -111,9 +114,9 @@ def generate_ticket_orders(ctx: Context, total_showings: int) -> int:
     weights = [1] * len(quantity_choices)
     weights[0] = 5
     weights[1] = 10
-
-    with open("ticket_orders.csv", "w", encoding="UTF-8") as out:
-        print("id|showing_id|quantity|contact_name|location_x|location_y", file=out)
+    sep = ctx.sep
+    with open(f"{ctx.target_dir}/ticket_orders.csv", "w", encoding="UTF-8") as out:
+        print(f"id{sep}showing_id{sep}quantity{sep}contact_name{sep}location_x{sep}location_y", file=out)
 
         for showing_id in range(total_showings):
             num_orders_for_showing = ctx.prng.randint(
@@ -125,7 +128,7 @@ def generate_ticket_orders(ctx: Context, total_showings: int) -> int:
                 loc_x = ctx.prng.random() * ctx.location_range + ctx.args.location_min
                 loc_y = ctx.prng.random() * ctx.location_range + ctx.args.location_min
                 print(
-                    "|".join(
+                    sep.join(
                         [
                             str(total_orders),
                             str(showing_id),
@@ -149,6 +152,8 @@ def main():
     parser.add_argument("--location-max", type=float, default=1e6)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--showing-start-date", type=str, default="2023-07-17")
+    parser.add_argument("--sep", type=str, default=",")
+    parser.add_argument("--target_dir", type=str, default="imdb")
     args = parser.parse_args()
 
     # Scale
