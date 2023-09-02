@@ -72,7 +72,7 @@ def get_complex_rows():
                                                                     ->  Parallel Bitmap Heap Scan on public.aka_name_brad_source  (cost=530.89..15285.07 rows=9694 width=12)
                                                                           Output: aka_name_brad_source.person_id, aka_name_brad_source.id
                                                                           Recheck Cond: ((aka_name_brad_source.person_id >= 1276226) AND (aka_name_brad_source.person_id <= 1377150))
-                                                                          ->  Bitmap Index Scan on index_aka_name_person_id  (cost=0.00..525.07 rows=23265 width=0)
+                                                                          ->  Bitmap Index Scan on aka_name_person_id_index  (cost=0.00..525.07 rows=23265 width=0)
                                                                                 Index Cond: ((aka_name_brad_source.person_id >= 1276226) AND (aka_name_brad_source.person_id <= 1377150))
                                                                     ->  Index Only Scan using name_brad_source_pkey on public.name_brad_source  (cost=0.43..2.70 rows=1 width=4)
                                                                           Output: name_brad_source.id
