@@ -1,11 +1,16 @@
 from typing import Dict, Tuple, Optional
 
+from functionality_catalog import Functionality
 from brad.data_stats.estimator import Estimator
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.query_rep import QueryRep
 
 
 class Router:
+
+    def __init__(self):
+        self.functionality_catalog = Functionality()
+
     async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
         """
         Should be called before using the router. This is used to set up any
@@ -36,6 +41,47 @@ class Router:
         query passed to this method will always be a read-only query.
         """
         raise NotImplementedError
+
+    def _run_functionality_routing(
+        self, query: QueryRep
+    ) -> Tuple[int, Optional[Engine]]:
+        """
+        Based on the functinalities required by the query (e.g. geospatial),
+        compute the set of engines that are able to serve this query.
+        """
+
+        # Bitmap describing what functionality is required for running query
+        req_bitmap = query.get_required_functionality()
+
+        # Bitmap for each engine which features it supports
+        engine_support = self.functionality_catalog.get_engine_functionalities()
+        engines = [Engine.Athena, Engine.Aurora, Engine.Redshift]
+
+        # Narrow down the valid engines that can run the query, based on the
+        # engine functionality
+        valid_locations_list = []
+        for engine, sup_bitmap in zip(engines, engine_support):
+
+            query_supported = (~req_bitmap | (req_bitmap & sup_bitmap)) == -1
+
+            if query_supported:
+                valid_locations_list.append(engine)
+
+        valid_locations = Engine.to_bitmap(valid_locations_list)
+
+        if (valid_locations & (valid_locations - 1)) == 0:
+            # Bitmap trick - only one bit is set.
+            if (EngineBitmapValues[Engine.Aurora] & valid_locations) != 0:
+                return (valid_locations, Engine.Aurora)
+            elif (EngineBitmapValues[Engine.Redshift] & valid_locations) != 0:
+                return (valid_locations, Engine.Redshift)
+            elif (EngineBitmapValues[Engine.Athena] & valid_locations) != 0:
+                return (valid_locations, Engine.Athena)
+            else:
+                raise RuntimeError("Unsupported bitmap value " + str(valid_locations))
+
+        # There is more than one possible location.
+        return (valid_locations, None)
 
     def _run_location_routing(
         self, query: QueryRep, location_bitmap: Dict[str, int]

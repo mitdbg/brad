@@ -1,0 +1,11 @@
+database_engines:
+  - name: Aurora
+    functionalities:
+      - geospatial
+
+  - name: Athena
+    functionalities:
+      - geospatial
+
+  - name: Redshift
+    functionalities: []
