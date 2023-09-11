@@ -119,6 +119,9 @@ if __name__ == "__main__":
     parser.add_argument("--with_indexes", action="store_true")
     parser.add_argument("--run_workload", action="store_true")
     parser.add_argument("--re_execute_query_with_no_result", action="store_true")
+    # Used to parallelize the data collection.
+    parser.add_argument("--run_workload_rank", default=0, type=int)
+    parser.add_argument("--run_workload_world_size", default=1, type=int)
 
     # Parse workload command
     parser.add_argument("--parse_plans", action="store_true")
@@ -268,6 +271,8 @@ if __name__ == "__main__":
             cap_workload=args.cap_workload,
             min_runtime=args.min_query_ms,
             re_execute_query=args.re_execute_query_with_no_result,
+            rank=args.run_workload_rank,
+            world_size=args.run_workload_world_size,
         )
 
     if args.parse_plans:
