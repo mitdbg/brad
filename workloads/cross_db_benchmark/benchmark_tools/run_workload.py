@@ -30,6 +30,9 @@ def run_workload(
     cap_workload=None,
     min_runtime=100,
     re_execute_query=False,
+    # Used to parallelize the data collection.
+    rank=0,
+    world_size=1,
 ):
     if database == DatabaseSystem.POSTGRES:
         run_pg_workload(
@@ -64,6 +67,8 @@ def run_workload(
                 repetitions_per_query,
                 timeout_sec,
                 cap_workload=cap_workload,
+                rank=rank,
+                world_size=world_size,
             )
     elif database == DatabaseSystem.REDSHIFT:
         run_redshift_workload(
@@ -77,6 +82,8 @@ def run_workload(
             repetitions_per_query,
             timeout_sec,
             cap_workload=cap_workload,
+            rank=rank,
+            world_size=world_size,
         )
     elif database == DatabaseSystem.ATHENA:
         run_athena_workload(
@@ -87,6 +94,8 @@ def run_workload(
             run_kwargs,
             timeout_sec,
             cap_workload=cap_workload,
+            rank=rank,
+            world_size=world_size,
         )
     else:
         raise NotImplementedError

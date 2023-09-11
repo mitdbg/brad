@@ -2,6 +2,7 @@
 import json
 import os
 from types import SimpleNamespace
+from typing import Tuple
 
 
 def dumper(obj):
@@ -61,3 +62,19 @@ def load_schema_sql(dataset, sql_filename):
     with open(sql_path, "r") as file:
         data = file.read().replace("\n", "")
     return data
+
+
+def compute_workload_splits(
+    num_queries: int, rank: int, world_size: int
+) -> Tuple[int, int]:
+    # For simplicity, we put all the remainder queries on the highest rank
+    per_rank = num_queries // world_size
+    remainder = num_queries % world_size
+
+    start_offset = rank * per_rank
+    end_offset_excl = start_offset + per_rank
+
+    if rank == world_size - 1:
+        end_offset_excl += remainder
+
+    return start_offset, end_offset_excl
