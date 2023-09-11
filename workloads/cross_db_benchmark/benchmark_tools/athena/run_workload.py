@@ -38,7 +38,7 @@ def run_athena_workload(
     print("----------------------------------")
     print("Rank:", rank)
     print("World size:", world_size)
-    print("Running queries in range: [%d, %d)".format(start_offset, end_offset))
+    print("Running queries in range: [{}, {})".format(start_offset, end_offset))
     print("----------------------------------")
     relevant_queries = queries[start_offset:end_offset]
 

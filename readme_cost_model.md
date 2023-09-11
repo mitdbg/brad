@@ -2,7 +2,7 @@
 The cost model directory is adapted from https://github.com/DataManagementLab/zero-shot-cost-estimation, 
 containing a lot of legacy file.
 
-Additional packages are needed to use cost model in brad: pytorch, torchvision, dgl, tqdm, optuna
+Additional packages are needed to use cost model in brad: pytorch, torchvision, dgl, tqdm, optuna, psycopg2
 
 If you are using pip, run:
 ```angular2html
