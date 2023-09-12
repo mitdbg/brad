@@ -180,6 +180,9 @@ async def _load_aurora(
         logger.debug("Running on Aurora: %s", q)
         await cursor.execute(q)
 
+    # Commit each table load so that we can resume.
+    await cursor.commit()
+
     logger.info("Done loading %s on Aurora!", table_name)
     return Engine.Aurora
 
@@ -205,6 +208,10 @@ async def _load_redshift(
     logger.debug("Running on Redshift %s", load_query)
     cursor = await redshift_connection.cursor()
     await cursor.execute(load_query)
+
+    # Commit each table load so that we can resume.
+    await cursor.commit()
+
     logger.info("Done loading %s on Redshift!", table_name)
     return Engine.Redshift
 
@@ -404,7 +411,10 @@ async def bulk_load_impl(args, manifest: Dict[str, Any]) -> None:
                     )
 
         # If we are reloading Aurora, truncate the tables first.
-        await _truncate_aurora_tables(blueprint, engines.get_connection(Engine.Aurora))
+        if args.reload_aurora:
+            await _truncate_aurora_tables(
+                blueprint, engines.get_connection(Engine.Aurora)
+            )
 
         # 2. Execute the load tasks.
         # The intention is to have one in-flight load task for each engine
@@ -413,7 +423,7 @@ async def bulk_load_impl(args, manifest: Dict[str, Any]) -> None:
         redshift_loads = load_tasks_for_engine(Engine.Redshift)
         athena_loads = load_tasks_for_engine(Engine.Athena)
 
-        logger.info("Starting the bulk load.")
+        logger.info("Starting (or resuming) the bulk load.")
         if args.sequential:
             for t in aurora_loads:
                 await t
