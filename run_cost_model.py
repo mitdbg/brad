@@ -229,8 +229,8 @@ if __name__ == "__main__":
                 min_no_predicates=2,
                 seed=1,
             ),
-            "simple_workload_50k_s1": dict(
-                num_queries=50000,
+            "simple_workload_25k_s1": dict(
+                num_queries=25000,
                 max_no_aggregates=2,
                 max_no_group_by=1,
                 max_cols_per_agg=1,
@@ -240,6 +240,19 @@ if __name__ == "__main__":
                 max_no_predicates=4,
                 min_no_predicates=1,
                 seed=1,
+            ),
+            # this even simpler
+            "simple_workload_25k_s2": dict(
+                num_queries=25000,
+                max_no_aggregates=2,
+                max_no_group_by=1,
+                max_cols_per_agg=1,
+                complex_predicates=False,
+                max_no_joins=2,
+                min_no_joins=0,
+                max_no_predicates=4,
+                min_no_predicates=1,
+                seed=2,
             ),
         }
 

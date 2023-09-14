@@ -71,7 +71,7 @@ def column_stats(column, categorical_threshold=10000):
 def generate_stats(data_dir, dataset, force=True):
     # read the schema file
     column_stats_path = os.path.join(
-        "cross_db_benchmark/datasets/", dataset, "column_statistics.json"
+        "workloads/cross_db_benchmark/datasets/", dataset, "column_statistics.json"
     )
     if os.path.exists(column_stats_path) and not force:
         print("Column stats already created")
