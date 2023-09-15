@@ -115,7 +115,7 @@ if __name__ == "__main__":
     parser.add_argument("--target", default="../zero-shot-data/evaluation/imdb_aurora/")
     parser.add_argument("--source", default="")
     parser.add_argument("--repetitions_per_query", default=1, type=int)
-    parser.add_argument("--cap_workload", default=10000, type=int)
+    parser.add_argument("--cap_workload", default=100000, type=int)
     parser.add_argument("--with_indexes", action="store_true")
     parser.add_argument("--run_workload", action="store_true")
     parser.add_argument("--re_execute_query_with_no_result", action="store_true")
@@ -275,10 +275,6 @@ if __name__ == "__main__":
                 generate_workload(
                     dataset.source_dataset,
                     workload_path,
-                    #max_no_joins=dataset.max_no_joins,
-                    #min_no_joins=dataset.min_no_joins,
-                    #max_no_predicates=dataset.max_no_predicates,
-                    #min_no_predicates=dataset.min_no_predicates,
                     no_joins_dist=no_joins_dist,
                     **workload_args,
                     force=args.force,

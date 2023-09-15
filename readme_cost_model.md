@@ -43,8 +43,9 @@ python run_cost_model.py --run_workload
               --database aurora
               --db_name imdb
               --query_timeout 200 
+              --repetitions_per_query 4
               --host xxxx
-              --port 5439
+              --port 5432
               --user xxx
               --password 'xxxx'
               --source ../data/imdb/workloads/complex_workload_10k_s1.sql
@@ -68,7 +69,7 @@ python run_cost_model.py --run_workload
 
 ## On athena:
 Need to modify the connection string in workloads/cross_db_benchmark/benchmark_tools/athena/database_connection.py
-(TODO: make it an argparse input).
+(TODO: make it an argparse input; TODO: need to add repetitions_per_query, we currently don't add it because Athena is slow).
 ```angular2html
 python run_cost_model.py --run_workload 
               --database athena

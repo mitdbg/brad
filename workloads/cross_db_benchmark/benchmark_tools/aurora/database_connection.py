@@ -22,7 +22,7 @@ class AuroraDatabaseConnection(DatabaseConnection):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def load_database(self, dataset, data_dir, force=False):
+    def load_database(self, dataset, data_dir, force=False, create_index=False):
         # drop and create database
         exists_res = self.check_if_database_exists()
 
@@ -47,6 +47,32 @@ class AuroraDatabaseConnection(DatabaseConnection):
             )
             self.submit_query(load_cmd)
             print(f"Loaded {t} in {time.perf_counter() - start_t:.2f} secs")
+
+        if create_index:
+            created_index_set = set()
+            for t1, k1s, t2, k2s in schema.relationships:
+                if type(k1s) == list:
+                    for k1 in k1s:
+                        identifier = t1 + "." + k1
+                        if identifier not in created_index_set:
+                            self.create_index(t1, k1)
+                            created_index_set.add(identifier)
+                else:
+                    identifier = t1 + "." + k1s
+                    if identifier not in created_index_set:
+                        self.create_index(t1, k1s)
+                        created_index_set.add(identifier)
+                if type(k2s) == list:
+                    for k2 in k2s:
+                        identifier = t2 + "." + k2
+                        if identifier not in created_index_set:
+                            self.create_index(t2, k2)
+                            created_index_set.add(identifier)
+                else:
+                    identifier = t2 + "." + k2s
+                    if identifier not in created_index_set:
+                        self.create_index(t2, k2s)
+                        created_index_set.add(identifier)
 
         print("Starting vacuum analyze...")
         self.submit_query("VACUUM ANALYZE;")

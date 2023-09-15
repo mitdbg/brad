@@ -160,9 +160,9 @@ CREATE TABLE role_type (
 DROP TABLE IF EXISTS "title";
 CREATE TABLE title (
     id SERIAL PRIMARY KEY,
-    title character varying NOT NULL,
+    title character varying,
     imdb_index character varying(5),
-    kind_id integer NOT NULL,
+    kind_id integer,
     production_year integer,
     imdb_id integer,
     phonetic_code character varying(5),
