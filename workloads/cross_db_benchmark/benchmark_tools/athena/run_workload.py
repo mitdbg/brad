@@ -123,5 +123,5 @@ def save_workload(run_stats, target_path):
         os.path.dirname(target_path), f"{os.path.basename(target_path)}_temp"
     )
     with open(target_temp_path, "w") as outfile:
-        json.dump(run_stats, outfile)
+        json.dump(run_stats, outfile, default=str)
     shutil.move(target_temp_path, target_path)
