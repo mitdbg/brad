@@ -1,8 +1,6 @@
 import collections
 import re
 import numpy as np
-import pandas as pd
-from typing import Dict, Any
 from tqdm import tqdm
 
 from workloads.cross_db_benchmark.benchmark_tools.generate_workload import (
