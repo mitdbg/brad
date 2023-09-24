@@ -82,9 +82,20 @@ python run_cost_model.py --run_workload
 # Parse the queries
 
 ## For Aurora:
-Set flag --is_brad since brad has different table names
+Set flag --is_brad since brad has different table names. Provide connection details to Aurora.
 ```angular2html
-python run_cost_model.py --database aurora --parse_queries --db_name imdb --include_zero_card --workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json --target ../data/imdb/parsed_queries/ --is_brad
+python run_cost_model.py \
+    --database aurora \
+    --parse_queries \
+    --db_name imdb \
+    --include_zero_card \
+    --workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json \
+    --target ../data/imdb/parsed_queries/ \
+    --is_brad \
+    --host xxxx \
+    --user xxxx \
+    --pass xxxx \
+    --port 5432
 ```
 
 
@@ -95,13 +106,39 @@ python run_cost_model.py --argment_dataset --workload_runs ../data/imdb/parsed_q
 
 
 ## On Redshift
+Provide connection details to Aurora.
 ```angular2html
-python run_cost_model.py --database redshift --parse_queries --db_name imdb --include_zero_card --workload_runs ../data/imdb/raw/redshift_IMDB_10k_10_6.json --aurora_workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json --target ../data/imdb/parsed_queries/ --is_brad
+python run_cost_model.py \
+    --database redshift \
+    --parse_queries \
+    --db_name imdb \
+    --include_zero_card \
+    --workload_runs ../data/imdb/raw/redshift_IMDB_10k_10_6.json \
+    --aurora_workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json \
+    --target ../data/imdb/parsed_queries/ \
+    --is_brad \
+    --host xxxx \
+    --user xxxx \
+    --pass xxxx \
+    --port 5432
 ```
 
 ## On Athena
+Provide connection details to Aurora.
 ```angular2html
-python run_cost_model.py --database athena --parse_queries --db_name imdb --include_zero_card --workload_runs ../data/imdb/raw/athena_IMDB_10k_10_6.json --aurora_workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json --target ../data/imdb/parsed_queries/ --is_brad
+python run_cost_model.py \
+    --database athena \
+    --parse_queries \
+    --db_name imdb \
+    --include_zero_card \
+    --workload_runs ../data/imdb/raw/athena_IMDB_10k_10_6.json \
+    --aurora_workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json \
+    --target ../data/imdb/parsed_queries/ \
+    --is_brad \
+    --host xxxx \
+    --user xxxx \
+    --pass xxxx \
+    --port 5432
 ```
 
 # Training the cost model

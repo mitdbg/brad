@@ -2,6 +2,7 @@ import collections
 import json
 import os.path
 import numpy as np
+import statistics
 import psycopg2
 from tqdm import tqdm
 
@@ -118,6 +119,12 @@ def parse_queries_redshift(
         alias_dict = dict()
         if is_timeout:
             runtime = max_runtime * np.uniform(1, 3)
+        elif hasattr(q, "runtimes") and len(q.runtimes) > 1:
+            # We ran for more than one repetition.
+            # Always discard the first run to exclude compilation overhead (Redshift).
+            # Note that this function also runs to parse Athena results. But we
+            # only run one repetition on Athena, so this branch should not run.
+            runtime = statistics.mean(q.runtimes[1:]) * 1000
         else:
             runtime = q.runtime * 1000
 
