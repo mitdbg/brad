@@ -1,9 +1,11 @@
 import collections
 import json
 import numpy as np
+import pandas as pd
 import psycopg2
 from tqdm import tqdm
 from types import SimpleNamespace
+from typing import Dict, Any
 
 from workloads.cross_db_benchmark.benchmark_tools.database import DatabaseSystem
 from workloads.cross_db_benchmark.benchmark_tools.aurora.utils import (
@@ -363,6 +365,31 @@ def refine_db_stats(database_stats, db_conn=None, cursor=None):
     return database_stats
 
 
+def extract_total_blocks_accessed(df: pd.DataFrame) -> int:
+    rel = df[df["relname"].str.endswith("_brad_source")]
+    blks_accessed = (
+        rel["heap_blks_read"]
+        + rel["heap_blks_hit"]
+        + rel["idx_blks_read"]
+        + rel["idx_blks_hit"]
+    )
+    return blks_accessed.sum()
+
+
+def compute_blocks_accessed(raw_stats) -> int:
+    pre = raw_stats.pre
+    post = raw_stats.post
+
+    pre_df = pd.DataFrame.from_records(pre.physical.data, columns=pre.physical.cols)
+    post_df = pd.DataFrame.from_records(post.physical.data, columns=post.physical.cols)
+
+    # We record data access stats before and after executing the query. The
+    # difference in the counters is the number of blocks accessed by this query.
+    pre_blocks = extract_total_blocks_accessed(pre_df)
+    post_blocks = extract_total_blocks_accessed(post_df)
+    return post_blocks - pre_blocks
+
+
 def parse_plans_with_query_aurora(
     run_stats,
     min_runtime=100,
@@ -436,6 +463,7 @@ def parse_plans_with_query_aurora(
     avg_runtimes = []
     no_tables = []
     no_filters = []
+    blocks_accessed = []
     for query_no, q in enumerate(tqdm(run_stats.query_list)):
         # either only parse explain part of query or skip entirely
         is_timeout = False
@@ -476,6 +504,26 @@ def parse_plans_with_query_aurora(
             if init_plan_regex.search(analyze_plan_string) is not None:
                 print(f"parsed_query {query_no} init_plan_regex incorrect")
                 continue
+
+            # Extract data accessed stats.
+            # There is more than one `stat_run` if we ran the query more than once.
+            if hasattr(q, "data_stats") and len(q.data_stats) > 0:
+                recorded_blocks = []
+                for stat_run in q.data_stats:
+                    recorded_blocks.append(compute_blocks_accessed(stat_run))
+
+                if any(map(lambda b: b < 0, recorded_blocks)):
+                    print(
+                        f"Warning: Query {query_no} has invalid (< 0) blocks accessed stats."
+                    )
+                    blocks_accessed.append(0)
+                else:
+                    # In theory the number of blocks accessed should be
+                    # deterministic, so all the values in this list should be the
+                    # same. To be conservative, we record the max.
+                    blocks_accessed.append(max(recorded_blocks))
+            else:
+                blocks_accessed.append(None)
 
             # compute average execution and planning times
             ex_times = []
@@ -618,6 +666,9 @@ def parse_plans_with_query_aurora(
         database_stats=database_stats,
         run_kwargs=run_stats.run_kwargs,
     )
+
+    if not all(map(lambda ba: ba is None, blocks_accessed)):
+        parsed_runs["blocks_accessed"] = blocks_accessed
 
     stats = dict(
         runtimes=str(avg_runtimes), no_tables=str(no_tables), no_filters=str(no_filters)
