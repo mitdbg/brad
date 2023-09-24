@@ -376,16 +376,12 @@ def extract_total_blocks_accessed(df: pd.DataFrame) -> int:
     return blks_accessed.sum()
 
 
-def compute_blocks_accessed(raw_stats: Dict[str, Any]) -> int:
-    pre = raw_stats["pre"]
-    post = raw_stats["post"]
+def compute_blocks_accessed(raw_stats) -> int:
+    pre = raw_stats.pre
+    post = raw_stats.post
 
-    pre_df = pd.DataFrame.from_records(
-        pre["physical"]["data"], columns=pre["physical"]["cols"]
-    )
-    post_df = pd.DataFrame.from_records(
-        post["physical"]["data"], columns=post["physical"]["cols"]
-    )
+    pre_df = pd.DataFrame.from_records(pre.physical.data, columns=pre.physical.cols)
+    post_df = pd.DataFrame.from_records(post.physical.data, columns=post.physical.cols)
 
     # We record data access stats before and after executing the query. The
     # difference in the counters is the number of blocks accessed by this query.
