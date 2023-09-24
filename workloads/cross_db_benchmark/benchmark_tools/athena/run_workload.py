@@ -6,6 +6,9 @@ import time
 from json.decoder import JSONDecodeError
 from tqdm import tqdm
 
+from workloads.cross_db_benchmark.benchmark_tools.athena.athena_boto import (
+    AthenaBotoClient,
+)
 from workloads.cross_db_benchmark.benchmark_tools.load_database import create_db_conn
 from workloads.cross_db_benchmark.benchmark_tools.utils import (
     load_json,
@@ -25,10 +28,24 @@ def run_athena_workload(
     cap_workload,
     rank,
     world_size,
+    use_boto_client=True,
+    s3_output_path=None,
 ):
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
-    db_conn = create_db_conn(database, db_name, None, None)
+    if not use_boto_client:
+        db_conn = create_db_conn(database, db_name, None, None)
+        boto_client = None
+    else:
+        db_conn = None
+        # NOTE: Using the boto client is preferred because it also collects data
+        # scanned statistics, which we need.
+        assert s3_output_path is not None
+        boto_client = AthenaBotoClient(
+            schema_name=db_name,
+            s3_output_path=s3_output_path,
+            query_timeout_s=timeout_sec,
+        )
 
     with open(workload_path) as f:
         content = f.readlines()
@@ -67,9 +84,16 @@ def run_athena_workload(
         if cap_workload and i >= cap_workload:
             break
 
-        curr_statistics = db_conn.run_query_collect_statistics(sql_query, timeout_sec)
-        curr_statistics.update(sql=sql_query)
-        query_list.append(curr_statistics)
+        if not use_boto_client:
+            curr_statistics = db_conn.run_query_collect_statistics(
+                sql_query, timeout_sec
+            )
+            curr_statistics.update(sql=sql_query)
+            query_list.append(curr_statistics)
+        else:
+            results = boto_client.run_query(sql_query)
+            results["query_index"] = i
+            query_list.append(results)
 
         run_stats = dict(
             query_list=query_list,
