@@ -137,6 +137,7 @@ def main():
             num_too_long += 1
             continue
 
+        q["avg_runtime"] = avg_runtime
         good_queries.append(q)
 
     print("Timeouts:", timeout_count)
