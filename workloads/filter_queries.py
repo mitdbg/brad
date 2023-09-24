@@ -11,6 +11,8 @@ import workloads.cross_db_benchmark.benchmark_tools.aurora.parse_plan as pp
 
 def main():
     # This script removes queries that have zero cardinality and/or timed out.
+    # This is useful on the first runs of a generated query dataset to prune
+    # invalid queries.
     parser = argparse.ArgumentParser()
     parser.add_argument("--raw-run", type=str, required=True)
     parser.add_argument("--out-file", type=str, required=True)
@@ -33,7 +35,7 @@ def main():
     for i, column_stat in enumerate(database_stats["column_stats"]):
         table = column_stat["tablename"]
         column = column_stat["attname"]
-        column_stat.table_size = table_sizes[table]
+        column_stat["table_size"] = table_sizes[table]
         column_id_mapping[(table, column)] = i
         partial_column_name_mapping[column].add(table)
 
@@ -46,30 +48,33 @@ def main():
     num_zero_card = 0
     num_too_short = 0
     num_too_long = 0
+    num_missing_analyze_plans = 0
+    num_empty = 0
+    num_invalid = 0
     good_queries = []
 
-    for query_no, q in tqdm(enumerate(raw_data["query_list"])):
+    for q in tqdm(raw_data["query_list"]):
         if q["timeout"]:
             timeout_count += 1
             continue
 
         if "analyze_plans" not in q or q["analyze_plans"] is None:
-            print(f"parsed_query {query_no} no analyze plans")
+            num_missing_analyze_plans += 1
             continue
 
         if len(q["analyze_plans"]) == 0:
-            print(f"parsed_query {query_no} no analyze plans")
+            num_missing_analyze_plans += 1
             continue
 
         # subqueries are currently not supported
         analyze_str = "".join([l[0] for l in q["verbose_plan"]])
         if "SubPlan" in analyze_str or "InitPlan" in analyze_str:
-            print(f"parsed_query {query_no} contains SubPlan or InitPlan")
+            num_invalid += 1
             continue
 
         # subquery is empty due to logical constraints
         if "->  Result  (cost=0.00..0.00 rows=0" in analyze_str:
-            print(f"parsed_query {query_no} is empty")
+            num_empty += 1
             continue
 
         # compute average execution and planning times
@@ -117,22 +122,18 @@ def main():
 
         # check if result is None
         if analyze_plan.min_card() == 0:
-            print(f"parsed_query {query_no} has zero_card")
             num_zero_card += 1
             continue
 
         elif analyze_plan.min_card() == 0 and avg_runtime < min_runtime:
-            print(f"parsed_query {query_no} has zero_card and runtime too small")
             num_too_short += 1
             continue
 
         if min_runtime is not None and avg_runtime < min_runtime:
-            print(f"parsed_query {query_no} runtime too small")
             num_too_short += 1
             continue
 
         if avg_runtime > max_runtime:
-            print(f"parsed_query {query_no} runtime too large")
             num_too_long += 1
             continue
 
@@ -142,10 +143,17 @@ def main():
     print("Zero card:", num_zero_card)
     print("Too short:", num_too_short)
     print("Too long:", num_too_long)
+    print("Missing analyze plans:", num_missing_analyze_plans)
+    print("Empty:", num_empty)
+    print("Invalid:", num_invalid)
     print("OK:", len(good_queries))
 
-    with open(args.out_file, "w") as file:
+    with open(args.out_file + ".json", "w") as file:
         json.dump(good_queries, file)
+
+    with open(args.out_file + ".sql", "w") as file:
+        for q in good_queries:
+            print(q["sql"], file=file)
 
 
 if __name__ == "__main__":
