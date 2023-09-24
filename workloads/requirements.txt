@@ -1,3 +1,4 @@
 pandas
 absl-py
 numpy
+boto3

@@ -68,13 +68,19 @@ python run_cost_model.py --run_workload
 ```
 
 ## On athena:
-Need to modify the connection string in workloads/cross_db_benchmark/benchmark_tools/athena/database_connection.py
+By default, the runner uses boto3 to connect to Athena. You need to set up the
+AWS CLI to configure your credentials. If you do not want to do this, set
+`use_boto_client` to `False` in `benchmark_tools.athena.run_athena_workload()`.
+
+Need to modify the connection string in workloads/cross_db_benchmark/benchmark_tools/athena/database_connection.py (only if you are not using the `boto3` client.)
 (TODO: make it an argparse input; TODO: need to add repetitions_per_query, we currently don't add it because Athena is slow).
+
 ```angular2html
 python run_cost_model.py --run_workload 
               --database athena
               --db_name imdb
               --query_timeout 200
+              --s3_output_path "s3://bucket-name/output/path"
               --source ../data/imdb/workloads/complex_workload_10k_s1.sql
               --target ../data/imdb/raw/athena_complex_workload_10k_s1.json
 ```

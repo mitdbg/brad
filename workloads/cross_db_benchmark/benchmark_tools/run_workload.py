@@ -33,6 +33,8 @@ def run_workload(
     # Used to parallelize the data collection.
     rank=0,
     world_size=1,
+    # Used by Athena
+    s3_output_path=None,
 ):
     if database == DatabaseSystem.POSTGRES:
         run_pg_workload(
@@ -96,6 +98,7 @@ def run_workload(
             cap_workload=cap_workload,
             rank=rank,
             world_size=world_size,
+            s3_output_path=s3_output_path,
         )
     else:
         raise NotImplementedError
