@@ -631,34 +631,37 @@ def parse_plans_with_query_aurora(
             parsed_queries.append(parsed_query)
             parsed_plans.append(analyze_plan)
             sql_queries.append(q.sql)
+
+            # Extract data accessed stats.
+            # There is more than one `stat_run` if we ran the query more than once.
+            if hasattr(q, "data_stats") and len(q.data_stats) > 0:
+                recorded_blocks = []
+                for stat_run in q.data_stats:
+                    recorded_blocks.append(compute_blocks_accessed(stat_run))
+
+                if any(map(lambda b: b < 0, recorded_blocks)):
+                    print(
+                        f"Warning: Query {query_no} has invalid (< 0) blocks accessed stats."
+                    )
+                    blocks_accessed.append(0)
+                else:
+                    # In theory the number of blocks accessed should be
+                    # deterministic, so all the values in this list should be the
+                    # same. To be conservative, we record the max.
+                    blocks_accessed.append(max(recorded_blocks))
+            else:
+                blocks_accessed.append(None)
+
         elif parsed_query is None:
             print(f"parsed_query {query_no} is none")
+            skipped.append(query_no)
         else:
             print(f"parsed_query {query_no} has no join")
+            skipped.append(query_no)
 
         if cap_queries is not None and len(parsed_plans) >= cap_queries:
             print(f"Parsed {cap_queries} queries. Stopping parsing.")
             break
-
-        # Extract data accessed stats.
-        # There is more than one `stat_run` if we ran the query more than once.
-        if hasattr(q, "data_stats") and len(q.data_stats) > 0:
-            recorded_blocks = []
-            for stat_run in q.data_stats:
-                recorded_blocks.append(compute_blocks_accessed(stat_run))
-
-            if any(map(lambda b: b < 0, recorded_blocks)):
-                print(
-                    f"Warning: Query {query_no} has invalid (< 0) blocks accessed stats."
-                )
-                blocks_accessed.append(0)
-            else:
-                # In theory the number of blocks accessed should be
-                # deterministic, so all the values in this list should be the
-                # same. To be conservative, we record the max.
-                blocks_accessed.append(max(recorded_blocks))
-        else:
-            blocks_accessed.append(None)
 
         if target_path is not None and len(parsed_plans) % 100 == 0:
             parsed_runs = dict(
@@ -669,6 +672,8 @@ def parse_plans_with_query_aurora(
                 run_kwargs=run_stats.run_kwargs,
                 skipped=skipped,
             )
+            if not all(map(lambda ba: ba is None, blocks_accessed)):
+                parsed_runs["blocks_accessed"] = blocks_accessed
             with open(target_path, "w") as outfile:
                 json.dump(parsed_runs, outfile, default=dumper)
 

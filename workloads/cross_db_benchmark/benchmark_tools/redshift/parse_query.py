@@ -203,10 +203,14 @@ def parse_queries_redshift(
             parsed_queries.append(parsed_query)
             parsed_plans.append(verbose_plan)
             sql_queries.append(q.sql)
+
         elif parsed_query is None:
             print(f"parsed_query {query_no} is none")
+            skipped.append(query_no)
+
         else:
             print(f"parsed_query {query_no} has no join")
+            skipped.append(query_no)
 
         if cap_queries is not None and len(parsed_plans) >= cap_queries:
             print(f"Parsed {cap_queries} queries. Stopping parsing.")

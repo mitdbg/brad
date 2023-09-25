@@ -201,20 +201,24 @@ def parse_queries_athena_boto_format(
             parsed_queries.append(parsed_query)
             parsed_plans.append(verbose_plan)
             sql_queries.append(q.sql)
+
+            if hasattr(q.runtime_stats, "Rows"):
+                bytes_scanned_per_query.append(q.runtime_stats.Rows.InputBytes)
+            else:
+                print(f"Missing bytes scanned data for query {query_no}")
+                bytes_scanned_per_query.append(0)
+
         elif parsed_query is None:
             print(f"parsed_query {query_no} is none")
+            skipped.append(query_no)
+
         else:
             print(f"parsed_query {query_no} has no join")
+            skipped.append(query_no)
 
         if cap_queries is not None and len(parsed_plans) >= cap_queries:
             print(f"Parsed {cap_queries} queries. Stopping parsing.")
             break
-
-        if hasattr(q.runtime_stats, "Rows"):
-            bytes_scanned_per_query.append(q.runtime_stats.Rows.InputBytes)
-        else:
-            print(f"Missing bytes scanned data for query {query_no}")
-            bytes_scanned_per_query.append(0)
 
         if target_path is not None and len(parsed_plans) % 100 == 0:
             parsed_runs = dict(
@@ -223,6 +227,7 @@ def parse_queries_athena_boto_format(
                 sql_queries=sql_queries,
                 database_stats=database_stats,
                 run_kwargs=run_kwargs,
+                bytes_scanned=bytes_scanned_per_query,
                 skipped=skipped,
             )
             with open(target_path, "w") as outfile:
