@@ -7,6 +7,7 @@ import pandas as pd
 import shutil
 
 from typing import Any, List, Optional, Dict, Tuple
+from brad.config.engine import Engine
 
 pd.options.mode.chained_assignment = None
 
@@ -33,16 +34,56 @@ def extract_run_times(
     run_times *= np.nan
 
     if parsed is None:
-        return None
+        return run_times
 
     for idx, sql in enumerate(parsed["sql_queries"]):
         try:
-            orig_idx = qorder[sql]
+            if not sql.endswith(";"):
+                matching_sql = sql + ";"
+            else:
+                matching_sql = sql
+
+            orig_idx = qorder[matching_sql]
             run_times[orig_idx] = parsed["parsed_plans"][idx]["plan_runtime"] / 1000
         except KeyError:
             print("WARNING: Unable to match", sql)
 
     return run_times
+
+
+def has_data_scanned_stats(parsed: Optional[ParsedData]) -> bool:
+    if parsed is None:
+        return False
+    return "blocks_accessed" in parsed or "bytes_scanned" in parsed
+
+
+def extract_data_stats(
+    qorder: Dict[str, int], parsed: Optional[ParsedData], engine: Engine
+) -> npt.NDArray:
+    if engine != Engine.Aurora and engine != Engine.Athena:
+        raise RuntimeError(f"No data access stats for {repr(engine)}")
+
+    data = np.ones(len(qorder), np.int64)
+    data *= -1
+
+    if parsed is None:
+        return data
+
+    data_key = "blocks_accessed" if engine == Engine.Aurora else "bytes_scanned"
+
+    for idx, sql in enumerate(parsed["sql_queries"]):
+        try:
+            if not sql.endswith(";"):
+                matching_sql = sql + ";"
+            else:
+                matching_sql = sql
+
+            orig_idx = qorder[matching_sql]
+            data[orig_idx] = parsed[data_key][idx]
+        except KeyError:
+            print("WARNING: Unable to match", sql)
+
+    return data
 
 
 def extract_relevant_athena(raw_json: Dict[Any, Any]) -> pd.DataFrame:
@@ -217,13 +258,19 @@ def main():
     run_times = np.stack([athena_rt, aurora_rt, redshift_rt])
     run_times = np.transpose(run_times)
 
-    athena_raw = load_athena_data(args.raw_athena_scan_data)
-    aurora_raw = load_aurora_data(args.raw_aurora_scan_data)
+    if has_data_scanned_stats(athena_parsed):
+        athena_data = extract_data_stats(qorder, athena_parsed, Engine.Athena)
+    else:
+        # Athena: Bytes accessed
+        athena_raw = load_athena_data(args.raw_athena_scan_data)
+        athena_data = consolidate_athena_data_accessed(qorder, athena_raw)
 
-    # Athena: Bytes accessed
-    # Aurora: Blocks accessed
-    athena_data = consolidate_athena_data_accessed(qorder, athena_raw)
-    aurora_data = consolidate_aurora_data_accessed(qorder, aurora_raw)
+    if has_data_scanned_stats(aurora_parsed):
+        aurora_data = extract_data_stats(qorder, aurora_parsed, Engine.Aurora)
+    else:
+        # Aurora: Blocks accessed
+        aurora_raw = load_aurora_data(args.raw_aurora_scan_data)
+        aurora_data = consolidate_aurora_data_accessed(qorder, aurora_raw)
 
     data_accessed = np.stack([athena_data, aurora_data])
     data_accessed = np.transpose(data_accessed)
