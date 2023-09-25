@@ -194,7 +194,7 @@ def parse_queries_redshift(
             is_brad=is_brad,
             cache=cache,
         )
-        parsed_query.query_index = query_no
+        parsed_query["query_index"] = query_no
         if "tables" in verbose_plan:
             verbose_plan["tables"] = list(verbose_plan["tables"])
         else:

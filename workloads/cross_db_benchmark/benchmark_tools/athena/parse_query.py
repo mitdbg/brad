@@ -192,7 +192,7 @@ def parse_queries_athena_boto_format(
             is_brad=is_brad,
             cache=cache,
         )
-        parsed_query.query_index = query_no
+        parsed_query["query_index"] = query_no
         if "tables" in verbose_plan:
             verbose_plan["tables"] = list(verbose_plan["tables"])
         else:

@@ -622,7 +622,7 @@ def parse_plans_with_query_aurora(
             is_brad=is_brad,
             cache=cache,
         )
-        parsed_query.query_index = query_no
+        parsed_query["query_index"] = query_no
         if "tables" in analyze_plan:
             analyze_plan["tables"] = list(analyze_plan["tables"])
         else:
