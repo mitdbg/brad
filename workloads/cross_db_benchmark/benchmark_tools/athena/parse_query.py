@@ -76,6 +76,7 @@ def parse_queries_athena_boto_format(
     no_filters = []
     bytes_scanned_per_query = []
     start_idx = 0
+    skipped = []
     if target_path is not None and os.path.exists(target_path):
         # TODO: loading from previous parsed plan is somewhat incorrect
         try:
@@ -115,6 +116,7 @@ def parse_queries_athena_boto_format(
         query_no += start_idx
         aurora_q = aurora_run_stats.query_list[query_no]
         if q.status != "SUCCEEDED":
+            skipped.append(query_no)
             continue
 
         q.sql = q.exec_info.Query
@@ -124,15 +126,10 @@ def parse_queries_athena_boto_format(
         alias_dict = dict()
         runtime = q.exec_info.Statistics.TotalExecutionTimeInMillis
 
-        if hasattr(q.runtime_stats, "Rows"):
-            bytes_scanned_per_query.append(q.runtime_stats.Rows.InputBytes)
-        else:
-            print(f"Missing bytes scanned data for query {query_no}")
-            bytes_scanned_per_query.append(0)
-
         # only explain plan (not executed)
         if aurora_q.verbose_plan is None:
             print(f"Aurora has no verbose plan for query {query_no}")
+            skipped.append(query_no)
             continue
         verbose_plan, _, _ = parse_plan(
             aurora_q.verbose_plan, analyze=False, parse=True
@@ -170,10 +167,12 @@ def parse_queries_athena_boto_format(
 
         if min_runtime is not None and runtime < min_runtime:
             print(f"parsed_query {query_no} runtime too small")
+            skipped.append(query_no)
             continue
 
         if runtime > max_runtime:
             print(f"parsed_query {query_no} runtime too large")
+            skipped.append(query_no)
             continue
 
         # parsed_query = None
@@ -210,6 +209,12 @@ def parse_queries_athena_boto_format(
             print(f"Parsed {cap_queries} queries. Stopping parsing.")
             break
 
+        if hasattr(q.runtime_stats, "Rows"):
+            bytes_scanned_per_query.append(q.runtime_stats.Rows.InputBytes)
+        else:
+            print(f"Missing bytes scanned data for query {query_no}")
+            bytes_scanned_per_query.append(0)
+
         if target_path is not None and len(parsed_plans) % 100 == 0:
             parsed_runs = dict(
                 parsed_plans=parsed_plans,
@@ -217,6 +222,7 @@ def parse_queries_athena_boto_format(
                 sql_queries=sql_queries,
                 database_stats=database_stats,
                 run_kwargs=run_kwargs,
+                skipped=skipped,
             )
             with open(target_path, "w") as outfile:
                 json.dump(parsed_runs, outfile, default=dumper)
@@ -228,6 +234,7 @@ def parse_queries_athena_boto_format(
         database_stats=database_stats,
         run_kwargs=run_kwargs,
         bytes_scanned=bytes_scanned_per_query,
+        skipped=skipped,
     )
 
     stats = dict(
