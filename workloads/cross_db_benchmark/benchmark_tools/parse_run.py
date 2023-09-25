@@ -21,6 +21,9 @@ from workloads.cross_db_benchmark.benchmark_tools.aurora.parse_query import (
 from workloads.cross_db_benchmark.benchmark_tools.redshift.parse_query import (
     parse_queries_redshift,
 )
+from workloads.cross_db_benchmark.benchmark_tools.athena.parse_query import (
+    parse_queries_athena,
+)
 from workloads.cross_db_benchmark.benchmark_tools.aurora.utils import plan_statistics
 from workloads.cross_db_benchmark.benchmark_tools.aurora.parse_plan import parse_plan
 from workloads.cross_db_benchmark.benchmark_tools.aurora.parse_query import (
@@ -193,8 +196,7 @@ def parse_queries(
             is_brad=is_brad,
         )
     elif database == DatabaseSystem.ATHENA:
-        # It is currently the same as parsing on REDSHIFT, might change it later
-        return parse_queries_redshift(
+        return parse_queries_athena(
             run_stats,
             run_stats_aurora,
             min_runtime=min_runtime,
