@@ -122,6 +122,8 @@ if __name__ == "__main__":
     # Used to parallelize the data collection.
     parser.add_argument("--run_workload_rank", default=0, type=int)
     parser.add_argument("--run_workload_world_size", default=1, type=int)
+    # Needed when collecting data on Athena.
+    parser.add_argument("--s3_output_path", type=str)
 
     # Parse workload command
     parser.add_argument("--parse_plans", action="store_true")
@@ -298,6 +300,7 @@ if __name__ == "__main__":
             re_execute_query=args.re_execute_query_with_no_result,
             rank=args.run_workload_rank,
             world_size=args.run_workload_world_size,
+            s3_output_path=args.s3_output_path,
         )
 
     if args.parse_plans:
