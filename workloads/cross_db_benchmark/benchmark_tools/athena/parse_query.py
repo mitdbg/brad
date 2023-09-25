@@ -123,7 +123,12 @@ def parse_queries_athena_boto_format(
 
         alias_dict = dict()
         runtime = q.exec_info.Statistics.TotalExecutionTimeInMillis
-        bytes_scanned_per_query.append(q.runtime_stats.Rows.InputBytes)
+
+        if hasattr(q.runtime_stats, "Rows"):
+            bytes_scanned_per_query.append(q.runtime_stats.Rows.InputBytes)
+        else:
+            print(f"Missing bytes scanned data for query {query_no}")
+            bytes_scanned_per_query.append(0)
 
         # only explain plan (not executed)
         if aurora_q.verbose_plan is None:
