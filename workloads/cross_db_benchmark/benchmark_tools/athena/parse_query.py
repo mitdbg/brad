@@ -112,14 +112,14 @@ def parse_queries_athena_boto_format(
         table_id_mapping[table] = i
 
     for query_no, q in enumerate(tqdm(run_stats.query_list[start_idx:])):
-        is_timeout = False
         query_no += start_idx
         aurora_q = aurora_run_stats.query_list[query_no]
         if q.status != "SUCCEEDED":
             continue
 
         q.sql = q.exec_info.Query
-        assert q.sql == aurora_q.sql or q.sql == aurora_q.sql + "\n", query_no
+        to_check = q.sql + ";"
+        assert to_check == aurora_q.sql or to_check == aurora_q.sql + "\n", query_no
 
         alias_dict = dict()
         runtime = q.exec_info.Statistics.TotalExecutionTimeInMillis
