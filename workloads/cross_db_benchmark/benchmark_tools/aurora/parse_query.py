@@ -387,7 +387,7 @@ def compute_blocks_accessed(raw_stats) -> int:
     # difference in the counters is the number of blocks accessed by this query.
     pre_blocks = extract_total_blocks_accessed(pre_df)
     post_blocks = extract_total_blocks_accessed(post_df)
-    return post_blocks - pre_blocks
+    return int(post_blocks - pre_blocks)
 
 
 def parse_plans_with_query_aurora(
