@@ -164,8 +164,9 @@ def redshift_to_aurora(
 
     modified = ast.where(*clean_predicates_str, *sel_predicates_str, append=False)
 
-    if prng.random() < select_star_prob:
-        modified = modified.select("*", append=False)
+    # Possibly problematic because too much data is transferred back.
+    # if prng.random() < select_star_prob:
+    #     modified = modified.select("*", append=False)
 
     return modified.sql()
 
