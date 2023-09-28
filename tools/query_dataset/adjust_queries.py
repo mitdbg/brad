@@ -170,13 +170,74 @@ def redshift_to_aurora(
     return modified.sql()
 
 
-def redshift_to_athena(query: str, ics: ColStats) -> str:
+def redshift_to_athena(
+    query: str,
+    ics: ColStats,
+    prng: random.Random,
+    tgt_selectivity: float,
+    select_star_prob: float,
+) -> str:
     """
     Converts a query that does well on Redshift to one that (should) do well on
     Athena (using heuristics).
     """
-    # To implement.
-    return query
+    # - Remove all predicates on indexed columns
+    # - Choose a random number of indexed columns to add a predicate to; make
+    #   the predicate non-selective
+    qr = QueryRep(query)
+    ast = qr.ast()
+
+    # Extract all predicates
+    predicates = []
+    for w in ast.find_all(exp.Where):
+        for p in w.find_all(exp.Predicate):
+            predicates.append(p)
+
+    # Remove predicates on indexed columns.
+    clean_predicates_str = []
+    for p in predicates:
+        if isinstance(p.left, exp.Column):
+            # Check if it references an indexed column
+            col_name = p.left.name
+            table_name = p.left.table
+            if col_name in ics[table_name]:
+                continue
+
+        if isinstance(p.right, exp.Column):
+            # Check if it references an indexed column
+            col_name = p.right.name
+            table_name = p.right.table
+            if col_name in ics[table_name]:
+                continue
+        clean_predicates_str.append(p.sql())
+
+    # Generate non-selective predicates on a random number of tables.
+    # We use indexed columns only for simplicity (since we gather stats about
+    # them).
+    tables = qr.tables()
+    prng.shuffle(tables)
+    num_to_choose = prng.randint(0, len(tables))
+    chosen_tables = tables[:num_to_choose]
+
+    sel_predicates_str = []
+    for tbl in chosen_tables:
+        indexed_cols = ics[tbl]
+        col, ranges = prng.choice(list(indexed_cols.items()))
+        # Uniformity assumption
+        tr = ranges[1] - ranges[0] + 1
+        upper = tr * (
+            tgt_selectivity + prng.random() * 0.05
+        )  # Add a bit of random jitter
+        upper += ranges[0]
+        upper = int(upper)
+        sel_predicates_str.append(f'"{tbl}"."{col}" <= {upper}')
+
+    modified = ast.where(*clean_predicates_str, *sel_predicates_str, append=False)
+
+    if prng.random() < select_star_prob:
+        modified = modified.select("*", append=False)
+
+    return modified.sql()
 
 
 def process_queries(
@@ -256,19 +317,23 @@ def process_queries(
     with open("aurora_diff.sql", "w") as file:
         for orig, new in new_aurora:
             print(orig, file=file)
-            print(new, file=file)
+            print(new + ";", file=file)
             print(file=file)
 
     new_athena = []
     for qidx in redshift_best_indices[add_to_aurora : add_to_athena + add_to_aurora]:
         orig_query = queries[qidx]
-        new_query = redshift_to_athena(orig_query, ics)
+        # We want to inject a few `SELECT *`s to ensure `SELECT *` does not bias
+        # you towards Aurora.
+        new_query = redshift_to_athena(
+            orig_query, ics, prng, tgt_selectivity=0.85, select_star_prob=0.2
+        )
         new_athena.append((orig_query, new_query))
 
     with open("athena_diff.sql", "w") as file:
         for orig, new in new_athena:
             print(orig, file=file)
-            print(new, file=file)
+            print(new + ";", file=file)
             print(file=file)
 
     # Print out the new query file. We cluster the queries.
@@ -279,7 +344,7 @@ def process_queries(
             print(queries[qidx], file=file)
         # Modified queries
         for _, modified in new_athena:
-            print(modified, file=file)
+            print(modified + ";", file=file)
 
         # Aurora
         # Original queries
@@ -287,7 +352,7 @@ def process_queries(
             print(queries[qidx], file=file)
         # Modified queries
         for _, modified in new_aurora:
-            print(modified, file=file)
+            print(modified + ";", file=file)
 
         # Redshift remainder
         for qidx in redshift_best_indices[add_to_athena + add_to_aurora :]:
@@ -296,6 +361,16 @@ def process_queries(
         # Remainder queries
         for qidx in np.where(remainder_mask)[0]:
             print(queries[qidx], file=file)
+
+    # Shuffle the queries too to avoid bias.
+    with open("adjusted_queries.sql", "r") as file:
+        new_queries = [line.strip() for line in file]
+
+    prng.shuffle(new_queries)
+
+    with open("adjusted_queries_shuffled.sql", "w") as file:
+        for q in new_queries:
+            print(q, file=file)
 
 
 def main():
