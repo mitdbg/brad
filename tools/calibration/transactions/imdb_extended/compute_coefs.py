@@ -135,7 +135,9 @@ def load_data(prefix):
     )
 
 
-def combine_data(data_path_str: str, instances: List[str]):
+def combine_data(
+    data_path_str: str, instances: List[str]
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     cpu_count = {
         "r6g_large": 2,
         "r6g_xlarge": 4,
@@ -157,10 +159,10 @@ def combine_data(data_path_str: str, instances: List[str]):
         all_stats.append(stats)
 
     all_data = pd.concat(results, ignore_index=True)
-    all_stats = pd.concat(all_stats, ignore_index=True)
-    return all_data.sort_values(by=["num_cpus", "num_clients"]), all_stats.sort_values(
+    all_stats_df = pd.concat(all_stats, ignore_index=True)
+    return all_data.sort_values(
         by=["num_cpus", "num_clients"]
-    )
+    ), all_stats_df.sort_values(by=["num_cpus", "num_clients"])
 
 
 def compute_client_txn_rate(df: pd.DataFrame) -> pd.DataFrame:

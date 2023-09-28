@@ -66,7 +66,9 @@ def load_indexed_column_stats(
             cursor.execute_sync(
                 f"SELECT MIN({column}), MAX({column}) FROM {table_name};"
             )
-            min_value, max_value = cursor.fetchone_sync()
+            row = cursor.fetchone_sync()
+            assert row is not None
+            min_value, max_value = row
             if min_value is None or max_value is None:
                 print("NOTE: Column has all NULLs: {}.{}".format(table_name, column))
                 continue
@@ -89,7 +91,7 @@ def get_best_indices(data: npt.NDArray, engine: Engine, thres: float) -> npt.NDA
 
 def compute_dataset_dist(
     data: npt.NDArray, thres: float
-) -> Tuple[int, int, int, int, int]:
+) -> Tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, int]:
     total, _ = data.shape
     aurora_best_mask = (
         data[:, ei[Engine.Aurora]] * thres < data[:, ei[Engine.Redshift]]
@@ -136,17 +138,17 @@ def redshift_to_aurora(
     # Remove predicates on indexed columns.
     clean_predicates_str = []
     for p in predicates:
-        if isinstance(p.left, exp.Column):
+        if isinstance(p.left, exp.Column):  # type: ignore
             # Check if it references an indexed column
-            col_name = p.left.name
-            table_name = p.left.table
+            col_name = p.left.name  # type: ignore
+            table_name = p.left.table  # type: ignore
             if col_name in ics[table_name]:
                 continue
 
-        if isinstance(p.right, exp.Column):
+        if isinstance(p.right, exp.Column):  # type: ignore
             # Check if it references an indexed column
-            col_name = p.right.name
-            table_name = p.right.table
+            col_name = p.right.name  # type: ignore
+            table_name = p.right.table  # type: ignore
             if col_name in ics[table_name]:
                 continue
         clean_predicates_str.append(p.sql())
@@ -171,7 +173,7 @@ def redshift_to_aurora(
         upper = int(upper)
         sel_predicates_str.append(f'"{tbl}"."{col}" <= {upper}')
 
-    modified = ast.where(*clean_predicates_str, *sel_predicates_str, append=False)
+    modified = ast.where(*clean_predicates_str, *sel_predicates_str, append=False)  # type: ignore
 
     if prng.random() < modify_select_prob:
         # Modify the columns that are selected. We want to force more columns to be
@@ -259,7 +261,7 @@ def redshift_to_athena(
         sel_predicates_str.append(f'"{tbl}"."{col}" <= {upper}')
 
     if len(sel_predicates_str) > 0:
-        modified = ast.where(*sel_predicates_str, append=False)
+        modified = ast.where(*sel_predicates_str, append=False)  # type: ignore
     else:
         # Remove the predicates.
         modified = ast.transform(
