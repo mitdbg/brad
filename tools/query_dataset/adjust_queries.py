@@ -258,8 +258,13 @@ def redshift_to_athena(
         upper = int(upper)
         sel_predicates_str.append(f'"{tbl}"."{col}" <= {upper}')
 
-    modified = ast.where("1", append=False)
-    modified = modified.where(*sel_predicates_str, append=False)
+    if len(sel_predicates_str) > 0:
+        modified = ast.where(*sel_predicates_str, append=False)
+    else:
+        # Remove the predicates.
+        modified = ast.transform(
+            lambda node: node if not isinstance(node, exp.Where) else None
+        )
 
     if prng.random() < modify_select_prob:
         # Modify the columns that are selected. We want to force more columns to be
