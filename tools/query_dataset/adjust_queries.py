@@ -165,7 +165,7 @@ def redshift_to_aurora(
         # Uniformity assumption
         tr = ranges[1] - ranges[0] + 1
         upper = tr * (
-            tgt_selectivity + prng.random() * 0.02
+            tgt_selectivity + prng.random() * 0.003
         )  # Add a bit of random jitter
         upper += ranges[0]
         upper = int(upper)
@@ -192,6 +192,21 @@ def redshift_to_aurora(
             ],
             append=False,
         )
+
+        def remove_group_by(node: exp.Expression):
+            if isinstance(node, exp.Group):
+                return None
+            else:
+                return node
+
+        def remove_order_by(node: exp.Expression):
+            if isinstance(node, exp.Group):
+                return None
+            else:
+                return node
+
+        modified = modified.transform(remove_group_by)
+        modified = modified.transform(remove_order_by)
 
     return modified.sql()
 
@@ -252,7 +267,7 @@ def redshift_to_athena(
         # Uniformity assumption
         tr = ranges[1] - ranges[0] + 1
         upper = tr * (
-            tgt_selectivity + prng.random() * 0.05
+            tgt_selectivity + prng.random() * 0.01
         )  # Add a bit of random jitter
         upper += ranges[0]
         upper = int(upper)
@@ -338,9 +353,9 @@ def process_queries(
             ics,
             schema,
             prng,
-            tgt_selectivity=0.01,
+            tgt_selectivity=0.001,
             select_col_frac=0.5,
-            modify_select_prob=0.8,
+            modify_select_prob=0.9,
         )
         new_aurora.append((orig_query, new_query))
 
@@ -353,10 +368,8 @@ def process_queries(
     new_athena = []
     for qidx in redshift_best_indices[add_to_aurora : add_to_athena + add_to_aurora]:
         orig_query = queries[qidx]
-        # We want to inject a few `SELECT *`s to ensure `SELECT *` does not bias
-        # you towards Aurora.
         new_query = redshift_to_athena(
-            orig_query, ics, schema, prng, tgt_selectivity=0.95
+            orig_query, ics, schema, prng, tgt_selectivity=0.99
         )
         new_athena.append((orig_query, new_query))
 
