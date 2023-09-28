@@ -175,7 +175,6 @@ def redshift_to_athena(
     ics: ColStats,
     prng: random.Random,
     tgt_selectivity: float,
-    select_star_prob: float,
 ) -> str:
     """
     Converts a query that does well on Redshift to one that (should) do well on
@@ -234,8 +233,10 @@ def redshift_to_athena(
 
     modified = ast.where(*clean_predicates_str, *sel_predicates_str, append=False)
 
-    if prng.random() < select_star_prob:
-        modified = modified.select("*", append=False)
+    # N.B.: SELECT * in Athena is problematic because we will return too much
+    # data to the front end.
+    # if prng.random() < select_star_prob:
+    #    modified = modified.select("*", append=False)
 
     return modified.sql()
 
@@ -325,9 +326,7 @@ def process_queries(
         orig_query = queries[qidx]
         # We want to inject a few `SELECT *`s to ensure `SELECT *` does not bias
         # you towards Aurora.
-        new_query = redshift_to_athena(
-            orig_query, ics, prng, tgt_selectivity=0.85, select_star_prob=0.2
-        )
+        new_query = redshift_to_athena(orig_query, ics, prng, tgt_selectivity=0.85)
         new_athena.append((orig_query, new_query))
 
     with open("athena_diff.sql", "w") as file:
