@@ -217,6 +217,8 @@ def redshift_to_athena(
     schema: Schema,
     prng: random.Random,
     tgt_selectivity: float,
+    modify_select_prob: float,
+    select_col_frac: float,
 ) -> str:
     """
     Converts a query that does well on Redshift to one that (should) do well on
@@ -234,24 +236,7 @@ def redshift_to_athena(
         for p in w.find_all(exp.Predicate):
             predicates.append(p)
 
-    # Remove predicates on indexed columns.
-    clean_predicates_str = []
-    for p in predicates:
-        if isinstance(p.left, exp.Column):
-            # Check if it references an indexed column
-            col_name = p.left.name
-            table_name = p.left.table
-            if col_name in ics[table_name]:
-                continue
-
-        if isinstance(p.right, exp.Column):
-            # Check if it references an indexed column
-            col_name = p.right.name
-            table_name = p.right.table
-            if col_name in ics[table_name]:
-                continue
-        clean_predicates_str.append(p.sql())
-
+    # N.B. We redo all the predicates.
     # Generate non-selective predicates on a random number of tables.
     # We use indexed columns only for simplicity (since we gather stats about
     # them).
@@ -273,7 +258,43 @@ def redshift_to_athena(
         upper = int(upper)
         sel_predicates_str.append(f'"{tbl}"."{col}" <= {upper}')
 
-    modified = ast.where(*clean_predicates_str, *sel_predicates_str, append=False)
+    modified = ast.where("1", append=False)
+    modified = modified.where(*sel_predicates_str, append=False)
+
+    if prng.random() < modify_select_prob:
+        # Modify the columns that are selected. We want to force more columns to be
+        # selected.
+        possible_columns = []
+        for table in tables:
+            for col in schema[table]:
+                possible_columns.append('"{}"."{}"'.format(table, col))
+
+        num_to_select = int(len(possible_columns) * select_col_frac)
+        prng.shuffle(possible_columns)
+        select_cols = possible_columns[:num_to_select]
+
+        modified = modified.select(
+            *[
+                "MAX({}) as agg_{}".format(expr, idx)
+                for idx, expr in enumerate(select_cols)
+            ],
+            append=False,
+        )
+
+        def remove_group_by(node: exp.Expression):
+            if isinstance(node, exp.Group):
+                return None
+            else:
+                return node
+
+        def remove_order_by(node: exp.Expression):
+            if isinstance(node, exp.Order):
+                return None
+            else:
+                return node
+
+        modified = modified.transform(remove_group_by)
+        modified = modified.transform(remove_order_by)
 
     return modified.sql()
 
@@ -369,7 +390,13 @@ def process_queries(
     for qidx in redshift_best_indices[add_to_aurora : add_to_athena + add_to_aurora]:
         orig_query = queries[qidx]
         new_query = redshift_to_athena(
-            orig_query, ics, schema, prng, tgt_selectivity=0.99
+            orig_query,
+            ics,
+            schema,
+            prng,
+            tgt_selectivity=0.99,
+            modify_select_prob=0.8,
+            select_col_frac=0.5,
         )
         new_athena.append((orig_query, new_query))
 
