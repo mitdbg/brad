@@ -178,11 +178,11 @@ def compute_client_txn_rate(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def compute_diffs(load_data: pd.DataFrame) -> pd.DataFrame:
-    instances = load_data["instance"].unique()
+def compute_diffs(load_data_df: pd.DataFrame) -> pd.DataFrame:
+    instances = load_data_df["instance"].unique()
     all_data = []
     for inst in instances:
-        rel = load_data[load_data["instance"] == inst].copy()
+        rel = load_data_df[load_data_df["instance"] == inst].copy()
         rel["diff"] = rel["completions_per_s"] / rel["completions_per_s"].shift(1)
         rel = rel.dropna()
         all_data.append(rel)
@@ -359,16 +359,16 @@ def main() -> None:
     )
 
     rates = compute_client_txn_rate(stats)
-    load_data = load_translation(data, rates)
+    load_data_df = load_translation(data, rates)
 
     # Compute the "saturation load" for each provisioning.
     cutoffs = find_cutoffs(
-        compute_diffs(load_data), threshold=args.saturation_threshold
+        compute_diffs(load_data_df), threshold=args.saturation_threshold
     )
     cutoff_models, cutoff_scores = compute_cutoff_models(cutoffs)
 
     # Compute "translation models" (mapping client-side metrics to system metrics)
-    fld = filter_cutoff(load_data, cutoffs)
+    fld = filter_cutoff(load_data_df, cutoffs)
     translation_models, translation_scores = compute_translation_models(fld)
 
     # Print out the results.

@@ -15,7 +15,7 @@ ParsedData = Dict[str, Any]
 
 
 def load_queries(file_path: str) -> Tuple[List[str], Dict[str, int]]:
-    with open(file_path) as file:
+    with open(file_path, "r", encoding="UTF-8") as file:
         queries = [line.strip() for line in file]
     return queries, {q: idx for idx, q in enumerate(queries)}
 
@@ -23,7 +23,7 @@ def load_queries(file_path: str) -> Tuple[List[str], Dict[str, int]]:
 def load_raw_json(file_path: Optional[str]) -> Optional[ParsedData]:
     if file_path is None:
         return None
-    with open(file_path) as file:
+    with open(file_path, "r", encoding="UTF-8") as file:
         return json.load(file)
 
 
@@ -140,7 +140,7 @@ def load_athena_data(file_paths: List[str]) -> Optional[pd.DataFrame]:
     dfs = []
 
     for file in file_paths:
-        with open(file, "r") as f:
+        with open(file, "r", encoding="UTF-8") as f:
             raw = json.load(f)
         dfs.append(extract_relevant_athena(raw))
 
@@ -156,7 +156,7 @@ def load_aurora_data(file_paths: List[str]) -> Optional[pd.DataFrame]:
     data = []
 
     for exp in file_paths:
-        with open(exp, "r") as file:
+        with open(exp, "r", encoding="UTF-8") as file:
             raw_json = json.load(file)
 
         for query in raw_json:

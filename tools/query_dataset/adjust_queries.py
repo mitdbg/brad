@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import yaml
-import sqlglot
 import sqlglot.expressions as exp
 import numpy as np
 import numpy.typing as npt
@@ -20,7 +19,7 @@ Schema = Dict[str, List[str]]
 
 
 def load_schema(schema_file: str) -> Tuple[Schema, Schema]:
-    with open(schema_file) as file:
+    with open(schema_file, "r", encoding="UTF-8") as file:
         raw_schema = yaml.load(file, yaml.Loader)
 
     # Retrieve all tables indexed columns in the schema
@@ -315,7 +314,7 @@ def process_queries(
     schema: Schema,
     prng: random.Random,
 ) -> None:
-    with open(query_file) as file:
+    with open(query_file, "r", encoding="UTF-8") as file:
         queries = [line.strip() for line in file]
     recorded_rt = np.load(recorded_run_times)
 
@@ -387,7 +386,7 @@ def process_queries(
         )
         new_aurora.append((orig_query, new_query))
 
-    with open("aurora_diff.sql", "w") as file:
+    with open("aurora_diff.sql", "w", encoding="UTF-8") as file:
         for orig, new in new_aurora:
             print(orig, file=file)
             print(new + ";", file=file)
@@ -407,14 +406,14 @@ def process_queries(
         )
         new_athena.append((orig_query, new_query))
 
-    with open("athena_diff.sql", "w") as file:
+    with open("athena_diff.sql", "w", encoding="UTF-8") as file:
         for orig, new in new_athena:
             print(orig, file=file)
             print(new + ";", file=file)
             print(file=file)
 
     # Print out the new query file. We cluster the queries.
-    with open("adjusted_queries.sql", "w") as file:
+    with open("adjusted_queries.sql", "w", encoding="UTF-8") as file:
         # Athena
         # Original queries
         for qidx in np.where(athena_best_mask)[0]:
@@ -440,12 +439,12 @@ def process_queries(
             print(queries[qidx], file=file)
 
     # Shuffle the queries too to avoid bias.
-    with open("adjusted_queries.sql", "r") as file:
+    with open("adjusted_queries.sql", "r", encoding="UTF-8") as file:
         new_queries = [line.strip() for line in file]
 
     prng.shuffle(new_queries)
 
-    with open("adjusted_queries_shuffled.sql", "w") as file:
+    with open("adjusted_queries_shuffled.sql", "w", encoding="UTF-8") as file:
         for q in new_queries:
             print(q, file=file)
 
