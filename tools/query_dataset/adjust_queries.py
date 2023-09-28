@@ -16,22 +16,28 @@ from brad.provisioning.directory import Directory
 from brad.query_rep import QueryRep
 
 ColStats = Dict[str, Dict[str, Tuple[int, int]]]
+Schema = Dict[str, List[str]]
 
 
-def load_indexed_cols(schema_file: str) -> Dict[str, List[str]]:
+def load_schema(schema_file: str) -> Tuple[Schema, Schema]:
     with open(schema_file) as file:
         raw_schema = yaml.load(file, yaml.Loader)
 
     # Retrieve all tables indexed columns in the schema
     # Note that we only index numeric columns, so this is OK for this script.
+    table_cols = {}
     table_indexed_cols = {}
     for table in raw_schema["tables"]:
         name = table["table_name"]
+        col_names = []
         indexed = []
 
         for column in table["columns"]:
+            col_names.append(column["name"])
             if "primary_key" in column and column["primary_key"]:
                 indexed.append(column["name"])
+
+        table_cols[name] = col_names
 
         if "indexes" not in table:
             table_indexed_cols[name] = indexed
@@ -45,7 +51,7 @@ def load_indexed_cols(schema_file: str) -> Dict[str, List[str]]:
             indexed.append(parts[0])
 
         table_indexed_cols[name] = indexed
-    return table_indexed_cols
+    return table_cols, table_indexed_cols
 
 
 def load_indexed_column_stats(
@@ -101,9 +107,11 @@ def compute_dataset_dist(
 def redshift_to_aurora(
     query: str,
     ics: ColStats,
+    schema: Schema,
     prng: random.Random,
     tgt_selectivity: float,
-    select_star_prob: float,
+    select_col_frac: float,
+    modify_select_prob: float,
 ) -> str:
     """
     Converts a query that does well on Redshift to one that (should) do well on
@@ -145,12 +153,13 @@ def redshift_to_aurora(
 
     # Generate selective predicates on n - 1 tables.
     tables = qr.tables()
-    prng.shuffle(tables)
-    if len(tables) > 1:
-        tables.pop()
+    partial_tables = tables.copy()
+    prng.shuffle(partial_tables)
+    if len(partial_tables) > 1:
+        partial_tables.pop()
 
     sel_predicates_str = []
-    for tbl in tables:
+    for tbl in partial_tables:
         indexed_cols = ics[tbl]
         col, ranges = prng.choice(list(indexed_cols.items()))
         # Uniformity assumption
@@ -164,9 +173,25 @@ def redshift_to_aurora(
 
     modified = ast.where(*clean_predicates_str, *sel_predicates_str, append=False)
 
-    # Possibly problematic because too much data is transferred back.
-    # if prng.random() < select_star_prob:
-    #     modified = modified.select("*", append=False)
+    if prng.random() < modify_select_prob:
+        # Modify the columns that are selected. We want to force more columns to be
+        # selected.
+        possible_columns = []
+        for table in tables:
+            for col in schema[table]:
+                possible_columns.append('"{}"."{}"'.format(table, col))
+
+        num_to_select = int(len(possible_columns) * select_col_frac)
+        prng.shuffle(possible_columns)
+        select_cols = possible_columns[:num_to_select]
+
+        modified = modified.select(
+            *[
+                "MAX({}) as agg_{}".format(expr, idx)
+                for idx, expr in enumerate(select_cols)
+            ],
+            append=False,
+        )
 
     return modified.sql()
 
@@ -174,6 +199,7 @@ def redshift_to_aurora(
 def redshift_to_athena(
     query: str,
     ics: ColStats,
+    schema: Schema,
     prng: random.Random,
     tgt_selectivity: float,
 ) -> str:
@@ -234,11 +260,6 @@ def redshift_to_athena(
 
     modified = ast.where(*clean_predicates_str, *sel_predicates_str, append=False)
 
-    # N.B.: SELECT * in Athena is problematic because we will return too much
-    # data to the front end.
-    # if prng.random() < select_star_prob:
-    #    modified = modified.select("*", append=False)
-
     return modified.sql()
 
 
@@ -248,6 +269,7 @@ def process_queries(
     engine_weights: List[int],
     threshold: float,
     ics: ColStats,
+    schema: Schema,
     prng: random.Random,
 ) -> None:
     with open(query_file) as file:
@@ -312,7 +334,13 @@ def process_queries(
     for qidx in redshift_best_indices[:add_to_aurora]:
         orig_query = queries[qidx]
         new_query = redshift_to_aurora(
-            orig_query, ics, prng, tgt_selectivity=0.01, select_star_prob=0.2
+            orig_query,
+            ics,
+            schema,
+            prng,
+            tgt_selectivity=0.01,
+            select_col_frac=0.5,
+            modify_select_prob=0.8,
         )
         new_aurora.append((orig_query, new_query))
 
@@ -327,7 +355,9 @@ def process_queries(
         orig_query = queries[qidx]
         # We want to inject a few `SELECT *`s to ensure `SELECT *` does not bias
         # you towards Aurora.
-        new_query = redshift_to_athena(orig_query, ics, prng, tgt_selectivity=0.95)
+        new_query = redshift_to_athena(
+            orig_query, ics, schema, prng, tgt_selectivity=0.95
+        )
         new_athena.append((orig_query, new_query))
 
     with open("athena_diff.sql", "w") as file:
@@ -391,7 +421,7 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
-    table_indexed_cols = load_indexed_cols(args.schema_file)
+    table_cols, table_indexed_cols = load_schema(args.schema_file)
 
     config = ConfigFile(args.config_file)
     directory = Directory(config)
@@ -414,6 +444,7 @@ def main():
         args.engine_weights,
         args.threshold,
         indexed_col_stats,
+        table_cols,
         prng,
     )
 
