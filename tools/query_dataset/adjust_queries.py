@@ -200,7 +200,7 @@ def redshift_to_aurora(
                 return node
 
         def remove_order_by(node: exp.Expression):
-            if isinstance(node, exp.Group):
+            if isinstance(node, exp.Order):
                 return None
             else:
                 return node
