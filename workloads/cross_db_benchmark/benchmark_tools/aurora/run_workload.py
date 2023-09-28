@@ -140,6 +140,7 @@ def run_aurora_workload(
         )
         curr_statistics.update(sql=sql_query)
         curr_statistics.update(hint=hint)
+        curr_statistics.update(query_index=i)
         query_list.append(curr_statistics)
 
         run_stats = dict(

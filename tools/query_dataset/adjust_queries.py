@@ -312,7 +312,7 @@ def process_queries(
     for qidx in redshift_best_indices[:add_to_aurora]:
         orig_query = queries[qidx]
         new_query = redshift_to_aurora(
-            orig_query, ics, prng, tgt_selectivity=0.05, select_star_prob=0.2
+            orig_query, ics, prng, tgt_selectivity=0.01, select_star_prob=0.2
         )
         new_aurora.append((orig_query, new_query))
 
@@ -327,7 +327,7 @@ def process_queries(
         orig_query = queries[qidx]
         # We want to inject a few `SELECT *`s to ensure `SELECT *` does not bias
         # you towards Aurora.
-        new_query = redshift_to_athena(orig_query, ics, prng, tgt_selectivity=0.85)
+        new_query = redshift_to_athena(orig_query, ics, prng, tgt_selectivity=0.95)
         new_athena.append((orig_query, new_query))
 
     with open("athena_diff.sql", "w") as file:
