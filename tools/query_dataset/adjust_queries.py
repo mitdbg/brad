@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import yaml
-import sqlglot
 import sqlglot.expressions as exp
 import numpy as np
 import numpy.typing as npt
@@ -16,22 +15,28 @@ from brad.provisioning.directory import Directory
 from brad.query_rep import QueryRep
 
 ColStats = Dict[str, Dict[str, Tuple[int, int]]]
+Schema = Dict[str, List[str]]
 
 
-def load_indexed_cols(schema_file: str) -> Dict[str, List[str]]:
-    with open(schema_file) as file:
+def load_schema(schema_file: str) -> Tuple[Schema, Schema]:
+    with open(schema_file, "r", encoding="UTF-8") as file:
         raw_schema = yaml.load(file, yaml.Loader)
 
     # Retrieve all tables indexed columns in the schema
     # Note that we only index numeric columns, so this is OK for this script.
+    table_cols = {}
     table_indexed_cols = {}
     for table in raw_schema["tables"]:
         name = table["table_name"]
+        col_names = []
         indexed = []
 
         for column in table["columns"]:
+            col_names.append(column["name"])
             if "primary_key" in column and column["primary_key"]:
                 indexed.append(column["name"])
+
+        table_cols[name] = col_names
 
         if "indexes" not in table:
             table_indexed_cols[name] = indexed
@@ -45,7 +50,7 @@ def load_indexed_cols(schema_file: str) -> Dict[str, List[str]]:
             indexed.append(parts[0])
 
         table_indexed_cols[name] = indexed
-    return table_indexed_cols
+    return table_cols, table_indexed_cols
 
 
 def load_indexed_column_stats(
@@ -60,7 +65,9 @@ def load_indexed_column_stats(
             cursor.execute_sync(
                 f"SELECT MIN({column}), MAX({column}) FROM {table_name};"
             )
-            min_value, max_value = cursor.fetchone_sync()
+            row = cursor.fetchone_sync()
+            assert row is not None
+            min_value, max_value = row
             if min_value is None or max_value is None:
                 print("NOTE: Column has all NULLs: {}.{}".format(table_name, column))
                 continue
@@ -83,7 +90,7 @@ def get_best_indices(data: npt.NDArray, engine: Engine, thres: float) -> npt.NDA
 
 def compute_dataset_dist(
     data: npt.NDArray, thres: float
-) -> Tuple[int, int, int, int, int]:
+) -> Tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, int]:
     total, _ = data.shape
     aurora_best_mask = (
         data[:, ei[Engine.Aurora]] * thres < data[:, ei[Engine.Redshift]]
@@ -101,9 +108,11 @@ def compute_dataset_dist(
 def redshift_to_aurora(
     query: str,
     ics: ColStats,
+    schema: Schema,
     prng: random.Random,
     tgt_selectivity: float,
-    select_star_prob: float,
+    select_col_frac: float,
+    modify_select_prob: float,
 ) -> str:
     """
     Converts a query that does well on Redshift to one that (should) do well on
@@ -128,45 +137,77 @@ def redshift_to_aurora(
     # Remove predicates on indexed columns.
     clean_predicates_str = []
     for p in predicates:
-        if isinstance(p.left, exp.Column):
+        if isinstance(p.left, exp.Column):  # type: ignore
             # Check if it references an indexed column
-            col_name = p.left.name
-            table_name = p.left.table
+            col_name = p.left.name  # type: ignore
+            table_name = p.left.table  # type: ignore
             if col_name in ics[table_name]:
                 continue
 
-        if isinstance(p.right, exp.Column):
+        if isinstance(p.right, exp.Column):  # type: ignore
             # Check if it references an indexed column
-            col_name = p.right.name
-            table_name = p.right.table
+            col_name = p.right.name  # type: ignore
+            table_name = p.right.table  # type: ignore
             if col_name in ics[table_name]:
                 continue
         clean_predicates_str.append(p.sql())
 
     # Generate selective predicates on n - 1 tables.
     tables = qr.tables()
-    prng.shuffle(tables)
-    if len(tables) > 1:
-        tables.pop()
+    partial_tables = tables.copy()
+    prng.shuffle(partial_tables)
+    if len(partial_tables) > 1:
+        partial_tables.pop()
 
     sel_predicates_str = []
-    for tbl in tables:
+    for tbl in partial_tables:
         indexed_cols = ics[tbl]
         col, ranges = prng.choice(list(indexed_cols.items()))
         # Uniformity assumption
         tr = ranges[1] - ranges[0] + 1
         upper = tr * (
-            tgt_selectivity + prng.random() * 0.02
+            tgt_selectivity + prng.random() * 0.003
         )  # Add a bit of random jitter
         upper += ranges[0]
         upper = int(upper)
         sel_predicates_str.append(f'"{tbl}"."{col}" <= {upper}')
 
-    modified = ast.where(*clean_predicates_str, *sel_predicates_str, append=False)
+    modified = ast.where(*clean_predicates_str, *sel_predicates_str, append=False)  # type: ignore
 
-    # Possibly problematic because too much data is transferred back.
-    # if prng.random() < select_star_prob:
-    #     modified = modified.select("*", append=False)
+    if prng.random() < modify_select_prob:
+        # Modify the columns that are selected. We want to force more columns to be
+        # selected.
+        possible_columns = []
+        for table in tables:
+            for col in schema[table]:
+                possible_columns.append('"{}"."{}"'.format(table, col))
+
+        num_to_select = int(len(possible_columns) * select_col_frac)
+        prng.shuffle(possible_columns)
+        select_cols = possible_columns[:num_to_select]
+
+        modified = modified.select(
+            *[
+                "MAX({}) as agg_{}".format(expr, idx)
+                for idx, expr in enumerate(select_cols)
+            ],
+            append=False,
+        )
+
+        def remove_group_by(node: exp.Expression):
+            if isinstance(node, exp.Group):
+                return None
+            else:
+                return node
+
+        def remove_order_by(node: exp.Expression):
+            if isinstance(node, exp.Order):
+                return None
+            else:
+                return node
+
+        modified = modified.transform(remove_group_by)
+        modified = modified.transform(remove_order_by)
 
     return modified.sql()
 
@@ -174,8 +215,11 @@ def redshift_to_aurora(
 def redshift_to_athena(
     query: str,
     ics: ColStats,
+    schema: Schema,
     prng: random.Random,
     tgt_selectivity: float,
+    modify_select_prob: float,
+    select_col_frac: float,
 ) -> str:
     """
     Converts a query that does well on Redshift to one that (should) do well on
@@ -193,24 +237,7 @@ def redshift_to_athena(
         for p in w.find_all(exp.Predicate):
             predicates.append(p)
 
-    # Remove predicates on indexed columns.
-    clean_predicates_str = []
-    for p in predicates:
-        if isinstance(p.left, exp.Column):
-            # Check if it references an indexed column
-            col_name = p.left.name
-            table_name = p.left.table
-            if col_name in ics[table_name]:
-                continue
-
-        if isinstance(p.right, exp.Column):
-            # Check if it references an indexed column
-            col_name = p.right.name
-            table_name = p.right.table
-            if col_name in ics[table_name]:
-                continue
-        clean_predicates_str.append(p.sql())
-
+    # N.B. We redo all the predicates.
     # Generate non-selective predicates on a random number of tables.
     # We use indexed columns only for simplicity (since we gather stats about
     # them).
@@ -226,18 +253,54 @@ def redshift_to_athena(
         # Uniformity assumption
         tr = ranges[1] - ranges[0] + 1
         upper = tr * (
-            tgt_selectivity + prng.random() * 0.05
+            tgt_selectivity + prng.random() * 0.01
         )  # Add a bit of random jitter
         upper += ranges[0]
         upper = int(upper)
         sel_predicates_str.append(f'"{tbl}"."{col}" <= {upper}')
 
-    modified = ast.where(*clean_predicates_str, *sel_predicates_str, append=False)
+    if len(sel_predicates_str) > 0:
+        modified = ast.where(*sel_predicates_str, append=False)  # type: ignore
+    else:
+        # Remove the predicates.
+        modified = ast.transform(
+            lambda node: node if not isinstance(node, exp.Where) else None
+        )
 
-    # N.B.: SELECT * in Athena is problematic because we will return too much
-    # data to the front end.
-    # if prng.random() < select_star_prob:
-    #    modified = modified.select("*", append=False)
+    if prng.random() < modify_select_prob:
+        # Modify the columns that are selected. We want to force more columns to be
+        # selected.
+        possible_columns = []
+        for table in tables:
+            for col in schema[table]:
+                possible_columns.append('"{}"."{}"'.format(table, col))
+
+        num_to_select = int(len(possible_columns) * select_col_frac)
+        prng.shuffle(possible_columns)
+        select_cols = possible_columns[:num_to_select]
+
+        modified = modified.select(
+            *[
+                "MAX({}) as agg_{}".format(expr, idx)
+                for idx, expr in enumerate(select_cols)
+            ],
+            append=False,
+        )
+
+        def remove_group_by(node: exp.Expression):
+            if isinstance(node, exp.Group):
+                return None
+            else:
+                return node
+
+        def remove_order_by(node: exp.Expression):
+            if isinstance(node, exp.Order):
+                return None
+            else:
+                return node
+
+        modified = modified.transform(remove_group_by)
+        modified = modified.transform(remove_order_by)
 
     return modified.sql()
 
@@ -248,9 +311,10 @@ def process_queries(
     engine_weights: List[int],
     threshold: float,
     ics: ColStats,
+    schema: Schema,
     prng: random.Random,
 ) -> None:
-    with open(query_file) as file:
+    with open(query_file, "r", encoding="UTF-8") as file:
         queries = [line.strip() for line in file]
     recorded_rt = np.load(recorded_run_times)
 
@@ -312,11 +376,17 @@ def process_queries(
     for qidx in redshift_best_indices[:add_to_aurora]:
         orig_query = queries[qidx]
         new_query = redshift_to_aurora(
-            orig_query, ics, prng, tgt_selectivity=0.05, select_star_prob=0.2
+            orig_query,
+            ics,
+            schema,
+            prng,
+            tgt_selectivity=0.001,
+            select_col_frac=0.5,
+            modify_select_prob=0.9,
         )
         new_aurora.append((orig_query, new_query))
 
-    with open("aurora_diff.sql", "w") as file:
+    with open("aurora_diff.sql", "w", encoding="UTF-8") as file:
         for orig, new in new_aurora:
             print(orig, file=file)
             print(new + ";", file=file)
@@ -325,19 +395,25 @@ def process_queries(
     new_athena = []
     for qidx in redshift_best_indices[add_to_aurora : add_to_athena + add_to_aurora]:
         orig_query = queries[qidx]
-        # We want to inject a few `SELECT *`s to ensure `SELECT *` does not bias
-        # you towards Aurora.
-        new_query = redshift_to_athena(orig_query, ics, prng, tgt_selectivity=0.85)
+        new_query = redshift_to_athena(
+            orig_query,
+            ics,
+            schema,
+            prng,
+            tgt_selectivity=0.99,
+            modify_select_prob=0.8,
+            select_col_frac=0.5,
+        )
         new_athena.append((orig_query, new_query))
 
-    with open("athena_diff.sql", "w") as file:
+    with open("athena_diff.sql", "w", encoding="UTF-8") as file:
         for orig, new in new_athena:
             print(orig, file=file)
             print(new + ";", file=file)
             print(file=file)
 
     # Print out the new query file. We cluster the queries.
-    with open("adjusted_queries.sql", "w") as file:
+    with open("adjusted_queries.sql", "w", encoding="UTF-8") as file:
         # Athena
         # Original queries
         for qidx in np.where(athena_best_mask)[0]:
@@ -363,12 +439,12 @@ def process_queries(
             print(queries[qidx], file=file)
 
     # Shuffle the queries too to avoid bias.
-    with open("adjusted_queries.sql", "r") as file:
+    with open("adjusted_queries.sql", "r", encoding="UTF-8") as file:
         new_queries = [line.strip() for line in file]
 
     prng.shuffle(new_queries)
 
-    with open("adjusted_queries_shuffled.sql", "w") as file:
+    with open("adjusted_queries_shuffled.sql", "w", encoding="UTF-8") as file:
         for q in new_queries:
             print(q, file=file)
 
@@ -391,7 +467,7 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
-    table_indexed_cols = load_indexed_cols(args.schema_file)
+    table_cols, table_indexed_cols = load_schema(args.schema_file)
 
     config = ConfigFile(args.config_file)
     directory = Directory(config)
@@ -414,6 +490,7 @@ def main():
         args.engine_weights,
         args.threshold,
         indexed_col_stats,
+        table_cols,
         prng,
     )
 

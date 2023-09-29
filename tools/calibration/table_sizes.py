@@ -10,7 +10,7 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.data_sync.execution.context import ExecutionContext
 from brad.data_sync.operators.unload_to_s3 import UnloadToS3
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 from brad.utils import set_up_logging
@@ -27,7 +27,7 @@ def delete_s3_object(client, bucket: str, key: str) -> None:
     client.delete_object(Bucket=bucket, Key=key)
 
 
-async def main_impl(args):
+async def main_impl(args) -> None:
     config = ConfigFile(args.config_file)
     assets = AssetManager(config)
     mgr = BlueprintManager(config, assets, args.schema_name)
@@ -90,8 +90,8 @@ async def main_impl(args):
 
     print("table_extract_bytes_per_row:", flush=True)
     print(f"  {args.schema_name}:")
-    for table, bpr in bytes_per_row.items():
-        print(f"    {table}: {bpr}", flush=True)
+    for table_name, bpr in bytes_per_row.items():
+        print(f"    {table_name}: {bpr}", flush=True)
 
     await engines.close()
     engines_sync.close_sync()

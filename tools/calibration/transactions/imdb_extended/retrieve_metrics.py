@@ -1,7 +1,7 @@
 import argparse
 from datetime import timedelta
 
-from brad.daemon.perf_insights import AwsPerformanceInsightsClient
+from brad.daemon.perf_insights import PerfInsightsClient
 
 
 BASE_METRICS = [
@@ -84,7 +84,7 @@ def main():
     )
     args = parser.parse_args()
 
-    client = AwsPerformanceInsightsClient(args.instance_id)
+    client = PerfInsightsClient(args.instance_id)
     metrics = client.fetch_metrics(
         ALL_METRICS,
         period=timedelta(minutes=1),
