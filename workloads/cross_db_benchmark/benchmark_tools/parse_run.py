@@ -135,6 +135,7 @@ def parse_queries(
     cap_queries=None,
     target_path=None,
     is_brad=False,
+    include_no_joins=False,
 ):
     if database == DatabaseSystem.POSTGRES:
         return parse_plans_with_query_postgres(
@@ -175,6 +176,7 @@ def parse_queries(
             cap_queries=cap_queries,
             target_path=target_path,
             is_brad=is_brad,
+            include_no_joins=include_no_joins,
         )
     elif database == DatabaseSystem.REDSHIFT:
         return parse_queries_redshift(
@@ -194,6 +196,7 @@ def parse_queries(
             cap_queries=cap_queries,
             target_path=target_path,
             is_brad=is_brad,
+            include_no_joins=include_no_joins,
         )
     elif database == DatabaseSystem.ATHENA:
         return parse_queries_athena(
@@ -213,6 +216,7 @@ def parse_queries(
             cap_queries=cap_queries,
             target_path=target_path,
             is_brad=is_brad,
+            include_no_joins=include_no_joins,
         )
     else:
         raise NotImplementedError(f"Database {database} not yet supported.")

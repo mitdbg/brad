@@ -409,6 +409,7 @@ def parse_plans_with_query_aurora(
     cap_queries=None,
     target_path=None,
     is_brad=True,
+    include_no_joins=False,
 ):
     # keep track of column statistics
     if zero_card_min_runtime is None:
@@ -627,7 +628,9 @@ def parse_plans_with_query_aurora(
             analyze_plan["tables"] = list(analyze_plan["tables"])
         else:
             analyze_plan["tables"] = []
-        if parsed_query is not None and len(parsed_query["join_nodes"]) != 0:
+        if parsed_query is not None and (
+            len(parsed_query["join_nodes"]) != 0 or include_no_joins
+        ):
             parsed_queries.append(parsed_query)
             parsed_plans.append(analyze_plan)
             sql_queries.append(q.sql)

@@ -60,6 +60,7 @@ def parse_queries_wrapper(
         zero_card_min_runtime=args.min_query_ms * 5,
         target_path=target,
         is_brad=is_brad,
+        include_no_joins=args.include_no_joins,
     )
     with open(target, "w") as outfile:
         json.dump(parsed_runs, outfile, default=dumper)
@@ -137,6 +138,7 @@ if __name__ == "__main__":
     parser.add_argument("--aurora_workload_runs", default=None, nargs="+")
     parser.add_argument("--argment_dataset", action="store_true")
     parser.add_argument("--is_brad", action="store_true")
+    parser.add_argument("--include_no_joins", action="store_true")
 
     # Training cost model command
     parser.add_argument("--workload_runs", default=None, nargs="+")

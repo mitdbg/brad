@@ -34,6 +34,7 @@ def parse_queries_redshift(
     cap_queries=None,
     target_path=None,
     is_brad=False,
+    include_no_joins=False,
 ):
     assert len(run_stats.query_list) == len(aurora_run_stats.query_list)
     db_conn = None
@@ -199,7 +200,9 @@ def parse_queries_redshift(
             verbose_plan["tables"] = list(verbose_plan["tables"])
         else:
             verbose_plan["tables"] = []
-        if parsed_query is not None and len(parsed_query["join_nodes"]) != 0:
+        if parsed_query is not None and (
+            len(parsed_query["join_nodes"]) != 0 or include_no_joins
+        ):
             parsed_queries.append(parsed_query)
             parsed_plans.append(verbose_plan)
             sql_queries.append(q.sql)

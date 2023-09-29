@@ -95,6 +95,7 @@ python run_cost_model.py \
     --parse_queries \
     --db_name imdb \
     --include_zero_card \
+    --include_no_joins \
     --workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json \
     --target ../data/imdb/parsed_queries/ \
     --is_brad \
@@ -119,6 +120,7 @@ python run_cost_model.py \
     --parse_queries \
     --db_name imdb \
     --include_zero_card \
+    --include_no_joins \
     --workload_runs ../data/imdb/raw/redshift_IMDB_10k_10_6.json \
     --aurora_workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json \
     --target ../data/imdb/parsed_queries/ \
@@ -137,6 +139,7 @@ python run_cost_model.py \
     --parse_queries \
     --db_name imdb \
     --include_zero_card \
+    --include_no_joins \
     --workload_runs ../data/imdb/raw/athena_IMDB_10k_10_6.json \
     --aurora_workload_runs ../data/imdb/raw/aurora_IMDB_10k_10_6.json \
     --target ../data/imdb/parsed_queries/ \
