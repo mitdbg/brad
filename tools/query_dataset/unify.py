@@ -173,8 +173,8 @@ def load_athena_data(file_paths: List[str]) -> Optional[pd.DataFrame]:
     return deduped
 
 
-def load_aurora_data(file_paths: List[str]) -> Optional[pd.DataFrame]:
-    if len(file_paths) == 0:
+def load_aurora_data(file_paths: Optional[List[str]]) -> Optional[pd.DataFrame]:
+    if file_paths is None or len(file_paths) == 0:
         return None
 
     data = []
