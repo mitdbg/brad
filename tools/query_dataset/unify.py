@@ -17,7 +17,15 @@ ParsedData = Dict[str, Any]
 def load_queries(file_path: str) -> Tuple[List[str], Dict[str, int]]:
     with open(file_path, "r", encoding="UTF-8") as file:
         queries = [line.strip() for line in file]
-    return queries, {q: idx for idx, q in enumerate(queries)}
+    # N.B. There may be duplicate queries. We keep the first index only.
+    query_map = {}
+    pos_offset = 0
+    for q in queries:
+        if q in query_map:
+            continue
+        query_map[q] = pos_offset
+        pos_offset += 1
+    return queries, query_map
 
 
 def load_raw_json(file_path: Optional[str]) -> Optional[ParsedData]:
@@ -32,6 +40,7 @@ def extract_run_times(
 ) -> npt.NDArray:
     run_times = np.ones(len(qorder), float)
     run_times *= np.nan
+    num_unmatched = 0
 
     if parsed is None:
         return run_times
@@ -46,7 +55,14 @@ def extract_run_times(
             orig_idx = qorder[matching_sql]
             run_times[orig_idx] = parsed["parsed_plans"][idx]["plan_runtime"] / 1000
         except KeyError:
-            print("WARNING: Unable to match", sql)
+            num_unmatched += 1
+
+    if num_unmatched > 0:
+        print(
+            "WARNING: Did not match {} of {} queries".format(
+                num_unmatched, len(parsed["sql_queries"])
+            )
+        )
 
     return run_times
 
@@ -63,6 +79,7 @@ def extract_data_stats(
     if engine != Engine.Aurora and engine != Engine.Athena:
         raise RuntimeError(f"No data access stats for {repr(engine)}")
 
+    num_unmatched = 0
     data = np.ones(len(qorder), np.int64)
     data *= -1
 
@@ -81,7 +98,14 @@ def extract_data_stats(
             orig_idx = qorder[matching_sql]
             data[orig_idx] = parsed[data_key][idx]
         except KeyError:
-            print("WARNING: Unable to match", sql)
+            num_unmatched += 1
+
+    if num_unmatched > 0:
+        print(
+            "WARNING: Did not match {} of {} queries".format(
+                num_unmatched, len(parsed["sql_queries"])
+            )
+        )
 
     return data
 
@@ -251,6 +275,11 @@ def main():
     aurora_parsed = load_raw_json(args.parsed_aurora)
     redshift_parsed = load_raw_json(args.parsed_redshift)
 
+    print("Unique queries:", len(qorder))
+    print("Athena parsed:", len(athena_parsed["sql_queries"]))
+    print("Aurora parsed:", len(aurora_parsed["sql_queries"]))
+    print("Redshift parsed:", len(redshift_parsed["sql_queries"]))
+
     athena_rt = extract_run_times(qorder, athena_parsed)
     aurora_rt = extract_run_times(qorder, aurora_parsed)
     redshift_rt = extract_run_times(qorder, redshift_parsed)
@@ -275,7 +304,15 @@ def main():
     data_accessed = np.stack([athena_data, aurora_data])
     data_accessed = np.transpose(data_accessed)
 
-    shutil.copy2(args.queries_file, out_dir / "queries.sql")
+    # Write out the queries in sorted order. We redo this to ensure we eliminate
+    # duplicates.
+    queries_with_order = [(query, idx) for query, idx in qorder.items()]
+    queries_with_order.sort(key=lambda v: v[1])
+
+    with open(out_dir / "queries.sql", "w", encoding="UTF-8") as out_file:
+        for q, _ in queries_with_order:
+            print(q, file=out_file)
+
     np.save(out_dir / "run_time_s-athena-aurora-redshift.npy", run_times)
     np.save(out_dir / "data_accessed-athena-aurora.npy", data_accessed)
 
