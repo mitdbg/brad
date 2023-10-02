@@ -4,7 +4,6 @@ import pathlib
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-import shutil
 
 from typing import Any, List, Optional, Dict, Tuple
 from brad.config.engine import Engine
