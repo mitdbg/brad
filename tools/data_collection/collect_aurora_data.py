@@ -11,6 +11,7 @@ import os
 import numpy as np
 
 from typing import Any, Dict, List
+from tqdm import tqdm
 
 from brad.utils import set_up_logging
 
@@ -212,13 +213,16 @@ def main():
     logger.info("Will save results in %s", output_file_path)
 
     overall_start = time.time()
-    for query_idx, query_str in enumerate(queries):
+    for query_idx, query_str in enumerate(tqdm(queries)):
         if query_idx < query_start_offset:
             continue
         if query_idx >= query_end_offset:
             break
 
-        if existing_run_times is not None and np.isinf(existing_run_times[query_idx]):
+        if existing_run_times is not None and (
+            np.isinf(existing_run_times[query_idx])
+            or np.isnan(existing_run_times[query_idx])
+        ):
             logger.info(
                 "Skipping query index %d because it will cause a timeout.", query_idx
             )
@@ -237,6 +241,7 @@ def main():
                 try:
                     cursor.execute("SELECT 1")
                     _ = cursor.fetchall()
+                    logger.info("Reconnected to Aurora.")
                     break
                 except pyodbc.Error as ex:
                     if connection_retry_count > 10:
