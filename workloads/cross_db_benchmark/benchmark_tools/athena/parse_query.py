@@ -44,6 +44,7 @@ def parse_queries_athena_boto_format(
     is_brad=False,
     include_no_joins=False,
 ):
+    print("Detected the boto3 Athena data format.")
     assert len(run_stats.query_list) == len(aurora_run_stats.query_list)
     db_conn = None
     cursor = None
@@ -276,6 +277,7 @@ def parse_queries_athena_classic_format(
     is_brad=False,
     include_no_joins=False,
 ):
+    print("Detected the classic Athena data format.")
     assert len(run_stats.query_list) == len(aurora_run_stats.query_list)
     db_conn = None
     cursor = None
@@ -426,6 +428,7 @@ def parse_queries_athena_classic_format(
             is_brad=is_brad,
             cache=cache,
         )
+        parsed_query["query_index"] = query_no
         if "tables" in verbose_plan:
             verbose_plan["tables"] = list(verbose_plan["tables"])
         else:
