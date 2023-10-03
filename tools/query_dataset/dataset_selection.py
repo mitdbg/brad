@@ -60,6 +60,7 @@ class QueryDataset:
 
         # Run times summary
         def summarize_run_times(engine):
+            data = self.run_times.copy()
             rel = data[:, EI[engine]]
             valid = rel[~np.isnan(rel)]
             print(f"{engine} run times:")
@@ -113,10 +114,13 @@ class QueryDataset:
         all_engines = [Engine.Redshift, Engine.Aurora, Engine.Athena]
         all_engines.remove(engine)
         data = self.run_times.copy()
-        data[np.isnan(data)] = 1000000.0
+        timeout_placeholder = 1000000.0
+        data[np.isnan(data)] = timeout_placeholder
         mask1 = data[:, EI[engine]] * thres < data[:, EI[all_engines[0]]]
         mask2 = data[:, EI[engine]] * thres < data[:, EI[all_engines[1]]]
-        comb = mask1 & mask2
+        mask3 = np.any(data < timeout_placeholder, axis=1)
+        # Exclude queries where all engines timeout.
+        comb = mask1 & mask2 & mask3
         return comb, np.where(comb)[0]
 
     def get_sql(self, query_index: int) -> str:
@@ -132,7 +136,9 @@ class QueryDataset:
                 to_return.append(q)
         return to_return
 
-    def split(self, test_indices: npt.NDArray) -> Tuple["QueryDataset", "QueryDataset"]:
+    def split(
+        self, test_indices: npt.NDArray, overall_to_exclude: npt.NDArray
+    ) -> Tuple["QueryDataset", "QueryDataset"]:
         matching_queries = []
         nonmatching_queries = []
 
@@ -142,13 +148,16 @@ class QueryDataset:
         matching_data = []
         nonmatching_data = []
 
+        # Sometimes we want to exclude queries that are not in the test set.
+        to_exclude = np.unique(np.concatenate([test_indices, overall_to_exclude]))
+
         for idx in test_indices:
             matching_queries.append(self.queries[idx])
             matching_run_times.append(self.run_times[idx])
             matching_data.append(self.data_accessed[idx])
 
         for idx in range(len(self.queries)):
-            if idx in test_indices:
+            if idx in to_exclude:
                 continue
             nonmatching_queries.append(self.queries[idx])
             nonmatching_run_times.append(self.run_times[idx])
@@ -167,6 +176,17 @@ class QueryDataset:
             ),
         )
 
+    def valid_mask(self) -> npt.NDArray:
+        # Returns a mask of queries that are valid. Validity conditions:
+        # - At least one engine did not time out
+        # - Data stats are available for both Athena and Aurora
+        data = self.run_times.copy()
+        timeout_placeholder = 100000000.0
+        data[np.isnan(data)] = timeout_placeholder
+        rt_valid = np.any(data < timeout_placeholder, axis=1)
+        data_valid = np.all(self.data_accessed > 0, axis=1)
+        return rt_valid & data_valid
+
 
 def select_queries_from_mask(
     mask: npt.NDArray, num_to_select: int, seed: int = 42
@@ -183,60 +203,86 @@ if __name__ == "__main__":
     reg_20g_full = QueryDataset.load("IMDB_20GB/regular_rebalanced_5k")
     reg_100g = QueryDataset.load("IMDB_100GB/regular_rebalanced_2k/")
 
+    reg_100g_valid = reg_100g.valid_mask()
     athena_best_100g_mask, athena_best_100g = reg_100g.get_best_indices(Engine.Athena)
     aurora_best_100g_mask, aurora_best_100g = reg_100g.get_best_indices(Engine.Aurora)
     redshift_best_100g_mask, redshift_best_100g = reg_100g.get_best_indices(
         Engine.Redshift
     )
     close_100g_mask = (
-        (~athena_best_100g_mask) & (~aurora_best_100g_mask) & (~redshift_best_100g_mask)
+        (~athena_best_100g_mask)
+        & (~aurora_best_100g_mask)
+        & (~redshift_best_100g_mask)
+        & reg_100g_valid
     )
 
+    reg_20g_valid = reg_20g_full.valid_mask()
     athena_best_20g_mask, athena_best_20g = reg_20g_full.get_best_indices(Engine.Athena)
     aurora_best_20g_mask, aurora_best_20g = reg_20g_full.get_best_indices(Engine.Aurora)
     redshift_best_20g_mask, redshift_best_20g = reg_20g_full.get_best_indices(
         Engine.Redshift
     )
     close_20g_mask = (
-        (~athena_best_20g_mask) & (~aurora_best_20g_mask) & (~redshift_best_20g_mask)
+        (~athena_best_20g_mask)
+        & (~aurora_best_20g_mask)
+        & (~redshift_best_20g_mask)
+        & reg_20g_valid
     )
 
-    athena_test_queries = select_queries_from_mask(
-        (athena_best_100g_mask & athena_best_20g_mask[:2000]), num_to_select=25, seed=42
+    athena_test_queries_100 = select_queries_from_mask(
+        (athena_best_100g_mask & reg_100g_valid), num_to_select=25, seed=42
     )
-    aurora_test_queries = select_queries_from_mask(
-        (aurora_best_100g_mask & aurora_best_20g_mask[:2000]),
+    aurora_test_queries_100 = select_queries_from_mask(
+        (aurora_best_100g_mask & reg_100g_valid), num_to_select=25, seed=42 ^ 1
+    )
+    redshift_test_queries_100 = select_queries_from_mask(
+        (redshift_best_100g_mask & reg_100g_valid), num_to_select=25, seed=42 ^ 2
+    )
+    close_test_queries_100 = select_queries_from_mask(
+        (close_100g_mask & reg_100g_valid), num_to_select=25, seed=42 ^ 3
+    )
+
+    athena_test_queries_20 = select_queries_from_mask(
+        (athena_best_20g_mask[:2000] & reg_20g_valid[:2000]),
         num_to_select=25,
-        seed=42 ^ 1,
+        seed=42 ^ 4,
     )
-    redshift_test_queries = select_queries_from_mask(
-        (redshift_best_100g_mask & redshift_best_20g_mask[:2000]),
+    aurora_test_queries_20 = select_queries_from_mask(
+        (aurora_best_20g_mask[:2000] & reg_20g_valid[:2000]),
         num_to_select=25,
-        seed=42 ^ 2,
+        seed=42 ^ 5,
     )
-    close_test_queries = select_queries_from_mask(
-        (close_100g_mask & close_20g_mask[:2000]), num_to_select=25, seed=42 ^ 3
+    redshift_test_queries_20 = select_queries_from_mask(
+        (redshift_best_20g_mask[:2000] & reg_20g_valid[:2000]),
+        num_to_select=25,
+        seed=42 ^ 6,
+    )
+    close_test_queries_20 = select_queries_from_mask(
+        (close_20g_mask[:2000] & reg_20g_valid[:2000]), num_to_select=25, seed=42 ^ 7
+    )
+
+    test_100g = np.concatenate(
+        [
+            athena_test_queries_100,
+            aurora_test_queries_100,
+            redshift_test_queries_100,
+            close_test_queries_100,
+        ]
+    )
+    test_20g = np.concatenate(
+        [
+            athena_test_queries_20,
+            aurora_test_queries_20,
+            redshift_test_queries_20,
+            close_test_queries_20,
+        ]
     )
 
     reg_100g_test, reg_100g_train = reg_100g.split(
-        np.concatenate(
-            [
-                athena_test_queries,
-                aurora_test_queries,
-                redshift_test_queries,
-                close_test_queries,
-            ]
-        )
+        test_100g, np.concatenate([test_100g, test_20g])
     )
     reg_20g_test, reg_20g_train = reg_20g_full.split(
-        np.concatenate(
-            [
-                athena_test_queries,
-                aurora_test_queries,
-                redshift_test_queries,
-                close_test_queries,
-            ]
-        )
+        test_20g, np.concatenate([test_100g, test_20g])
     )
 
     # Serialize the split datasets. Modify as needed
