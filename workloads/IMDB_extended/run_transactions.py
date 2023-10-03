@@ -11,6 +11,7 @@ import os
 import pytz
 import multiprocessing as mp
 from datetime import datetime
+from typing import List, Tuple
 
 from brad.grpc_client import BradGrpcClient, BradClientError
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
@@ -47,7 +48,9 @@ def runner(
     ]
     lookup_theatre_id_by_name = 0.8
     txn_indexes = list(range(len(transactions)))
-    latencies = [[] for _ in range(len(transactions))]
+    latencies: List[List[Tuple[datetime, float]]] = [
+        [] for _ in range(len(transactions))
+    ]
     commits = [0 for _ in range(len(transactions))]
     aborts = [0 for _ in range(len(transactions))]
 

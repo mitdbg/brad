@@ -1,6 +1,7 @@
 import random
 import logging
 from datetime import datetime, timedelta
+from typing import List, Tuple, Any
 
 from brad.grpc_client import RowList, BradClientError
 from .database import Database
@@ -229,7 +230,7 @@ class TransactionWorker:
             return False
 
     def _make_note_edits(self, rows: RowList) -> RowList:
-        to_edit = []
+        to_edit: List[Tuple[Any, ...]] = []
         for row in rows:
             if row[1] is not None and row[1].endswith(_EDIT_NOTE_SUFFIX):
                 # Bump the number in the suffix.

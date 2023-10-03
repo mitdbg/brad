@@ -11,6 +11,7 @@ import os
 import pytz
 import multiprocessing as mp
 from datetime import datetime
+from typing import List, Tuple
 
 from brad.grpc_client import BradGrpcClient
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
@@ -42,7 +43,7 @@ def runner(
     ]
     query_weights = [0.4, 0.3, 0.3]
     query_indexes = list(range(len(queries)))
-    latencies = [[] for _ in range(len(queries))]
+    latencies: List[List[Tuple[datetime, float]]] = [[] for _ in range(len(queries))]
 
     try:
         # Connect.
@@ -59,14 +60,13 @@ def runner(
         start_queue.put("")
         _ = stop_queue.get()
 
-        overall_start = time.time()
         while True:
             q_idx = prng.choices(query_indexes, weights=query_weights, k=1)[0]
             query = queries[q_idx]
 
             now = datetime.now().astimezone(pytz.utc)
             query_start = time.time()
-            succeeded = query(db)
+            query(db)
             query_end = time.time()
 
             # Record metrics.
@@ -77,7 +77,6 @@ def runner(
                 break
             except queue.Empty:
                 pass
-        overall_end = time.time()
         print(
             f"[{worker_idx}] Done running geospatial queries.",
             flush=True,
