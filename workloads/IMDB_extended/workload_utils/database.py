@@ -1,10 +1,15 @@
 import pyodbc
 
+from typing import Tuple, Optional
+from brad.config.engine import Engine
 from brad.grpc_client import BradGrpcClient, RowList
 
 
 class Database:
     def execute_sync(self, query: str) -> RowList:
+        raise NotImplementedError
+
+    def execute_sync_with_engine(self, query: str) -> Tuple[RowList, Optional[Engine]]:
         raise NotImplementedError
 
     def commit_sync(self) -> None:
@@ -18,9 +23,10 @@ class Database:
 
 
 class PyodbcDatabase(Database):
-    def __init__(self, connection) -> None:
+    def __init__(self, connection, engine: Optional[Engine] = None) -> None:
         self._conn = connection
         self._cursor = self._conn.cursor()
+        self._engine = engine
 
     def execute_sync(self, query: str) -> RowList:
         self._cursor.execute(query)
@@ -29,6 +35,9 @@ class PyodbcDatabase(Database):
             return list(rows)
         except pyodbc.ProgrammingError:
             return []
+
+    def execute_sync_with_engine(self, query: str) -> Tuple[RowList, Optional[Engine]]:
+        return self.execute_sync(query), self._engine
 
     def commit_sync(self) -> None:
         self._cursor.execute("COMMIT")
@@ -47,6 +56,9 @@ class BradDatabase(Database):
     def execute_sync(self, query: str) -> RowList:
         rows, _ = self._brad.run_query_json(query)
         return rows
+
+    def execute_sync_with_engine(self, query: str) -> Tuple[RowList, Optional[Engine]]:
+        return self._brad.run_query_json(query)
 
     def commit_sync(self) -> None:
         self._brad.run_query_ignore_results("COMMIT")
