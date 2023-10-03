@@ -21,7 +21,7 @@ from typing import Dict
 
 def build_query_map(query_bank: str) -> Dict[str, int]:
     queries = []
-    with open(query_bank, "r") as file:
+    with open(query_bank, "r", encoding="UTF-8") as file:
         for line in file:
             query = line.strip()
             if query:
@@ -64,6 +64,7 @@ def runner(
 
     # For printing out results.
     if "COND_OUT" in os.environ:
+        # pylint: disable-next=import-error
         import conductor.lib as cond
 
         out_dir = cond.get_output_path()
@@ -73,7 +74,9 @@ def runner(
     database = connect_to_db(args, runner_idx)
     try:
         with open(
-            out_dir / "repeating_olap_batch_{}.csv".format(runner_idx), "w"
+            out_dir / "repeating_olap_batch_{}.csv".format(runner_idx),
+            "w",
+            encoding="UTF-8",
         ) as file:
             print("timestamp,query_idx,run_time_s,engine", file=file, flush=True)
 
@@ -158,7 +161,7 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
     database = connect_to_db(args, worker_index=0)
 
     try:
-        with open("repeating_olap_batch_warmup.csv", "w") as file:
+        with open("repeating_olap_batch_warmup.csv", "w", encoding="UTF-8") as file:
             print("timestamp,query_idx,run_time_s,engine", file=file)
             for idx, qidx in enumerate(queries):
                 try:

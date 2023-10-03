@@ -99,7 +99,7 @@ class TransactionWorker:
             db.commit_sync()
             return True
 
-        except:
+        except:  # pylint: disable=bare-except
             logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
@@ -149,7 +149,7 @@ class TransactionWorker:
             db.commit_sync()
             return True
 
-        except:
+        except:  # pylint: disable=bare-except
             logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
@@ -224,7 +224,7 @@ class TransactionWorker:
             db.rollback_sync()
             return False
 
-        except:
+        except:  # pylint: disable=bare-except
             logger.exception("Need to rollback.")
             db.rollback_sync()
             return False

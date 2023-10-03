@@ -65,6 +65,7 @@ def generate_theatres(ctx: Context) -> int:
             loc_x = ctx.prng.random() * ctx.location_range + ctx.args.location_min
             loc_y = ctx.prng.random() * ctx.location_range + ctx.args.location_min
             print(
+                # pylint: disable-next=duplicate-string-formatting-argument
                 "{}|Theatre #{}|{:.4f}|{:.4f}".format(t, t, loc_x, loc_y),
                 file=out,
             )

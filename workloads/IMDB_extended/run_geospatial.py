@@ -33,7 +33,7 @@ def runner(
 
     signal.signal(signal.SIGINT, noop_handler)
 
-    worker = GeospatialWorker(worker_idx, args.seed ^ worker_idx, args.scale_factor)
+    worker = GeospatialWorker(worker_idx, args.seed ^ worker_idx)
 
     prng = random.Random(~(args.seed ^ worker_idx))
     queries = [
@@ -86,6 +86,7 @@ def runner(
     finally:
         # For printing out results.
         if "COND_OUT" in os.environ:
+            # pylint: disable-next=import-error
             import conductor.lib as cond
 
             out_dir = cond.get_output_path()
@@ -93,7 +94,9 @@ def runner(
             out_dir = pathlib.Path(".")
 
         with open(
-            out_dir / "geospatial_latency_{}.csv".format(worker_idx), "w"
+            out_dir / "geospatial_latency_{}.csv".format(worker_idx),
+            "w",
+            encoding="UTF-8",
         ) as file:
             print("query_idx,timestamp,run_time_s", file=file)
             for qidx, lat_list in enumerate(latencies):

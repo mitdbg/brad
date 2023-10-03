@@ -74,8 +74,8 @@ def runner(
     start_queue.put("")
     _ = stop_queue.get()
 
+    overall_start = time.time()
     try:
-        overall_start = time.time()
         while True:
             txn_idx = txn_prng.choices(txn_indexes, weights=transaction_weights, k=1)[0]
             txn = transactions[txn_idx]
@@ -83,6 +83,7 @@ def runner(
             now = datetime.now().astimezone(pytz.utc)
             txn_start = time.time()
             try:
+                # pylint: disable-next=comparison-with-callable
                 if txn == worker.purchase_tickets:
                     succeeded = txn(
                         db,
@@ -135,19 +136,24 @@ def runner(
 
         # For printing out results.
         if "COND_OUT" in os.environ:
+            # pylint: disable-next=import-error
             import conductor.lib as cond
 
             out_dir = cond.get_output_path()
         else:
             out_dir = pathlib.Path(".")
 
-        with open(out_dir / "oltp_latency_{}.csv".format(worker_idx), "w") as file:
+        with open(
+            out_dir / "oltp_latency_{}.csv".format(worker_idx), "w", encoding="UTF-8"
+        ) as file:
             print("txn_idx,timestamp,run_time_s", file=file)
             for tidx, lat_list in enumerate(latencies):
                 for timestamp, lat in lat_list:
                     print("{},{},{}".format(tidx, timestamp, lat), file=file)
 
-        with open(out_dir / "oltp_stats_{}.csv".format(worker_idx), "w") as file:
+        with open(
+            out_dir / "oltp_stats_{}.csv".format(worker_idx), "w", encoding="UTF-8"
+        ) as file:
             print("stat,value", file=file)
             print(f"overall_run_time_s,{overall_end - overall_start}", file=file)
             print(f"purchase_commits,{commits[0]}", file=file)
