@@ -1,26 +1,50 @@
 import random
 import logging
 from datetime import datetime, timedelta
+from typing import List, Tuple, Any
 
 from brad.grpc_client import RowList, BradClientError
 from .database import Database
+from .dataset_config import (
+    MIN_MOVIE_ID,
+    THEATRES_PER_SF,
+    MIN_THEATRE_ID,
+    MIN_CAPACITY,
+    MAX_CAPACITY,
+    MAX_MOVIE_ID_ORIGINAL,
+    MAX_MOVIE_ID_20GB,
+    MAX_MOVIE_ID_100GB,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class TransactionWorker:
-    def __init__(self, worker_id: int, seed: int, scale_factor: int) -> None:
+    def __init__(
+        self,
+        worker_id: int,
+        seed: int,
+        scale_factor: int,
+        dataset_type: str = "original",
+    ) -> None:
         self.worker_id = worker_id
         self.prng = random.Random(seed)
 
-        self.min_movie_id = 1
-        self.max_movie_id = 3870547
-        self.min_theatre_id = 1
-        self.max_theatre_id = 1000 * scale_factor
+        self.min_movie_id = MIN_MOVIE_ID
+        if dataset_type == "original":
+            self.max_movie_id = MAX_MOVIE_ID_ORIGINAL
+        elif dataset_type == "20gb":
+            self.max_movie_id = MAX_MOVIE_ID_20GB
+        elif dataset_type == "100gb":
+            self.max_movie_id = MAX_MOVIE_ID_100GB
+        else:
+            raise RuntimeError(dataset_type)
+        self.min_theatre_id = MIN_THEATRE_ID
+        self.max_theatre_id = THEATRES_PER_SF * scale_factor
         self.offset_date = datetime(year=2023, month=7, day=18)
 
         self.showings_to_add = (1, 3)  # [min, max]
-        self.showing_capacity = (200, 400)  # [min, max]
+        self.showing_capacity = (MIN_CAPACITY, MAX_CAPACITY)  # [min, max]
         self.showings_to_consider = (1, 5)  # [min, max]
         self.ticket_quantity = (1, 2)  # [min, max]
         self.loc_max = 1e6
@@ -75,7 +99,7 @@ class TransactionWorker:
             db.commit_sync()
             return True
 
-        except:
+        except:  # pylint: disable=bare-except
             logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
@@ -125,7 +149,7 @@ class TransactionWorker:
             db.commit_sync()
             return True
 
-        except:
+        except:  # pylint: disable=bare-except
             logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
@@ -200,13 +224,13 @@ class TransactionWorker:
             db.rollback_sync()
             return False
 
-        except:
+        except:  # pylint: disable=bare-except
             logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
 
     def _make_note_edits(self, rows: RowList) -> RowList:
-        to_edit = []
+        to_edit: List[Tuple[Any, ...]] = []
         for row in rows:
             if row[1] is not None and row[1].endswith(_EDIT_NOTE_SUFFIX):
                 # Bump the number in the suffix.
