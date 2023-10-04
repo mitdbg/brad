@@ -1,0 +1,14 @@
+include("../common.cond")
+
+run_experiment(
+  name="brad_100g",
+  run="./run_workload.sh",
+  options={
+    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
+    "config-file": "config/config_100g.yml",
+    "planner-config-file": "config/planner.yml",
+    # TODO: Select regular query indexes
+    "ra-query-indexes": "0,1,2",
+    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+  },
+)
