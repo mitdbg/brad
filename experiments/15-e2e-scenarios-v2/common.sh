@@ -61,6 +61,7 @@ function poll_file_for_event() {
     elapsed_time=$(( $(date +%s) - $start_time ))
     if [[ $elapsed_time -ge $((timeout_minutes * 60)) ]]; then
       >&2 echo "Timeout reached. Did not detect $event_name within $timeout_minutes minutes."
+      log_workload_point "timeout_poll_${event_name}"
       break
     fi
 
