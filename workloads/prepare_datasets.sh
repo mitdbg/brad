@@ -8,6 +8,7 @@ cd $script_loc
 
 if [ -z $5 ]; then
   >&2 echo "Usage: $0 out_name dataset_dir_prefix athena_parsed aurora_parsed redshift_parsed"
+  exit 1
 fi
 
 out_name=$1
@@ -20,6 +21,7 @@ redshift_parsed=$5
 set -e
 
 # 1. Make the output directory.
+PREFIX="${PREFIX:-.}"
 out_dir=$PREFIX/$out_name
 mkdir -p $out_dir
 
@@ -31,6 +33,7 @@ function split_parsed() {
     --out-file-1 $3
 }
 
+echo "--- Running train/test split ---"
 mkdir $out_dir/run_time
 
 split_parsed $athena_parsed ${dataset_dir_prefix}_train/queries.sql $out_dir/run_time/athena_${out_name}_train.json
@@ -44,19 +47,26 @@ split_parsed $redshift_parsed ${dataset_dir_prefix}_test/queries.sql $out_dir/ru
 
 # 3. Clean up the data.
 function fix_missing_rt() {
-  python3 ../tools/one_off/fix_missing_run_times.py --in-file $1
+  python3 ../tools/one_off/fix_missing_parsed_run_times.py --in-file $1
 }
-find "$out_dir/run_time" -type f -name "*.json" | xargs fix_missing_rt
+
+echo "--- Cleaning up missing run times ---"
+for datafile in $(find "$out_dir/run_time" -type f -name "*.json"); do
+  fix_missing_rt $datafile
+done
 
 pushd $out_dir/run_time
-rm *.orig
+rm *.json_orig
 popd
 
 # 3. Run run time data augmentation.
-mkdir $out_dir/run_time_augmented
+mkdir -p $out_dir/run_time_augmented
 
 function run_augmentation() {
   python3 ../run_cost_model.py --argment_dataset --workload_runs $2 --target $1
 }
 
-find "$out_dir/run_time" -type f -name "*_train.json" | xargs run_augmentation $out_dir/run_time_augmented
+echo "--- Running data augmentation ---"
+for datafile in $(find "$out_dir/run_time" -type f -name "*_train.json"); do
+  run_augmentation $out_dir/run_time_augmented $datafile
+done
