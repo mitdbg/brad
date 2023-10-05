@@ -16,7 +16,7 @@ from datetime import datetime
 from brad.grpc_client import BradGrpcClient, BradClientError
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
 from workload_utils.transaction_worker import TransactionWorker
-from workloads.IMDB_extended.workload_utils.baseline import make_tidb_conn
+from workloads.IMDB_extended.workload_utils.baseline import make_tidb_conn, make_postgres_compatible_conn
 
 
 def runner(
@@ -58,6 +58,8 @@ def runner(
         db: Database = PyodbcDatabase(pyodbc.connect(os.environ[args.cstr_var]))
     elif args.tidb:
         db: Database = PyodbcDatabase(make_tidb_conn())
+    elif args.aurora:
+        db: Database = PyodbcDatabase(make_postgres_compatible_conn("aurora"))
     else:
         port_offset = worker_idx % args.num_front_ends
         brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
@@ -185,6 +187,12 @@ def main():
     )
     parser.add_argument(
         "--tidb",
+        default=False,
+        action="store_true",
+        help="Environment variable that whether to run a TIDB benchmark through ODBC or not",
+    )
+    parser.add_argument(
+        "--aurora",
         default=False,
         action="store_true",
         help="Environment variable that whether to run a TIDB benchmark through ODBC or not",
