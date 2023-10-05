@@ -1,9 +1,11 @@
 import collections
 import json
 import numpy as np
+import pandas as pd
 import psycopg2
 from tqdm import tqdm
 from types import SimpleNamespace
+from typing import Dict, Any
 
 from workloads.cross_db_benchmark.benchmark_tools.database import DatabaseSystem
 from workloads.cross_db_benchmark.benchmark_tools.aurora.utils import (
@@ -363,6 +365,31 @@ def refine_db_stats(database_stats, db_conn=None, cursor=None):
     return database_stats
 
 
+def extract_total_blocks_accessed(df: pd.DataFrame) -> int:
+    rel = df[df["relname"].str.endswith("_brad_source")]
+    blks_accessed = (
+        rel["heap_blks_read"]
+        + rel["heap_blks_hit"]
+        + rel["idx_blks_read"]
+        + rel["idx_blks_hit"]
+    )
+    return blks_accessed.sum()
+
+
+def compute_blocks_accessed(raw_stats) -> int:
+    pre = raw_stats.pre
+    post = raw_stats.post
+
+    pre_df = pd.DataFrame.from_records(pre.physical.data, columns=pre.physical.cols)
+    post_df = pd.DataFrame.from_records(post.physical.data, columns=post.physical.cols)
+
+    # We record data access stats before and after executing the query. The
+    # difference in the counters is the number of blocks accessed by this query.
+    pre_blocks = extract_total_blocks_accessed(pre_df)
+    post_blocks = extract_total_blocks_accessed(post_df)
+    return int(post_blocks - pre_blocks)
+
+
 def parse_plans_with_query_aurora(
     run_stats,
     min_runtime=100,
@@ -382,6 +409,7 @@ def parse_plans_with_query_aurora(
     cap_queries=None,
     target_path=None,
     is_brad=True,
+    include_no_joins=False,
 ):
     # keep track of column statistics
     if zero_card_min_runtime is None:
@@ -436,6 +464,8 @@ def parse_plans_with_query_aurora(
     avg_runtimes = []
     no_tables = []
     no_filters = []
+    blocks_accessed = []
+    skipped = []
     for query_no, q in enumerate(tqdm(run_stats.query_list)):
         # either only parse explain part of query or skip entirely
         is_timeout = False
@@ -445,27 +475,32 @@ def parse_plans_with_query_aurora(
             if include_timeout:
                 is_timeout = True
             else:
+                skipped.append(query_no)
                 continue
 
         alias_dict = dict()
         if not curr_explain_only and not is_timeout:
             if q.analyze_plans is None:
                 print(f"parsed_query {query_no} no analyze plans")
+                skipped.append(query_no)
                 continue
 
             if len(q.analyze_plans) == 0:
                 print(f"parsed_query {query_no} no analyze plans")
+                skipped.append(query_no)
                 continue
 
             # subqueries are currently not supported
             analyze_str = "".join([l[0] for l in q.verbose_plan])
             if "SubPlan" in analyze_str or "InitPlan" in analyze_str:
                 print(f"parsed_query {query_no} contains SubPlan or InitPlan")
+                skipped.append(query_no)
                 continue
 
             # subquery is empty due to logical constraints
             if "->  Result  (cost=0.00..0.00 rows=0" in analyze_str:
                 print(f"parsed_query {query_no} is empty")
+                skipped.append(query_no)
                 continue
 
             # check if it just initializes a plan
@@ -475,6 +510,7 @@ def parse_plans_with_query_aurora(
                 analyze_plan_string = "".join(q.analyze_plans)
             if init_plan_regex.search(analyze_plan_string) is not None:
                 print(f"parsed_query {query_no} init_plan_regex incorrect")
+                skipped.append(query_no)
                 continue
 
             # compute average execution and planning times
@@ -552,18 +588,22 @@ def parse_plans_with_query_aurora(
             # check if result is None
             if analyze_plan.min_card() == 0 and not include_zero_card:
                 print(f"parsed_query {query_no} has zero_card")
+                skipped.append(query_no)
                 continue
 
             elif analyze_plan.min_card() == 0 and avg_runtime < zero_card_min_runtime:
                 print(f"parsed_query {query_no} has zero_card and runtime too small")
+                skipped.append(query_no)
                 continue
 
             if min_runtime is not None and avg_runtime < min_runtime:
                 print(f"parsed_query {query_no} runtime too small")
+                skipped.append(query_no)
                 continue
 
             if avg_runtime > max_runtime:
                 print(f"parsed_query {query_no} runtime too large")
+                skipped.append(query_no)
                 continue
 
         # parsed_query = None
@@ -583,18 +623,44 @@ def parse_plans_with_query_aurora(
             is_brad=is_brad,
             cache=cache,
         )
+        parsed_query["query_index"] = query_no
         if "tables" in analyze_plan:
             analyze_plan["tables"] = list(analyze_plan["tables"])
         else:
             analyze_plan["tables"] = []
-        if parsed_query is not None and len(parsed_query["join_nodes"]) != 0:
+        if parsed_query is not None and (
+            len(parsed_query["join_nodes"]) != 0 or include_no_joins
+        ):
             parsed_queries.append(parsed_query)
             parsed_plans.append(analyze_plan)
             sql_queries.append(q.sql)
+
+            # Extract data accessed stats.
+            # There is more than one `stat_run` if we ran the query more than once.
+            if hasattr(q, "data_stats") and len(q.data_stats) > 0:
+                recorded_blocks = []
+                for stat_run in q.data_stats:
+                    recorded_blocks.append(compute_blocks_accessed(stat_run))
+
+                if any(map(lambda b: b < 0, recorded_blocks)):
+                    print(
+                        f"Warning: Query {query_no} has invalid (< 0) blocks accessed stats."
+                    )
+                    blocks_accessed.append(0)
+                else:
+                    # In theory the number of blocks accessed should be
+                    # deterministic, so all the values in this list should be the
+                    # same. To be conservative, we record the max.
+                    blocks_accessed.append(max(recorded_blocks))
+            else:
+                blocks_accessed.append(None)
+
         elif parsed_query is None:
             print(f"parsed_query {query_no} is none")
+            skipped.append(query_no)
         else:
             print(f"parsed_query {query_no} has no join")
+            skipped.append(query_no)
 
         if cap_queries is not None and len(parsed_plans) >= cap_queries:
             print(f"Parsed {cap_queries} queries. Stopping parsing.")
@@ -607,7 +673,10 @@ def parse_plans_with_query_aurora(
                 sql_queries=sql_queries,
                 database_stats=database_stats,
                 run_kwargs=run_stats.run_kwargs,
+                skipped=skipped,
             )
+            if not all(map(lambda ba: ba is None, blocks_accessed)):
+                parsed_runs["blocks_accessed"] = blocks_accessed
             with open(target_path, "w") as outfile:
                 json.dump(parsed_runs, outfile, default=dumper)
 
@@ -617,7 +686,11 @@ def parse_plans_with_query_aurora(
         sql_queries=sql_queries,
         database_stats=database_stats,
         run_kwargs=run_stats.run_kwargs,
+        skipped=skipped,
     )
+
+    if not all(map(lambda ba: ba is None, blocks_accessed)):
+        parsed_runs["blocks_accessed"] = blocks_accessed
 
     stats = dict(
         runtimes=str(avg_runtimes), no_tables=str(no_tables), no_filters=str(no_filters)

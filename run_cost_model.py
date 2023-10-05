@@ -60,6 +60,7 @@ def parse_queries_wrapper(
         zero_card_min_runtime=args.min_query_ms * 5,
         target_path=target,
         is_brad=is_brad,
+        include_no_joins=args.include_no_joins,
     )
     with open(target, "w") as outfile:
         json.dump(parsed_runs, outfile, default=dumper)
@@ -115,10 +116,15 @@ if __name__ == "__main__":
     parser.add_argument("--target", default="../zero-shot-data/evaluation/imdb_aurora/")
     parser.add_argument("--source", default="")
     parser.add_argument("--repetitions_per_query", default=1, type=int)
-    parser.add_argument("--cap_workload", default=10000, type=int)
+    parser.add_argument("--cap_workload", default=100000, type=int)
     parser.add_argument("--with_indexes", action="store_true")
     parser.add_argument("--run_workload", action="store_true")
     parser.add_argument("--re_execute_query_with_no_result", action="store_true")
+    # Used to parallelize the data collection.
+    parser.add_argument("--run_workload_rank", default=0, type=int)
+    parser.add_argument("--run_workload_world_size", default=1, type=int)
+    # Needed when collecting data on Athena.
+    parser.add_argument("--s3_output_path", type=str)
 
     # Parse workload command
     parser.add_argument("--parse_plans", action="store_true")
@@ -132,6 +138,7 @@ if __name__ == "__main__":
     parser.add_argument("--aurora_workload_runs", default=None, nargs="+")
     parser.add_argument("--argment_dataset", action="store_true")
     parser.add_argument("--is_brad", action="store_true")
+    parser.add_argument("--include_no_joins", action="store_true")
 
     # Training cost model command
     parser.add_argument("--workload_runs", default=None, nargs="+")
@@ -220,7 +227,36 @@ if __name__ == "__main__":
                 max_no_group_by=0,
                 max_cols_per_agg=1,
                 complex_predicates=True,
+                max_no_joins=10,
+                min_no_joins=4,
+                max_no_predicates=6,
+                min_no_predicates=2,
                 seed=1,
+            ),
+            "simple_workload_25k_s1": dict(
+                num_queries=25000,
+                max_no_aggregates=2,
+                max_no_group_by=1,
+                max_cols_per_agg=1,
+                complex_predicates=True,
+                max_no_joins=2,
+                min_no_joins=0,
+                max_no_predicates=4,
+                min_no_predicates=1,
+                seed=1,
+            ),
+            # this even simpler
+            "simple_workload_25k_s2": dict(
+                num_queries=25000,
+                max_no_aggregates=2,
+                max_no_group_by=1,
+                max_cols_per_agg=1,
+                complex_predicates=False,
+                max_no_joins=2,
+                min_no_joins=0,
+                max_no_predicates=4,
+                min_no_predicates=1,
+                seed=2,
             ),
         }
 
@@ -243,10 +279,6 @@ if __name__ == "__main__":
                 generate_workload(
                     dataset.source_dataset,
                     workload_path,
-                    max_no_joins=dataset.max_no_joins,
-                    min_no_joins=dataset.min_no_joins,
-                    max_no_predicates=dataset.max_no_predicates,
-                    min_no_predicates=dataset.min_no_predicates,
                     no_joins_dist=no_joins_dist,
                     **workload_args,
                     force=args.force,
@@ -268,6 +300,9 @@ if __name__ == "__main__":
             cap_workload=args.cap_workload,
             min_runtime=args.min_query_ms,
             re_execute_query=args.re_execute_query_with_no_result,
+            rank=args.run_workload_rank,
+            world_size=args.run_workload_world_size,
+            s3_output_path=args.s3_output_path,
         )
 
     if args.parse_plans:

@@ -2,6 +2,7 @@ import collections
 import json
 import os.path
 import numpy as np
+import statistics
 import psycopg2
 from tqdm import tqdm
 
@@ -33,6 +34,7 @@ def parse_queries_redshift(
     cap_queries=None,
     target_path=None,
     is_brad=False,
+    include_no_joins=False,
 ):
     assert len(run_stats.query_list) == len(aurora_run_stats.query_list)
     db_conn = None
@@ -66,6 +68,7 @@ def parse_queries_redshift(
     no_tables = []
     no_filters = []
     start_idx = 0
+    skipped = []
     if target_path is not None and os.path.exists(target_path):
         # TODO: loading from previous parsed plan is somewhat incorrect
         try:
@@ -113,17 +116,23 @@ def parse_queries_redshift(
             if include_timeout:
                 is_timeout = True
             else:
+                skipped.append(query_no)
                 continue
 
         alias_dict = dict()
         if is_timeout:
             runtime = max_runtime * np.uniform(1, 3)
+        elif hasattr(q, "runtimes") and len(q.runtimes) > 1:
+            # We ran for more than one repetition.
+            # Always discard the first run to exclude compilation overhead (Redshift).
+            runtime = statistics.mean(q.runtimes[1:]) * 1000
         else:
             runtime = q.runtime * 1000
 
         # only explain plan (not executed)
         if aurora_q.verbose_plan is None:
             print(f"Aurora has no verbose plan for query {query_no}")
+            skipped.append(query_no)
             continue
         verbose_plan, _, _ = parse_plan(
             aurora_q.verbose_plan, analyze=False, parse=True
@@ -161,10 +170,12 @@ def parse_queries_redshift(
 
         if min_runtime is not None and runtime < min_runtime:
             print(f"parsed_query {query_no} runtime too small")
+            skipped.append(query_no)
             continue
 
         if runtime > max_runtime:
             print(f"parsed_query {query_no} runtime too large")
+            skipped.append(query_no)
             continue
 
         # parsed_query = None
@@ -184,18 +195,25 @@ def parse_queries_redshift(
             is_brad=is_brad,
             cache=cache,
         )
+        parsed_query["query_index"] = query_no
         if "tables" in verbose_plan:
             verbose_plan["tables"] = list(verbose_plan["tables"])
         else:
             verbose_plan["tables"] = []
-        if parsed_query is not None and len(parsed_query["join_nodes"]) != 0:
+        if parsed_query is not None and (
+            len(parsed_query["join_nodes"]) != 0 or include_no_joins
+        ):
             parsed_queries.append(parsed_query)
             parsed_plans.append(verbose_plan)
             sql_queries.append(q.sql)
+
         elif parsed_query is None:
             print(f"parsed_query {query_no} is none")
+            skipped.append(query_no)
+
         else:
             print(f"parsed_query {query_no} has no join")
+            skipped.append(query_no)
 
         if cap_queries is not None and len(parsed_plans) >= cap_queries:
             print(f"Parsed {cap_queries} queries. Stopping parsing.")
@@ -208,6 +226,7 @@ def parse_queries_redshift(
                 sql_queries=sql_queries,
                 database_stats=database_stats,
                 run_kwargs=run_kwargs,
+                skipped=skipped,
             )
             with open(target_path, "w") as outfile:
                 json.dump(parsed_runs, outfile, default=dumper)
@@ -218,6 +237,7 @@ def parse_queries_redshift(
         sql_queries=sql_queries,
         database_stats=database_stats,
         run_kwargs=run_kwargs,
+        skipped=skipped,
     )
 
     stats = dict(

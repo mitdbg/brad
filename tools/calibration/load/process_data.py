@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 
-def load_metrics(metrics_file: str) -> pd.DataFrame:
+def load_metrics(metrics_file: pathlib.Path | str) -> pd.DataFrame:
     metrics = {
         "redshift_CPUUtilization_Average": "cpu",
         "redshift_ReadIOPS_Average": "riops",
@@ -45,13 +45,13 @@ def load_data(data_dir: str) -> pd.DataFrame:
             for client in range(num_clients):
                 df = pd.read_csv(exp_inst / f"runner_{client}.csv")
                 data.append(df)
-            data = pd.concat(data, ignore_index=True)
-            data = data.groupby("query_idx").mean().reset_index()
+            data_df = pd.concat(data, ignore_index=True)
+            data_df = data_df.groupby("query_idx").mean().reset_index()
 
-            data.insert(0, "instance", instance)
-            data.insert(1, "num_nodes", num_nodes)
-            data.insert(2, "num_clients", num_clients)
-            run_times.append(data)
+            data_df.insert(0, "instance", instance)
+            data_df.insert(1, "num_nodes", num_nodes)
+            data_df.insert(2, "num_clients", num_clients)
+            run_times.append(data_df)
 
             # Metrics
             metrics = load_metrics(exp_inst / "metrics.csv")

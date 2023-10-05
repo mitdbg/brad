@@ -517,7 +517,7 @@ def generate_workload(
     os.makedirs(target_dir, exist_ok=True)
     with open(target_path, "w") as text_file:
         text_file.write("\n".join([q for k, q in zip(keep, queries) if k]))
-    with open(target_path + "_histogram", "w") as text_file:
+    with open(target_path.split(".sql")[0] + "_histogram", "w") as text_file:
         text_file.write(",".join([str(i) for i in count_per_no_joins]) + "\n")
 
 

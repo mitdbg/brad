@@ -22,7 +22,7 @@ def generate_string_stats(
 ):
     # read the schema file
     string_stats_path = os.path.join(
-        "cross_db_benchmark/datasets/", dataset, "string_statistics.json"
+        "workloads/cross_db_benchmark/datasets/", dataset, "string_statistics.json"
     )
     if os.path.exists(string_stats_path) and not force:
         print("String stats already created")

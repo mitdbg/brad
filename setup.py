@@ -57,6 +57,7 @@ DEV_REQUIRES = [
     "attrs",
     "typing-extensions",
     "types-tabulate",
+    "tqdm",
 ]
 
 KEYWORDS = []

@@ -8,7 +8,10 @@ from json.decoder import JSONDecodeError
 from tqdm import tqdm
 
 from workloads.cross_db_benchmark.benchmark_tools.load_database import create_db_conn
-from workloads.cross_db_benchmark.benchmark_tools.utils import load_json
+from workloads.cross_db_benchmark.benchmark_tools.utils import (
+    load_json,
+    compute_workload_splits,
+)
 from workloads.cross_db_benchmark.benchmark_tools.database import DatabaseSystem
 
 column_regex = re.compile('"(\S+)"."(\S+)"')
@@ -76,6 +79,8 @@ def run_aurora_workload(
     repetitions_per_query,
     timeout_sec,
     cap_workload,
+    rank,
+    world_size,
 ):
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
@@ -84,6 +89,16 @@ def run_aurora_workload(
     with open(workload_path) as f:
         content = f.readlines()
     sql_queries = [x.strip() for x in content]
+
+    start_offset, end_offset = compute_workload_splits(
+        len(sql_queries), rank, world_size
+    )
+    print("----------------------------------")
+    print("Rank:", rank)
+    print("World size:", world_size)
+    print("Running queries in range: [{}, {})".format(start_offset, end_offset))
+    print("----------------------------------")
+    relevant_queries = sql_queries[start_offset:end_offset]
 
     hint_list = ["" for _ in sql_queries]
 
@@ -113,7 +128,7 @@ def run_aurora_workload(
     # extract query plans
     start_t = time.perf_counter()
     valid_queries = 0
-    for i, sql_query in enumerate(tqdm(sql_queries)):
+    for i, sql_query in enumerate(tqdm(relevant_queries)):
         if cap_workload and i >= cap_workload:
             break
         if sql_query in seen_queries:
@@ -125,6 +140,7 @@ def run_aurora_workload(
         )
         curr_statistics.update(sql=sql_query)
         curr_statistics.update(hint=hint)
+        curr_statistics.update(query_index=i)
         query_list.append(curr_statistics)
 
         run_stats = dict(
@@ -181,5 +197,5 @@ def save_workload(run_stats, target_path):
         os.path.dirname(target_path), f"{os.path.basename(target_path)}_temp"
     )
     with open(target_temp_path, "w") as outfile:
-        json.dump(run_stats, outfile)
+        json.dump(run_stats, outfile, default=str)
     shutil.move(target_temp_path, target_path)

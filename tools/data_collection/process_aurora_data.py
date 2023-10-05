@@ -18,7 +18,7 @@ def load_data(data_path, prefix):
         if parts[1] != prefix:
             continue
 
-        with open(exp, "r") as file:
+        with open(exp, "r", encoding="UTF-8") as file:
             raw_json = json.load(file)
 
         for query in raw_json:

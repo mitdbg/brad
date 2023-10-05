@@ -1,15 +1,13 @@
 import random
 import logging
-from datetime import datetime, timedelta
 
-from brad.grpc_client import RowList
 from .database import Database
 
 logger = logging.getLogger(__name__)
 
 
 class GeospatialWorker:
-    def __init__(self, worker_id: int, seed: int, scale_factor: int) -> None:
+    def __init__(self, worker_id: int, seed: int) -> None:
         self.worker_id = worker_id
         self.prng = random.Random(seed)
 
@@ -36,7 +34,7 @@ class GeospatialWorker:
             db.execute_sync(query)
             return True
 
-        except:
+        except:  # pylint: disable=bare-except
             return False
 
     def query2(self, db: Database) -> bool:
@@ -67,7 +65,7 @@ class GeospatialWorker:
             db.execute_sync(query)
             return True
 
-        except:
+        except:  # pylint: disable=bare-except
             return False
 
     def query3(self, db: Database) -> bool:
@@ -88,5 +86,5 @@ class GeospatialWorker:
             db.execute_sync(query)
             return True
 
-        except:
+        except:  # pylint: disable=bare-except
             return False
