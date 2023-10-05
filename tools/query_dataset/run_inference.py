@@ -44,6 +44,7 @@ def main():
     predictions = model.predict(queries, conn)
 
     if args.undo_log:
+        print("Undoing natural log...")
         predictions = np.exp(predictions)
 
     np.save(args.out_file, predictions)

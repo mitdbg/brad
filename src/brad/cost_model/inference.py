@@ -7,6 +7,7 @@ import pathlib
 import json
 import numpy.typing as npt
 from typing import Any, Dict, List, Tuple
+from types import SimpleNamespace
 
 import brad.cost_model.setup.tuned_hyperparameters as hp
 from brad.config.engine import Engine
@@ -36,7 +37,7 @@ class TrainedModel:
             loss_class_name="QLoss",
         )
         with open(database_stats_file, encoding="UTF-8") as file:
-            database_stats = json.load(file)
+            database_stats = json.load(file, object_hook=lambda d: SimpleNamespace(**d))
         _rename_database_stats(database_stats)
         return cls(model, feature_statistics, engine, database_stats)
 
@@ -45,7 +46,7 @@ class TrainedModel:
         model: Any,
         feature_stats: Dict[str, Any],
         engine: Engine,
-        database_stats: Dict[str, Any],
+        database_stats: SimpleNamespace,
     ) -> None:
         self._model = model
         self._feature_stats = feature_stats
@@ -275,7 +276,7 @@ def _load_model(
 
 
 def _parse_query_for_brad(
-    queries: List[str], database_stats: Dict[str, Any], sidecar_connection: Connection
+    queries: List[str], database_stats: SimpleNamespace, sidecar_connection: Connection
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     column_id_mapping = dict()
     table_id_mapping = dict()
@@ -284,19 +285,19 @@ def _parse_query_for_brad(
 
     # enrich column stats with table sizes
     table_sizes = dict()
-    for table_stat in database_stats["table_stats"]:
-        table_sizes[table_stat["relname"]] = table_stat["reltuples"]
+    for table_stat in database_stats.table_stats:
+        table_sizes[table_stat.relname] = table_stat.reltuples
 
-    for i, column_stat in enumerate(database_stats["column_stats"]):
-        table = column_stat["tablename"]
-        column = column_stat["attname"]
-        column_stat["table_size"] = table_sizes[table]
+    for i, column_stat in enumerate(database_stats.column_stats):
+        table = column_stat.tablename
+        column = column_stat.attname
+        column_stat.table_size = table_sizes[table]
         column_id_mapping[(table, column)] = i
         partial_column_name_mapping[column].add(table)
 
     # similar for table statistics
-    for i, table_stat in enumerate(database_stats["table_stats"]):
-        table = table_stat["relname"]
+    for i, table_stat in enumerate(database_stats.table_stats):
+        table = table_stat.relname
         table_id_mapping[table] = i
 
     parsed_queries: List[Any] = []
@@ -317,7 +318,7 @@ def _parse_query_for_brad(
         verbose_plan = None
         try:
             cursor.execute_sync(f"EXPLAIN VERBOSE {sql}")
-            verbose_plan = cursor.fetchall_sync()
+            verbose_plan = [r[0] for r in cursor.fetchall_sync()]
         except:  # pylint: disable=bare-except
             print(f"WARNING skipping query {i}: {sql} due to error in Aurora EXPLAIN")
             skipped_query_idx.append(i)
