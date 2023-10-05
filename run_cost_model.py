@@ -353,7 +353,7 @@ if __name__ == "__main__":
         for i, workload_file in enumerate(args.workload_runs):
             target = os.path.join(
                 args.target,
-                workload_file.split("/")[-1].split(".json")[0] + "_argmented.json",
+                workload_file.split("/")[-1].split(".json")[0] + "_augmented.json",
             )
             argment_dataset(workload_file, target)
 
