@@ -28,6 +28,7 @@ class TrainedModel:
         model_path = pathlib.Path(model_file)
         model, feature_statistics = _load_model(
             statistics_file=stats_file,
+            engine=engine,
             filename_model=model_path.name,
             hyperparams=_load_hyperparams(engine),
             model_dir=str(model_path.parent),
@@ -54,16 +55,14 @@ class TrainedModel:
     def predict(
         self,
         queries: List[str],
-        database_stats: Dict[str, Any],
         sidecar_connection: Connection,
     ) -> npt.NDArray:
         parsed_runs, query_meta_data = _parse_query_for_brad(
-            queries, database_stats, sidecar_connection
+            queries, self._database_stats, sidecar_connection
         )
 
         database_statistics = dict()  # current only support one database for brad
-        database_statistics[0] = database_stats
-        database_statistics[0].run_kwars = None
+        database_statistics[0] = self._database_stats
 
         if self._engine == Engine.Aurora:
             metadata_key = "aurora_query_idx"
@@ -168,13 +167,13 @@ def _load_model_one(
         model.parameters(), **optimizer_kwargs
     )
     (
-        csv_stats,
-        epochs_wo_improvement,
-        epoch,
+        _csv_stats,
+        _epochs_wo_improvement,
+        _epoch,
         model,
         optimizer,
-        metrics,
-        finished,
+        _metrics,
+        _finished,
     ) = load_checkpoint(
         model,
         model_dir,
@@ -189,7 +188,7 @@ def _load_model_one(
 def _load_model(
     statistics_file: str,
     filename_model: str,
-    database: str,
+    engine: Engine,
     hyperparams: Dict[str, Any],
     model_dir: str,
     device="cpu",
@@ -247,7 +246,7 @@ def _load_model(
         output_dim=1,
         device=device,
     )
-    if database == "aurora":
+    if engine == Engine.Aurora:
         model = _load_model_one(
             DatabaseSystem.AURORA,
             model_dir,
@@ -255,7 +254,7 @@ def _load_model(
             feature_statistics,
             **train_kwargs,
         )
-    elif database == "redshift":
+    elif engine == Engine.Redshift:
         model = _load_model_one(
             DatabaseSystem.REDSHIFT,
             model_dir,
@@ -263,7 +262,7 @@ def _load_model(
             feature_statistics,
             **train_kwargs,
         )
-    elif database == "athena":
+    elif engine == Engine.Athena:
         model = _load_model_one(
             DatabaseSystem.ATHENA,
             model_dir,
@@ -278,10 +277,6 @@ def _load_model(
 def _parse_query_for_brad(
     queries: List[str], database_stats: Dict[str, Any], sidecar_connection: Connection
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    # assume that runtimes are list of tuple [(engine, runtime)] for each query in test_workload_sqls or None
-    if database_kwarg_dict is None:
-        database_kwarg_dict = dict()
-
     column_id_mapping = dict()
     table_id_mapping = dict()
 
@@ -289,23 +284,23 @@ def _parse_query_for_brad(
 
     # enrich column stats with table sizes
     table_sizes = dict()
-    for table_stat in database_stats.table_stats:
-        table_sizes[table_stat.relname] = table_stat.reltuples
+    for table_stat in database_stats["table_stats"]:
+        table_sizes[table_stat["relname"]] = table_stat["reltuples"]
 
-    for i, column_stat in enumerate(database_stats.column_stats):
-        table = column_stat.tablename
-        column = column_stat.attname
-        column_stat.table_size = table_sizes[table]
+    for i, column_stat in enumerate(database_stats["column_stats"]):
+        table = column_stat["tablename"]
+        column = column_stat["attname"]
+        column_stat["table_size"] = table_sizes[table]
         column_id_mapping[(table, column)] = i
         partial_column_name_mapping[column].add(table)
 
     # similar for table statistics
-    for i, table_stat in enumerate(database_stats.table_stats):
-        table = table_stat.relname
+    for i, table_stat in enumerate(database_stats["table_stats"]):
+        table = table_stat["relname"]
         table_id_mapping[table] = i
 
-    parsed_queries = []
-    parsed_query_sql = []
+    parsed_queries: List[Any] = []
+    parsed_query_sql: List[Any] = []
     skipped_query_idx = []
     parsed_query_idx = []
 
@@ -315,15 +310,15 @@ def _parse_query_for_brad(
 
     cursor = sidecar_connection.cursor_sync()
     # HACK: This is to avoid changing a lot of the underlying code...
-    cursor.fetchall = cursor.fetchall_sync
-    cursor.execute = cursor.execute_sync
+    cursor.fetchall = cursor.fetchall_sync  # type: ignore
+    cursor.execute = cursor.execute_sync  # type: ignore
 
     for i, sql in enumerate(queries):
         verbose_plan = None
         try:
             cursor.execute_sync(f"EXPLAIN VERBOSE {sql}")
-            verbose_plan = cursor.fetchall_sync(f"EXPLAIN VERBOSE {sql}")
-        except:
+            verbose_plan = cursor.fetchall_sync()
+        except:  # pylint: disable=bare-except
             print(f"WARNING skipping query {i}: {sql} due to error in Aurora EXPLAIN")
             skipped_query_idx.append(i)
             parsed_queries.append(None)
@@ -347,27 +342,12 @@ def _parse_query_for_brad(
             continue
 
         parsed_query.database_id = 0  # Current we only have one database
-        if runtimes is not None:
-            engine, runtime = runtimes[i]
-            if engine == "aurora":
-                redshift_query_idx.append(i)
-                athena_query_idx.append(i)
-            elif engine == "redshift":
-                aurora_query_idx.append(i)
-                athena_query_idx.append(i)
-            elif engine == "athena":
-                redshift_query_idx.append(i)
-                aurora_query_idx.append(i)
-
-            parsed_query.plan_runtime = runtime
-            parsed_query.runtime = runtimes[i]
-        else:
-            aurora_query_idx.append(i)
-            redshift_query_idx.append(i)
-            athena_query_idx.append(i)
-            parsed_query.plan_runtime = (
-                1.0  # random number so that we don't need to rewrite data loader
-            )
+        aurora_query_idx.append(i)
+        redshift_query_idx.append(i)
+        athena_query_idx.append(i)
+        parsed_query.plan_runtime = (
+            1.0  # random number so that we don't need to rewrite data loader
+        )
 
         parsed_queries.append(parsed_query)
         parsed_query_sql.append(sql)
