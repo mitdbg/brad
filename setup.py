@@ -37,6 +37,7 @@ INSTALL_REQUIRES = [
     "numpy",
     "imbalanced-learn",
     "redshift_connector",
+    "psycopg2-binary",
     "mysql-connector-python",
     "tabulate",
     "PyAthena",

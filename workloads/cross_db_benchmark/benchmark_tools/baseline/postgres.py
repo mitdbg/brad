@@ -1,11 +1,9 @@
-import os, json
+import os
 import time
 from pathlib import Path
 import yaml
 import pandas as pd
-import mysql.connector
-import platform
-import pyodbc
+import psycopg2
 
 
 from workloads.cross_db_benchmark.benchmark_tools.utils import (
@@ -14,49 +12,29 @@ from workloads.cross_db_benchmark.benchmark_tools.utils import (
 )
 
 
-class TiDB:
-    def __init__(self):
-        self.conn: mysql.connector.MySQLConnection = self.reopen_connection()
-        cur = self.conn.cursor()
-        cur.execute("SET GLOBAL local_infile = 1;")
-        self.conn.commit()
+class PostgresCompatible:
+    def __init__(self, engine="redshift"):
+        self.engine = engine
+        self.conn: psycopg2.connection = self.reopen_connection()
 
     def reopen_connection(self):
-        config_file = "config/tidb.yml"
+        config_file = "config/baseline.yml"
         with open(config_file, "r") as f:
             config = yaml.load(f, Loader=yaml.Loader)
-            self.host = config["host"]
-            self.password = config["password"]
-            self.user = config["user"]
-            self.port = config["port"]
-            self.public_key = config["public_key"]
-            self.private_key = config["private_key"]
-            is_mac = platform.system() == "Darwin"
-            if is_mac:
-                self.ssl_file = "/etc/ssl/cert.pem"
-            else:
-                self.ssl_file = "/etc/ssl/certs/ca-certificates.crt"
-        conn = mysql.connector.connect(
-            host=self.host,
-            port=self.port,
-            user=self.user,
-            password=self.password,
-            database="test",
-            autocommit=True,
-            ssl_ca=self.ssl_file,
-            ssl_verify_identity=True,
-            allow_local_infile=True,
+            config = config[self.engine]
+            host = config["host"]
+            password = config["password"]
+            user = config["user"]
+            port = config["port"]
+            database = config["database"]
+        conn = psycopg2.connect(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database=database,
         )
-        cur = conn.cursor()
-        cur.execute("SET sql_mode = 'ANSI';")
-        conn.commit()
         return conn
-
-    def manually_replicate(self, dataset):
-        schema = load_schema_json(dataset)
-        for t in schema.tables:
-            replica_cmd = f"ALTER TABLE {t} SET TIFLASH REPLICA 1;"
-            self.submit_query(replica_cmd, until_success=True)
 
     def load_database(self, dataset, data_dir, force=False, load_from: str = ""):
         # First, check existence.
@@ -67,7 +45,7 @@ class TiDB:
         # Create tables.
         print("Creating tables.")
         if load_from == "":
-            schema_sql = load_schema_sql(dataset, "mysql.sql")
+            schema_sql = load_schema_sql(dataset, "postgres.sql")
             self.submit_query(schema_sql)
         # Load data.
         print("Loading data.")
@@ -81,7 +59,7 @@ class TiDB:
             start_t = time.perf_counter()
             p = os.path.join(data_dir, f"{t}.csv")
             table_path = Path(p).resolve()
-            tidb_path = os.path.join(data_dir, f"{t}_tidb0.csv")
+            baseline_path = os.path.join(data_dir, f"{t}_baseline0.csv")
             table = pd.read_csv(
                 table_path,
                 delimiter=",",
@@ -97,37 +75,23 @@ class TiDB:
             print(f"Loading {t}. {len(table)} rows.")
             for i, chunk in enumerate(range(0, len(table), chunksize)):
                 # Also need to rewrite nulls.
-                tidb_path = os.path.join(data_dir, f"{t}_tidb{i}.csv")
+                baseline_path = os.path.join(data_dir, f"{t}_baseline{i}.csv")
                 print(f"Writing {t} chunk {i}. ({chunk}/{len(table)}).")
                 table.iloc[chunk : chunk + chunksize].to_csv(
-                    tidb_path, sep="|", index=False, header=True, na_rep="\\N"
+                    baseline_path, sep="|", index=False, header=True, na_rep="\\N"
                 )
-                load_cmd = f"LOAD DATA LOCAL INFILE '{tidb_path}' INTO TABLE {t} {schema.db_load_kwargs.mysql}"
+                load_cmd = f"COPY {t} FROM '{baseline_path}' {schema.db_load_kwargs.postgres}"
                 print(f"LOAD CMD:\n{load_cmd}")
                 self.submit_query(load_cmd, until_success=True)
                 print(f"Chunk {i} took {time.perf_counter() - start_t:.2f} secs")
             print(f"Loaded {t} in {time.perf_counter() - start_t:.2f} secs")
-            print(f"Replicating {t} for HTAP")
-            replica_cmd = f"ALTER TABLE {t} SET TIFLASH REPLICA 1"
-            self.submit_query(replica_cmd, until_success=True)
-
-        # print("Creating Indexes")
-        # indexes_sql = load_schema_sql(dataset, "indexes.sql")
-        # self.submit_query(indexes_sql)
 
     # Check if all the tables in the given dataset already exist.
     def check_exists(self, dataset):
         schema = load_schema_json(dataset)
         for t in schema.tables:
             q = f"""
-                SELECT 
-                    TABLE_SCHEMA,TABLE_NAME, TABLE_TYPE
-                FROM 
-                    information_schema.TABLES 
-                WHERE 
-                    TABLE_SCHEMA LIKE 'test' AND
-                    TABLE_TYPE LIKE 'BASE TABLE' AND
-                    TABLE_NAME = '{t}';
+                SELECT * FROM pg_tables WHERE schemaname = 'public' AND tablename='{t}'
             """
             res = self.run_query_with_results(q)
             print(f"Tables: {res}")
@@ -148,13 +112,16 @@ class TiDB:
                 for command in commands:
                     command = command.strip()
                     if len(command) > 0:
+                        if self.engine == "redshift" and command.upper().startswith("CREATE INDEX"):
+                            print(f"Skipping index for redshift: {command}!")
+                            continue
                         print(f"Running Query: {command}")
                         cur.execute(command)
                 self.conn.commit()
                 return
-            except mysql.connector.Error as err:
+            except psycopg2.Error as err:
                 err_str = f"{err}"
-
+                # TODO: make psycopg2 specific.
                 if not until_success:
                     raise err
                 if "Lost connection" in err_str:
@@ -172,10 +139,8 @@ class TiDB:
 
 
 if __name__ == "__main__":
-    tidb = TiDB()
-    with tidb.conn.cursor() as cur:
-        cur.execute("CREATE TABLE test_table(k INT PRIMARY KEY, v INT);")
-        cur.execute("SHOW TABLES;")
+    baseline = PostgresCompatible(engine="redshift")
+    with baseline.conn.cursor() as cur:
+        cur.execute("SELECT 37;")
         res = cur.fetchall()
         print(f"Results: {res}")
-    tidb.load_database("imdb", False)

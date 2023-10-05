@@ -15,6 +15,12 @@ So we have two options:
     * Paste into [https://curlconverter.com/](cURL converter).
     * Use the resulting python code.
 
+#### Current Interpolations
+With the current workload (extended imdb with 3GB) of data:
+* 1 txn client consumes ~205 request units per secons.
+* 
+
+
 
 
 ### Loading Data and Querying
@@ -38,3 +44,4 @@ python workloads/IMDB_extended/run_analytics.py --tidb
 
 ### TODOs
 * TiDB Serverless fails on many queries. Figure out why.
+

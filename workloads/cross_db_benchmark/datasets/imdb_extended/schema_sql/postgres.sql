@@ -46,11 +46,11 @@ CREATE TABLE aka_name (
     id SERIAL PRIMARY KEY,
     person_id BIGINT,
     name TEXT,
-    imdb_index CHARACTER VARYING(3),
-    name_pcode_cf CHARACTER VARYING(11),
-    name_pcode_nf CHARACTER VARYING(11),
-    surname_pcode CHARACTER VARYING(11),
-    md5sum CHARACTER VARYING(65)
+    imdb_index TEXT,
+    name_pcode_cf TEXT,
+    name_pcode_nf TEXT,
+    surname_pcode TEXT,
+    md5sum TEXT
 );
 
 CREATE INDEX aka_name_person_id_idx ON aka_name (person_id);
@@ -60,15 +60,15 @@ CREATE TABLE aka_title (
     id SERIAL PRIMARY KEY,
     movie_id BIGINT,
     title TEXT,
-    imdb_index CHARACTER VARYING(4),
+    imdb_index TEXT,
     kind_id BIGINT,
     production_year BIGINT,
-    phonetic_code CHARACTER VARYING(5),
+    phonetic_code TEXT,
     episode_of_id BIGINT,
     season_nr BIGINT,
     episode_nr BIGINT,
-    note CHARACTER VARYING(72),
-    md5sum CHARACTER VARYING(32)
+    note TEXT,
+    md5sum TEXT
 );
 
 CREATE INDEX aka_title_movie_id_idx ON aka_title (movie_id);
@@ -93,11 +93,11 @@ DROP TABLE IF EXISTS char_name;
 CREATE TABLE char_name (
     id SERIAL PRIMARY KEY,
     name TEXT,
-    imdb_index CHARACTER VARYING(2),
+    imdb_index TEXT,
     imdb_id BIGINT,
-    name_pcode_nf CHARACTER VARYING(5),
-    surname_pcode CHARACTER VARYING(5),
-    md5sum CHARACTER VARYING(32)
+    name_pcode_nf TEXT,
+    surname_pcode TEXT,
+    md5sum TEXT
 );
 
 CREATE INDEX char_name_imdb_id_idx ON char_name (imdb_id);
@@ -105,18 +105,18 @@ CREATE INDEX char_name_imdb_id_idx ON char_name (imdb_id);
 DROP TABLE IF EXISTS comp_cast_type;
 CREATE TABLE comp_cast_type (
     id SERIAL PRIMARY KEY,
-    kind CHARACTER VARYING(32)
+    kind TEXT
 );
 
 DROP TABLE IF EXISTS company_name;
 CREATE TABLE company_name (
     id SERIAL PRIMARY KEY,
     name TEXT,
-    country_code CHARACTER VARYING(6),
+    country_code TEXT,
     imdb_id BIGINT,
-    name_pcode_nf CHARACTER VARYING(5),
-    name_pcode_sf CHARACTER VARYING(5),
-    md5sum CHARACTER VARYING(32)
+    name_pcode_nf TEXT,
+    name_pcode_sf TEXT,
+    md5sum TEXT
 );
 
 CREATE INDEX company_name_imdb_id_idx ON company_name (imdb_id);
@@ -124,7 +124,7 @@ CREATE INDEX company_name_imdb_id_idx ON company_name (imdb_id);
 DROP TABLE IF EXISTS company_type;
 CREATE TABLE company_type (
     id SERIAL PRIMARY KEY,
-    kind CHARACTER VARYING(32)
+    kind TEXT
 );
 
 DROP TABLE IF EXISTS complete_cast;
@@ -142,26 +142,26 @@ CREATE INDEX complete_cast_status_id_idx ON complete_cast (status_id);
 DROP TABLE IF EXISTS info_type;
 CREATE TABLE info_type (
     id SERIAL PRIMARY KEY,
-    info CHARACTER VARYING(32)
+    info TEXT
 );
 
 DROP TABLE IF EXISTS keyword;
 CREATE TABLE keyword (
     id SERIAL PRIMARY KEY,
     keyword TEXT,
-    phonetic_code CHARACTER VARYING(5)
+    phonetic_code TEXT
 );
 
 DROP TABLE IF EXISTS kind_type;
 CREATE TABLE kind_type (
     id SERIAL PRIMARY KEY,
-    kind CHARACTER VARYING(15)
+    kind TEXT
 );
 
 DROP TABLE IF EXISTS link_type;
 CREATE TABLE link_type (
     id SERIAL PRIMARY KEY,
-    link CHARACTER VARYING(32)
+    link TEXT
 );
 
 DROP TABLE IF EXISTS movie_companies;
@@ -183,7 +183,7 @@ CREATE TABLE movie_info_idx (
     movie_id BIGINT,
     info_type_id BIGINT,
     info TEXT,
-    note CHARACTER VARYING(1)
+    note TEXT
 );
 
 CREATE INDEX movie_info_idx_movie_id_idx ON movie_info_idx (movie_id);
@@ -215,13 +215,13 @@ DROP TABLE IF EXISTS name;
 CREATE TABLE name (
     id SERIAL PRIMARY KEY,
     name TEXT,
-    imdb_index CHARACTER VARYING(9),
+    imdb_index TEXT,
     imdb_id BIGINT,
-    gender CHARACTER VARYING(1),
-    name_pcode_cf CHARACTER VARYING(5),
-    name_pcode_nf CHARACTER VARYING(5),
-    surname_pcode CHARACTER VARYING(5),
-    md5sum CHARACTER VARYING(32)
+    gender TEXT,
+    name_pcode_cf TEXT,
+    name_pcode_nf TEXT,
+    surname_pcode TEXT,
+    md5sum TEXT
 );
 
 CREATE INDEX name_imdb_id_idx ON name (imdb_id);
@@ -229,23 +229,23 @@ CREATE INDEX name_imdb_id_idx ON name (imdb_id);
 DROP TABLE IF EXISTS role_type;
 CREATE TABLE role_type (
     id SERIAL PRIMARY KEY,
-    role CHARACTER VARYING(32)
+    role TEXT
 );
 
 DROP TABLE IF EXISTS title;
 CREATE TABLE title (
     id SERIAL PRIMARY KEY,
     title TEXT,
-    imdb_index CHARACTER VARYING(5),
+    imdb_index TEXT,
     kind_id BIGINT,
     production_year BIGINT,
     imdb_id BIGINT,
-    phonetic_code CHARACTER VARYING(5),
+    phonetic_code TEXT,
     episode_of_id BIGINT,
     season_nr BIGINT,
     episode_nr BIGINT,
-    series_years CHARACTER VARYING(49),
-    md5sum CHARACTER VARYING(32)
+    series_years TEXT,
+    md5sum TEXT
 );
 
 CREATE INDEX title_kind_id_idx ON title (kind_id);

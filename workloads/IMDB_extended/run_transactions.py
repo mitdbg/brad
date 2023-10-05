@@ -16,7 +16,7 @@ from datetime import datetime
 from brad.grpc_client import BradGrpcClient, BradClientError
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
 from workload_utils.transaction_worker import TransactionWorker
-from workload_utils.tidb import make_tidb_odbc
+from workloads.IMDB_extended.workload_utils.baseline import make_tidb_conn
 
 
 def runner(
@@ -57,7 +57,7 @@ def runner(
     if args.cstr_var is not None:
         db: Database = PyodbcDatabase(pyodbc.connect(os.environ[args.cstr_var]))
     elif args.tidb:
-        db: Database = PyodbcDatabase(make_tidb_odbc())
+        db: Database = PyodbcDatabase(make_tidb_conn())
     else:
         port_offset = worker_idx % args.num_front_ends
         brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)

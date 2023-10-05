@@ -1,9 +1,12 @@
 {"name": "imdb",
   "csv_kwargs": {"sep": "|", "header": 0, "escapechar": "\\", "encoding": "utf-8", "quotechar": "\"", "on_bad_lines": "skip"},
   "db_load_kwargs": {
-    "postgres": "DELIMITER '|' QUOTE '\"' ESCAPE '\\' NULL '' CSV HEADER;",
+    "postgres": "DELIMITER ',' QUOTE '\"' ESCAPE '\\' NULL '' CSV HEADER;",
+    "redshift": "CSV IGNOREHEADER 1 delimiter '|' BLANKSASNULL",
+    "aurora": "FORMAT csv, HEADER true, ESCAPE ''\\'', DELIMITER ''|''",
     "mysql": "FIELDS TERMINATED BY '|' ENCLOSED BY '\"' ESCAPED BY '\\\\'"
   },
+  
   "tables": [
     "theatres",
     "showings",

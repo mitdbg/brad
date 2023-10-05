@@ -2,7 +2,7 @@
 
 import argparse
 import sys
-from workloads.cross_db_benchmark.benchmark_tools.tidb import TiDB
+from workloads.IMDB_extended.workload_utils.baseline import PostgresCompatibleLoader, TiDBLoader
 import time
 
 
@@ -13,16 +13,20 @@ def main():
     parser.add_argument("--force_load", default=False, action="store_true")
     parser.add_argument("--load_from", default="")
     parser.add_argument("--run_query", default=None)
-    tidb = TiDB()
+    parser.add_argument("--engine", default="tidb")
     args = parser.parse_args()
-    tidb.load_database(
+    if args.engine == "tidb":
+        loader = TiDBLoader()
+    else:
+        loader = PostgresCompatibleLoader(engine=args.engine)
+    loader.load_database(
         data_dir=args.data_dir,
         dataset=args.dataset,
         force=args.force_load,
         load_from=args.load_from,
     )
     if args.run_query is not None:
-        cur = tidb.conn.cursor()
+        cur = loader.conn.cursor()
         print(f"Executing: {args.run_query}")
         start_time = time.perf_counter()
         cur.execute(args.run_query)
@@ -32,7 +36,7 @@ def main():
         for r in res:
             print(r)
         print(f"Execution took: {end_time-start_time}s")
-        tidb.conn.commit()
+        loader.conn.commit()
 
 
 if __name__ == "__main__":
@@ -46,6 +50,8 @@ def column_definition(column):
     data_type = column["data_type"].upper()
     if data_type == "VARCHAR" or data_type == "CHARACTER VARYING":
         # Arbitrary length string. Write as TEXT for compatibility
+        data_type = "TEXT"
+    if data_type.startswith("CHARACTER VAR"):
         data_type = "TEXT"
     sql = f"{column['name']} {data_type}"
     if "primary_key" in column and column["primary_key"]:

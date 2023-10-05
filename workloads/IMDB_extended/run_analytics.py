@@ -14,7 +14,7 @@ from datetime import datetime
 
 from brad.grpc_client import BradGrpcClient, BradClientError
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
-from workload_utils.tidb import make_tidb_odbc
+from workload_utils.baseline import make_tidb_conn, make_postgres_compatible_conn
 from typing import Dict
 
 
@@ -56,7 +56,10 @@ def runner(
         os.makedirs(f"{out_dir}", exist_ok=True)
 
     if args.tidb:
-        db: Database = PyodbcDatabase(make_tidb_odbc())
+        db: Database = PyodbcDatabase(make_tidb_conn())
+    elif args.redshift:
+        print("REDSHIFT")
+        db: Database = PyodbcDatabase(make_postgres_compatible_conn(engine="redshift"))
     else:
         port_offset = runner_idx % args.num_front_ends
         brad = BradGrpcClient(args.host, args.port + port_offset)
@@ -127,7 +130,7 @@ def runner(
 
 def run_warmup(args, query_bank: List[str], queries: List[int]):
     if args.tidb:
-        db: Database = PyodbcDatabase(make_tidb_odbc())
+        db: Database = PyodbcDatabase(make_tidb_conn())
     else:
         brad = BradGrpcClient(args.host, args.port)
         brad.connect()
@@ -195,6 +198,12 @@ def main():
     parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
     # parser.add_argument("--query-indexes", type=str, required=True)
     parser.add_argument("--tidb", default=False, action="store_true")
+    parser.add_argument(
+        "--redshift",
+        default=False,
+        action="store_true",
+        help="Environment variable that whether to run a Redshift Benchmark",
+    )
     parser.add_argument("--output-dir", type=str, default=".")
     args = parser.parse_args()
 
