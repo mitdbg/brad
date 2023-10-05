@@ -17,6 +17,9 @@ def main() -> None:
     parser.add_argument("--take-log", action="store_true")
     args = parser.parse_args()
 
+    print("Processing:", args.parsed_queries_file)
+    print("Using:", args.data_accessed_file)
+
     engine = Engine.from_str(args.engine)
     ei = {
         Engine.Athena: 0,
@@ -38,14 +41,22 @@ def main() -> None:
             & (~np.isnan(data_stats_float))
             & (~np.isinf(data_stats_float))
         )
-        data_stats_float[mask] = np.log(data_stats_float)
+        np.putmask(data_stats_float, mask, np.log(data_stats_float))
 
     with open(args.parsed_queries_file, encoding="UTF-8") as file:
         parsed = json.load(file)
 
+    print("Sizes:")
+    print("Queries:", len(queries))
+    print("Parsed Plans:", len(parsed["parsed_plans"]))
+    print("Parsed Queries:", len(parsed["parsed_queries"]))
+
     assert len(queries) == data_stats_float.shape[0], "Mismatched dataset."
-    assert len(parsed["parsed_queries"]) == len(queries), "Mismatched dataset."
-    assert len(parsed["parsed_plans"]) == len(queries), "Mismatched dataset."
+    assert len(parsed["parsed_plans"]) == len(
+        parsed["parsed_queries"]
+    ), "Mismatched dataset."
+    # assert len(parsed["parsed_queries"]) <= len(queries), "Invalid dataset."
+    # assert len(parsed["parsed_plans"]) <= len(queries), "Invalid dataset."
 
     new_pp, new_pq, new_sql = [], [], []
 
@@ -53,7 +64,11 @@ def main() -> None:
         parsed["parsed_plans"], parsed["parsed_queries"], parsed["sql_queries"]
     ):
         try:
-            orig_idx = queries[sql]
+            if not sql.endswith(";"):
+                key_sql = sql + ";"
+            else:
+                key_sql = sql
+            orig_idx = queries[key_sql]
             data_stat = data_stats_float[orig_idx, ei[engine]].item()
 
             if data_stat <= 0 or np.isnan(data_stat) or np.isinf(data_stat):
