@@ -43,7 +43,10 @@ class PyodbcDatabase(Database):
                 cursor = self._cursor
             # Exec
             cursor.execute(query)
-            rows = cursor.fetchall()
+            if cursor.rowcount is None or cursor.rowcount <= 0:
+                rows = []
+            else:
+                rows = cursor.fetchall()
             # Close if newly opened.
             if not had_cursor:
                 cursor.close()

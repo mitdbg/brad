@@ -16,7 +16,7 @@ from datetime import datetime
 from brad.grpc_client import BradGrpcClient, BradClientError
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
 from workload_utils.transaction_worker import TransactionWorker
-from workloads.IMDB_extended.workload_utils.baseline import make_tidb_conn, make_postgres_compatible_conn
+from workload_utils.baseline import make_tidb_conn, make_postgres_compatible_conn
 
 
 def runner(
