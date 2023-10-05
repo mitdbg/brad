@@ -271,7 +271,23 @@ class PostgresCompatibleLoader:
                 aws_commons.create_aws_credentials('{self.access_key}', '{self.secret_key}', '')
             );
             """
-        return load_cmd        
+        return load_cmd 
+
+    def reset_aurora_seq_nums(self, t):
+        q = f"SELECT MAX(id) FROM {t}"
+        cur = self.conn.cursor()
+        cur.execute(q)
+        max_serial_val = cur.fetchone()[0]
+        q = f"ALTER SEQUENCE {t}_id_seq RESTART WITH {max_serial_val + 1}"
+        print(f"Running: {q}")
+        cur.execute(q)
+        self.conn.commit()       
+
+
+    def manual_reset_aurora_seq_nums(self, dataset):
+        schema = load_schema_json(dataset)
+        for t in schema.tables:
+            self.reset_aurora_seq_nums(t)
 
     def load_database(self, dataset, data_dir, force=False, load_from: str = ""):
         # First, check existence.
@@ -299,6 +315,7 @@ class PostgresCompatibleLoader:
             print(f"LOAD CMD:\n{load_cmd}")
             self.submit_query(load_cmd, until_success=True)
             print(f"Loaded {t} in {time.perf_counter() - start_t:.2f} secs")
+            self.reset_aurora_seq_nums(t=t)
 
     # Check if all the tables in the given dataset already exist.
     def check_exists(self, dataset):
@@ -359,14 +376,14 @@ class PostgresCompatibleLoader:
 
 if __name__ == "__main__":
     baseline = PostgresCompatibleLoader(engine="aurora")
-    with baseline.conn.cursor() as cur:
-        s3_bucket = baseline.s3_bucket
-        region = baseline.bucket_region
-        t = "theaters"
-        path = f"s3://{s3_bucket}/imdb_extended/{t}/{t}.csv"
-        cur.execute(f"SELECT aws_commons.create_s3_uri('{s3_bucket}', '{path}', '{region}');")
-        res = cur.fetchall()
-        print(f"Results: {res}")
-    # import sys
-    # if len(sys.argv) > 1 and sys.argv[1] == "copy":
-    #     baseline.manually_copy_s3_data("imdb_extended")
+    # with baseline.conn.cursor() as cur:
+    #     s3_bucket = baseline.s3_bucket
+    #     region = baseline.bucket_region
+    #     t = "theaters"
+    #     path = f"s3://{s3_bucket}/imdb_extended/{t}/{t}.csv"
+    #     cur.execute(f"SELECT aws_commons.create_s3_uri('{s3_bucket}', '{path}', '{region}');")
+    #     res = cur.fetchall()
+    #     print(f"Results: {res}")
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "reset":
+        baseline.manual_reset_aurora_seq_nums("imdb_extended")

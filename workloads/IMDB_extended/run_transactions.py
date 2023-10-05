@@ -35,7 +35,11 @@ def runner(
 
     signal.signal(signal.SIGINT, noop_handler)
 
-    worker = TransactionWorker(worker_idx, args.seed ^ worker_idx, args.scale_factor)
+    if args.aurora or args.tidb:
+        dataset_type = "20gb"
+    else:
+        dataset_type = "original"
+    worker = TransactionWorker(worker_idx, args.seed ^ worker_idx, args.scale_factor, dataset_type=dataset_type)
 
     txn_prng = random.Random(~(args.seed ^ worker_idx))
     transactions = [

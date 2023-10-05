@@ -1,5 +1,5 @@
 alias python=python3.11
-duration=10
+duration=600
 txnengine="aurora"
 analyticsengine="redshift"
 echo ${analyticsengine}_expts/ana1
