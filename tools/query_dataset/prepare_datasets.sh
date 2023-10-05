@@ -27,7 +27,7 @@ mkdir -p $out_dir
 
 # 2. Run the train/test split.
 function split_parsed() {
-  python3 ../tools/query_dataset/split_parsed.py \
+  python3 split_parsed.py \
     --source-parsed $1 \
     --queries-file $2 \
     --out-file-1 $3
@@ -56,7 +56,7 @@ with open('${out_dir}/database_${out_name}_stats.json', 'w') as file:
 
 # 3. Clean up the data.
 function fix_missing_rt() {
-  python3 ../tools/one_off/fix_missing_parsed_run_times.py --in-file $1
+  python3 ../one_off/fix_missing_parsed_run_times.py --in-file $1
 }
 
 echo "--- Cleaning up missing run times ---"
@@ -72,7 +72,7 @@ popd
 mkdir -p $out_dir/run_time_augmented
 
 function run_augmentation() {
-  python3 ../run_cost_model.py --argment_dataset --workload_runs $2 --target $1
+  python3 ../../run_cost_model.py --argment_dataset --workload_runs $2 --target $1
 }
 
 echo "--- Running data augmentation ---"
@@ -84,7 +84,7 @@ done
 mkdir -p $out_dir/data_accessed
 
 function add_data() {
-  python3 ../tools/query_dataset/add_data_accessed.py \
+  python3 add_data_accessed.py \
     --parsed-queries-file $1 \
     --all-queries-file $2 \
     --data-accessed-file $3 \
