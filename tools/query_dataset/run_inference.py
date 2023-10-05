@@ -1,12 +1,18 @@
+import sys
 import argparse
 import asyncio
 import numpy as np
+import pathlib
 
 from typing import List
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
-from brad.cost_model.inference import TrainedModel
 from brad.connection.factory import ConnectionFactory
+
+# HACK: Unfortunately this is needed because the GNN's dependencies include
+# out-of-source modules.
+sys.path.append(str(pathlib.Path(__file__).parents[2]))
+from brad.cost_model.inference import TrainedModel
 
 
 def load_queries(file_name: str) -> List[str]:
