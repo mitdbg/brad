@@ -34,7 +34,7 @@ function split_parsed() {
 }
 
 echo "--- Running train/test split ---"
-mkdir $out_dir/run_time
+mkdir -p $out_dir/run_time
 
 split_parsed $athena_parsed ${dataset_dir_prefix}_train/queries.sql $out_dir/run_time/athena_${out_name}_train.json
 split_parsed $athena_parsed ${dataset_dir_prefix}_test/queries.sql $out_dir/run_time/athena_${out_name}_test.json
@@ -46,7 +46,13 @@ split_parsed $redshift_parsed ${dataset_dir_prefix}_train/queries.sql $out_dir/r
 split_parsed $redshift_parsed ${dataset_dir_prefix}_test/queries.sql $out_dir/run_time/redshift_${out_name}_test.json
 
 # Extract the database stats.
-python3 -c "import json; with open(\"${athena_parsed}\") as file: d = json.load(file); with open(\"${out_dir}/run_time/database_${out_name}_stats.json\", \"w\") as file: json.dump(d['database_stats'], file);"
+python3 -c "
+import json
+with open('${athena_parsed}') as file:
+    d = json.load(file)
+with open('${out_dir}/database_${out_name}_stats.json', 'w') as file:
+    json.dump(d['database_stats'], file)
+"
 
 # 3. Clean up the data.
 function fix_missing_rt() {
