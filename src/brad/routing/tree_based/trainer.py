@@ -82,6 +82,38 @@ class ForestTrainer:
 
         return cls(policy, bp.tables, raw_queries, stacked)
 
+    @classmethod
+    def load_from_standard_dataset(
+        cls,
+        policy: RoutingPolicy,
+        schema_file: str | pathlib.Path,
+        dataset_path: str | pathlib.Path,
+    ) -> "ForestTrainer":
+        bp = UserProvidedBlueprint.load_from_yaml_file(schema_file)
+
+        if isinstance(dataset_path, pathlib.Path):
+            dsp = dataset_path
+        else:
+            dsp = pathlib.Path(dataset_path)
+
+        with open(dsp / "queries.sql", "r", encoding="UTF-8") as file:
+            raw_queries = []
+            for line in file:
+                clean = line.strip()
+                if clean.endswith(";"):
+                    raw_queries.append(clean)
+                else:
+                    raw_queries.append(clean + ";")
+
+        run_times = np.load(dsp / "run_time_s-athena-aurora-redshift.npy")
+
+        # Reorder the engine dimension.
+        stacked = np.stack(
+            [run_times[:, 1], run_times[:, 2], run_times[:, 0]], axis=cls.m
+        )
+
+        return cls(policy, bp.tables, raw_queries, stacked)
+
     def train(
         self,
         train_full: bool = True,
@@ -142,7 +174,12 @@ class ForestTrainer:
 
     def _preprocess_training_data(self) -> None:
         # Used to remove queries that time out everywhere.
-        all_timeout_idx = np.where(np.all(np.isinf(self._raw_run_times), axis=self.m))
+        all_timeout_idx = np.where(
+            np.all(
+                np.isinf(self._raw_run_times) | np.isnan(self._raw_run_times),
+                axis=self.m,
+            )
+        )
 
         # Create a (N, m) validity mask.
         val_mask = np.ones(self._raw_run_times.shape[self.N], dtype=bool)
@@ -159,10 +196,11 @@ class ForestTrainer:
             )
         )
 
-        # Replace `inf` values with the time out value and remove queries that
-        # time out across all engines.
+        # Replace `inf` / `nan` values with the time out value and remove
+        # queries that time out across all engines.
         run_times = self._raw_run_times.copy()
         run_times[np.isinf(run_times)] = self.TIMEOUT_VALUE_S
+        run_times[np.isnan(run_times)] = self.TIMEOUT_VALUE_S
         run_times = run_times[val_mask]
 
         # Pre-compute:

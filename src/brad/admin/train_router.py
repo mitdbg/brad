@@ -35,27 +35,28 @@ def register_admin_action(subparser) -> None:
         help="Path to the schema definition file.",
     )
     parser.add_argument(
+        "--std-dataset-path",
+        type=str,
+        help="Path to a standard dataset to use for training.",
+    )
+    parser.add_argument(
         "--data-queries",
         type=str,
-        required=True,
         help="Path to the queries to use for training.",
     )
     parser.add_argument(
         "--data-aurora-rt",
         type=str,
-        required=True,
         help="Path to the Aurora run times to use for training.",
     )
     parser.add_argument(
         "--data-redshift-rt",
         type=str,
-        required=True,
         help="Path to the Redshift run times to use for training.",
     )
     parser.add_argument(
         "--data-athena-rt",
         type=str,
-        required=True,
         help="Path to the Athena run times to use for training.",
     )
     parser.add_argument(
@@ -76,6 +77,12 @@ def register_admin_action(subparser) -> None:
         type=int,
         default=25,
         help="Used to specify the number of trees in the forest.",
+    )
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=15,
+        help="Maximum tree depth.",
     )
     parser.add_argument(
         "--policy",
@@ -107,14 +114,26 @@ def train_router(args):
     config = ConfigFile(args.config_file)
     policy = RoutingPolicy.from_str(args.policy)
 
-    trainer = ForestTrainer.load_saved_data(
-        policy=policy,
-        schema_file=args.schema_file,
-        queries_file=args.data_queries,
-        aurora_run_times=args.data_aurora_rt,
-        redshift_run_times=args.data_redshift_rt,
-        athena_run_times=args.data_athena_rt,
-    )
+    if args.std_dataset_path is not None:
+        trainer = ForestTrainer.load_from_standard_dataset(
+            policy=policy,
+            schema_file=args.schema_file,
+            dataset_path=args.std_dataset_path,
+        )
+    else:
+        assert args.data_queries is not None
+        assert args.data_aurora_rt is not None
+        assert args.data_redshift_rt is not None
+        assert args.data_athena_rt is not None
+        trainer = ForestTrainer.load_saved_data(
+            policy=policy,
+            schema_file=args.schema_file,
+            queries_file=args.data_queries,
+            aurora_run_times=args.data_aurora_rt,
+            redshift_run_times=args.data_redshift_rt,
+            athena_run_times=args.data_athena_rt,
+        )
+
     if policy == RoutingPolicy.ForestTableSelectivity:
         asset_mgr = AssetManager(config)
         mgr = BlueprintManager(config, asset_mgr, schema_name)
@@ -123,10 +142,13 @@ def train_router(args):
         estimator = asyncio.run(set_up_estimator(schema_name, blueprint, config))
     else:
         estimator = None
+
     trainer.compute_features(estimator)
 
     logger.info("Routing policy: %s", policy)
-    model, quality = trainer.train(num_trees=args.num_trees)
+    model, quality = trainer.train(
+        num_trees=args.num_trees, min_samples_split=5, max_depth=args.max_depth
+    )
     logger.info("Model quality: %s", json.dumps(quality, indent=2))
 
     if args.persist_local:
