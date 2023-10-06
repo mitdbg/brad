@@ -8,6 +8,7 @@ from functools import reduce
 class Functionality:
 
     Geospatial = "geospatial"
+    Transaction = "transactions"
 
     def __init__(self, functionality_yaml="engine_functionality.yml"):
 
@@ -52,4 +53,5 @@ class Functionality:
         return self.engine_functionalities
 
 FunctionalityBitmapValues = {}
-FunctionalityBitmapValues[Functionality.Geospatial] = 0b1
+FunctionalityBitmapValues[Functionality.Geospatial] = 0b01
+FunctionalityBitmapValues[Functionality.Transaction] = 0b10

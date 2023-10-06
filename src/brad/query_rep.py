@@ -4,7 +4,7 @@ import yaml
 import pathlib
 import os
 from brad.routing.functionality_catalog import Functionality
-
+from brad.front_end.session import Session
 from typing import List, Optional
 
 _DATA_MODIFICATION_PREFIXES = [
@@ -22,7 +22,7 @@ _DATA_MODIFICATION_PREFIXES = [
 ]
 
 # Load geospatial keywords used to detect if geospatial query
-_GEOSPATIAL_KEYWORDS_PATH = os.path.join(pathlib.Path(__file__).parent.resolve(), "specialized_functionality/geospatial_keywords.yml")
+_GEOSPATIAL_KEYWORDS_PATH = os.path.join(pathlib.Path(__file__).parent.resolve(), "routing/geospatial_keywords.yml")
 with open(_GEOSPATIAL_KEYWORDS_PATH, "r") as f:
     _GEOSPATIAL_KEYWORDS = yaml.safe_load(f)
 _GEOSPATIAL_KEYWORDS = [k.upper() for k in _GEOSPATIAL_KEYWORDS]
@@ -70,10 +70,15 @@ class QueryRep:
                 return True
         return False
 
-    def get_required_functionality(self) -> int:
+    def is_transaction(self, session: Session) -> bool:
+        return self.is_data_modification_query() or session.in_transaction
+
+    def get_required_functionality(self, session: Session) -> int:
         req_functionality = []
         if self.is_geospatial():
             req_functionality.append(Functionality.Geospatial)
+        if self.is_transaction(session):
+            req_functionality.append(Functionality.Transaction)
 
         return Functionality.to_bitmap(req_functionality)
 

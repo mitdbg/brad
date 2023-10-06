@@ -11,7 +11,7 @@ from brad.blueprint_manager import BlueprintManager
 from brad.daemon.monitor import Monitor
 from brad.routing.router import Router
 from brad.query_rep import QueryRep
-from brad.front_end.session import SessionManager
+from brad.front_end.session import SessionManager, Session
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +188,7 @@ class RuleBased(Router):
             return True
         return not_overloaded
 
-    def engine_for_sync(self, query: QueryRep) -> Engine:
+    def engine_for_sync(self, query: QueryRep, session: Session) -> Engine:
         if self._table_placement_bitmap is None:
             if self._blueprint is not None:
                 blueprint = self._blueprint
@@ -197,8 +197,8 @@ class RuleBased(Router):
                 blueprint = self._blueprint_mgr.get_blueprint()
             self._table_placement_bitmap = blueprint.table_locations_bitmap()
 
-        valid_locations, only_location = self._run_location_routing(
-            query, self._table_placement_bitmap
+        valid_locations, only_location = self._filter_on_constraints(
+            query, self._table_placement_bitmap, session
         )
         if only_location is not None:
             return only_location

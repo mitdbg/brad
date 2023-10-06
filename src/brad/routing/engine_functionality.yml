@@ -2,6 +2,7 @@ database_engines:
   - name: Aurora
     functionalities:
       - geospatial
+      - transactions
 
   - name: Athena
     functionalities:

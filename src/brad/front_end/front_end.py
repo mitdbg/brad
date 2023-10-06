@@ -249,13 +249,7 @@ class BradFrontEnd(BradInterface):
 
             # 2. Select an engine for the query.
             query_rep = QueryRep(query)
-            transactional_query = (
-                session.in_transaction or query_rep.is_data_modification_query()
-            )
-            if transactional_query:
-                engine_to_use = Engine.Aurora
-            else:
-                engine_to_use = await self._router.engine_for(query_rep)
+            engine_to_use = await self._router.engine_for(query_rep, session)
 
             logger.debug(
                 "[S%d] Routing '%s' to %s", session_id.value(), query, engine_to_use
