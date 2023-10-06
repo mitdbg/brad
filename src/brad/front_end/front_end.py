@@ -5,7 +5,7 @@ import random
 import time
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import grpc
 import pyodbc
@@ -13,7 +13,7 @@ import pyodbc
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
 
 from brad.asset_manager import AssetManager
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.monitor import Monitor
@@ -23,14 +23,15 @@ from brad.daemon.messages import (
     MetricsReport,
     InternalCommandRequest,
     InternalCommandResponse,
+    NewBlueprint,
+    NewBlueprintAck,
 )
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.front_end.brad_interface import BradInterface
-from brad.front_end.epoch_file_handler import EpochFileHandler
 from brad.front_end.errors import QueryError
 from brad.front_end.grpc import BradGrpc
-from brad.front_end.session import SessionManager, SessionId
+from brad.front_end.session import SessionManager, SessionId, Session
 from brad.query_rep import QueryRep
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.rule_based import RuleBased
@@ -39,9 +40,13 @@ from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
 from brad.routing.tree_based.forest_router import ForestRouter
 from brad.row_list import RowList
+from brad.utils import log_verbose
 from brad.utils.counter import Counter
 from brad.utils.json_decimal_encoder import DecimalEncoder
 from brad.utils.mailbox import Mailbox
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
+from brad.utils.run_time_reservoir import RunTimeReservoir
+from brad.workload_logging.epoch_file_handler import EpochFileHandler
 
 logger = logging.getLogger(__name__)
 
@@ -73,25 +78,33 @@ class BradFrontEnd(BradInterface):
         self._output_queue = output_queue
 
         self._assets = AssetManager(self._config)
-        self._blueprint_mgr = BlueprintManager(self._assets, self._schema_name)
+        self._blueprint_mgr = BlueprintManager(
+            self._config, self._assets, self._schema_name
+        )
         self._path_to_planner_config = path_to_planner_config
         self._monitor: Optional[Monitor] = None
 
         # Set up query logger
         self._qlogger = logging.getLogger("queries")
         self._qlogger.setLevel(logging.INFO)
-        qhandler = EpochFileHandler(
+        self._qhandler = EpochFileHandler(
+            self._fe_index,
             self._config.local_logs_path,
             self._config.epoch_length,
             self._config.s3_logs_bucket,
             self._config.s3_logs_path,
             self._config.txn_log_prob,
         )
-        qhandler.setLevel(logging.INFO)
+        self._qhandler.setLevel(logging.INFO)
         formatter = logging.Formatter("%(message)s")
-        qhandler.setFormatter(formatter)
-        self._qlogger.addHandler(qhandler)
+        self._qhandler.setFormatter(formatter)
+        self._qlogger.addHandler(self._qhandler)
         self._qlogger.propagate = False  # Avoids printing to stdout
+
+        # Used to track query performance.
+        self._query_run_times = RunTimeReservoir[float](
+            self._config.front_end_query_latency_buffer_size
+        )
 
         # We have different routing policies for performance evaluation and
         # testing purposes.
@@ -106,7 +119,7 @@ class BradFrontEnd(BradInterface):
         elif routing_policy == RoutingPolicy.AlwaysRedshift:
             self._router = AlwaysOneRouter(Engine.Redshift)
         elif routing_policy == RoutingPolicy.RuleBased:
-            self._monitor = Monitor.from_config_file(config)
+            self._monitor = Monitor(config, self._blueprint_mgr)
             self._router = RuleBased(
                 blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
             )
@@ -123,7 +136,9 @@ class BradFrontEnd(BradInterface):
             )
         logger.info("Using routing policy: %s", routing_policy)
 
-        self._sessions = SessionManager(self._config, self._schema_name)
+        self._sessions = SessionManager(
+            self._config, self._blueprint_mgr, self._schema_name
+        )
         self._daemon_messages_task: Optional[asyncio.Task[None]] = None
         self._estimator: Optional[Estimator] = None
 
@@ -137,6 +152,12 @@ class BradFrontEnd(BradInterface):
         self._daemon_request_mailbox = Mailbox[str, RowList](
             do_send_msg=self._send_daemon_request
         )
+
+        # Used to close a logging epoch when needed.
+        self._qlogger_refresh_task: Optional[asyncio.Task[None]] = None
+
+        # Used to re-establish engine connections.
+        self._reestablish_connections_task: Optional[asyncio.Task[None]] = None
 
     async def serve_forever(self):
         await self._run_setup()
@@ -172,6 +193,10 @@ class BradFrontEnd(BradInterface):
         await self._blueprint_mgr.load()
         logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
 
+        if self._monitor is not None:
+            self._monitor.set_up_metrics_sources()
+            await self._monitor.fetch_latest()
+
         if self._routing_policy == RoutingPolicy.ForestTableSelectivity:
             self._estimator = await PostgresEstimator.connect(
                 self._schema_name, self._config
@@ -189,12 +214,14 @@ class BradFrontEnd(BradInterface):
         # Used to handle messages from the daemon.
         self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
 
+        self._qlogger_refresh_task = asyncio.create_task(self._refresh_qlogger())
+
     async def _run_teardown(self):
         logger.debug("Starting BRAD front end _run_teardown()")
         await self._sessions.end_all_sessions()
 
         # Important for unblocking our message reader thread.
-        self._input_queue.put(Sentinel())
+        self._input_queue.put(Sentinel(self._fe_index))
 
         if self._daemon_messages_task is not None:
             self._daemon_messages_task.cancel()
@@ -203,6 +230,10 @@ class BradFrontEnd(BradInterface):
         if self._brad_metrics_reporting_task is not None:
             self._brad_metrics_reporting_task.cancel()
             self._brad_metrics_reporting_task = None
+
+        if self._qlogger_refresh_task is not None:
+            self._qlogger_refresh_task.cancel()
+            self._qlogger_refresh_task = None
 
         if self._estimator is not None:
             await self._estimator.close()
@@ -234,7 +265,9 @@ class BradFrontEnd(BradInterface):
     ) -> RowList:
         session = self._sessions.get_session(session_id)
         if session is None:
-            raise QueryError("Invalid session id {}".format(str(session_id)))
+            raise QueryError(
+                "Invalid session id {}".format(str(session_id)), is_transient=False
+            )
 
         try:
             # Remove any trailing or leading whitespace. Remove the trailing
@@ -245,14 +278,18 @@ class BradFrontEnd(BradInterface):
 
             # Handle internal commands separately.
             if query.startswith("BRAD_"):
-                return await self._handle_internal_command(query)
+                return await self._handle_internal_command(session, query, debug_info)
 
             # 2. Select an engine for the query.
             query_rep = QueryRep(query)
             engine_to_use = await self._router.engine_for(query_rep, session)
 
-            logger.debug(
-                "[S%d] Routing '%s' to %s", session_id.value(), query, engine_to_use
+            log_verbose(
+                logger,
+                "[S%d] Routing '%s' to %s",
+                session_id.value(),
+                query,
+                engine_to_use,
             )
             debug_info["executor"] = engine_to_use
 
@@ -263,9 +300,22 @@ class BradFrontEnd(BradInterface):
                 start = datetime.now(tz=timezone.utc)
                 await cursor.execute(query_rep.raw_query)
                 end = datetime.now(tz=timezone.utc)
-            except (pyodbc.ProgrammingError, pyodbc.Error) as ex:
+            except (
+                pyodbc.ProgrammingError,
+                pyodbc.Error,
+                pyodbc.OperationalError,
+            ) as ex:
+                is_transient_error = False
+                if connection.is_connection_lost_error(ex):
+                    connection.mark_connection_lost()
+                    self._schedule_reestablish_connections()
+                    is_transient_error = True
+                    # N.B. We still pass the error to the client. The client
+                    # should retry the query (later on we can add more graceful
+                    # handling here).
+
                 # Error when executing the query.
-                raise QueryError.from_exception(ex)
+                raise QueryError.from_exception(ex, is_transient_error)
 
             # We keep track of transactional state after executing the query in
             # case the query failed.
@@ -277,44 +327,57 @@ class BradFrontEnd(BradInterface):
                 self._transaction_end_counter.bump()
 
             # Decide whether to log the query.
+            run_time_s = end - start
             if not transactional_query or (random.random() < self._config.txn_log_prob):
                 self._qlogger.info(
-                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {end-start}s IsTransaction: {transactional_query}"
+                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {run_time_s}s IsTransaction: {transactional_query}"
                 )
+            self._query_run_times.add_value(run_time_s.total_seconds())
 
             # Extract and return the results, if any.
             try:
-                results = []
-                while True:
-                    row = await cursor.fetchone()
-                    if row is None:
-                        break
-                    results.append(tuple(row))
-                logger.debug("Responded with %d rows.", len(results))
+                # Using `fetchall_sync()` is lower overhead than the async interface.
+                results = [tuple(row) for row in cursor.fetchall_sync()]
+                log_verbose(logger, "Responded with %d rows.", len(results))
                 return results
             except pyodbc.ProgrammingError:
-                logger.debug("No rows produced.")
+                log_verbose(logger, "No rows produced.")
                 return []
+            except (pyodbc.Error, pyodbc.OperationalError) as ex:
+                is_transient_error = False
+                if connection.is_connection_lost_error(ex):
+                    connection.mark_connection_lost()
+                    self._schedule_reestablish_connections()
+                    is_transient_error = True
 
-        except QueryError:
+                raise QueryError.from_exception(ex, is_transient_error)
+
+        except QueryError as ex:
             # This is an expected exception. We catch and re-raise it here to
             # avoid triggering the handler below.
+            logger.debug("Query error: %s", repr(ex))
             raise
         except Exception as ex:
             logger.exception("Encountered unexpected exception when handling request.")
             raise QueryError.from_exception(ex)
 
-    async def _handle_internal_command(self, command_raw: str) -> RowList:
+    async def _handle_internal_command(
+        self, session: Session, command_raw: str, debug_info: Dict[str, Any]
+    ) -> RowList:
         """
         This method is used to handle BRAD_ prefixed "queries" (i.e., commands
         to run custom functionality like syncing data across the engines).
         """
         command = command_raw.upper()
+        if not command.startswith("BRAD_INSPECT_WORKLOAD"):
+            debug_info["not_tabular"] = True
 
         if (
             command == "BRAD_SYNC"
             or command == "BRAD_EXPLAIN_SYNC_STATIC"
             or command == "BRAD_EXPLAIN_SYNC"
+            or command.startswith("BRAD_INSPECT_WORKLOAD")
+            or command.startswith("BRAD_RUN_PLANNER")
         ):
             if self._daemon_request_mailbox.is_active():
                 return [
@@ -330,6 +393,38 @@ class BradFrontEnd(BradInterface):
             # Send the command to the daemon for execution.
             return await self._daemon_request_mailbox.send_recv(command)
 
+        elif command == "BRAD_NOOP":
+            # Used to measure the overhead of accessing BRAD.
+            return [("OK",)]
+
+        elif command.startswith("BRAD_RUN_ON"):
+            # BRAD_RUN_ON <engine> <query or command>
+            # This is useful for commands used to set up experiments (e.g.,
+            # running ANALYZE).
+            parts = command_raw.split(" ")
+            try:
+                engine = Engine.from_str(parts[1])
+            except ValueError as ex:
+                return [(str(ex),)]
+
+            query = " ".join(parts[2:])
+            if len(query) == 0:
+                return [("Empty query/command.",)]
+
+            try:
+                connection = session.engines.get_connection(engine)
+                cursor = await connection.cursor()
+                logger.debug("Requested to run on %s: %s", str(engine), query)
+                await cursor.execute(query)
+            except RuntimeError as ex:
+                return [(str(ex),)]
+
+            # Extract and return the results, if any.
+            try:
+                return [tuple(row) for row in cursor.fetchall_sync()]
+            except pyodbc.ProgrammingError:
+                return []
+
         else:
             return [("Unknown internal command: {}".format(command),)]
 
@@ -338,19 +433,20 @@ class BradFrontEnd(BradInterface):
         loop = asyncio.get_running_loop()
         while True:
             message = await loop.run_in_executor(None, self._input_queue.get)
+            if message.fe_index != self._fe_index:
+                logger.warning(
+                    "Received message with invalid front end index. Expected %d. Received %d.",
+                    self._fe_index,
+                    message.fe_index,
+                )
+                continue
 
             if isinstance(message, ShutdownFrontEnd):
                 logger.debug("The BRAD front end is initiating a shut down...")
                 loop.create_task(_orchestrate_shutdown())
                 break
+
             elif isinstance(message, InternalCommandResponse):
-                if message.fe_index != self._fe_index:
-                    logger.warning(
-                        "Received message with invalid front end index. Expected %d. Received %d.",
-                        self._fe_index,
-                        message.fe_index,
-                    )
-                    continue
                 if not self._daemon_request_mailbox.is_active():
                     logger.warning(
                         "Received an internal command response but no one was waiting for it: %s",
@@ -358,6 +454,22 @@ class BradFrontEnd(BradInterface):
                     )
                     continue
                 self._daemon_request_mailbox.on_new_message(message.response)
+
+            elif isinstance(message, NewBlueprint):
+                logger.info(
+                    "Received notification to update to blueprint version %d",
+                    message.version,
+                )
+                # This refreshes any cached state that depends on the old blueprint.
+                await self._run_blueprint_update(message.version)
+                # Tell the daemon that we have updated.
+                self._output_queue.put(
+                    NewBlueprintAck(self._fe_index, message.version), block=False
+                )
+                logger.info(
+                    "Acknowledged update to blueprint version %d", message.version
+                )
+
             else:
                 logger.info("Received message from the daemon: %s", message)
 
@@ -371,9 +483,13 @@ class BradFrontEnd(BradInterface):
 
             # If the input queue is full, we just drop this message.
             sampled_thpt = txn_value / elapsed_time_s
-            metrics_report = MetricsReport(self._fe_index, sampled_thpt)
+            rt_summary = self._query_run_times.get_summary(k=1)
+            self._query_run_times.clear()  # Only keep the unreported samples.
+            metrics_report = MetricsReport(self._fe_index, sampled_thpt, rt_summary)
             logger.debug(
-                "Sending metrics report: txn_completions_per_s: %.2f", sampled_thpt
+                "Sending metrics report: txn_completions_per_s: %.2f, max_query_run_time_s: %.2f",
+                sampled_thpt,
+                max(rt_summary.top_k) if len(rt_summary.top_k) > 0 else 0.0,
             )
             self._output_queue.put_nowait(metrics_report)
 
@@ -394,6 +510,83 @@ class BradFrontEnd(BradInterface):
         logger.debug("Sending internal command request: %s", message)
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._output_queue.put, message)
+
+    async def _refresh_qlogger(self) -> None:
+        try:
+            while True:
+                await asyncio.sleep(self._config.epoch_length.total_seconds())
+                await self._qhandler.refresh()
+        finally:
+            # Run one last refresh before exiting to ensure any remaining log
+            # files are uploaded.
+            await self._qhandler.refresh()
+
+    async def _run_blueprint_update(self, version: int) -> None:
+        await self._blueprint_mgr.load()
+        active_version = self._blueprint_mgr.get_active_blueprint_version()
+        if version != active_version:
+            logger.error(
+                "Retrieved active blueprint version (%d) is not the same as the notified version (%d).",
+                active_version,
+                version,
+            )
+            return
+
+        blueprint = self._blueprint_mgr.get_blueprint()
+        directory = self._blueprint_mgr.get_directory()
+        logger.debug("Loaded new directory: %s", directory)
+        if self._monitor is not None:
+            self._monitor.update_metrics_sources()
+        await self._sessions.add_connections()
+        self._router.update_blueprint(blueprint)
+        # NOTE: This will cause any pending queries on the to-be-removed
+        # connections to be cancelled. We consider this behavior to be
+        # acceptable.
+        await self._sessions.remove_connections()
+        logger.info("Completed transition to blueprint version %d", version)
+
+    def _schedule_reestablish_connections(self) -> None:
+        if self._reestablish_connections_task is not None:
+            return
+        self._reestablish_connections_task = asyncio.create_task(
+            self._do_reestablish_connections()
+        )
+
+    async def _do_reestablish_connections(self) -> None:
+        # FIXME: This approach is not ideal because we introduce concurrent
+        # access to the session manager.
+        rand_backoff = None
+
+        while True:
+            succeeded = await self._sessions.reestablish_connections()
+            if succeeded:
+                logger.debug("Re-established connections successfully.")
+                self._reestablish_connections_task = None
+                break
+
+            if rand_backoff is None:
+                rand_backoff = RandomizedExponentialBackoff(
+                    max_retries=10,
+                    base_delay_s=2.0,
+                    max_delay_s=timedelta(minutes=10).total_seconds(),
+                )
+
+            wait_time = rand_backoff.wait_time_s()
+            if wait_time is None:
+                logger.warning(
+                    "Abandoning connection re-establishment due to too many failures"
+                )
+                # N.B. We purposefully do not clear the
+                # `_reestablish_connections_task` variable.
+                break
+            else:
+                await asyncio.sleep(wait_time)
+
+            # Refresh the blueprint and directory again.
+            logger.debug(
+                "Refreshing the blueprint before attempting to re-establish connections again."
+            )
+            await self._blueprint_mgr.load()
 
 
 async def _orchestrate_shutdown() -> None:

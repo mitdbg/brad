@@ -1,67 +1,94 @@
 import asyncio
 import logging
 import queue
+import pytz
+import os
 import multiprocessing as mp
+import numpy as np
 from typing import Optional, List
+from datetime import datetime
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.diff.blueprint import BlueprintDiff
+from brad.blueprint.manager import BlueprintManager
+from brad.blueprint.state import TransitionState
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
+from brad.config.system_event import SystemEvent
+from brad.config.temp_config import TempConfig
 from brad.daemon.messages import (
     ShutdownFrontEnd,
     Sentinel,
     MetricsReport,
     InternalCommandRequest,
     InternalCommandResponse,
+    NewBlueprint,
+    NewBlueprintAck,
 )
 from brad.daemon.monitor import Monitor
+from brad.daemon.system_event_logger import SystemEventLogger
+from brad.daemon.transition_orchestrator import TransitionOrchestrator
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.front_end.start_front_end import start_front_end
 from brad.planner.abstract import BlueprintPlanner
-from brad.planner.compare.cost import best_cost_under_geomean_latency
+from brad.planner.compare.cost import best_cost_under_p99_latency
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import MetricsFromMonitor
+from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.provider import DataAccessProvider
+from brad.planner.scoring.data_access.precomputed_values import (
+    PrecomputedDataAccessProvider,
+)
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
-from brad.planner.workload.provider import WorkloadProvider
+from brad.planner.scoring.performance.precomputed_predictions import (
+    PrecomputedPredictions,
+)
 from brad.planner.workload import Workload
+from brad.planner.workload.builder import WorkloadBuilder
+from brad.planner.workload.provider import LoggedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
 from brad.row_list import RowList
+from brad.utils.time_periods import period_start
 
 logger = logging.getLogger(__name__)
+
+# Temporarily used.
+PERSIST_BLUEPRINT_VAR = "BRAD_PERSIST_BLUEPRINT"
 
 
 class BradDaemon:
     """
     Represents BRAD's controller process.
 
-    This code is written with the assumption that this daemon is spawned by the
-    BRAD server. In the future, we may want the daemon to be launched
-    independently and for it to communicate with the server via RPCs.
+    This code is written with the assumption that this daemon spawns the BRAD
+    front end servers. In the future, we may want the servers to be launched
+    independently and for them to communicate with the daemon via RPCs.
     """
 
     def __init__(
         self,
         config: ConfigFile,
+        temp_config: Optional[TempConfig],
         schema_name: str,
         path_to_planner_config: str,
         debug_mode: bool,
     ):
         self._config = config
+        self._temp_config = temp_config
         self._schema_name = schema_name
         self._path_to_planner_config = path_to_planner_config
         self._planner_config = PlannerConfig(path_to_planner_config)
         self._debug_mode = debug_mode
 
         self._assets = AssetManager(self._config)
-        self._blueprint_mgr = BlueprintManager(self._assets, self._schema_name)
-        # TODO(Amadou): Determine how to pass in specific clusters.
-        self._monitor = Monitor.from_config_file(config)
+        self._blueprint_mgr = BlueprintManager(
+            self._config, self._assets, self._schema_name
+        )
+        self._monitor = Monitor(self._config, self._blueprint_mgr)
         self._estimator_provider = _EstimatorProvider()
         self._planner: Optional[BlueprintPlanner] = None
 
@@ -70,6 +97,11 @@ class BradDaemon:
 
         self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
         self._timed_sync_task: Optional[asyncio.Task[None]] = None
+
+        self._transition_orchestrator: Optional[TransitionOrchestrator] = None
+        self._transition_task: Optional[asyncio.Task[None]] = None
+
+        self._system_event_logger = SystemEventLogger.create_if_requested(self._config)
 
     async def run_forever(self) -> None:
         """
@@ -85,42 +117,78 @@ class BradDaemon:
                 if fe.message_reader_task is not None
             ]
             logger.info("The BRAD daemon is running.")
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(SystemEvent.StartUp)
             await asyncio.gather(
                 self._planner.run_forever(),
                 self._monitor.run_forever(),
                 *message_reader_tasks,
             )
+        except Exception:
+            logger.exception("The BRAD daemon encountered an unexpected exception.")
+            raise
         finally:
             logger.info("The BRAD daemon is shutting down...")
             await self._run_teardown()
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(SystemEvent.ShutDown)
             logger.info("The BRAD daemon has shut down.")
 
     async def _run_setup(self) -> None:
         await self._blueprint_mgr.load()
         logger.info("Current blueprint: %s", self._blueprint_mgr.get_blueprint())
 
+        # Initialize the monitor.
+        self._monitor.set_up_metrics_sources()
+
         if self._config.data_sync_period_seconds > 0:
             self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
         await self._data_sync_executor.establish_connections()
 
+        if self._temp_config is not None:
+            # TODO: Actually call into the models. We avoid doing so for now to
+            # avoid having to implement model loading, etc.
+            latency_scorer: AnalyticsLatencyScorer = PrecomputedPredictions.load(
+                workload_file_path=self._temp_config.query_bank_path(),
+                aurora_predictions_path=self._temp_config.aurora_preds_path(),
+                redshift_predictions_path=self._temp_config.redshift_preds_path(),
+                athena_predictions_path=self._temp_config.athena_preds_path(),
+            )
+            data_access_provider = PrecomputedDataAccessProvider.load(
+                workload_file_path=self._temp_config.query_bank_path(),
+                aurora_accessed_pages_path=self._temp_config.aurora_data_access_path(),
+                athena_accessed_bytes_path=self._temp_config.athena_data_access_path(),
+            )
+            comparator = best_cost_under_p99_latency(
+                max_latency_ceiling_s=self._temp_config.latency_ceiling_s()
+            )
+        else:
+            logger.warning(
+                "TempConfig not provided. The planner will not be able to run correctly."
+            )
+            latency_scorer = _NoopAnalyticsScorer()
+            data_access_provider = _NoopDataAccessProvider()
+            comparator = best_cost_under_p99_latency(max_latency_ceiling_s=10)
+
         self._planner = BlueprintPlannerFactory.create(
             planner_config=self._planner_config,
             current_blueprint=self._blueprint_mgr.get_blueprint(),
-            # N.B. This is a placeholder
-            current_workload=Workload.empty(),
+            current_blueprint_score=self._blueprint_mgr.get_active_score(),
             monitor=self._monitor,
             config=self._config,
             schema_name=self._schema_name,
-            # TODO: Hook into the query logging infrastructure. This is a placeholder.
-            workload_provider=_EmptyWorkloadProvider(),
-            # TODO: Hook into the learned performance cost model. This is a placeholder.
-            analytics_latency_scorer=_NoopAnalyticsScorer(),
-            # TODO: Make this configurable.
-            comparator=best_cost_under_geomean_latency(geomean_latency_ceiling_s=10),
-            metrics_provider=MetricsFromMonitor(self._monitor, forecasted=True),
-            # TODO: Hook into the data access models. This is a placeholder.
-            data_access_provider=_NoopDataAccessProvider(),
+            workload_provider=LoggedWorkloadProvider(
+                self._config,
+                self._planner_config,
+                self._blueprint_mgr,
+                self._schema_name,
+            ),
+            analytics_latency_scorer=latency_scorer,
+            comparator=comparator,
+            metrics_provider=MetricsFromMonitor(self._monitor, self._blueprint_mgr),
+            data_access_provider=data_access_provider,
             estimator_provider=self._estimator_provider,
+            system_event_logger=self._system_event_logger,
         )
         self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
 
@@ -155,10 +223,12 @@ class BradDaemon:
         if self._config.routing_policy == RoutingPolicy.ForestTableSelectivity:
             logger.info("Setting up the cardinality estimator...")
             estimator = await PostgresEstimator.connect(self._schema_name, self._config)
-            await estimator.analyze(self._blueprint_mgr.get_blueprint())
+            await estimator.analyze(
+                self._blueprint_mgr.get_blueprint(),
+                # N.B. Only the daemon attempts to repopulate the cache.
+                populate_cache_if_missing=True,
+            )
             self._estimator_provider.set_estimator(estimator)
-
-        self._monitor.force_read_metrics()
 
     async def _run_teardown(self) -> None:
         # Shut down the front end processes.
@@ -166,10 +236,10 @@ class BradDaemon:
         # 2. Input sentinel messages to unblock our reader tasks.
         # 3. Wait for the processes to shut down.
         logger.info("Telling %d front end(s) to shut down...", len(self._front_ends))
-        for fe in self._front_ends:
-            fe.input_queue.put(ShutdownFrontEnd())
+        for fe_index, fe in enumerate(self._front_ends):
+            fe.input_queue.put(ShutdownFrontEnd(fe_index))
             if fe.message_reader_task is not None:
-                fe.output_queue.put(Sentinel())
+                fe.output_queue.put(Sentinel(fe_index))
 
         if self._timed_sync_task is not None:
             self._timed_sync_task.cancel()
@@ -197,26 +267,48 @@ class BradDaemon:
         loop = asyncio.get_running_loop()
         while True:
             message = await loop.run_in_executor(None, front_end.output_queue.get)
+            if message.fe_index != front_end.fe_index:
+                logger.warning(
+                    "Received message with invalid front end index. Expected %d. Received %d.",
+                    front_end.fe_index,
+                    message.fe_index,
+                )
+                continue
+
             if isinstance(message, MetricsReport):
-                if message.fe_index != front_end.fe_index:
-                    logger.warning(
-                        "Received MetricsReport with invalid front end index. Expected %d. Received %d.",
-                        front_end.fe_index,
-                        message.fe_index,
-                    )
-                    continue
                 self._monitor.handle_metric_report(message)
+
             elif isinstance(message, InternalCommandRequest):
-                if message.fe_index != front_end.fe_index:
-                    logger.warning(
-                        "Received InternalCommandRequest with invalid front end index. Expected %d. Received %d.",
-                        front_end.fe_index,
-                        message.fe_index,
-                    )
-                    continue
                 asyncio.create_task(
                     self._run_internal_command_request_response(message)
                 )
+
+            elif isinstance(message, NewBlueprintAck):
+                if self._transition_orchestrator is None:
+                    logger.error(
+                        "Received blueprint ack message but no transition is in progress. Version: %d, Front end: %d",
+                        message.version,
+                        message.fe_index,
+                    )
+                    continue
+
+                # Sanity check.
+                next_version = self._transition_orchestrator.next_version()
+                if next_version != message.version:
+                    logger.error(
+                        "Received a blueprint ack for a mismatched version. Received %d, Expected %d",
+                        message.version,
+                        next_version,
+                    )
+                    continue
+
+                self._transition_orchestrator.decrement_waiting_for_front_ends()
+                if self._transition_orchestrator.waiting_for_front_ends() == 0:
+                    # Schedule the second half of the transition.
+                    self._transition_task = asyncio.create_task(
+                        self._run_transition_part_two()
+                    )
+
             else:
                 logger.debug(
                     "Received unexpected message from front end %d: %s",
@@ -224,13 +316,91 @@ class BradDaemon:
                     str(message),
                 )
 
-    async def _handle_new_blueprint(self, blueprint: Blueprint) -> None:
+    async def _handle_new_blueprint(self, blueprint: Blueprint, score: Score) -> None:
         """
         Informs the server about a new blueprint.
         """
-        # TODO: Need to persist the blueprint and notify the front ends to
-        # transition.
-        logger.info("Planner selected new blueprint: %s", blueprint)
+        if self._system_event_logger is not None:
+            self._system_event_logger.log(SystemEvent.NewBlueprintProposed)
+
+        if self._should_skip_blueprint(blueprint, score):
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(SystemEvent.NewBlueprintSkipped)
+            return
+
+        if PERSIST_BLUEPRINT_VAR in os.environ:
+            logger.info(
+                "Force-persisting the new blueprint. Run a manual transition and "
+                "then restart BRAD to load the new blueprint."
+            )
+            new_version = await self._blueprint_mgr.start_transition(blueprint, score)
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.NewBlueprintAccepted, "version={}".format(new_version)
+                )
+        else:
+            logger.info(
+                "Planner selected a new blueprint. Transition is starting. New blueprint: %s",
+                blueprint,
+            )
+            new_version = await self._blueprint_mgr.start_transition(blueprint, score)
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.NewBlueprintAccepted, "version={}".format(new_version)
+                )
+            if self._planner is not None:
+                self._planner.set_disable_triggers(disable=True)
+            self._transition_orchestrator = TransitionOrchestrator(
+                self._config, self._blueprint_mgr
+            )
+            self._transition_task = asyncio.create_task(self._run_transition_part_one())
+
+    def _should_skip_blueprint(self, blueprint: Blueprint, score: Score) -> bool:
+        """
+        This is called whenever the planner chooses a new blueprint. The purpose
+        is to avoid transitioning to blueprints with few changes.
+
+        We always skip the blueprint if a transition is currently in progress.
+
+        We do not skip the blueprint if:
+        - If there is a provisioning change
+        - The change in query routing is above a threshold
+        """
+        if self._transition_orchestrator is not None:
+            logger.warning(
+                "Planner selected a new blueprint, but we are still transitioning to a blueprint. Skipping new blueprint: %s",
+                blueprint,
+            )
+            return True
+
+        current_blueprint = self._blueprint_mgr.get_blueprint()
+        diff = BlueprintDiff.of(current_blueprint, blueprint)
+        if diff is None:
+            logger.info("Planner selected an identical blueprint - skipping.")
+            return True
+
+        if diff.aurora_diff() is not None or diff.redshift_diff() is not None:
+            return False
+
+        current_score = self._blueprint_mgr.get_active_score()
+        if current_score is None:
+            # Do not skip - we are currently missing the score of the active
+            # blueprint, so there is nothing to compare to.
+            return False
+
+        current_dist = current_score.normalized_query_count_distribution()
+        next_dist = score.normalized_query_count_distribution()
+        abs_delta = np.abs(next_dist - current_dist).sum()
+
+        if abs_delta >= self._planner_config.query_dist_change_frac():
+            return False
+        else:
+            logger.info(
+                "Skipping blueprint because the query distribution change (%.4f) falls under the threshold (%.4f).",
+                abs_delta,
+                self._planner_config.query_dist_change_frac(),
+            )
+            return True
 
     async def _run_sync_periodically(self) -> None:
         while True:
@@ -279,14 +449,146 @@ class BradDaemon:
                 to_return.append((str_op,))
             return to_return
 
+        elif command.startswith("BRAD_INSPECT_WORKLOAD"):
+            now = datetime.now().astimezone(pytz.utc)
+            epoch_length = self._config.epoch_length
+            planning_window = self._planner_config.planning_window()
+            window_end = period_start(now, self._config.epoch_length) + epoch_length
+
+            parts = command.split(" ")
+            if len(parts) > 1:
+                try:
+                    window_multiplier = int(parts[-1])
+                except ValueError:
+                    window_multiplier = 1
+            else:
+                window_multiplier = 1
+
+            window_start = window_end - planning_window * window_multiplier
+            w = (
+                WorkloadBuilder()
+                .add_queries_from_s3_logs(self._config, window_start, window_end)
+                .build()
+            )
+
+            return [
+                ("Unique AP queries", len(w.analytical_queries())),
+                ("Unique TP queries", len(w.transactional_queries())),
+                ("Period", w.period()),
+                ("Window start (UTC)", str(window_start)),
+                ("Window end (UTC)", str(window_end)),
+            ]
+
+        elif command.startswith("BRAD_RUN_PLANNER"):
+            if self._planner is None:
+                return [("Planner not yet initialized.",)]
+
+            parts = command.split(" ")
+            if len(parts) > 1:
+                try:
+                    window_multiplier = int(parts[-1])
+                except ValueError:
+                    window_multiplier = 1
+            else:
+                window_multiplier = 1
+
+            logger.info("Triggering the planner based on an external request...")
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(SystemEvent.ManuallyTriggeredReplan)
+            try:
+                await self._planner.run_replan(window_multiplier)
+                return [("Planner completed. See the daemon's logs for more details.",)]
+            except Exception as ex:
+                logger.exception("Encountered exception when running the planner.")
+                return [(str(ex),)]
+
         else:
             logger.warning("Received unknown internal command: %s", command)
             return []
 
+    async def _run_transition_part_one(self) -> None:
+        assert self._transition_orchestrator is not None
+        tm = self._blueprint_mgr.get_transition_metadata()
+        transitioning_to_version = tm.next_version
 
-class _EmptyWorkloadProvider(WorkloadProvider):
-    def next_workload(self) -> Workload:
-        return Workload.empty()
+        if self._system_event_logger is not None:
+            self._system_event_logger.log(
+                SystemEvent.PreTransitionStarted,
+                "version={}".format(transitioning_to_version),
+            )
+
+        def update_monitor_sources():
+            self._monitor.update_metrics_sources()
+
+        await self._transition_orchestrator.run_prepare_then_transition(
+            update_monitor_sources
+        )
+
+        # Switch to the transitioned state.
+        tm = self._blueprint_mgr.get_transition_metadata()
+        assert (
+            tm.state == TransitionState.TransitionedPreCleanUp
+        ), "Incorrect transition state."
+        assert tm.next_version is not None, "Missing next version."
+
+        directory = self._blueprint_mgr.get_directory()
+        logger.debug("Using new directory: %s", directory)
+        self._monitor.update_metrics_sources()
+
+        await self._data_sync_executor.update_connections()
+
+        if self._system_event_logger is not None:
+            self._system_event_logger.log(
+                SystemEvent.PreTransitionCompleted,
+                "version={}".format(transitioning_to_version),
+            )
+
+        # Inform all front ends about the new blueprint.
+        logger.debug(
+            "Notifying %d front ends about the new blueprint.", len(self._front_ends)
+        )
+        self._transition_orchestrator.set_waiting_for_front_ends(len(self._front_ends))
+        for fe in self._front_ends:
+            fe.input_queue.put(NewBlueprint(fe.fe_index, tm.next_version))
+
+        self._transition_task = None
+
+        # We finish the transition after all front ends acknowledge that they
+        # have transitioned to the new blueprint.
+
+    async def _run_transition_part_two(self) -> None:
+        assert self._transition_orchestrator is not None
+        tm = self._blueprint_mgr.get_transition_metadata()
+        transitioning_to_version = tm.next_version
+        if self._system_event_logger is not None:
+            self._system_event_logger.log(
+                SystemEvent.PostTransitionStarted,
+                "version={}".format(transitioning_to_version),
+            )
+
+        await self._transition_orchestrator.run_clean_up_after_transition()
+        if self._planner is not None:
+            self._planner.update_blueprint(
+                self._blueprint_mgr.get_blueprint(),
+                self._blueprint_mgr.get_active_score(),
+            )
+
+        # Done.
+        tm = self._blueprint_mgr.get_transition_metadata()
+        assert (
+            tm.state == TransitionState.Stable
+        ), "Incorrect transition state after completion."
+        if self._planner is not None:
+            self._planner.set_disable_triggers(disable=False)
+        logger.info("Completed the transition to blueprint version %d", tm.curr_version)
+        self._transition_task = None
+        self._transition_orchestrator = None
+
+        if self._system_event_logger is not None:
+            self._system_event_logger.log(
+                SystemEvent.PostTransitionCompleted,
+                "version={}".format(transitioning_to_version),
+            )
 
 
 class _NoopAnalyticsScorer(AnalyticsLatencyScorer):

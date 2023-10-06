@@ -1,0 +1,10 @@
+latency_ceiling_s: 30.0
+
+aurora_preds_path: workloads/IMDB/OLAP_queries_new/pred_aurora_300.npy
+redshift_preds_path: workloads/IMDB/OLAP_queries_new/pred_redshift_300.npy
+athena_preds_path: workloads/IMDB/OLAP_queries_new/pred_athena_300.npy
+
+aurora_data_access_path: workloads/IMDB/OLAP_queries_new/pred_aurora_blocks_300.npy
+athena_data_access_path: workloads/IMDB/OLAP_queries_new/pred_athena_bytes_scanned_300.npy
+
+query_bank_path: workloads/IMDB/OLAP_queries_new/all_queries_300.sql

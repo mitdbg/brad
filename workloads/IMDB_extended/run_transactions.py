@@ -8,9 +8,15 @@ import sys
 import threading
 import time
 import os
+import pytz
 import multiprocessing as mp
+from datetime import datetime
 
+<<<<<<< HEAD
 from brad.grpc_client import BradGrpcClient
+=======
+from brad.grpc_client import BradGrpcClient, BradClientError
+>>>>>>> main
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
 from workload_utils.transaction_worker import TransactionWorker
 
@@ -43,38 +49,72 @@ def runner(
         0.20,
         0.10,
     ]
+    lookup_theatre_id_by_name = 0.8
     txn_indexes = list(range(len(transactions)))
     latencies = [[] for _ in range(len(transactions))]
     commits = [0 for _ in range(len(transactions))]
     aborts = [0 for _ in range(len(transactions))]
 
-    try:
-        # Connect.
-        if args.cstr_var is not None:
-            db: Database = PyodbcDatabase(
-                pyodbc.connect(os.environ[args.cstr_var], autocommit=True)
-            )
-        else:
-            brad = BradGrpcClient(args.brad_host, args.brad_port)
-            brad.connect()
-            db = BradDatabase(brad)
-
-        # Set the isolation level.
-        db.execute_sync(
-            f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
+    # Connect.
+    if args.cstr_var is not None:
+        db: Database = PyodbcDatabase(
+            pyodbc.connect(os.environ[args.cstr_var], autocommit=True)
         )
+    else:
+        port_offset = worker_idx % args.num_front_ends
+        brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
+        brad.connect()
+        db = BradDatabase(brad)
 
-        # Signal that we are ready to start and wait for other clients.
-        start_queue.put("")
-        _ = stop_queue.get()
+    # Set the isolation level.
+    db.execute_sync(
+        f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
+    )
 
+    # Signal that we are ready to start and wait for other clients.
+    start_queue.put("")
+    _ = stop_queue.get()
+
+    try:
         overall_start = time.time()
         while True:
             txn_idx = txn_prng.choices(txn_indexes, weights=transaction_weights, k=1)[0]
             txn = transactions[txn_idx]
 
+            now = datetime.now().astimezone(pytz.utc)
             txn_start = time.time()
-            succeeded = txn(db)
+            try:
+                if txn == worker.purchase_tickets:
+                    succeeded = txn(
+                        db,
+                        select_using_name=txn_prng.random() < lookup_theatre_id_by_name,
+                    )
+                else:
+                    succeeded = txn(db)
+            except BradClientError as ex:
+                succeeded = False
+                if ex.is_transient():
+                    print(
+                        "Encountered transient error (probably engine change). Will retry...",
+                        flush=True,
+                        file=sys.stderr,
+                    )
+
+                else:
+                    print(
+                        "Encountered an unexpected `BradClientError`. Aborting the workload...",
+                        flush=True,
+                        file=sys.stderr,
+                    )
+                    raise
+            except:
+                succeeded = False
+                print(
+                    "Encountered an unexpected error. Aborting the workload...",
+                    flush=True,
+                    file=sys.stderr,
+                )
+                raise
             txn_end = time.time()
 
             # Record metrics.
@@ -82,17 +122,18 @@ def runner(
                 commits[txn_idx] += 1
             else:
                 aborts[txn_idx] += 1
-            latencies[txn_idx].append(txn_end - txn_start)
+            latencies[txn_idx].append((now, txn_end - txn_start))
 
             try:
                 _ = stop_queue.get_nowait()
                 break
             except queue.Empty:
                 pass
+
+    finally:
         overall_end = time.time()
         print(f"[{worker_idx}] Done running transactions.", flush=True, file=sys.stderr)
 
-    finally:
         # For printing out results.
         if "COND_OUT" in os.environ:
             import conductor.lib as cond
@@ -102,10 +143,10 @@ def runner(
             out_dir = pathlib.Path(".")
 
         with open(out_dir / "oltp_latency_{}.csv".format(worker_idx), "w") as file:
-            print("txn_idx,run_time_s", file=file)
+            print("txn_idx,timestamp,run_time_s", file=file)
             for tidx, lat_list in enumerate(latencies):
-                for lat in lat_list:
-                    print("{},{}".format(tidx, lat), file=file)
+                for timestamp, lat in lat_list:
+                    print("{},{},{}".format(tidx, timestamp, lat), file=file)
 
         with open(out_dir / "oltp_stats_{}.csv".format(worker_idx), "w") as file:
             print("stat,value", file=file)
@@ -157,6 +198,7 @@ def main():
     )
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)
+    parser.add_argument("--num-front-ends", type=int, default=1)
     args = parser.parse_args()
 
     mgr = mp.Manager()

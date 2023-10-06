@@ -7,7 +7,7 @@ from importlib.resources import files, as_file
 import brad.routing
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.daemon.monitor import Monitor
 from brad.routing.router import Router
 from brad.query_rep import QueryRep
@@ -35,20 +35,20 @@ class RuleBasedParams(object):
 
         # Aurora metric threshold
         aurora_parameters_upper_limit: MutableMapping[str, Optional[float]] = dict()
-        aurora_parameters_upper_limit["aurora_WRITER_CPUUtilization_Average"] = 50.0
-        aurora_parameters_upper_limit["aurora_WRITER_ReadIOPS_Average"] = None
-        aurora_parameters_upper_limit["aurora_READER_CPUUtilization_Average"] = 50.0
-        aurora_parameters_upper_limit["aurora_READER_ReadIOPS_Average"] = None
-        aurora_parameters_upper_limit["aurora_READER_ReadLatency_Average"] = 1e-4
+        aurora_parameters_upper_limit["CPUUtilization_Average"] = 50.0
+        aurora_parameters_upper_limit["ReadIOPS_Average"] = None
+        # aurora_parameters_upper_limit["aurora_READER_CPUUtilization_Average"] = 50.0
+        # aurora_parameters_upper_limit["aurora_READER_ReadIOPS_Average"] = None
+        # aurora_parameters_upper_limit["aurora_READER_ReadLatency_Average"] = 1e-4
         self.aurora_parameters_upper_limit = aurora_parameters_upper_limit
         aurora_parameters_lower_limit: MutableMapping[str, Optional[float]] = dict()
         self.aurora_parameters_lower_limit = aurora_parameters_lower_limit
 
         # Redshift metric threshold
         redshift_parameters_upper_limit: MutableMapping[str, Optional[float]] = dict()
-        redshift_parameters_upper_limit["redshift_CPUUtilization_Average"] = 50.0
-        redshift_parameters_upper_limit["redshift_ReadIOPS_Average"] = None
-        redshift_parameters_upper_limit["redshift_ReadLatency_Average"] = 1e-4
+        redshift_parameters_upper_limit["CPUUtilization_Average"] = 50.0
+        redshift_parameters_upper_limit["ReadIOPS_Average"] = None
+        redshift_parameters_upper_limit["ReadLatency_Average"] = 1e-4
         self.redshift_parameters_upper_limit = redshift_parameters_upper_limit
         redshift_parameters_lower_limit: MutableMapping[str, Optional[float]] = dict()
         self.redshift_parameters_lower_limit = redshift_parameters_lower_limit
@@ -84,6 +84,10 @@ class RuleBased(Router):
         # non-determinism will be used for offline training data exploration (not implemented)
         self._deterministic = deterministic
         self._params = RuleBasedParams()
+
+    def update_blueprint(self, blueprint: Blueprint) -> None:
+        self._blueprint = blueprint
+        self._table_placement_bitmap = blueprint.table_locations_bitmap()
 
     async def recollect_catalog(self, sessions: SessionManager) -> None:
         # recollect catalog stats; happens every maintenance window
@@ -153,33 +157,48 @@ class RuleBased(Router):
         await sessions.end_session(session_id)
 
     def check_engine_state(
-        self, engine: Engine, sys_metric: Mapping[str, float]
+        self,
+        engine: Engine,
+        aurora_metrics: Mapping[str, float],
+        redshift_metrics: Mapping[str, float],
     ) -> bool:
         # We define a set of rules to judge whether the current system is overloaded
         not_overloaded = True
         if engine == Engine.Aurora:
             for param in self._params.aurora_parameters_upper_limit:
                 limit = self._params.aurora_parameters_upper_limit[param]
-                if limit and param in sys_metric and sys_metric[param] > limit:
+                if limit and param in aurora_metrics and aurora_metrics[param] > limit:
                     not_overloaded = False
                     break
             if not_overloaded:
                 for param in self._params.aurora_parameters_lower_limit:
                     limit = self._params.aurora_parameters_lower_limit[param]
-                    if limit and param in sys_metric and sys_metric[param] < limit:
+                    if (
+                        limit
+                        and param in aurora_metrics
+                        and aurora_metrics[param] < limit
+                    ):
                         not_overloaded = False
                         break
 
         if engine == Engine.Redshift:
             for param in self._params.redshift_parameters_upper_limit:
                 limit = self._params.redshift_parameters_upper_limit[param]
-                if limit and param in sys_metric and sys_metric[param] > limit:
+                if (
+                    limit
+                    and param in redshift_metrics
+                    and redshift_metrics[param] > limit
+                ):
                     not_overloaded = False
                     break
             if not_overloaded:
                 for param in self._params.redshift_parameters_lower_limit:
                     limit = self._params.redshift_parameters_lower_limit[param]
-                    if limit and param in sys_metric and sys_metric[param] < limit:
+                    if (
+                        limit
+                        and param in redshift_metrics
+                        and redshift_metrics[param] < limit
+                    ):
                         not_overloaded = False
                         break
 
@@ -275,18 +294,24 @@ class RuleBased(Router):
             assert False
         else:
             # Todo(Ziniu): this can be stored in this class to reduce latency
-            raw_sys_metric = self._monitor.read_k_most_recent(k=1)
-            if raw_sys_metric.empty:
+            raw_aurora_metrics = self._monitor.aurora_metrics(
+                reader_index=None
+            ).read_k_most_recent(k=1)
+            raw_redshift_metrics = self._monitor.redshift_metrics().read_k_most_recent(
+                k=1
+            )
+            if raw_aurora_metrics.empty or raw_redshift_metrics.empty:
                 logger.warning(
                     "Routing without system metrics when we expect to have metrics."
                 )
                 return ideal_location_rank[0]
 
-            col_name = list(raw_sys_metric.columns)
-            col_value = list(raw_sys_metric.values)[0]
-            sys_metric = {col_name[i]: col_value[i] for i in range(len(col_value))}
+            aurora_metrics = raw_aurora_metrics.iloc[0].to_dict()
+            redshift_metrics = raw_redshift_metrics.iloc[0].to_dict()
             for loc in ideal_location_rank:
-                if loc in locations and self.check_engine_state(loc, sys_metric):
+                if loc in locations and self.check_engine_state(
+                    loc, aurora_metrics, redshift_metrics
+                ):
                     return loc
 
             # In the case of all system are overloaded (time to trigger replan),

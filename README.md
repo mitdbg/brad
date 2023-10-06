@@ -27,18 +27,8 @@ Note that these instructions are written for a Debian based machine (e.g., Ubunt
     Description=PostgreSQL ODBC Driver
     Driver=/usr/lib/x86_64-linux-gnu/odbc/psqlodbcw.so
     ```
-- **Athena**
-  - Download the 64-bit Linux driver: https://docs.aws.amazon.com/athena/latest/ug/connect-with-odbc.html
-  - Install `alien`: `sudo apt install alien` (it converts `*.rpm` files into `*.deb` files for installation on Ubuntu)
-  - Install the driver: `sudo alien -i path/to/downloaded/athena_driver.rpm`
-  - Add the following snippet to `~/.odbcinst.ini`
-    ```ini
-    [Athena]
-    Description=Amazon Athena Driver
-    Driver=/opt/simba/athenaodbc/lib/64/libathenaodbc_sb64.so
-    ```
 
-We no longer depend on ODBC to connect to Redshift.
+We no longer depend on ODBC to connect to Redshift nor Athena.
 
 ### Creating a Configuration File
 
@@ -100,6 +90,17 @@ files.
 - (07/24/2023) Update your local `config.yml` and add entries for
   `front_end_interface`, `front_end_port`, `num_front_ends`, and
   `front_end_log_path`. Remove `server_interface` and `server_port`.
+- (07/26/2023) Update your local `config.yml` and add entries for `cluster_id`
+  for Aurora and Redshift. You can remove any address/port details for Aurora and
+  Redshift; BRAD now resolves endpoints for the engines from AWS.
+- (07/27/2023) Update the logging configs in `config.yml` (see the
+  `config_sample.yml` file).
+- (08/07/2023) Re-run `./tools/install-dev.sh` to update your dependencies. We
+  added `PyAthena`.
+- (08/08/2023) Add `monitoring_role_arn` to your Aurora connection
+  configuration. This should be set to the ARN of the `rds-monitoring-role`
+  found in your AWS IAM console.
+- (08/15/2023) Add `front_end_query_latency_buffer_size` to your `config.yml`.
 
 
 ### Generate IMDB workload

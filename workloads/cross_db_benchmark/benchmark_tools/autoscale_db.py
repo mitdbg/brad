@@ -131,14 +131,16 @@ def auto_scale(data_dir, target_dir, dataset, factor=2, PK_randomness=False):
     all_keys = dict()
     all_PK_mappings = dict()
     for r in schema.relationships:
-        if r[0] not in all_keys:
-            all_keys[r[0]] = set()
-        all_keys[r[0]].add(r[0] + "." + r[1])
-        if r[2] not in all_keys:
-            all_keys[r[2]] = set()
-        all_keys[r[2]].add(r[2] + "." + r[3])
+        if r[0] in schema.auto_scale_tables:
+            if r[0] not in all_keys:
+                all_keys[r[0]] = set()
+            all_keys[r[0]].add(r[0] + "." + r[1])
+        if r[2] in schema.auto_scale_tables:
+            if r[2] not in all_keys:
+                all_keys[r[2]] = set()
+            all_keys[r[2]].add(r[2] + "." + r[3])
 
-    for t in all_keys:
+    for t in schema.auto_scale_tables:
         table_dir = os.path.join(data_path, f"{t}.csv")
         assert os.path.exists(table_dir), f"Could not find table csv {table_dir}"
         if hasattr(schema.primary_key, t):
@@ -159,6 +161,10 @@ def auto_scale(data_dir, target_dir, dataset, factor=2, PK_randomness=False):
             if t == r[2]:
                 key = t + "." + r[3]
                 equivalent_key[key] = r[0] + "." + r[1]
+        if hasattr(schema.primary_key, t):
+            pk = t + "." + getattr(schema.primary_key, t)
+            if pk not in equivalent_key:
+                equivalent_key[pk] = ""
         duplicate_data(
             schema,
             os.path.join(data_path, f"{t}.csv"),

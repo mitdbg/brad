@@ -9,7 +9,7 @@ from brad.data_stats.estimator import Estimator
 from brad.query_rep import QueryRep
 from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 
 
 class ForestRouter(Router):
@@ -77,6 +77,10 @@ class ForestRouter(Router):
                 self._blueprint = self._blueprint_mgr.get_blueprint()
 
             self._table_placement_bitmap = self._blueprint.table_locations_bitmap()
+
+    def update_blueprint(self, blueprint: Blueprint) -> None:
+        self._blueprint = blueprint
+        self._table_placement_bitmap = blueprint.table_locations_bitmap()
 
     async def engine_for(self, query: QueryRep) -> Engine:
         # Compute valid locations.

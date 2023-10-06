@@ -38,6 +38,7 @@ INSTALL_REQUIRES = [
     "imbalanced-learn",
     "redshift_connector",
     "tabulate",
+    "PyAthena",
 ]
 
 DEV_REQUIRES = [

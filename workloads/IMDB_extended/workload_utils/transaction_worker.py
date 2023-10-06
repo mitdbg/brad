@@ -2,7 +2,7 @@ import random
 import logging
 from datetime import datetime, timedelta
 
-from brad.grpc_client import RowList
+from brad.grpc_client import RowList, BradClientError
 from .database import Database
 
 logger = logging.getLogger(__name__)
@@ -130,22 +130,35 @@ class TransactionWorker:
             db.rollback_sync()
             return False
 
-    def purchase_tickets(self, db: Database) -> bool:
+    def purchase_tickets(self, db: Database, select_using_name: bool) -> bool:
         """
         Represents a user buying tickets for a specific showing.
 
-        - Select theatre by id
+        - Select theatre (by name or id)
         - Select showing by theatre id and date
         - Insert into `ticket_order`
         - Update the `showing` entry
         """
 
-        # 1. Select a random theatre id.
-        theatre_id = self.prng.randint(self.min_theatre_id, self.max_theatre_id)
+        # 1. Select a random theatre number.
+        theatre_num = self.prng.randint(self.min_theatre_id, self.max_theatre_id)
 
         try:
             # Start the transaction.
             db.execute_sync("BEGIN")
+
+            if select_using_name:
+                results = db.execute_sync(
+                    f"SELECT id FROM theatres WHERE name = 'Theatre #{theatre_num}'"
+                )
+                if len(results) == 0:
+                    # Occasionally, nothing is found.
+                    db.commit_sync()
+                    return True
+                theatre_id = results[0][0]
+            else:
+                # By design, the theatre number is equal to the ID.
+                theatre_id = theatre_num
 
             # 2. Look for a showing.
             num_to_consider = self.prng.randint(*self.showings_to_consider)
@@ -182,6 +195,10 @@ class TransactionWorker:
             # 6. Commit changes.
             db.commit_sync()
             return True
+
+        except BradClientError:
+            db.rollback_sync()
+            return False
 
         except:
             logger.exception("Need to rollback.")

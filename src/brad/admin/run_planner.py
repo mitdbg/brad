@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import pathlib
+import pytz
 from typing import Dict
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -15,6 +16,7 @@ from brad.planner.compare.cost import (
 )
 from brad.planner.estimator import EstimatorProvider, FixedEstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
+from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.precomputed_values import (
     PrecomputedDataAccessProvider,
 )
@@ -31,7 +33,7 @@ from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import FixedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 
@@ -86,11 +88,6 @@ def register_admin_action(subparser) -> None:
         help="The number of analytical queries issued per second.",
     )
     parser.add_argument(
-        "--transactional-rate-per-s",
-        type=float,
-        help="The number of transactions issued per second.",
-    )
-    parser.add_argument(
         "--debug",
         action="store_true",
         help="Set to enable debug logging.",
@@ -137,7 +134,7 @@ def run_planner(args) -> None:
 
     # 3. Load the blueprint.
     assets = AssetManager(config)
-    blueprint_mgr = BlueprintManager(assets, args.schema_name)
+    blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
     blueprint_mgr.load_sync()
     logger.info("Current blueprint:")
     logger.info("%s", blueprint_mgr.get_blueprint())
@@ -151,7 +148,6 @@ def run_planner(args) -> None:
     elif args.workload_source == "query_bank":
         assert args.query_bank_file is not None
         assert args.query_counts_file is not None
-        assert args.transactional_rate_per_s is not None
         assert args.workload_dir is not None
 
         engines = EngineConnections.connect_sync(
@@ -166,9 +162,6 @@ def run_planner(args) -> None:
                 args.query_counts_file,
             )
             .add_transactional_queries_from_file(workload_dir / "oltp.sql")
-            .uniform_total_transaction_rate(
-                args.transactional_rate_per_s, period=timedelta(seconds=1)
-            )
             .for_period(timedelta(hours=1))
             .table_sizes_from_engines(blueprint_mgr.get_blueprint(), table_sizer)
             .build()
@@ -176,7 +169,6 @@ def run_planner(args) -> None:
 
     elif args.workload_source == "workload_dir":
         assert args.analytical_rate_per_s is not None
-        assert args.transactional_rate_per_s is not None
 
         engines = EngineConnections.connect_sync(
             config, args.schema_name, autocommit=True
@@ -189,9 +181,6 @@ def run_planner(args) -> None:
             .add_transactional_queries_from_file(workload_dir / "oltp.sql")
             .uniform_per_analytical_query_rate(
                 args.analytical_rate_per_s, period=timedelta(seconds=1)
-            )
-            .uniform_total_transaction_rate(
-                args.transactional_rate_per_s, period=timedelta(seconds=1)
             )
             .for_period(timedelta(hours=1))
             .table_sizes_from_engines(blueprint_mgr.get_blueprint(), table_sizer)
@@ -215,13 +204,16 @@ def run_planner(args) -> None:
     )
 
     # 6. Start the planner.
-    monitor = Monitor.from_config_file(config)
+    monitor = Monitor(config, blueprint_mgr)
+    monitor.set_up_metrics_sources()
     if args.use_fixed_metrics is not None:
+        now = datetime.now().astimezone(pytz.utc)
         metrics_provider: MetricsProvider = FixedMetricsProvider(
-            Metrics(**parse_metrics(args.use_fixed_metrics))
+            Metrics(**parse_metrics(args.use_fixed_metrics)),
+            now,
         )
     else:
-        metrics_provider = MetricsFromMonitor(monitor, forecasted=True)
+        metrics_provider = MetricsFromMonitor(monitor, blueprint_mgr)
 
     if config.routing_policy == RoutingPolicy.ForestTableSelectivity:
         pe = asyncio.run(PostgresEstimator.connect(args.schema_name, config))
@@ -232,7 +224,7 @@ def run_planner(args) -> None:
 
     planner = BlueprintPlannerFactory.create(
         current_blueprint=blueprint_mgr.get_blueprint(),
-        current_workload=workload,
+        current_blueprint_score=blueprint_mgr.get_active_score(),
         planner_config=planner_config,
         monitor=monitor,
         config=config,
@@ -249,23 +241,29 @@ def run_planner(args) -> None:
         data_access_provider=data_access_provider,
         estimator_provider=estimator_provider,
     )
-    monitor.force_read_metrics()
+    asyncio.run(monitor.fetch_latest())
 
-    async def on_new_blueprint(blueprint: Blueprint):
+    async def on_new_blueprint(blueprint: Blueprint, score: Score):
         logger.info("Selected new blueprint")
         logger.info("%s", blueprint)
 
         while True:
-            response = input("Do you want to persist this blueprint? (y/n): ").lower()
+            response = input(
+                "Do you want to persist this blueprint? Use 'f' to force-persist the blueprint. (y/f/n): "
+            ).lower()
             if response == "y":
-                blueprint_mgr.set_blueprint(blueprint)
-                blueprint_mgr.persist_sync()
+                await blueprint_mgr.start_transition(blueprint, score)
+                print("Done!")
+                break
+            elif response == "f":
+                print("Forcing the blueprint...")
+                blueprint_mgr.force_new_blueprint_sync(blueprint, score)
                 print("Done!")
                 break
             elif response == "n":
                 break
             else:
-                print("Invalid input. Please enter 'y' or 'n'.")
+                print("Invalid input. Please enter 'y', 'f', or 'n'.")
 
     planner.register_new_blueprint_callback(on_new_blueprint)
 

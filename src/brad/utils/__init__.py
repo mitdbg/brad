@@ -1,5 +1,11 @@
 import logging
 
+VERBOSE = 5
+
+
+def log_verbose(logger: logging.Logger, message: str, *args) -> None:
+    logger.log(VERBOSE, message, *args)
+
 
 def set_up_logging(filename=None, debug_mode=False, also_console=False):
     logging_kwargs = {
@@ -16,6 +22,7 @@ def set_up_logging(filename=None, debug_mode=False, also_console=False):
             logging.StreamHandler(),
         ]
     logging.basicConfig(**logging_kwargs)
+    logging.addLevelName(VERBOSE, "VERBOSE")
 
     # boto3 logging is too verbose - it interferes with our debug messages. This
     # snippet disables debug logging on boto3 related modules.
@@ -25,3 +32,4 @@ def set_up_logging(filename=None, debug_mode=False, also_console=False):
     logging.getLogger("s3transfer").setLevel(logging.INFO)
     logging.getLogger("urllib3").setLevel(logging.INFO)
     logging.getLogger("redshift_connector").setLevel(logging.INFO)
+    logging.getLogger("pyathena").setLevel(logging.INFO)

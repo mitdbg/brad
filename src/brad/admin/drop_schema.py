@@ -1,12 +1,14 @@
+import asyncio
 import logging
 
 from brad.asset_manager import AssetManager
+from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
+from brad.front_end.engine_connections import EngineConnections
+from brad.provisioning.directory import Directory
 from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.forest_router import ForestRouter
-from brad.blueprint_manager import BlueprintManager
-from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
@@ -30,23 +32,20 @@ def register_admin_action(subparser) -> None:
 
 # This method is called by `brad.exec.admin.main`.
 def drop_schema(args):
-    # 1. Load the config.
+    # 1. Load the config and blueprint.
     config = ConfigFile(args.config_file)
 
-    # 2. Delete the persisted data blueprint, if it exists.
-    assets = AssetManager(config)
-    data_blueprint_mgr = BlueprintManager(assets, args.schema_name)
-    data_blueprint_mgr.delete_sync()
-
-    # 3. Connect to the underlying engines without an explicit database.
-    cxns = EngineConnections.connect_sync(config, autocommit=True)
+    # 2. Connect to the underlying engines without an explicit database.
+    directory = Directory(config)
+    asyncio.run(directory.refresh())
+    cxns = EngineConnections.connect_sync(config, directory, autocommit=True)
     redshift = cxns.get_connection(Engine.Redshift).cursor_sync()
     aurora = cxns.get_connection(Engine.Aurora).cursor_sync()
     athena = cxns.get_connection(Engine.Athena).cursor_sync()
 
     logger.info("Starting the schema drop...")
 
-    # 4. Drop the underlying "databases" if they exist.
+    # 3. Drop the underlying "databases" if they exist.
     athena.execute_sync("DROP DATABASE IF EXISTS {} CASCADE".format(args.schema_name))
     aurora.execute_sync("DROP DATABASE IF EXISTS {}".format(args.schema_name))
     try:
@@ -55,12 +54,17 @@ def drop_schema(args):
         # Ignore the error if a database does not exist.
         logger.exception("Exception when dropping Redshift database.")
 
-    # 5. Drop any serialized routers.
+    # 4. Drop any serialized routers.
+    assets = AssetManager(config)
     ForestRouter.static_drop_model_sync(
         args.schema_name, RoutingPolicy.ForestTableSelectivity, assets
     )
     ForestRouter.static_drop_model_sync(
         args.schema_name, RoutingPolicy.ForestTablePresence, assets
     )
+
+    # 5. Delete the persisted blueprint if it exists.
+    blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
+    blueprint_mgr.delete_sync()
 
     logger.info("Done!")

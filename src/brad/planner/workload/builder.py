@@ -1,14 +1,17 @@
 import csv
 import pathlib
 import logging
-from datetime import timedelta
+import re
+from datetime import timedelta, datetime
 from typing import List, Dict, Optional
 
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
+from brad.config.file import ConfigFile
 from brad.planner.workload import Workload
 from brad.planner.workload.query import Query
 from brad.utils.table_sizer import TableSizer
+from brad.workload_logging.log_fetcher import LogFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -26,32 +29,53 @@ class WorkloadBuilder:
         self._analytical_queries: List[str] = []
         self._transactional_queries: List[str] = []
         self._analytics_count_per: int = 1
-        self._total_transaction_count: float = 0.0
         self._period = timedelta(hours=1)
         self._table_sizes: Dict[str, int] = {}
         self._prespecified_queries: List[Query] = []
 
-    def build(self) -> Workload:
+    def build(self, rescale_to_period: Optional[timedelta] = None) -> Workload:
+        """
+        Change the workload's period using `rescale_period`. We linearly scale
+        the query counts.
+        """
+        if rescale_to_period is None or self._period.total_seconds() == 0.0:
+            multiplier = 1.0
+        else:
+            multiplier = rescale_to_period / self._period
+
         if len(self._analytical_queries) > 0:
             analytics = [
-                Query(q, arrival_count=self._analytics_count_per * count)
+                Query(
+                    q,
+                    arrival_count=max(
+                        int(self._analytics_count_per * count * multiplier), 1
+                    ),
+                )
                 for q, count in self._deduplicate_queries(
                     self._analytical_queries
                 ).items()
             ]
         else:
-            analytics = self._prespecified_queries
+            if rescale_to_period is not None:
+                analytics = [
+                    Query(q.raw_query, max(int(q.arrival_count() * multiplier), 1))
+                    for q in self._prespecified_queries
+                ]
+            else:
+                analytics = self._prespecified_queries
 
         transactions = [
-            Query(q, arrival_count=0)
-            for q in self._deduplicate_queries(self._transactional_queries).keys()
+            # N.B. `count` is sampled!
+            Query(q, arrival_count=max(int(count * multiplier), 1))
+            for q, count in self._deduplicate_queries(
+                self._transactional_queries
+            ).items()
         ]
 
         return Workload(
-            period=self._period,
+            period=self._period if rescale_to_period is None else rescale_to_period,
             analytical_queries=analytics,
             transactional_queries=transactions,
-            transaction_arrival_count=self._total_transaction_count,
             table_sizes=self._table_sizes,
         )
 
@@ -75,23 +99,6 @@ class WorkloadBuilder:
             logger.warning(
                 "Analytical rate rounded down to 0 queries. Original count: %f", count
             )
-        return self
-
-    def uniform_total_transaction_rate(
-        self, count: float, period: Optional[timedelta] = None
-    ) -> "WorkloadBuilder":
-        """
-        Used to express the rate of transactions arriving during the period. If
-        `period` is None, it defaults to the current period in the workload.
-
-        Note that this is a global *transaction* rate, not a per-query rate.
-        This is because a transaction may consist of multiple queries.
-        """
-        if period is None:
-            self._total_transaction_count = count
-        else:
-            scaled = count / period.total_seconds() * self._period.total_seconds()
-            self._total_transaction_count = scaled
         return self
 
     def add_analytical_queries_and_counts_from_file(
@@ -149,6 +156,82 @@ class WorkloadBuilder:
                 )
                 break
             assert table.name in self._table_sizes
+        return self
+
+    def add_queries_from_s3_logs(
+        self, config: ConfigFile, window_start: datetime, window_end: datetime
+    ) -> "WorkloadBuilder":
+        assert window_start <= window_end
+        self._prespecified_queries.clear()
+
+        log_fetcher = LogFetcher(config)
+
+        txn_queries = []
+        analytical_queries = []
+        sampling_prob = 1  # Currently unused.
+
+        range_end: Optional[datetime] = None
+        range_start: Optional[datetime] = None
+        epoch_length = config.epoch_length
+
+        # The logic below extracts data from log files that represent epochs
+        # that intersect with the provided window.
+        #
+        # NOTE: This logic will overcount the time period if there are log gaps
+        # in the window (e.g., the window spans multiple epochs and we did not
+        # log a few epochs in the middle of the window). This behavior is OK for
+        # our use cases since we will assume that the query logger runs
+        # continuously.
+
+        for log_file in log_fetcher.fetch_logs(
+            window_start, window_end, include_contents=True
+        ):
+            is_valid = False
+
+            if "analytical" in log_file.file_key:
+                for line in log_file.contents.strip().split("\n"):
+                    matches = re.findall(r"Query: (.+?) Engine:", line)
+                    if len(matches) == 0:
+                        continue
+                    q = matches[0]
+                    analytical_queries.append(q.strip())
+                is_valid = True
+
+            elif "transactional" in log_file.file_key:
+                prob = re.findall(r"_p(\d+)\.log$", log_file.file_key)[0]
+                prob = float(prob) / 100.0
+                if (prob / 100.0) < sampling_prob:
+                    sampling_prob = prob
+                for line in log_file.contents.strip().split("\n"):
+                    matches = re.findall(r"Query: (.+) Engine:", line)
+                    if len(matches) == 0:
+                        continue
+                    q = matches[0]
+                    txn_queries.append(q.strip())
+                is_valid = True
+
+            # Adjust the processed range of data.
+            if is_valid:
+                if range_start is None:
+                    range_start = log_file.epoch_start
+                else:
+                    range_start = min(range_start, log_file.epoch_start)
+
+                if range_end is None:
+                    range_end = log_file.epoch_start + epoch_length
+                else:
+                    range_end = max(range_end, log_file.epoch_start + epoch_length)
+
+        # Sanity checks.
+        if range_start is None or range_end is None:
+            # No queries match.
+            self._period = timedelta(seconds=0)
+            return self
+
+        self._transactional_queries.extend(txn_queries)
+        self._analytical_queries.extend(analytical_queries)
+        self._period = range_end - range_start
+
         return self
 
     def _deduplicate_queries(self, queries: List[str]) -> Dict[str, int]:

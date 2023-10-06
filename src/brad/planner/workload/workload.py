@@ -47,7 +47,7 @@ class Workload:
 
     @classmethod
     def empty(cls) -> "Workload":
-        return cls(timedelta(hours=1), [], [], 0, {})
+        return cls(timedelta(hours=1), [], [], {})
 
     @classmethod
     def from_pickle(cls, file_path: str | Path) -> "Workload":
@@ -59,13 +59,11 @@ class Workload:
         period: timedelta,
         analytical_queries: List[Query],
         transactional_queries: List[Query],
-        transaction_arrival_count: float,
         table_sizes: Dict[str, int],
     ) -> None:
         self._period = period
         self._analytical_queries: List[Query] = analytical_queries
         self._transactional_queries: List[Query] = transactional_queries
-        self._transaction_arrival_count = transaction_arrival_count
         self._table_sizes = table_sizes
 
         # The predicted latencies of the analytical queries.
@@ -91,6 +89,34 @@ class Workload:
         self._table_sizes_mb: Dict[Tuple[str, Engine], int] = {}
         self._dataset_size_mb = 0
 
+    def clone(self) -> "Workload":
+        workload = Workload(
+            self._period,
+            self._analytical_queries.copy(),
+            self._transactional_queries.copy(),
+            self._table_sizes.copy(),
+        )
+
+        if self._predicted_analytical_latencies is not None:
+            workload._predicted_analytical_latencies = (  # pylint: disable=protected-access
+                self._predicted_analytical_latencies.copy()
+            )
+
+        if self._predicted_aurora_pages_accessed is not None:
+            workload._predicted_aurora_pages_accessed = (  # pylint: disable=protected-access
+                self._predicted_aurora_pages_accessed.copy()
+            )
+
+        if self._predicted_athena_bytes_accessed is not None:
+            workload._predicted_athena_bytes_accessed = (  # pylint: disable=protected-access
+                self._predicted_athena_bytes_accessed.copy()
+            )
+
+        # N.B. We do not edit the legacy properties because this method is a new
+        # method and is unused in legacy code.
+
+        return workload
+
     def serialize_for_debugging(self, output_path: str | Path) -> None:
         with open(output_path, "wb") as out_file:
             pickle.dump(self, out_file)
@@ -106,9 +132,6 @@ class Workload:
 
     def all_queries(self) -> Iterable[Query]:
         return chain(self._transactional_queries, self._analytical_queries)
-
-    def transaction_arrival_count(self) -> float:
-        return self._transaction_arrival_count
 
     def table_num_rows(self, table_name: str) -> int:
         return self._table_sizes[table_name]

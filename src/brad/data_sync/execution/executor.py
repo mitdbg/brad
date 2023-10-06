@@ -11,7 +11,7 @@ from brad.data_sync.execution.table_sync_bounds import TableSyncBounds
 from brad.data_sync.logical_plan import LogicalDataSyncPlan
 from brad.data_sync.physical_plan import PhysicalDataSyncPlan
 from brad.data_sync.planner import make_logical_data_sync_plan
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
@@ -27,8 +27,21 @@ class DataSyncExecutor:
         logger.debug(
             "Data sync executor is establishing connections to the underlying engines..."
         )
+        blueprint = self._blueprint_mgr.get_blueprint()
+        engines = {Engine.Athena, Engine.Aurora}
+        assert (
+            blueprint.aurora_provisioning().num_nodes() > 0
+        ), "The data sync executor must be able to connect to Aurora."
+
+        if blueprint.redshift_provisioning().num_nodes() > 0:
+            engines.add(Engine.Redshift)
+
         self._engines = await EngineConnections.connect(
-            self._config, self._blueprint_mgr.schema_name, autocommit=False
+            self._config,
+            self._blueprint_mgr.get_directory(),
+            self._blueprint_mgr.schema_name,
+            autocommit=False,
+            specific_engines=engines,
         )
         # Reads/writes to the data sync metadata are handled by this Aurora connection.
         # We need serializable isolation for correctness.
@@ -37,6 +50,22 @@ class DataSyncExecutor:
         await cursor.execute(
             "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE"
         )
+
+    async def update_connections(self) -> None:
+        if self._engines is None:
+            return
+
+        blueprint = self._blueprint_mgr.get_blueprint()
+        directory = self._blueprint_mgr.get_directory()
+        expected_engines = {Engine.Athena}
+
+        if blueprint.aurora_provisioning().num_nodes() > 0:
+            expected_engines.add(Engine.Aurora)
+        if blueprint.redshift_provisioning().num_nodes() > 0:
+            expected_engines.add(Engine.Redshift)
+
+        await self._engines.add_connections(self._config, directory, expected_engines)
+        await self._engines.remove_connections(expected_engines)
 
     async def shutdown(self) -> None:
         if self._engines is None:

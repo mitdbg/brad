@@ -1,5 +1,5 @@
 from brad.config.engine import Engine
-from brad.blueprint_manager import BlueprintManager
+from brad.blueprint.manager import BlueprintManager
 from brad.routing.router import Router
 from brad.query_rep import QueryRep
 from brad.front_end.session import Session
