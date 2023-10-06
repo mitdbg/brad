@@ -1,7 +1,7 @@
 function start_brad() {
   config_file=$1
 
-  pushd ../../
+  pushd ../../../
   brad daemon \
     --config-file $config_file \
     --schema-name $schema_name \
@@ -79,13 +79,13 @@ function start_repeating_olap_runner() {
   mkdir $results_dir
 
   log_workload_point "rana_${ra_clients}"
-  COND_OUT=$results_dir python3 ../../workloads/IMDB_extended/run_repeating_analytics.py \
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py \
     --num-clients $ra_clients \
     --avg-gap-s $ra_gap_s \
     --avg-gap-std-s $ra_gap_std_s \
     --num-front-ends $num_front_ends \
-    --query-indexes $query_indexes \
-    --query-bank-file $query_bank_file \
+    --query-indexes $ra_query_indexes \
+    --query-bank-file $ra_query_bank_file \
     &
   rana_pid=$!
 }
@@ -98,7 +98,7 @@ function start_txn_runner() {
   mkdir $results_dir
 
   log_workload_point "txn_${t_clients}"
-  COND_OUT=$results_dir python3 ../../workloads/IMDB_extended/run_transactions.py \
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions.py \
     --num-clients $t_clients \
     --num-front-ends $num_front_ends \
     &
@@ -129,7 +129,7 @@ function extract_named_arguments() {
     fi
 
     if [[ $phys_arg =~ --ra-query-bank-file=.+ ]]; then
-      ra_query_bank_file=${phys_arg:22}
+      ra_query_bank_file=${phys_arg:21}
     fi
 
     if [[ $phys_arg =~ --ra-gap-s=.+ ]]; then
@@ -150,6 +150,10 @@ function extract_named_arguments() {
 
     if [[ $phys_arg =~ --config-file=.+ ]]; then
       config_file=${phys_arg:14}
+    fi
+
+    if [[ $phys_arg =~ --planner-config-file=.+ ]]; then
+      planner_config_file=${phys_arg:22}
     fi
 
     if [[ $phys_arg =~ --skip-replan=.+ ]]; then

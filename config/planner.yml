@@ -151,6 +151,34 @@ table_extract_bytes_per_row:
     movie_info: 66.48728137225561
     person_info: 133.20102076348735
 
+  imdb_extended_20g:
+    homes: 20.556198
+    theatres: 32.4135
+    showings: 46.01808
+    ticket_orders: 36.773404
+    aka_name: 81.795698
+    aka_title: 115.56834554266997
+    cast_info: 35.296638
+    char_name: 71.25104
+    comp_cast_type: 11.25
+    company_name: 78.345222
+    company_type: 23.0
+    complete_cast: 17.87376189982678
+    info_type: 17.061946902654867
+    keyword: 28.256227174480138
+    kind_type: 12.142857142857142
+    link_type: 14.5
+    movie_companies: 42.636226
+    movie_info_idx: 26.61975
+    movie_keyword: 18.729882
+    movie_link: 21.888322165549887
+    name: 78.5697
+    role_type: 13.333333333333334
+    title: 88.5209
+    movie_info: 29.449154
+    person_info: 133.458044
+
+
 ###
 ### Performance metrics scaling modifiers.
 ### (Used by neighborhood planning.)
