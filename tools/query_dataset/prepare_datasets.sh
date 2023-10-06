@@ -90,7 +90,7 @@ function add_data() {
     --data-accessed-file $3 \
     --engine $4 \
     --out-file $5 \
-    --take-log
+    --convert-mega
 }
 
 # TODO: Do we want to use the augmented dataset?
