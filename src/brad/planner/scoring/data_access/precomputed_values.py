@@ -37,7 +37,7 @@ class PrecomputedDataAccessProvider(DataAccessProvider):
             else:
                 queries_map[query] = idx
 
-        data_stats = np.load("pred-data_accessed-athena-aurora.npy")
+        data_stats = np.load(dsp / "pred-data_accessed-athena-aurora.npy")
         # TODO: Maybe we might want a better placeholder.
         data_stats[np.isnan(data_stats)] = 0
 

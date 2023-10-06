@@ -151,12 +151,12 @@ class BradDaemon:
             if self._temp_config.std_dataset_path is not None:
                 latency_scorer: AnalyticsLatencyScorer = (
                     PrecomputedPredictions.load_from_standard_dataset(
-                        dataset_path=self._temp_config.std_dataset_path,
+                        dataset_path=self._temp_config.std_dataset_path(),
                     )
                 )
                 data_access_provider = (
                     PrecomputedDataAccessProvider.load_from_standard_dataset(
-                        dataset_path=self._temp_config.std_dataset_path,
+                        dataset_path=self._temp_config.std_dataset_path(),
                     )
                 )
             else:

@@ -1,5 +1,8 @@
 latency_ceiling_s: 30.0
 
+# Use this instead of the individual paths below.
+std_dataset_path: workloads/IMDB_20GB/regular_test/
+
 aurora_preds_path: workloads/IMDB/OLAP_queries_new/pred_aurora_300.npy
 redshift_preds_path: workloads/IMDB/OLAP_queries_new/pred_redshift_300.npy
 athena_preds_path: workloads/IMDB/OLAP_queries_new/pred_athena_300.npy
