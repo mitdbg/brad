@@ -148,17 +148,29 @@ class BradDaemon:
         if self._temp_config is not None:
             # TODO: Actually call into the models. We avoid doing so for now to
             # avoid having to implement model loading, etc.
-            latency_scorer: AnalyticsLatencyScorer = PrecomputedPredictions.load(
-                workload_file_path=self._temp_config.query_bank_path(),
-                aurora_predictions_path=self._temp_config.aurora_preds_path(),
-                redshift_predictions_path=self._temp_config.redshift_preds_path(),
-                athena_predictions_path=self._temp_config.athena_preds_path(),
-            )
-            data_access_provider = PrecomputedDataAccessProvider.load(
-                workload_file_path=self._temp_config.query_bank_path(),
-                aurora_accessed_pages_path=self._temp_config.aurora_data_access_path(),
-                athena_accessed_bytes_path=self._temp_config.athena_data_access_path(),
-            )
+            if self._temp_config.std_dataset_path is not None:
+                latency_scorer: AnalyticsLatencyScorer = (
+                    PrecomputedPredictions.load_from_standard_dataset(
+                        dataset_path=self._temp_config.std_dataset_path,
+                    )
+                )
+                data_access_provider = (
+                    PrecomputedDataAccessProvider.load_from_standard_dataset(
+                        dataset_path=self._temp_config.std_dataset_path,
+                    )
+                )
+            else:
+                latency_scorer: AnalyticsLatencyScorer = PrecomputedPredictions.load(
+                    workload_file_path=self._temp_config.query_bank_path(),
+                    aurora_predictions_path=self._temp_config.aurora_preds_path(),
+                    redshift_predictions_path=self._temp_config.redshift_preds_path(),
+                    athena_predictions_path=self._temp_config.athena_preds_path(),
+                )
+                data_access_provider = PrecomputedDataAccessProvider.load(
+                    workload_file_path=self._temp_config.query_bank_path(),
+                    aurora_accessed_pages_path=self._temp_config.aurora_data_access_path(),
+                    athena_accessed_bytes_path=self._temp_config.athena_data_access_path(),
+                )
             comparator = best_cost_under_p99_latency(
                 max_latency_ceiling_s=self._temp_config.latency_ceiling_s()
             )

@@ -1,6 +1,6 @@
 import pathlib
 import yaml
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class TempConfig:
@@ -18,6 +18,11 @@ class TempConfig:
 
     def latency_ceiling_s(self) -> float:
         return float(self._raw["latency_ceiling_s"])
+
+    def std_dataset_path(self) -> Optional[pathlib.Path]:
+        if "std_dataset_path" not in self._raw:
+            return None
+        return pathlib.Path(self._raw["std_dataset_path"])
 
     def aurora_preds_path(self) -> pathlib.Path:
         return pathlib.Path(self._raw["aurora_preds_path"])

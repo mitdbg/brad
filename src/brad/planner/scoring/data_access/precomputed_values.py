@@ -17,6 +17,38 @@ class PrecomputedDataAccessProvider(DataAccessProvider):
     """
 
     @classmethod
+    def load_from_standard_dataset(
+        cls,
+        dataset_path: str | pathlib.Path,
+    ):
+        if isinstance(dataset_path, pathlib.Path):
+            dsp = dataset_path
+        else:
+            dsp = pathlib.Path(dataset_path)
+
+        with open(dsp / "queries.sql", "r", encoding="UTF-8") as query_file:
+            raw_queries = [line.strip() for line in query_file]
+
+        queries_map = {query: idx for idx, query in enumerate(raw_queries)}
+        queries_map = {}
+        for idx, query in enumerate(raw_queries):
+            if query.endswith(";"):
+                queries_map[query[:-1]] = idx
+            else:
+                queries_map[query] = idx
+
+        data_stats = np.load("pred-data_accessed-athena-aurora.npy")
+        # TODO: Maybe we might want a better placeholder.
+        data_stats[np.isnan(data_stats)] = 0
+
+        aurora = data_stats[:, 1]
+        athena = data_stats[:, 0]
+        assert len(aurora.shape) == 1
+        assert len(athena.shape) == 1
+
+        return cls(queries_map, aurora, athena)
+
+    @classmethod
     def load(
         cls,
         workload_file_path: str | pathlib.Path,
