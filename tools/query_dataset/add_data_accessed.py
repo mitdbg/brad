@@ -15,7 +15,11 @@ def main() -> None:
     parser.add_argument("--out-file", type=str, required=True)
     parser.add_argument("--engine", type=str, required=True)
     parser.add_argument("--take-log", action="store_true")
+    parser.add_argument("--convert-mega", action="store_true")
     args = parser.parse_args()
+
+    if args.take_log and args.convert_mega:
+        print("WARNING: Both --take-log and --convert-mega set.")
 
     print("Processing:", args.parsed_queries_file)
     print("Using:", args.data_accessed_file)
@@ -73,6 +77,11 @@ def main() -> None:
 
             if data_stat <= 0 or np.isnan(data_stat) or np.isinf(data_stat):
                 continue
+
+            if args.convert_mega:
+                # We use MB instead of MiB (to be consistent with storage
+                # usage). Billing is also done in MB.
+                data_stat /= 1e6
 
             pp["plan_runtime"] = data_stat
             pq["plan_runtime"] = data_stat
