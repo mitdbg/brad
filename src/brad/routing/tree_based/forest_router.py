@@ -10,6 +10,7 @@ from brad.query_rep import QueryRep
 from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
 from brad.blueprint.manager import BlueprintManager
+from brad.front_end.session import Session
 
 
 class ForestRouter(Router):
@@ -82,11 +83,11 @@ class ForestRouter(Router):
         self._blueprint = blueprint
         self._table_placement_bitmap = blueprint.table_locations_bitmap()
 
-    async def engine_for(self, query: QueryRep) -> Engine:
+    async def engine_for(self, query: QueryRep, session: Session) -> Engine:
         # Compute valid locations.
         assert self._table_placement_bitmap is not None
-        valid_locations, only_location = self._run_location_routing(
-            query, self._table_placement_bitmap
+        valid_locations, only_location = self._filter_on_constraints(
+            query, self._table_placement_bitmap, session
         )
         if only_location is not None:
             return only_location
