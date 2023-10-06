@@ -1,7 +1,7 @@
 import numpy as np
-import torch
+import torch  # pylint: disable=import-error
 import collections
-import torch.optim as opt
+import torch.optim as opt  # pylint: disable=import-error
 import importlib.resources as pkg_resources
 import pathlib
 import json
