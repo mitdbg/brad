@@ -148,19 +148,20 @@ class BradDaemon:
         if self._temp_config is not None:
             # TODO: Actually call into the models. We avoid doing so for now to
             # avoid having to implement model loading, etc.
-            if self._temp_config.std_dataset_path is not None:
+            std_dataset_path = self._temp_config.std_dataset_path()
+            if std_dataset_path is not None:
                 latency_scorer: AnalyticsLatencyScorer = (
                     PrecomputedPredictions.load_from_standard_dataset(
-                        dataset_path=self._temp_config.std_dataset_path(),
+                        dataset_path=std_dataset_path,
                     )
                 )
                 data_access_provider = (
                     PrecomputedDataAccessProvider.load_from_standard_dataset(
-                        dataset_path=self._temp_config.std_dataset_path(),
+                        dataset_path=std_dataset_path,
                     )
                 )
             else:
-                latency_scorer: AnalyticsLatencyScorer = PrecomputedPredictions.load(
+                latency_scorer = PrecomputedPredictions.load(
                     workload_file_path=self._temp_config.query_bank_path(),
                     aurora_predictions_path=self._temp_config.aurora_preds_path(),
                     redshift_predictions_path=self._temp_config.redshift_preds_path(),
