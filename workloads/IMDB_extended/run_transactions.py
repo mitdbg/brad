@@ -12,11 +12,7 @@ import pytz
 import multiprocessing as mp
 from datetime import datetime
 
-<<<<<<< HEAD
-from brad.grpc_client import BradGrpcClient
-=======
 from brad.grpc_client import BradGrpcClient, BradClientError
->>>>>>> main
 from workload_utils.database import Database, PyodbcDatabase, BradDatabase
 from workload_utils.transaction_worker import TransactionWorker
 
