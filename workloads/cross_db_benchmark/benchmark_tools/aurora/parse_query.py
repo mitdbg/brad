@@ -6,6 +6,7 @@ import psycopg2
 from tqdm import tqdm
 from types import SimpleNamespace
 from typing import Dict, Any
+from brad.connection.cursor import Cursor
 
 from workloads.cross_db_benchmark.benchmark_tools.database import DatabaseSystem
 from workloads.cross_db_benchmark.benchmark_tools.aurora.utils import (
@@ -94,7 +95,12 @@ def create_scan_node(
                         has_timeout = True
                 else:
                     assert db_conn is not None, "no valid database connection"
-                    true_card = db_conn.get_result(sql)[0][0]
+                    if isinstance(db_conn, Cursor):
+                        # HACK
+                        db_conn.execute_sync(sql)
+                        true_card = db_conn.fetchall_sync()[0][0]
+                    else:
+                        true_card = db_conn.get_result(sql)[0][0]
                 if cache is not None:
                     cache[sql] = true_card
                 new_filter_node["plan_parameters"]["act_card"] = true_card
@@ -185,8 +191,11 @@ def create_join_node(
     if cursor:
         est_card, est_width = get_est_card(sql, cursor, return_width=True)
     elif db_conn:
-        _, temp_cursor = db_conn.get_cursor()
-        est_card, est_width = get_est_card(sql, temp_cursor, return_width=True)
+        if isinstance(db_conn, Cursor):
+            est_card, est_width = get_est_card(sql, cursor=db_conn, return_width=True)
+        else:
+            _, temp_cursor = db_conn.get_cursor()
+            est_card, est_width = get_est_card(sql, temp_cursor, return_width=True)
     else:
         est_card = join_node["plan_parameters"]["children_card"]
         est_width = (
@@ -206,8 +215,12 @@ def create_join_node(
             if curr_has_timeout:
                 has_timeout = True
         else:
-            assert db_conn is not None, "no valid database connection"
-            true_card = db_conn.get_result(sql)[0][0]
+            if isinstance(db_conn, Cursor):
+                db_conn.execute_sync(sql)
+                true_card = db_conn.fetchall_sync()[0][0]
+            else:
+                assert db_conn is not None, "no valid database connection"
+                true_card = db_conn.get_result(sql)[0][0]
         if cache is not None:
             cache[sql] = true_card
         join_node["plan_parameters"]["act_card"] = true_card

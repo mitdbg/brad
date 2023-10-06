@@ -2,6 +2,7 @@ import collections
 import contextlib
 from select import select
 import socket
+import json
 
 import psycopg2
 import psycopg2.extensions
@@ -167,7 +168,13 @@ def get_join_node(root):
 def get_est_card(sql, cursor, return_width=False):
     explain_sql = "EXPLAIN(format json) " + sql
     cursor.execute(explain_sql)
-    json_dict = cursor.fetchall()[0][0][0]
+    # json_dict = cursor.fetchall()[0][0][0]
+    json_dict = cursor.fetchall()[0][0]
+    # HACK to deal with different cursor implementations.
+    if isinstance(json_dict, str):
+        json_dict = json.loads(json_dict)[0]
+    else:
+        json_dict = json_dict[0]
     node = get_join_node(json_dict["Plan"])
     num_rows = int(node["Plan Rows"])
     if num_rows < 1:
