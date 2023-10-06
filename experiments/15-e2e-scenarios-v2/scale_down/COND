@@ -24,5 +24,6 @@ run_experiment(
     # TODO: Select regular query indexes
     "ra-query-indexes": "0,1,25,26,50,51,75,76,27,28",
     "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
+    "num-front-ends": 4,
   },
 )

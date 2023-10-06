@@ -84,8 +84,8 @@ function start_repeating_olap_runner() {
     --avg-gap-s $ra_gap_s \
     --avg-gap-std-s $ra_gap_std_s \
     --num-front-ends $num_front_ends \
-    --query-indexes $query_indexes \
-    --query-bank-file $query_bank_file \
+    --query-indexes $ra_query_indexes \
+    --query-bank-file $ra_query_bank_file \
     &
   rana_pid=$!
 }
@@ -129,7 +129,7 @@ function extract_named_arguments() {
     fi
 
     if [[ $phys_arg =~ --ra-query-bank-file=.+ ]]; then
-      ra_query_bank_file=${phys_arg:22}
+      ra_query_bank_file=${phys_arg:21}
     fi
 
     if [[ $phys_arg =~ --ra-gap-s=.+ ]]; then

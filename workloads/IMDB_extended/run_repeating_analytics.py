@@ -13,7 +13,7 @@ import pyodbc
 from typing import List
 from datetime import datetime, timedelta
 
-from .workload_utils.database import Database, BradDatabase, PyodbcDatabase
+from workload_utils.database import Database, BradDatabase, PyodbcDatabase
 from brad.grpc_client import BradGrpcClient, BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from typing import Dict
@@ -208,8 +208,8 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", type=str, default="localhost")
-    parser.add_argument("--port", type=int, default=6583)
+    parser.add_argument("--brad-host", type=str, default="localhost")
+    parser.add_argument("--brad-port", type=int, default=6583)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--num-front-ends", type=int, default=1)
     parser.add_argument("--run-warmup", action="store_true")
