@@ -58,7 +58,8 @@ async def control_impl(args) -> None:
         if blueprint.aurora_provisioning().num_nodes() > 0:
             if directory.aurora_writer().status() != RdsStatus.Stopped:
                 logger.warning(
-                    "Aurora instance %s is not stopped. Not issuing a start command."
+                    "Aurora instance %s is not stopped. Not issuing a start command.",
+                    config.aurora_cluster_id,
                 )
             else:
                 futures.append(
@@ -73,7 +74,8 @@ async def control_impl(args) -> None:
                 != RedshiftAvailabilityStatus.Paused
             ):
                 logger.warning(
-                    "Redshift cluster %s is not paused. Not issuing a resume command."
+                    "Redshift cluster %s is not paused. Not issuing a resume command.",
+                    config.redshift_cluster_id,
                 )
             else:
                 futures.append(

@@ -7,7 +7,7 @@ NUM_CLIENTS = {
   "r6g_4xlarge": [1, 2, 4, 8, 16, 32, 64, 128, 256],
 }
 
-INSTANCES = ["t4g_large", "r6g_large", "r6g_xlarge", "r6g_2xlarge", "r6g_4xlarge"]
+INSTANCES = ["t4g_medium", "r6g_large", "r6g_xlarge", "r6g_2xlarge", "r6g_4xlarge"]
 
 SCHEMA_SCALE_FACTORS = {
   "imdb_extended": 1,
