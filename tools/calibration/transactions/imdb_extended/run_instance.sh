@@ -11,4 +11,8 @@ fi
 sleep 10
 
 >&2 echo "Retrieving metrics..."
-python3 retrieve_metrics.py --out-file $COND_OUT/pi_metrics.csv --instance-id $BRAD_INSTANCE_ID
+if [ -z $BRAD_CONFIG_FILE ]; then
+  python3 retrieve_metrics.py --out-file $COND_OUT/pi_metrics.csv --instance-id $BRAD_INSTANCE_ID
+else
+  python3 retrieve_metrics.py --out-file $COND_OUT/pi_metrics.csv --config-file $BRAD_CONFIG_FILE
+fi

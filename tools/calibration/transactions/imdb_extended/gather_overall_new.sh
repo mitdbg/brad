@@ -11,9 +11,9 @@ schema_name=$2
 export BRAD_CONFIG_FILE=$config_file
 
 function modify_instance_sync() {
-    local new_instance=$2
+    local new_instance=$1
 
-    >&2 echo "Ensuring Aurora is $new_type"
+    >&2 echo "Ensuring Aurora is $new_instance"
 
     # N.B. This modification script is blocking.
     brad admin --debug modify_blueprint \
