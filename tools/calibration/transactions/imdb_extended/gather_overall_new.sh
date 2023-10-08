@@ -25,6 +25,9 @@ function modify_instance_sync() {
     >&2 echo "Instance modified successfully."
 }
 
+# Start the cluster first.
+brad admin --debug control resume --schema-name $schema_name --config-file $config_file
+
 # db.r6g.4xlarge
 >&2 echo "r6g.4xlarge"
 modify_instance_sync "db.r6g.4xlarge"
@@ -49,3 +52,5 @@ cond run //imdb_extended/:r6g_large-$schema_name
 >&2 echo "t4g.medium"
 modify_instance_sync "db.t4g.medium"
 cond run //imdb_extended/:t4g_medium-$schema_name
+
+brad admin --debug control pause --schema-name $schema_name --config-file $config_file
