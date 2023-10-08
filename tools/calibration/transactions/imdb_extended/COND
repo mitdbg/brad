@@ -50,6 +50,7 @@ for instance in INSTANCES:
             "run-for-s": RUN_FOR_S,
             "num-clients": clients,
             "scale-factor": sf,
+            "schema-name": name,
           },
         )
         for clients in NUM_CLIENTS[instance]

@@ -1,6 +1,5 @@
 [MESSAGES CONTROL]
 disable=R,C,logging-fstring-interpolation,broad-exception-caught,fixme
-enable=useless-suppression
 
 extension-pkg-whitelist=pyodbc
 ignore-paths=src/brad/proto_gen/

@@ -9,12 +9,11 @@ import sys
 import threading
 import signal
 import pytz
-import pyodbc
 from typing import List
 from datetime import datetime, timedelta
 
-from workload_utils.database import Database, BradDatabase, PyodbcDatabase
-from brad.grpc_client import BradGrpcClient, BradClientError
+from workload_utils.connect import connect_to_db
+from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from typing import Dict
 
@@ -32,21 +31,6 @@ def build_query_map(query_bank: str) -> Dict[str, int]:
         idx_map[q] = idx
 
     return idx_map
-
-
-def connect_to_db(args, worker_index: int) -> Database:
-    # Connect.
-    if args.cstr_var is not None:
-        db: Database = PyodbcDatabase(
-            pyodbc.connect(os.environ[args.cstr_var], autocommit=True)
-        )
-    else:
-        port_offset = worker_index % args.num_front_ends
-        brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
-        brad.connect()
-        db = BradDatabase(brad)
-
-    return db
 
 
 def runner(
