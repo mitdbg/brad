@@ -27,7 +27,7 @@ def connect_to_db(
         config = ConfigFile(args.config_file)
         directory = Directory(config)
         asyncio.run(directory.refresh())
-        conn = ConnectionFactory.connect_to(
+        conn = ConnectionFactory.connect_to_sync(
             direct_engine, args.schema_name, config, directory
         )
         db: Database = DirectConnection(conn)

@@ -78,7 +78,11 @@ class DirectConnection(Database):
 
     def execute_sync(self, query: str) -> RowList:
         self._cursor.execute_sync(query)
-        return self._cursor.fetchall_sync()
+        try:
+            return self._cursor.fetchall_sync()
+        except pyodbc.ProgrammingError:
+            # Happens when we call `fetchall()` after running a DML statement.
+            return []
 
     def execute_sync_with_engine(self, query: str) -> Tuple[RowList, Optional[Engine]]:
         return self.execute_sync(query), None
