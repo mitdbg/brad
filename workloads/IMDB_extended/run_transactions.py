@@ -9,11 +9,12 @@ import time
 import os
 import pytz
 import multiprocessing as mp
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Tuple
 
 from brad.config.engine import Engine
 from brad.grpc_client import BradClientError
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from workload_utils.connect import connect_to_db
 from workload_utils.transaction_worker import TransactionWorker
 
@@ -64,6 +65,7 @@ def runner(
     start_queue.put("")
     _ = stop_queue.get()
 
+    rand_backoff = None
     overall_start = time.time()
     try:
         while True:
@@ -81,6 +83,9 @@ def runner(
                     )
                 else:
                     succeeded = txn(db)
+
+                rand_backoff = None
+
             except BradClientError as ex:
                 succeeded = False
                 if ex.is_transient():
@@ -89,6 +94,21 @@ def runner(
                         flush=True,
                         file=sys.stderr,
                     )
+
+                    if rand_backoff is None:
+                        rand_backoff = RandomizedExponentialBackoff(
+                            max_retries=100,
+                            base_delay_s=2.0,
+                            max_delay_s=timedelta(minutes=10).total_seconds(),
+                        )
+
+                    # Delay retrying in the case of a transient error (this
+                    # happens during blueprint transitions).
+                    wait_s = rand_backoff.wait_time_s()
+                    if wait_s is None:
+                        print("Aborting benchmark. Too many transient errors.")
+                        break
+                    time.sleep(wait_s)
 
                 else:
                     print(

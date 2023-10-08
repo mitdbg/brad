@@ -100,6 +100,8 @@ def runner(
                         file=file,
                         flush=True,
                     )
+                    rand_backoff = None
+
                 except BradClientError as ex:
                     if ex.is_transient():
                         print(
