@@ -1,9 +1,11 @@
 import argparse
 import asyncio
 from datetime import timedelta
+from typing import List
 
 from brad.config.file import ConfigFile
 from brad.provisioning.directory import Directory
+from brad.daemon.metrics_def import MetricDef
 from brad.daemon.perf_insights import PerfInsightsClient
 
 
@@ -58,11 +60,11 @@ BASE_METRICS = [
     "os.diskIO.auroraStorage.writeIOsPS",
 ]
 
-ALL_METRICS = []
+ALL_METRICS: List[MetricDef] = []
 for m in BASE_METRICS:
     # N.B. The metrics are reported no more than once a minute. So
     # average/max/min will all report the same number.
-    ALL_METRICS.append(m + ".avg")
+    ALL_METRICS.append((m, "avg"))
 
 
 def main():
