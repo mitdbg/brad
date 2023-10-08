@@ -1,7 +1,11 @@
 #! /bin/bash
 
 >&2 echo "Running the transactional workload..."
-python3 ../../../../workloads/IMDB_extended/run_transactions.py --cstr-var $BRAD_CSTR_VAR $@
+if [ -z $BRAD_CSTR_VAR ]; then
+  python3 ../../../../workloads/IMDB_extended/run_transactions.py --config-file $BRAD_CONFIG_FILE --brad-direct $@
+else
+  python3 ../../../../workloads/IMDB_extended/run_transactions.py --cstr-var $BRAD_CSTR_VAR $@
+fi
 
 >&2 echo "Waiting 10 seconds before retrieving metrics..."
 sleep 10

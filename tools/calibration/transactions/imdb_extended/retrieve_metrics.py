@@ -1,6 +1,9 @@
 import argparse
+import asyncio
 from datetime import timedelta
 
+from brad.config.file import ConfigFile
+from brad.provisioning.directory import Directory
 from brad.daemon.perf_insights import PerfInsightsClient
 
 
@@ -67,8 +70,12 @@ def main():
     parser.add_argument(
         "--instance-id",
         type=str,
-        required=True,
         help="The Aurora instance's identifier.",
+    )
+    parser.add_argument(
+        "--config-file",
+        type=str,
+        help="Used to specify the Aurora instance instead of by an ID.",
     )
     parser.add_argument(
         "--out-file",
@@ -84,7 +91,18 @@ def main():
     )
     args = parser.parse_args()
 
-    client = PerfInsightsClient(args.instance_id)
+    if args.instance_id is not None:
+        client = PerfInsightsClient.from_instance_identifier(
+            instance_identifier=args.instance_id
+        )
+    elif args.config_file is not None:
+        config = ConfigFile(args.config_file)
+        directory = Directory(config)
+        asyncio.run(directory.refresh())
+        client = PerfInsightsClient(resource_id=directory.aurora_writer().resource_id())
+    else:
+        raise RuntimeError()
+
     metrics = client.fetch_metrics(
         ALL_METRICS,
         period=timedelta(minutes=1),

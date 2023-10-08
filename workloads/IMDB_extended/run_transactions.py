@@ -1,6 +1,5 @@
 import argparse
 import pathlib
-import pyodbc
 import queue
 import random
 import signal
@@ -10,11 +9,13 @@ import time
 import os
 import pytz
 import multiprocessing as mp
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Tuple
 
-from brad.grpc_client import BradGrpcClient, BradClientError
-from workload_utils.database import Database, PyodbcDatabase, BradDatabase
+from brad.config.engine import Engine
+from brad.grpc_client import BradClientError
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
+from workload_utils.connect import connect_to_db
 from workload_utils.transaction_worker import TransactionWorker
 
 
@@ -54,18 +55,8 @@ def runner(
     commits = [0 for _ in range(len(transactions))]
     aborts = [0 for _ in range(len(transactions))]
 
-    # Connect.
-    if args.cstr_var is not None:
-        db: Database = PyodbcDatabase(
-            pyodbc.connect(os.environ[args.cstr_var], autocommit=True)
-        )
-    else:
-        port_offset = worker_idx % args.num_front_ends
-        brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
-        brad.connect()
-        db = BradDatabase(brad)
-
-    # Set the isolation level.
+    # Connect and set the isolation level.
+    db = connect_to_db(args, worker_idx, direct_engine=Engine.Aurora)
     db.execute_sync(
         f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
     )
@@ -74,6 +65,7 @@ def runner(
     start_queue.put("")
     _ = stop_queue.get()
 
+    rand_backoff = None
     overall_start = time.time()
     try:
         while True:
@@ -91,6 +83,9 @@ def runner(
                     )
                 else:
                     succeeded = txn(db)
+
+                rand_backoff = None
+
             except BradClientError as ex:
                 succeeded = False
                 if ex.is_transient():
@@ -99,6 +94,21 @@ def runner(
                         flush=True,
                         file=sys.stderr,
                     )
+
+                    if rand_backoff is None:
+                        rand_backoff = RandomizedExponentialBackoff(
+                            max_retries=100,
+                            base_delay_s=2.0,
+                            max_delay_s=timedelta(minutes=10).total_seconds(),
+                        )
+
+                    # Delay retrying in the case of a transient error (this
+                    # happens during blueprint transitions).
+                    wait_s = rand_backoff.wait_time_s()
+                    if wait_s is None:
+                        print("Aborting benchmark. Too many transient errors.")
+                        break
+                    time.sleep(wait_s)
 
                 else:
                     print(
@@ -200,6 +210,16 @@ def main():
         type=str,
         default="REPEATABLE READ",
         help="The isolation level to use when running the transactions.",
+    )
+    parser.add_argument(
+        "--brad-direct",
+        action="store_true",
+        help="Set to connect directly to Aurora via BRAD's config.",
+    )
+    parser.add_argument(
+        "--config-file",
+        type=str,
+        help="The BRAD config file (if --brad-direct is used).",
     )
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)

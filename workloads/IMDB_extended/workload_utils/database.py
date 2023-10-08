@@ -3,6 +3,7 @@ import pyodbc
 from typing import Tuple, Optional
 from brad.config.engine import Engine
 from brad.grpc_client import BradGrpcClient, RowList
+from brad.connection.connection import Connection
 
 
 class Database:
@@ -68,3 +69,25 @@ class BradDatabase(Database):
 
     def close_sync(self) -> None:
         self._brad.close()
+
+
+class DirectConnection(Database):
+    def __init__(self, connection: Connection) -> None:
+        self._conn = connection
+        self._cursor = connection.cursor_sync()
+
+    def execute_sync(self, query: str) -> RowList:
+        self._cursor.execute_sync(query)
+        return self._cursor.fetchall_sync()
+
+    def execute_sync_with_engine(self, query: str) -> Tuple[RowList, Optional[Engine]]:
+        return self.execute_sync(query), None
+
+    def commit_sync(self) -> None:
+        self._cursor.commit_sync()
+
+    def rollback_sync(self) -> None:
+        self._cursor.rollback_sync()
+
+    def close_sync(self) -> None:
+        self._conn.close_sync()
