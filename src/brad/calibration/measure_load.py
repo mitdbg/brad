@@ -78,7 +78,7 @@ def main() -> None:
         "--aurora-instance-var",
         type=str,
         default="BRAD_AURORA_INSTANCE_ID",
-        help="Environment variable holding the Aurora instance identifier (needed for metrics).",
+        help="(Deprecated) Environment variable holding the Aurora instance identifier (needed for metrics).",
     )
     parser.add_argument(
         "--engine", type=str, required=True, help="The engine to run against."
@@ -145,10 +145,14 @@ def main() -> None:
     config = ConfigFile(os.environ[args.config_file_var])
     queries = load_queries(args.query_file)
 
+    directory = Directory(config)
+    asyncio.run(directory.refresh())
+
     if args.run_warmup:
-        directory = Directory(config)
-        asyncio.run(directory.refresh())
         conn = ConnectionFactory.connect_to_sync(engine, schema_name, config, directory)
+        if engine == Engine.Redshift:
+            cursor = conn.cursor_sync()
+            cursor.execute_sync("SET enable_result_cache_for_session = off")
         run_warmup(conn, queries)
         conn.close_sync()
         return
@@ -180,7 +184,7 @@ def main() -> None:
         pi: Optional[PerfInsightsClient] = None
     else:
         cw = None
-        aurora_instance_id = os.environ[args.aurora_instance_var]
+        aurora_instance_id = directory.aurora_writer().instance_id()
         print(
             "Using Aurora instance ID:", aurora_instance_id, file=sys.stderr, flush=True
         )
