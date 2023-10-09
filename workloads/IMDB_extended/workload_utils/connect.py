@@ -17,7 +17,10 @@ from workload_utils.database import (
 
 
 def connect_to_db(
-    args, worker_index: int, direct_engine: Optional[Engine] = None
+    args,
+    worker_index: int,
+    direct_engine: Optional[Engine] = None,
+    directory: Optional[Directory] = None,
 ) -> Database:
     if args.brad_direct:
         assert direct_engine is not None
@@ -25,10 +28,13 @@ def connect_to_db(
         assert args.config_file is not None
 
         config = ConfigFile(args.config_file)
-        directory = Directory(config)
-        asyncio.run(directory.refresh())
+        if directory is None:
+            directory_to_use = Directory(config)
+            asyncio.run(directory_to_use.refresh())
+        else:
+            directory_to_use = directory
         conn = ConnectionFactory.connect_to_sync(
-            direct_engine, args.schema_name, config, directory
+            direct_engine, args.schema_name, config, directory_to_use
         )
         db: Database = DirectConnection(conn)
 

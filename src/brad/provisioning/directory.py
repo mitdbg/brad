@@ -57,6 +57,35 @@ class Directory:
             ]
         )
 
+    def __getstate__(self) -> Dict[Any, Any]:
+        return {
+            "config": self._config,
+            "aurora_writer": self._aurora_writer,
+            "aurora_readers": self._aurora_readers,
+            "redshift_cluster": self._redshift_cluster,
+            "aurora_writer_endpoint": self._aurora_writer_endpoint,
+            "aurora_reader_endpoint": self._aurora_reader_endpoint,
+        }
+
+    def __setstate__(self, d: Dict[Any, Any]) -> None:
+        self._config = d["config"]
+        self._aurora_writer = d["aurora_writer"]
+        self._aurora_readers = d["aurora_readers"]
+        self._redshift_cluster = d["redshift_cluster"]
+        self._aurora_writer_endpoint = d["aurora_writer_endpoint"]
+        self._aurora_reader_endpoint = d["aurora_reader_endpoint"]
+
+        self._rds = boto3.client(
+            "rds",
+            aws_access_key_id=self._config.aws_access_key,
+            aws_secret_access_key=self._config.aws_access_key_secret,
+        )
+        self._redshift = boto3.client(
+            "redshift",
+            aws_access_key_id=self._config.aws_access_key,
+            aws_secret_access_key=self._config.aws_access_key_secret,
+        )
+
     def aurora_writer(self) -> "AuroraInstanceMetadata":
         assert self._aurora_writer is not None
         return self._aurora_writer
