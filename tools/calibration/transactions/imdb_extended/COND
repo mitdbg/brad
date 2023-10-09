@@ -56,3 +56,13 @@ for instance in INSTANCES:
         for clients in NUM_CLIENTS[instance]
       ],
     )
+
+
+for name in SCHEMA_SCALE_FACTORS.keys():
+  combine(
+    name=name,
+    deps=[
+      f":{instance}-{name}"
+      for instance in INSTANCES
+    ],
+  )
