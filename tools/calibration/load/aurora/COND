@@ -70,9 +70,7 @@ for instance in INSTANCE_TYPES:
             "query-file": "../../../../workloads/IMDB_100GB/scaling_20/queries.sql",
             "engine": "aurora",
           },
-          parallelizable=True,
         )
         for clients, query_idx in product(NUM_CLIENTS, range(NUM_QUERIES))
       ],
-      chain_experiments=True,
     )

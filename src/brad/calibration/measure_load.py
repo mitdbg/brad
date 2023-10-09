@@ -150,6 +150,9 @@ def main() -> None:
 
     if args.run_warmup:
         conn = ConnectionFactory.connect_to_sync(engine, schema_name, config, directory)
+        if engine == Engine.Redshift:
+            cursor = conn.cursor_sync()
+            cursor.execute_sync("SET enable_result_cache_for_session = off")
         run_warmup(conn, queries)
         conn.close_sync()
         return
@@ -181,7 +184,7 @@ def main() -> None:
         pi: Optional[PerfInsightsClient] = None
     else:
         cw = None
-        aurora_instance_id = directory.aurora_writer().instance_id
+        aurora_instance_id = directory.aurora_writer().instance_id()
         print(
             "Using Aurora instance ID:", aurora_instance_id, file=sys.stderr, flush=True
         )
