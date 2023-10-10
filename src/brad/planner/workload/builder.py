@@ -45,6 +45,10 @@ class WorkloadBuilder:
         if reinterpret_second_as is not None:
             # This is used to "scale up" the workload (in time) without actually
             # having to wait for the workload to complete.
+            logger.info(
+                "NOTICE: Constructing workload where 1 second is interpreted as %d seconds.",
+                reinterpret_second_as.total_seconds(),
+            )
             self._period = timedelta(
                 seconds=self._period.total_seconds()
                 * reinterpret_second_as.total_seconds()
