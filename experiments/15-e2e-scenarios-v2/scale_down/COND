@@ -22,7 +22,22 @@ run_experiment(
     "planner-config-file": "config/planner.yml",
     "schema-name": "imdb_extended_20g",
     # TODO: Select regular query indexes
-    "ra-query-indexes": "0,1,25,26,50,51,75,76,27,28",
+    "ra-query-indexes": "25,26,50,51,75,76,27,28",
+    "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
+    "num-front-ends": 4,
+  },
+)
+
+run_command(
+  name="brad_20g_debug",
+  run="./run_workload_debug.sh",
+  options={
+    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
+    "config-file": "config/config_large.yml",
+    "planner-config-file": "config/planner.yml",
+    "schema-name": "imdb_extended_20g",
+    # TODO: Select regular query indexes
+    "ra-query-indexes": "25,26,50,51,75,76,27,28",
     "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
     "num-front-ends": 4,
   },

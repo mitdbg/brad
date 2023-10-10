@@ -22,7 +22,7 @@ def connect_to_db(
     direct_engine: Optional[Engine] = None,
     directory: Optional[Directory] = None,
 ) -> Database:
-    if args.brad_direct:
+    if hasattr(args, "brad_direct") and args.brad_direct:
         assert direct_engine is not None
         assert args.schema_name is not None
         assert args.config_file is not None

@@ -12,6 +12,21 @@ function start_brad() {
   popd
 }
 
+function start_brad_debug() {
+  config_file=$1
+
+  pushd ../../../
+  brad daemon \
+    --config-file $config_file \
+    --schema-name $schema_name \
+    --planner-config-file $planner_config_file \
+    --temp-config-file config/temp_config_sample.yml \
+    --debug \
+    &
+  brad_pid=$!
+  popd
+}
+
 function cancel_experiment() {
   kill -INT $txn_pid
   kill -INT $rana_pid
@@ -76,7 +91,7 @@ function start_repeating_olap_runner() {
 
   >&2 echo "[Repeating Analytics] Running with $ra_clients..."
   results_dir=$COND_OUT/ra_${ra_clients}
-  mkdir $results_dir
+  mkdir -p $results_dir
 
   log_workload_point "rana_${ra_clients}"
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py \
@@ -95,7 +110,7 @@ function start_txn_runner() {
 
   >&2 echo "[Transactions] Running with $t_clients..."
   results_dir=$COND_OUT/t_${t_clients}
-  mkdir $results_dir
+  mkdir -p $results_dir
 
   log_workload_point "txn_${t_clients}"
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions.py \
