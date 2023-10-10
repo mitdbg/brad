@@ -70,7 +70,11 @@ def runner(
             prng = random.Random(args.seed ^ runner_idx)
             rand_backoff = None
 
-            logger.info("[Repeating Analytics Runner %d] Queries to run: %s", runner_idx, queries)
+            logger.info(
+                "[Repeating Analytics Runner %d] Queries to run: %s",
+                runner_idx,
+                queries,
+            )
             query_order = queries.copy()
             prng.shuffle(query_order)
 
