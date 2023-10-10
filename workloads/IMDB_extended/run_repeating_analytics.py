@@ -9,6 +9,7 @@ import sys
 import threading
 import signal
 import pytz
+import logging
 from typing import List
 from datetime import datetime, timedelta
 
@@ -16,6 +17,8 @@ from workload_utils.connect import connect_to_db
 from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from typing import Dict
+
+logger = logging.getLogger(__name__)
 
 
 def build_query_map(query_bank: str) -> Dict[str, int]:
@@ -67,6 +70,10 @@ def runner(
             prng = random.Random(args.seed ^ runner_idx)
             rand_backoff = None
 
+            logger.info("[Repeating Analytics Runner %d] Queries to run: %s", runner_idx, queries)
+            query_order = queries.copy()
+            prng.shuffle(query_order)
+
             # Signal that we're ready to start and wait for the controller.
             start_queue.put_nowait("")
             _ = stop_queue.get()
@@ -80,8 +87,12 @@ def runner(
                         wait_for_s = 0.0
                     time.sleep(wait_for_s)
 
-                qidx_offset = prng.randint(0, len(queries) - 1)
-                qidx = queries[qidx_offset]
+                if len(query_order) == 0:
+                    query_order = queries.copy()
+                    prng.shuffle(query_order)
+
+                qidx = query_order.pop()
+                logger.debug("Executing qidx: %d", qidx)
                 query = query_bank[qidx]
 
                 try:
