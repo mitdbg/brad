@@ -117,7 +117,10 @@ class LoggedWorkloadProvider(WorkloadProvider):
             builder.table_sizes_from_engines(
                 self._blueprint_mgr.get_blueprint(), table_sizer
             )
-            workload = builder.build(rescale_to_period=desired_period)
+            workload = builder.build(
+                rescale_to_period=desired_period,
+                reinterpret_second_as=self._planner_config.reinterpret_second_as(),
+            )
             logger.debug(
                 "LoggedWorkloadProvider loaded workload: %d unique A queries, %d T queries, period %s",
                 len(workload.analytical_queries()),

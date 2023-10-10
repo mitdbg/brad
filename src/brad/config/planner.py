@@ -41,6 +41,11 @@ class PlannerConfig:
     def query_dist_change_frac(self) -> float:
         return float(self._raw["query_dist_change_frac"])
 
+    def reinterpret_second_as(self) -> Optional[timedelta]:
+        if "reinterpret_second_as" not in self._raw:
+            return None
+        return timedelta(seconds=int(self._raw["reinterpret_second_as"]))
+
     def beam_size(self) -> int:
         return int(self._raw["beam_size"])
 
