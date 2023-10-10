@@ -1,0 +1,21 @@
+# This captures the relevant dependencies.
+combine(
+  name="relevant",
+  deps=[
+    ":imdb_extended_20g",
+    ":imdb_extended_100g",
+  ],
+)
+
+for schema in ["imdb_extended_20g", "imdb_extended_100g"]:
+  combine(
+    name=schema,
+    deps=[
+      f"//aurora:r6g_large-{schema}",
+      f"//aurora:r6g_xlarge-{schema}",
+      f"//aurora:r6g_2xlarge-{schema}",
+      f"//redshift:dc2_large-2-{schema}",
+      f"//redshift:dc2_large-4-{schema}",
+      f"//redshift:dc2_large-8-{schema}",
+    ],
+  )
