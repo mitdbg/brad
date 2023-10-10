@@ -99,7 +99,10 @@ class VariableCosts(Trigger):
         workload = (
             WorkloadBuilder()
             .add_queries_from_s3_logs(self._config, window_start, window_end)
-            .build(rescale_to_period=timedelta(hours=1))
+            .build(
+                rescale_to_period=timedelta(hours=1),
+                reinterpret_second_as=self._planner_config.reinterpret_second_as(),
+            )
         )
         if len(workload.analytical_queries()) == 0:
             return 0.0
