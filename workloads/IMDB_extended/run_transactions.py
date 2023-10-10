@@ -1,3 +1,4 @@
+import asyncio
 import argparse
 import pathlib
 import queue
@@ -245,6 +246,9 @@ def main():
         assert args.schema_name is not None
         config = ConfigFile(args.config_file)
         directory = Directory(config)
+        asyncio.run(directory.refresh())
+    else:
+        directory = None
 
     clients = []
     for idx in range(args.num_clients):
