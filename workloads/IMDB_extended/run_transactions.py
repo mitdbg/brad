@@ -10,10 +10,12 @@ import os
 import pytz
 import multiprocessing as mp
 from datetime import datetime, timedelta
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from brad.config.engine import Engine
+from brad.config.file import ConfigFile
 from brad.grpc_client import BradClientError
+from brad.provisioning.directory import Directory
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from workload_utils.connect import connect_to_db
 from workload_utils.transaction_worker import TransactionWorker
@@ -22,6 +24,7 @@ from workload_utils.transaction_worker import TransactionWorker
 def runner(
     args,
     worker_idx: int,
+    directory: Optional[Directory],
     start_queue: mp.Queue,
     stop_queue: mp.Queue,
 ) -> None:
@@ -56,7 +59,9 @@ def runner(
     aborts = [0 for _ in range(len(transactions))]
 
     # Connect and set the isolation level.
-    db = connect_to_db(args, worker_idx, direct_engine=Engine.Aurora)
+    db = connect_to_db(
+        args, worker_idx, direct_engine=Engine.Aurora, directory=directory
+    )
     db.execute_sync(
         f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
     )
@@ -235,9 +240,17 @@ def main():
     start_queue = mgr.Queue()
     stop_queue = mgr.Queue()
 
+    if args.brad_direct:
+        assert args.config_file is not None
+        assert args.schema_name is not None
+        config = ConfigFile(args.config_file)
+        directory = Directory(config)
+
     clients = []
     for idx in range(args.num_clients):
-        p = mp.Process(target=runner, args=(args, idx, start_queue, stop_queue))
+        p = mp.Process(
+            target=runner, args=(args, idx, directory, start_queue, stop_queue)
+        )
         p.start()
         clients.append(p)
 
