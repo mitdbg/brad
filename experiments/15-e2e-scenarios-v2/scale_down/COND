@@ -22,7 +22,7 @@ run_experiment(
     "planner-config-file": "config/planner.yml",
     "schema-name": "imdb_extended_20g",
     # TODO: Select regular query indexes
-    "ra-query-indexes": "25,26,50,51,75,76,27,28,6",
+    "ra-query-indexes": "25,50,51,75,76,27,28,6",
     "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
     "num-front-ends": 4,
   },
@@ -37,7 +37,7 @@ run_command(
     "planner-config-file": "config/planner.yml",
     "schema-name": "imdb_extended_20g",
     # TODO: Select regular query indexes
-    "ra-query-indexes": "25,26,50,51,75,76,27,28,6",
+    "ra-query-indexes": "25,50,51,75,76,27,28,6",
     "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
     "num-front-ends": 4,
   },
