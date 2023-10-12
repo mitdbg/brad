@@ -219,7 +219,7 @@ def main():
     parser.add_argument(
         "--scale-factor",
         type=int,
-        default=1,
+        default=6,
         help="The scale factor used to generate the dataset.",
     )
     parser.add_argument(

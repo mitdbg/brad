@@ -191,7 +191,7 @@ def main():
     parser.add_argument(
         "--query_bank_file",
         type=str,
-        default="workloads/IMDB/OLAP_queries_new/all_queries.sql",
+        default="workloads/IMDB_20GB/regular_test/queries.sql",
     )
     parser.add_argument("--num-clients", type=int, default=1)
     parser.add_argument("--avg-gap-s", type=float)
@@ -210,7 +210,7 @@ def main():
     with open(args.query_bank_file, "r", encoding="UTF-8") as file:
         query_bank = [line.strip() for line in file]
 
-    queries = [80, 108, 133]  # list(range(0, len(query_bank)))
+    queries = [25,50,51,75,76,27,28,6]  # list(range(0, len(query_bank)))
     for qidx in queries:
         assert qidx < len(query_bank)
         assert qidx >= 0
