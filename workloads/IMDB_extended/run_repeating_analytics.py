@@ -12,6 +12,7 @@ import signal
 import pytz
 import logging
 from typing import List, Optional
+import numpy.typing as npt
 from datetime import datetime, timedelta
 
 from workload_utils.connect import connect_to_db
@@ -44,7 +45,7 @@ def runner(
     args,
     query_bank: List[str],
     queries: List[int],
-    query_frequency: Optional[np.array] = None
+    query_frequency: Optional[npt.NDArray] = None,
 ) -> None:
     def noop(_signal, _frame):
         pass
@@ -231,22 +232,34 @@ def main():
     parser.add_argument(
         "--query-bank-file", type=str, required=True, help="Path to a query bank."
     )
-    parser.add_argument("--query-frequency-path", type=str, default=None,
-                        help="path to the frequency to draw each query in query bank")
+    parser.add_argument(
+        "--query-frequency-path",
+        type=str,
+        default=None,
+        help="path to the frequency to draw each query in query bank",
+    )
     parser.add_argument("--num-clients", type=int, default=1)
     parser.add_argument("--avg-gap-s", type=float)
     parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
     parser.add_argument("--query-indexes", type=str, default=None)
-    parser.add_argument("--query-gap-path", type=str, default=None,
-                        help="path to the gaps to run each query")
+    parser.add_argument(
+        "--query-gap-path",
+        type=str,
+        default=None,
+        help="path to the gaps to run each query",
+    )
     args = parser.parse_args()
 
     with open(args.query_bank_file, "r", encoding="UTF-8") as file:
         query_bank = [line.strip() for line in file]
 
-    if args.query_frequency_path is not None and os.path.exists(args.query_frequency_path):
+    if args.query_frequency_path is not None and os.path.exists(
+        args.query_frequency_path
+    ):
         query_frequency = np.load(args.query_frequency_path)
-        assert len(query_frequency) == len(query_bank), "query_frequency size does not match total number of queries"
+        assert len(query_frequency) == len(
+            query_bank
+        ), "query_frequency size does not match total number of queries"
     else:
         query_frequency = None
 
@@ -271,7 +284,15 @@ def main():
     for idx in range(args.num_clients):
         p = mp.Process(
             target=runner,
-            args=(idx, start_queue, stop_queue, args, query_bank, queries, query_frequency),
+            args=(
+                idx,
+                start_queue,
+                stop_queue,
+                args,
+                query_bank,
+                queries,
+                query_frequency,
+            ),
         )
         p.start()
         processes.append(p)

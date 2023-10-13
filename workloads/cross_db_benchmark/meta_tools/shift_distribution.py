@@ -1,8 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import numpy.typing as npt
 
 
-def shift_frequency_to_match_hist(runtime: np.array, target_hist: (np.array, np.array), balanced: bool) -> np.array:
+def shift_frequency_to_match_hist(
+    runtime: npt.NDArray, target_hist: (npt.NDArray, npt.NDArray), balanced: bool
+) -> npt.NDArray:
     """
     change the frequency of execution for a list of queries to match the distribution of a target histogram
     runtime: a numpy array of shape (n, 3) corresponding to the athena-aurora-redshift runtime of n queries
@@ -51,12 +54,17 @@ def shift_frequency_to_match_hist(runtime: np.array, target_hist: (np.array, np.
                     else:
                         inverse_frac_best = 1 / np.maximum(frac_best, 1e-5)
                         inverse_frac_best[~has_best_engines] = 0
-                        inverse_frac_best[has_best_engines] = inverse_frac_best[has_best_engines] / np.sum(
-                            inverse_frac_best[has_best_engines])
+                        inverse_frac_best[has_best_engines] = inverse_frac_best[
+                            has_best_engines
+                        ] / np.sum(inverse_frac_best[has_best_engines])
                         for e in range(3):
                             if has_best_engines[e]:
                                 e_best_idx = idx[np.where(best_engines == e)[0]]
-                                return_freq[e_best_idx] = target_freq[i] * inverse_frac_best[e] / len(e_best_idx)
+                                return_freq[e_best_idx] = (
+                                    target_freq[i]
+                                    * inverse_frac_best[e]
+                                    / len(e_best_idx)
+                                )
                                 frac_best[e] += target_freq[i] * inverse_frac_best[e]
                 else:
                     return_freq[idx] = target_freq[i] / len(idx)
@@ -65,6 +73,7 @@ def shift_frequency_to_match_hist(runtime: np.array, target_hist: (np.array, np.
     unassigned_freq = 1 - np.sum(return_freq)
     le = np.argmin(frac_best)
     best_engines = np.argmin(runtime, axis=1)
-    return_freq[np.where(best_engines == le)[0]] += unassigned_freq / np.sum(best_engines == le)
+    return_freq[np.where(best_engines == le)[0]] += unassigned_freq / np.sum(
+        best_engines == le
+    )
     return return_freq
-
