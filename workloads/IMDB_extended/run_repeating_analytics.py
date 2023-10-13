@@ -2,6 +2,7 @@ import argparse
 import multiprocessing as mp
 import time
 import os
+import numpy as np
 import pathlib
 import random
 import queue
@@ -10,7 +11,7 @@ import threading
 import signal
 import pytz
 import logging
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timedelta
 
 from workload_utils.connect import connect_to_db
@@ -43,6 +44,7 @@ def runner(
     args,
     query_bank: List[str],
     queries: List[int],
+    query_frequency: Optional[np.array] = None
 ) -> None:
     def noop(_signal, _frame):
         pass
@@ -59,6 +61,9 @@ def runner(
         out_dir = pathlib.Path(".")
 
     database = connect_to_db(args, runner_idx)
+    if query_frequency is not None:
+        query_frequency = query_frequency[queries]
+        query_frequency = query_frequency / np.sum(query_frequency)
     try:
         with open(
             out_dir / "repeating_olap_batch_{}.csv".format(runner_idx),
@@ -86,16 +91,20 @@ def runner(
                 if args.avg_gap_s is not None:
                     # Wait times are normally distributed right now.
                     # TODO: Consider using a different distribution (e.g., exponential).
+                    # TODO: load gap distribution from a path that mimics snowset
                     wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
                     if wait_for_s < 0.0:
                         wait_for_s = 0.0
                     time.sleep(wait_for_s)
 
-                if len(query_order) == 0:
-                    query_order = queries.copy()
-                    prng.shuffle(query_order)
+                if query_frequency is not None:
+                    qidx = prng.choices(queries, query_frequency)[0]
+                else:
+                    if len(query_order) == 0:
+                        query_order = queries.copy()
+                        prng.shuffle(query_order)
 
-                qidx = query_order.pop()
+                    qidx = query_order.pop()
                 logger.debug("Executing qidx: %d", qidx)
                 query = query_bank[qidx]
 
@@ -222,16 +231,30 @@ def main():
     parser.add_argument(
         "--query-bank-file", type=str, required=True, help="Path to a query bank."
     )
+    parser.add_argument("--query-frequency-path", type=str, default=None,
+                        help="path to the frequency to draw each query in query bank")
     parser.add_argument("--num-clients", type=int, default=1)
     parser.add_argument("--avg-gap-s", type=float)
     parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
-    parser.add_argument("--query-indexes", type=str, required=True)
+    parser.add_argument("--query-indexes", type=str, default=None)
+    parser.add_argument("--query-gap-path", type=str, default=None,
+                        help="path to the gaps to run each query")
     args = parser.parse_args()
 
     with open(args.query_bank_file, "r", encoding="UTF-8") as file:
         query_bank = [line.strip() for line in file]
 
-    queries = list(map(int, args.query_indexes.split(",")))
+    if args.query_frequency_path is not None and os.path.exists(args.query_frequency_path):
+        query_frequency = np.load(args.query_frequency_path)
+        assert len(query_frequency) == len(query_bank), "query_frequency size does not match total number of queries"
+    else:
+        query_frequency = None
+
+    if args.query_indexes is None:
+        queries = list(range(len(query_bank)))
+    else:
+        queries = list(map(int, args.query_indexes.split(",")))
+
     for qidx in queries:
         assert qidx < len(query_bank)
         assert qidx >= 0
@@ -248,7 +271,7 @@ def main():
     for idx in range(args.num_clients):
         p = mp.Process(
             target=runner,
-            args=(idx, start_queue, stop_queue, args, query_bank, queries),
+            args=(idx, start_queue, stop_queue, args, query_bank, queries, query_frequency),
         )
         p.start()
         processes.append(p)
