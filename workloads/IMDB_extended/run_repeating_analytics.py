@@ -99,7 +99,7 @@ def runner(
                     time.sleep(wait_for_s)
 
                 if query_frequency is not None:
-                    qidx = prng.choices(queries, query_frequency)[0]
+                    qidx = prng.choices(queries, list(query_frequency))[0]
                 else:
                     if len(query_order) == 0:
                         query_order = queries.copy()
