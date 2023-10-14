@@ -18,7 +18,5 @@ run_repeating_olap_warmup 1 5
 
 >&2 echo "Experiment done. Shutting down."
 
-kill -INT $rana_pid
-wait $rana_pid
 kill -INT $brad_pid
 wait $brad_pid
