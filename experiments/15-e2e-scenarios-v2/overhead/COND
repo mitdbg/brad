@@ -51,6 +51,7 @@ run_experiment_group(
         "run-for-s": 3 * 60,
         "run-warmup-times": 5,
       },
+      parallelizable=True,
     )
     for engine in ["redshift", "aurora", "athena"]
   ]

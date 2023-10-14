@@ -182,8 +182,24 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
         disable_direct_redshift_result_cache=True,
     )
 
+    # For printing out results.
+    if "COND_OUT" in os.environ:
+        # pylint: disable-next=import-error
+        import conductor.lib as cond
+
+        out_dir = cond.get_output_path()
+    else:
+        out_dir = pathlib.Path(".")
+
     try:
-        with open("repeating_olap_batch_warmup.csv", "w", encoding="UTF-8") as file:
+        print(
+            f"Starting warmup pass (will run {args.run_warmup_times} times)...",
+            file=sys.stderr,
+            flush=True,
+        )
+        with open(
+            out_dir / "repeating_olap_batch_warmup.csv", "w", encoding="UTF-8"
+        ) as file:
             print("timestamp,query_idx,run_time_s,engine", file=file)
             for _ in range(args.run_warmup_times):
                 for idx, qidx in enumerate(queries):
@@ -198,7 +214,9 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
                         print(
                             "Warmed up {} of {}. Run time (s): {}".format(
                                 idx + 1, len(queries), run_time_s
-                            )
+                            ),
+                            file=sys.stderr,
+                            flush=True,
                         )
                         print(
                             "{},{},{},{}".format(
