@@ -1,40 +1,42 @@
-from itertools import product
-
-QUERY_INDEXES = "0,25,50,75"
+QUERY_INDEXES = "0,1,2,25,26,27,50,51,52"
 
 combine(
   name="overhead",
   deps=[
-    f":olap_{engine}_{method}"
-    for engine, method in product(["redshift", "aurora", "athena"], ["brad", "direct"])
-  ] + [
+    ":olap_brad",
+    ":olap_direct",
     ":oltp_brad",
     ":oltp_direct",
   ],
 )
 
-for engine in ["redshift", "aurora", "athena"]:
-  run_experiment(
-    name=f"olap_{engine}_brad",
-    run="./run_ana_via_brad.sh",
-    options={
-      "config-file": f"config/config_large_{engine}.yml",
-      "planner-config-file": "config/planner.yml",
-      "ra-query-indexes": QUERY_INDEXES,
-    },
-  )
+run_experiment(
+  name=f"olap_brad",
+  run="./run_ana_via_brad.sh",
+  options={
+    "config-file": f"config/config_large.yml",
+    "planner-config-file": "config/planner.yml",
+    "ra-query-indexes": QUERY_INDEXES,
+  },
+)
 
-  run_experiment(
-    name=f"olap_{engine}_direct",
-    run="python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py",
-    args=["--brad-direct"],
-    options={
-      "config-file": "config/config_large.yml",
-      "schema-name": "imdb_extended_20g",
-      "query-indexes": QUERY_INDEXES,
-      "engine": engine,
-    },
-  )
+run_experiment_group(
+  name=f"olap_direct",
+  run="python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py",
+  experiments=[
+    ExperimentInstance(
+      name=f"olap_direct_{engine}",
+      args=["--brad-direct"],
+      options={
+        "config-file": "config/config_large.yml",
+        "schema-name": "imdb_extended_20g",
+        "query-indexes": QUERY_INDEXES,
+        "engine": engine,
+      },
+    )
+    for engine in ["redshift", "aurora", "athena"]
+  ]
+)
 
 run_experiment(
   name="oltp_brad",
