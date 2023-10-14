@@ -64,5 +64,6 @@ run_experiment(
     "config-file": "../../../config/config_large.yml",
     "schema-name": "imdb_extended_20g",
     "run-for-s": 3 * 60,
+    "num-clients": 2,
   },
 )
