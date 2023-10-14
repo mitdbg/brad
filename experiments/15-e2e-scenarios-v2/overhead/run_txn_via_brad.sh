@@ -16,4 +16,8 @@ start_txn_runner 2
 sleep $((3 * 60))  # 3 minutes
 
 >&2 echo "Experiment done. Shutting down."
-graceful_shutdown
+
+kill -INT $txn_pid
+wait $txn_pid
+kill -INT $brad_pid
+wait $brad_pid

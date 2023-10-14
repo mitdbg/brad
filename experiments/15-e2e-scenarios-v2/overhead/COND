@@ -1,3 +1,5 @@
+include("../common.cond")
+
 QUERY_INDEXES = "0,1,2,25,26,27,50,51,52"
 
 combine(
@@ -17,6 +19,9 @@ run_experiment(
     "config-file": f"config/config_large.yml",
     "planner-config-file": "config/planner.yml",
     "ra-query-indexes": QUERY_INDEXES,
+    "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
+    "schema-name": "imdb_extended_20g",
+    "num-front-ends": 4,
   },
 )
 
@@ -30,6 +35,7 @@ run_experiment_group(
       options={
         "config-file": "config/config_large.yml",
         "schema-name": "imdb_extended_20g",
+        "query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
         "query-indexes": QUERY_INDEXES,
         "engine": engine,
       },
@@ -44,6 +50,8 @@ run_experiment(
   options={
     "config-file": "config/config_large.yml",
     "planner-config-file": "config/planner.yml",
+    "schema-name": "imdb_extended_20g",
+    "num-front-ends": 4,
   },
 )
 

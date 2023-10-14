@@ -17,4 +17,8 @@ start_repeating_olap_runner 1 10 5
 sleep $((3 * 60))  # 3 minutes
 
 >&2 echo "Experiment done. Shutting down."
-graceful_shutdown
+
+kill -INT $rana_pid
+wait $rana_pid
+kill -INT $brad_pid
+wait $brad_pid
