@@ -14,6 +14,7 @@ from typing import List
 from datetime import datetime, timedelta
 
 from workload_utils.connect import connect_to_db
+from brad.config.engine import Engine
 from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from typing import Dict
@@ -58,7 +59,12 @@ def runner(
     else:
         out_dir = pathlib.Path(".")
 
-    database = connect_to_db(args, runner_idx)
+    if args.engine is not None:
+        engine = Engine.from_str(args.engine)
+    else:
+        engine = None
+
+    database = connect_to_db(args, runner_idx, engine=engine)
     try:
         with open(
             out_dir / "repeating_olap_batch_{}.csv".format(runner_idx),
@@ -226,6 +232,24 @@ def main():
     parser.add_argument("--avg-gap-s", type=float)
     parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
     parser.add_argument("--query-indexes", type=str, required=True)
+    parser.add_argument(
+        "--brad-direct",
+        action="store_true",
+        help="Set to connect directly to Aurora via BRAD's config.",
+    )
+    parser.add_argument(
+        "--config-file",
+        type=str,
+        help="The BRAD config file (if --brad-direct is used).",
+    )
+    parser.add_argument(
+        "--schema-name",
+        type=str,
+        help="The schema name to use, if connecting directly.",
+    )
+    parser.add_argument(
+        "--engine", type=str, help="The engine to use, if connecting directly."
+    )
     args = parser.parse_args()
 
     with open(args.query_bank_file, "r", encoding="UTF-8") as file:
