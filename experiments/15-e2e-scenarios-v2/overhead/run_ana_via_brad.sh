@@ -14,7 +14,8 @@ start_brad $config_file $planner_config_file
 sleep 30
 
 start_repeating_olap_runner 1 10 5
-sleep $((3 * 60))  # 3 minutes
+>&2 echo "Waiting for 3 minutes..."
+sleep 180  # 3 minutes
 
 >&2 echo "Experiment done. Shutting down."
 
