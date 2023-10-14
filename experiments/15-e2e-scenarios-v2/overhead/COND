@@ -1,5 +1,6 @@
 include("../common.cond")
 
+# Want a nice mix of long and short-running queries.
 QUERY_INDEXES = "0,1,2,25,26,27,50,51,52"
 
 combine(
@@ -9,6 +10,15 @@ combine(
     ":olap_direct",
     ":oltp_brad",
     ":oltp_direct",
+  ],
+)
+
+group(
+  name="olap",
+  deps=[
+    ":olap_direct_athena",
+    ":olap_direct_aurora",
+    ":olap_direct_redshift",
   ],
 )
 
@@ -31,7 +41,7 @@ run_experiment_group(
   experiments=[
     ExperimentInstance(
       name=f"olap_direct_{engine}",
-      args=["--brad-direct"],
+      args=["--brad-direct", "--run-warmup"],
       options={
         "config-file": "../../../config/config_large.yml",
         "schema-name": "imdb_extended_20g",
@@ -39,6 +49,7 @@ run_experiment_group(
         "query-indexes": QUERY_INDEXES,
         "engine": engine,
         "run-for-s": 3 * 60,
+        "run-warmup-times": 5,
       },
     )
     for engine in ["redshift", "aurora", "athena"]

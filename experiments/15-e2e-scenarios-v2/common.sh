@@ -105,6 +105,24 @@ function start_repeating_olap_runner() {
   rana_pid=$!
 }
 
+function run_repeating_olap_warmup() {
+  # NOTE: This is blocking.
+  local ra_clients=$1
+  local ra_warmup_times=$2
+
+  >&2 echo "[Repeating Analytics Warmup] Running with $ra_clients..."
+  results_dir=$COND_OUT/ra_${ra_clients}
+  mkdir -p $results_dir
+
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py \
+    --num-clients $ra_clients \
+    --num-front-ends $num_front_ends \
+    --query-indexes $ra_query_indexes \
+    --query-bank-file $ra_query_bank_file \
+    --run-warmup \
+    --run-warmup-times $ra_warmup_times
+}
+
 function start_txn_runner() {
   t_clients=$1
 

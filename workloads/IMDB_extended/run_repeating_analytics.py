@@ -19,24 +19,8 @@ from workload_utils.connect import connect_to_db
 from brad.config.engine import Engine
 from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
-from typing import Dict
 
 logger = logging.getLogger(__name__)
-
-
-def build_query_map(query_bank: str) -> Dict[str, int]:
-    queries = []
-    with open(query_bank, "r", encoding="UTF-8") as file:
-        for line in file:
-            query = line.strip()
-            if query:
-                queries.append(query)
-
-    idx_map = {}
-    for idx, q in enumerate(queries):
-        idx_map[q] = idx
-
-    return idx_map
 
 
 def runner(
@@ -67,7 +51,14 @@ def runner(
     else:
         engine = None
 
-    database = connect_to_db(args, runner_idx, direct_engine=engine)
+    database = connect_to_db(
+        args,
+        runner_idx,
+        direct_engine=engine,
+        # Ensure we disable the result cache if we are running directly on
+        # Redshift.
+        disable_direct_redshift_result_cache=True,
+    )
 
     if query_frequency is not None:
         query_frequency = query_frequency[queries]
@@ -177,50 +168,63 @@ def runner(
 
 
 def run_warmup(args, query_bank: List[str], queries: List[int]):
-    database = connect_to_db(args, worker_index=0)
+    if args.engine is not None:
+        engine = Engine.from_str(args.engine)
+    else:
+        engine = None
+
+    database = connect_to_db(
+        args,
+        worker_index=0,
+        direct_engine=engine,
+        # Ensure we disable the result cache if we are running directly on
+        # Redshift.
+        disable_direct_redshift_result_cache=True,
+    )
 
     try:
         with open("repeating_olap_batch_warmup.csv", "w", encoding="UTF-8") as file:
             print("timestamp,query_idx,run_time_s,engine", file=file)
-            for idx, qidx in enumerate(queries):
-                try:
-                    engine = None
-                    query = query_bank[qidx]
-                    now = datetime.now().astimezone(pytz.utc)
-                    start = time.time()
-                    _, engine = database.execute_sync_with_engine(query)
-                    end = time.time()
-                    run_time_s = end - start
-                    print(
-                        "Warmed up {} of {}. Run time (s): {}".format(
-                            idx + 1, len(queries), run_time_s
-                        )
-                    )
-                    print(
-                        "{},{},{},{}".format(
-                            now,
-                            qidx,
-                            run_time_s,
-                            engine.value if engine is not None else "unknown",
-                        ),
-                        file=file,
-                        flush=True,
-                    )
-                except BradClientError as ex:
-                    if ex.is_transient():
+            for _ in range(args.run_warmup_times):
+                for idx, qidx in enumerate(queries):
+                    try:
+                        engine = None
+                        query = query_bank[qidx]
+                        now = datetime.now().astimezone(pytz.utc)
+                        start = time.time()
+                        _, engine = database.execute_sync_with_engine(query)
+                        end = time.time()
+                        run_time_s = end - start
                         print(
-                            "Transient query error:",
-                            ex.message(),
-                            flush=True,
-                            file=sys.stderr,
+                            "Warmed up {} of {}. Run time (s): {}".format(
+                                idx + 1, len(queries), run_time_s
+                            )
                         )
-                    else:
                         print(
-                            "Unexpected query error:",
-                            ex.message(),
+                            "{},{},{},{}".format(
+                                now,
+                                qidx,
+                                run_time_s,
+                                engine.value if engine is not None else "unknown",
+                            ),
+                            file=file,
                             flush=True,
-                            file=sys.stderr,
                         )
+                    except BradClientError as ex:
+                        if ex.is_transient():
+                            print(
+                                "Transient query error:",
+                                ex.message(),
+                                flush=True,
+                                file=sys.stderr,
+                            )
+                        else:
+                            print(
+                                "Unexpected query error:",
+                                ex.message(),
+                                flush=True,
+                                file=sys.stderr,
+                            )
     finally:
         database.close_sync()
 
@@ -232,6 +236,12 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--num-front-ends", type=int, default=1)
     parser.add_argument("--run-warmup", action="store_true")
+    parser.add_argument(
+        "--run-warmup-times",
+        type=int,
+        default=1,
+        help="Run the warmup query list this many times.",
+    )
     parser.add_argument(
         "--cstr-var",
         type=str,
