@@ -69,11 +69,6 @@ class BradFrontEnd(BradInterface):
         self._schema_name = schema_name
         self._debug_mode = debug_mode
 
-        if fe_index == 0:
-            self._txn_file = open("/tmp/brad_txn.csv", "w")
-        else:
-            self._txn_file = None
-
         # Used for IPC with the daemon. Eventually we will use RPC to
         # communicate with the daemon. But there's currently no need for
         # something fancy here.
@@ -268,7 +263,6 @@ class BradFrontEnd(BradInterface):
     async def _run_query_impl(
         self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
     ) -> RowList:
-        t_start = time.perf_counter()
         session = self._sessions.get_session(session_id)
         if session is None:
             raise QueryError(
@@ -305,7 +299,6 @@ class BradFrontEnd(BradInterface):
             )
             debug_info["executor"] = engine_to_use
 
-            t_before_exec = time.perf_counter()
             # 3. Actually execute the query.
             connection = session.engines.get_connection(engine_to_use)
             cursor = connection.cursor_sync()
@@ -335,7 +328,6 @@ class BradFrontEnd(BradInterface):
 
                 # Error when executing the query.
                 raise QueryError.from_exception(ex, is_transient_error)
-            t_after_exec = time.perf_counter()
 
             # We keep track of transactional state after executing the query in
             # case the query failed.
@@ -345,7 +337,6 @@ class BradFrontEnd(BradInterface):
             if query_rep.is_transaction_end():
                 session.set_in_transaction(in_txn=False)
                 self._transaction_end_counter.bump()
-
 
             # Decide whether to log the query.
             run_time_s = end - start
@@ -360,12 +351,9 @@ class BradFrontEnd(BradInterface):
                 # Using `fetchall_sync()` is lower overhead than the async interface.
                 results = [tuple(row) for row in cursor.fetchall_sync()]
                 log_verbose(logger, "Responded with %d rows.", len(results))
-                t_finish = time.perf_counter()
                 return results
             except pyodbc.ProgrammingError:
                 log_verbose(logger, "No rows produced.")
-                t_finish = time.perf_counter()
-                self._record_times(t_before_exec - t_start, t_after_exec - t_before_exec, t_finish - t_after_exec)
                 return []
             except (pyodbc.Error, pyodbc.OperationalError) as ex:
                 is_transient_error = False
@@ -384,11 +372,6 @@ class BradFrontEnd(BradInterface):
         except Exception as ex:
             logger.exception("Encountered unexpected exception when handling request.")
             raise QueryError.from_exception(ex)
-
-    def _record_times(self, t1, t2, t3):
-        if self._txn_file is None:
-            return
-        print(f"{t1},{t2},{t3}", file=self._txn_file, flush=True)
 
     async def _handle_internal_command(
         self, session: Session, command_raw: str, debug_info: Dict[str, Any]
