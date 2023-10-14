@@ -19,6 +19,7 @@ group(
     ":olap_direct_athena",
     ":olap_direct_aurora",
     ":olap_direct_redshift",
+    ":olap_brad",
   ],
 )
 
@@ -26,7 +27,7 @@ run_experiment(
   name=f"olap_brad",
   run="./run_ana_via_brad.sh",
   options={
-    "config-file": f"config/config_large.yml",
+    "config-file": "config/config_large.yml",
     "planner-config-file": "config/planner.yml",
     "ra-query-indexes": QUERY_INDEXES,
     "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,

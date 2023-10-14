@@ -301,10 +301,16 @@ class BradFrontEnd(BradInterface):
 
             # 3. Actually execute the query.
             connection = session.engines.get_connection(engine_to_use)
-            cursor = await connection.cursor()
+            cursor = connection.cursor_sync()
             try:
                 start = datetime.now(tz=timezone.utc)
-                await cursor.execute(query_rep.raw_query)
+                if transactional_query:
+                    # Using execute_sync() is lower overhead than the async
+                    # interface. For transactions, we won't necessarily need the
+                    # async interface.
+                    cursor.execute_sync(query_rep.raw_query)
+                else:
+                    await cursor.execute(query_rep.raw_query)
                 end = datetime.now(tz=timezone.utc)
             except (
                 pyodbc.ProgrammingError,
