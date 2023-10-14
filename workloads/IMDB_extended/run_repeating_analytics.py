@@ -16,6 +16,7 @@ import numpy.typing as npt
 from datetime import datetime, timedelta
 
 from workload_utils.connect import connect_to_db
+from brad.config.engine import Engine
 from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from typing import Dict
@@ -61,10 +62,17 @@ def runner(
     else:
         out_dir = pathlib.Path(".")
 
-    database = connect_to_db(args, runner_idx)
+    if args.engine is not None:
+        engine = Engine.from_str(args.engine)
+    else:
+        engine = None
+
+    database = connect_to_db(args, runner_idx, direct_engine=engine)
+
     if query_frequency is not None:
         query_frequency = query_frequency[queries]
         query_frequency = query_frequency / np.sum(query_frequency)
+
     try:
         with open(
             out_dir / "repeating_olap_batch_{}.csv".format(runner_idx),
@@ -241,12 +249,31 @@ def main():
     parser.add_argument("--num-clients", type=int, default=1)
     parser.add_argument("--avg-gap-s", type=float)
     parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
-    parser.add_argument("--query-indexes", type=str, default=None)
+    parser.add_argument("--query-indexes", type=str)
+    parser.add_argument(
+        "--brad-direct",
+        action="store_true",
+        help="Set to connect directly to Aurora via BRAD's config.",
+    )
+    parser.add_argument(
+        "--config-file",
+        type=str,
+        help="The BRAD config file (if --brad-direct is used).",
+    )
+    parser.add_argument(
+        "--schema-name",
+        type=str,
+        help="The schema name to use, if connecting directly.",
+    )
+    parser.add_argument(
+        "--engine", type=str, help="The engine to use, if connecting directly."
+    )
+    parser.add_argument("--run-for-s", type=int, help="If set, run for this long.")
     parser.add_argument(
         "--query-gap-path",
         type=str,
         default=None,
-        help="path to the gaps to run each query",
+        help="Path to the gaps to run each query",
     )
     args = parser.parse_args()
 
@@ -305,21 +332,29 @@ def main():
     for _ in range(args.num_clients):
         stop_queue.put("")
 
-    # Wait until requested to stop.
-    print(
-        "Repeating analytics waiting until requested to stop... (hit Ctrl-C)",
-        flush=True,
-        file=sys.stderr,
-    )
-    should_shutdown = threading.Event()
+    if args.run_for_s:
+        print(
+            "Waiting for {} seconds...".format(args.run_for_s),
+            flush=True,
+            file=sys.stderr,
+        )
+        time.sleep(args.run_for_s)
+    else:
+        # Wait until requested to stop.
+        print(
+            "Repeating analytics waiting until requested to stop... (hit Ctrl-C)",
+            flush=True,
+            file=sys.stderr,
+        )
+        should_shutdown = threading.Event()
 
-    def signal_handler(_signal, _frame):
-        should_shutdown.set()
+        def signal_handler(_signal, _frame):
+            should_shutdown.set()
 
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
 
-    should_shutdown.wait()
+        should_shutdown.wait()
 
     print("Stopping clients...", flush=True, file=sys.stderr)
     for _ in range(args.num_clients):
