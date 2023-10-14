@@ -19,6 +19,7 @@ group(
     ":olap_direct_athena",
     ":olap_direct_aurora",
     ":olap_direct_redshift",
+    ":olap_brad",
   ],
 )
 
