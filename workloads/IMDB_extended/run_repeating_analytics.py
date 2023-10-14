@@ -250,6 +250,7 @@ def main():
     parser.add_argument(
         "--engine", type=str, help="The engine to use, if connecting directly."
     )
+    parser.add_argument("--run-for-s", type=int, help="If set, run for this long.")
     args = parser.parse_args()
 
     with open(args.query_bank_file, "r", encoding="UTF-8") as file:
@@ -285,21 +286,29 @@ def main():
     for _ in range(args.num_clients):
         stop_queue.put("")
 
-    # Wait until requested to stop.
-    print(
-        "Repeating analytics waiting until requested to stop... (hit Ctrl-C)",
-        flush=True,
-        file=sys.stderr,
-    )
-    should_shutdown = threading.Event()
+    if args.run_for_s:
+        print(
+            "Waiting for {} seconds...".format(args.run_for_s),
+            flush=True,
+            file=sys.stderr,
+        )
+        time.sleep(args.run_for_s)
+    else:
+        # Wait until requested to stop.
+        print(
+            "Repeating analytics waiting until requested to stop... (hit Ctrl-C)",
+            flush=True,
+            file=sys.stderr,
+        )
+        should_shutdown = threading.Event()
 
-    def signal_handler(_signal, _frame):
-        should_shutdown.set()
+        def signal_handler(_signal, _frame):
+            should_shutdown.set()
 
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
 
-    should_shutdown.wait()
+        should_shutdown.wait()
 
     print("Stopping clients...", flush=True, file=sys.stderr)
     for _ in range(args.num_clients):
