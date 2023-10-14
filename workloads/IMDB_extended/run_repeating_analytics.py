@@ -64,7 +64,7 @@ def runner(
     else:
         engine = None
 
-    database = connect_to_db(args, runner_idx, engine=engine)
+    database = connect_to_db(args, runner_idx, direct_engine=engine)
     try:
         with open(
             out_dir / "repeating_olap_batch_{}.csv".format(runner_idx),
