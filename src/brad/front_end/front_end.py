@@ -500,8 +500,10 @@ class BradFrontEnd(BradInterface):
             await asyncio.sleep(0.1 * self._fe_index)
 
             while True:
-                # Ideally we adjust for delays here too
-                await asyncio.sleep(self._config.front_end_metrics_reporting_period_seconds)
+                # Ideally we adjust for delays here too.
+                await asyncio.sleep(
+                    self._config.front_end_metrics_reporting_period_seconds
+                )
 
                 txn_value = self._transaction_end_counter.value()
                 period_end = time.time()
