@@ -1,5 +1,6 @@
 .vscode
 .idea
+.ipynb_checkpoints
 
 __pycache__
 *.pyc
@@ -17,6 +18,7 @@ config/temp_config.yml
 query_logs/
 
 cond-out*
+cond-archive*
 
 build
 
