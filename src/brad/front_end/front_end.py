@@ -6,6 +6,7 @@ import time
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
+from ddsketch import DDSketch
 
 import grpc
 import pyodbc
@@ -144,6 +145,7 @@ class BradFrontEnd(BradInterface):
 
         # Number of transactions that completed.
         self._transaction_end_counter = Counter()
+        self._reset_latency_sketches()
         self._brad_metrics_reporting_task: Optional[asyncio.Task[None]] = None
 
         # Used to manage `BRAD_` requests that need to be sent to the daemon for
@@ -344,7 +346,11 @@ class BradFrontEnd(BradInterface):
                 self._qlogger.info(
                     f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {run_time_s}s IsTransaction: {transactional_query}"
                 )
-            self._query_run_times.add_value(run_time_s.total_seconds())
+                run_time_s_float = run_time_s.total_seconds()
+                if transactional_query:
+                    self._txn_latency_sketch.add(run_time_s_float)
+                else:
+                    self._query_latency_sketch.add(run_time_s_float)
 
             # Extract and return the results, if any.
             try:
@@ -486,30 +492,43 @@ class BradFrontEnd(BradInterface):
                 logger.info("Received message from the daemon: %s", message)
 
     async def _report_metrics_to_daemon(self) -> None:
-        period_start = time.time()
-        while True:
-            txn_value = self._transaction_end_counter.value()
-            period_end = time.time()
-            self._transaction_end_counter.reset()
-            elapsed_time_s = period_end - period_start
-
-            # If the input queue is full, we just drop this message.
-            sampled_thpt = txn_value / elapsed_time_s
-            rt_summary = self._query_run_times.get_summary(k=1)
-            self._query_run_times.clear()  # Only keep the unreported samples.
-            metrics_report = MetricsReport(self._fe_index, sampled_thpt, rt_summary)
-            logger.debug(
-                "Sending metrics report: txn_completions_per_s: %.2f, max_query_run_time_s: %.2f",
-                sampled_thpt,
-                max(rt_summary.top_k) if len(rt_summary.top_k) > 0 else 0.0,
-            )
-            self._output_queue.put_nowait(metrics_report)
-
+        try:
             period_start = time.time()
 
-            # NOTE: Once we add multiple front end servers, we should stagger
-            # the sleep period.
-            await asyncio.sleep(self._config.front_end_metrics_reporting_period_seconds)
+            # We want to stagger the reports across the front ends to avoid
+            # overwhelming the daemon.
+            await asyncio.sleep(0.1 * self._fe_index)
+
+            while True:
+                # Ideally we adjust for delays here too.
+                await asyncio.sleep(
+                    self._config.front_end_metrics_reporting_period_seconds
+                )
+
+                txn_value = self._transaction_end_counter.value()
+                period_end = time.time()
+                self._transaction_end_counter.reset()
+                elapsed_time_s = period_end - period_start
+
+                # If the input queue is full, we just drop this message.
+                sampled_thpt = txn_value / elapsed_time_s
+                metrics_report = MetricsReport.from_data(
+                    self._fe_index,
+                    sampled_thpt,
+                    self._txn_latency_sketch,
+                    self._query_latency_sketch,
+                )
+                logger.debug(
+                    "Sending metrics report: txn_completions_per_s: %.2f", sampled_thpt
+                )
+                self._output_queue.put_nowait(metrics_report)
+
+                period_start = time.time()
+                self._reset_latency_sketches()
+
+        except:  # pylint: disable=bare-except
+            # This should be a fatal error.
+            logger.exception("Unexpected error in the metrics reporting task.")
 
     def _clean_query_str(self, raw_sql: str) -> str:
         sql = raw_sql.strip()
@@ -599,6 +618,11 @@ class BradFrontEnd(BradInterface):
                 "Refreshing the blueprint before attempting to re-establish connections again."
             )
             await self._blueprint_mgr.load()
+
+    def _reset_latency_sketches(self) -> None:
+        sketch_rel_accuracy = 0.01
+        self._query_latency_sketch = DDSketch(relative_accuracy=sketch_rel_accuracy)
+        self._txn_latency_sketch = DDSketch(relative_accuracy=sketch_rel_accuracy)
 
 
 async def _orchestrate_shutdown() -> None:

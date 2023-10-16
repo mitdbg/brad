@@ -1,5 +1,7 @@
+from ddsketch import DDSketch
+from ddsketch.pb.proto import DDSketchProto, pb as ddspb
+
 from brad.row_list import RowList
-from brad.utils.run_time_reservoir import RunTimeSummary
 
 
 class IpcMessage:
@@ -40,12 +42,46 @@ class MetricsReport(IpcMessage):
     Sent from the front end to the daemon to report BRAD's client-side metrics.
     """
 
+    @classmethod
+    def from_data(
+        cls,
+        fe_index,
+        txn_completions_per_s: float,
+        txn_latency_sketch: DDSketch,
+        query_latency_sketch: DDSketch,
+    ) -> "MetricsReport":
+        return cls(
+            fe_index,
+            txn_completions_per_s,
+            serialized_txn_latency_sketch=DDSketchProto.to_proto(
+                txn_latency_sketch
+            ).SerializeToString(),
+            serialized_query_latency_sketch=DDSketchProto.to_proto(
+                query_latency_sketch
+            ).SerializeToString(),
+        )
+
     def __init__(
-        self, fe_index: int, txn_completions_per_s: float, latency: RunTimeSummary
+        self,
+        fe_index: int,
+        txn_completions_per_s: float,
+        serialized_txn_latency_sketch: bytes,
+        serialized_query_latency_sketch: bytes,
     ) -> None:
         super().__init__(fe_index)
         self.txn_completions_per_s = txn_completions_per_s
-        self.latency = latency
+        self.serialized_txn_latency_sketch = serialized_txn_latency_sketch
+        self.serialized_query_latency_sketch = serialized_query_latency_sketch
+
+    def txn_latency_sketch(self) -> DDSketch:
+        pb_sketch = ddspb.DDSketch()
+        pb_sketch.ParseFromString(self.serialized_txn_latency_sketch)
+        return DDSketchProto.from_proto(pb_sketch)
+
+    def query_latency_sketch(self) -> DDSketch:
+        pb_sketch = ddspb.DDSketch()
+        pb_sketch.ParseFromString(self.serialized_query_latency_sketch)
+        return DDSketchProto.from_proto(pb_sketch)
 
 
 class InternalCommandRequest(IpcMessage):

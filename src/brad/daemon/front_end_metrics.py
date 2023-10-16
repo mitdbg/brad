@@ -1,21 +1,20 @@
+import enum
 import math
 import logging
 import pandas as pd
 import pytz
 from typing import Dict, List, Optional
 from datetime import datetime, timezone
+from ddsketch import DDSketch
 
 from .metrics_source import MetricsSourceWithForecasting
 from brad.config.file import ConfigFile
 from brad.config.metrics import FrontEndMetric
 from brad.daemon.messages import MetricsReport
 from brad.daemon.metrics_logger import MetricsLogger
-from brad.utils.streaming_metric import StreamingMetric
+from brad.utils.streaming_metric import StreamingMetric, StreamingNumericMetric
 
 logger = logging.getLogger(__name__)
-
-
-FrontEndMetricDict = Dict[FrontEndMetric, List[StreamingMetric]]
 
 
 class FrontEndMetrics(MetricsSourceWithForecasting):
@@ -32,28 +31,34 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             / self._config.front_end_metrics_reporting_period_seconds
         )
         sm_window_size = math.ceil(10 * samples_per_epoch)
-        self._front_end_metrics: FrontEndMetricDict = {
-            FrontEndMetric.TxnEndPerSecond: [
-                StreamingMetric[float](sm_window_size)
-                for _ in range(self._config.num_front_ends)
-            ],
-            FrontEndMetric.QueryLatencySumSecond: [
-                StreamingMetric[float](sm_window_size)
-                for _ in range(self._config.num_front_ends)
-            ],
-            FrontEndMetric.NumQueries: [
-                StreamingMetric[float](sm_window_size)
-                for _ in range(self._config.num_front_ends)
-            ],
-            FrontEndMetric.QueryLatencyMaxSecond: [
-                StreamingMetric[float](sm_window_size)
+        self._numeric_front_end_metrics: Dict[
+            _MetricKey, List[StreamingNumericMetric]
+        ] = {
+            _MetricKey.TxnEndPerSecond: [
+                StreamingNumericMetric(window_size=sm_window_size)
                 for _ in range(self._config.num_front_ends)
             ],
         }
-        self._ordered_metrics = list(self._front_end_metrics.keys())
-        self._values_df = pd.DataFrame(
-            columns=list(map(lambda metric: metric.value, self._ordered_metrics))
-        )
+        self._sketch_front_end_metrics: Dict[
+            _MetricKey, List[StreamingMetric[DDSketch]]
+        ] = {
+            _MetricKey.QueryLatencySecond: [
+                StreamingMetric[DDSketch](window_size=sm_window_size)
+                for _ in range(self._config.num_front_ends)
+            ],
+            _MetricKey.TxnLatencySecond: [
+                StreamingMetric[DDSketch](window_size=sm_window_size)
+                for _ in range(self._config.num_front_ends)
+            ],
+        }
+        self._ordered_metrics: List[str] = [
+            FrontEndMetric.TxnEndPerSecond.value,
+            FrontEndMetric.QueryLatencySecondP50.value,
+            FrontEndMetric.TxnLatencySecondP50.value,
+            FrontEndMetric.QueryLatencySecondP90.value,
+            FrontEndMetric.TxnLatencySecondP90.value,
+        ]
+        self._values_df = pd.DataFrame(columns=self._ordered_metrics.copy())
         self._logger = MetricsLogger.create_from_config(
             self._config, "brad_metrics_front_end.log"
         )
@@ -72,14 +77,14 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
 
         timestamps = []
         data_cols: Dict[str, List[float]] = {
-            metric_kind.value: [] for metric_kind in self._ordered_metrics
+            metric_name: [] for metric_name in self._ordered_metrics
         }
 
         for offset in range(num_epochs):
             window_start = start_time + offset * self._epoch_length
             window_end = window_start + self._epoch_length
-            for metric, values in self._front_end_metrics.items():
-                if metric == FrontEndMetric.TxnEndPerSecond:
+            for metric_key, values in self._numeric_front_end_metrics.items():
+                if metric_key == _MetricKey.TxnEndPerSecond:
                     total = sum(
                         map(
                             # pylint: disable-next=cell-var-from-loop
@@ -87,31 +92,54 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
                             values,
                         )
                     )
-                    data_cols[metric.value].append(total)
-                elif (
-                    metric == FrontEndMetric.QueryLatencySumSecond
-                    or metric == FrontEndMetric.NumQueries
-                ):
-                    total = sum(
-                        map(
-                            # pylint: disable-next=cell-var-from-loop
-                            lambda val: val.sum_in_window(window_start, window_end),
-                            values,
-                        )
-                    )
-                    data_cols[metric.value].append(total)
-                elif metric == FrontEndMetric.QueryLatencyMaxSecond:
-                    max_val = max(
-                        map(
-                            # pylint: disable-next=cell-var-from-loop
-                            lambda val: val.max_in_window(window_start, window_end),
-                            values,
-                        )
-                    )
-                    data_cols[metric.value].append(max_val)
+                    data_cols[FrontEndMetric.TxnEndPerSecond.value].append(total)
                 else:
-                    logger.warning("Unhandled front end metric: %s", metric)
-                    data_cols[metric.value].append(0.0)
+                    logger.warning("Unhandled front end metric: %s", metric_key)
+
+            for metric_key, fe_sketches in self._sketch_front_end_metrics.items():
+                if (
+                    metric_key == _MetricKey.QueryLatencySecond
+                    or metric_key == _MetricKey.TxnLatencySecond
+                ):
+                    merged = None
+                    for sketches in fe_sketches:
+                        for sketch, _ in sketches.window_iterator(
+                            window_start, window_end
+                        ):
+                            if merged is None:
+                                merged = sketch
+                            else:
+                                merged = merged.merge(sketch)
+
+                    if merged is None:
+                        logger.warning(
+                            "Missing latency sketch values for %s", metric_key
+                        )
+                        p50_val = 0.0
+                        p90_val = 0.0
+                    else:
+                        p50_val_cand = merged.get_quantile_value(0.5)
+                        p90_val_cand = merged.get_quantile_value(0.9)
+                        p50_val = p50_val_cand if p50_val_cand is not None else 0.0
+                        p90_val = p90_val_cand if p90_val_cand is not None else 0.0
+
+                    if metric_key == _MetricKey.QueryLatencySecond:
+                        data_cols[FrontEndMetric.QueryLatencySecondP50.value].append(
+                            p50_val
+                        )
+                        data_cols[FrontEndMetric.QueryLatencySecondP90.value].append(
+                            p90_val
+                        )
+                    else:
+                        data_cols[FrontEndMetric.TxnLatencySecondP50.value].append(
+                            p50_val
+                        )
+                        data_cols[FrontEndMetric.TxnLatencySecondP90.value].append(
+                            p90_val
+                        )
+                else:
+                    logger.warning("Unhandled front end metric: %s", metric_key)
+
             timestamps.append(window_end)
 
         # Sanity checks.
@@ -132,23 +160,15 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
         fe_index = report.fe_index
 
         # Each front end server reports these metrics.
-        txns = self._front_end_metrics[FrontEndMetric.TxnEndPerSecond][fe_index]
-        txns.add_sample(report.txn_completions_per_s, now)
-
-        query_lat = self._front_end_metrics[FrontEndMetric.QueryLatencySumSecond][
+        self._numeric_front_end_metrics[_MetricKey.TxnEndPerSecond][
             fe_index
-        ]
-        query_lat.add_sample(report.latency.sum, now)
-
-        query_count = self._front_end_metrics[FrontEndMetric.NumQueries][fe_index]
-        query_count.add_sample(report.latency.num_values, now)
-
-        query_lat_max = self._front_end_metrics[FrontEndMetric.QueryLatencyMaxSecond][
+        ].add_sample(report.txn_completions_per_s, now)
+        self._sketch_front_end_metrics[_MetricKey.QueryLatencySecond][
             fe_index
-        ]
-        query_lat_max.add_sample(
-            max(report.latency.top_k) if len(report.latency.top_k) > 0 else 0.0, now
-        )
+        ].add_sample(report.query_latency_sketch(), now)
+        self._sketch_front_end_metrics[_MetricKey.TxnLatencySecond][
+            fe_index
+        ].add_sample(report.txn_latency_sketch(), now)
 
         logger.debug(
             "Received metrics report: [%d] %f (ts: %s)",
@@ -156,3 +176,9 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             report.txn_completions_per_s,
             now,
         )
+
+
+class _MetricKey(enum.Enum):
+    TxnEndPerSecond = "txn_end_per_s"
+    QueryLatencySecond = "query_latency_s"
+    TxnLatencySecond = "txn_latency_s"
