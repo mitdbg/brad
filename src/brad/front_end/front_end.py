@@ -6,6 +6,7 @@ import time
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
+from ddsketch import DDSketch
 
 import grpc
 import pyodbc
@@ -144,6 +145,7 @@ class BradFrontEnd(BradInterface):
 
         # Number of transactions that completed.
         self._transaction_end_counter = Counter()
+        self._reset_latency_sketches()
         self._brad_metrics_reporting_task: Optional[asyncio.Task[None]] = None
 
         # Used to manage `BRAD_` requests that need to be sent to the daemon for
@@ -344,7 +346,11 @@ class BradFrontEnd(BradInterface):
                 self._qlogger.info(
                     f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {run_time_s}s IsTransaction: {transactional_query}"
                 )
-            self._query_run_times.add_value(run_time_s.total_seconds())
+                run_time_s_float = run_time_s.total_seconds()
+                if transactional_query:
+                    self._txn_latency_sketch.add(run_time_s_float)
+                else:
+                    self._query_latency_sketch.add(run_time_s_float)
 
             # Extract and return the results, if any.
             try:
@@ -495,17 +501,25 @@ class BradFrontEnd(BradInterface):
 
             # If the input queue is full, we just drop this message.
             sampled_thpt = txn_value / elapsed_time_s
-            rt_summary = self._query_run_times.get_summary(k=1)
-            self._query_run_times.clear()  # Only keep the unreported samples.
-            metrics_report = MetricsReport(self._fe_index, sampled_thpt, rt_summary)
-            logger.debug(
-                "Sending metrics report: txn_completions_per_s: %.2f, max_query_run_time_s: %.2f",
+            metrics_report = MetricsReport.from_data(
+                self._fe_index,
                 sampled_thpt,
-                max(rt_summary.top_k) if len(rt_summary.top_k) > 0 else 0.0,
+                self._txn_latency_sketch,
+                self._query_latency_sketch,
+            )
+            logger.debug(
+                "Sending metrics report: txn_completions_per_s: %.2f, "
+                "txn_lat_s (p50): %.2f, txn_lat_s (p90): %.2f, "
+                "query_lat_s (p50): %.2f, query_lat_s (p90): %.2f",
+                self._txn_latency_sketch.get_quantile_value(0.5),
+                self._txn_latency_sketch.get_quantile_value(0.9),
+                self._query_latency_sketch.get_quantile_value(0.5),
+                self._query_latency_sketch.get_quantile_value(0.9),
             )
             self._output_queue.put_nowait(metrics_report)
 
             period_start = time.time()
+            self._reset_latency_sketches()
 
             # NOTE: Once we add multiple front end servers, we should stagger
             # the sleep period.
@@ -599,6 +613,10 @@ class BradFrontEnd(BradInterface):
                 "Refreshing the blueprint before attempting to re-establish connections again."
             )
             await self._blueprint_mgr.load()
+
+    def _reset_latency_sketches(self) -> None:
+        self._query_latency_sketch = DDSketch()
+        self._txn_latency_sketch = DDSketch()
 
 
 async def _orchestrate_shutdown() -> None:
