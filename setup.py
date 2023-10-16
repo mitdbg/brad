@@ -39,6 +39,7 @@ INSTALL_REQUIRES = [
     "redshift_connector",
     "tabulate",
     "PyAthena",
+    "ddsketch",
 ]
 
 DEV_REQUIRES = [
