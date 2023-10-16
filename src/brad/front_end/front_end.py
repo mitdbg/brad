@@ -511,6 +511,7 @@ class BradFrontEnd(BradInterface):
                 "Sending metrics report: txn_completions_per_s: %.2f, "
                 "txn_lat_s (p50): %.2f, txn_lat_s (p90): %.2f, "
                 "query_lat_s (p50): %.2f, query_lat_s (p90): %.2f",
+                sampled_thpt,
                 self._txn_latency_sketch.get_quantile_value(0.5),
                 self._txn_latency_sketch.get_quantile_value(0.9),
                 self._query_latency_sketch.get_quantile_value(0.5),

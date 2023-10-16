@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import List, Tuple
 
-from brad.utils.streaming_metric import StreamingMetric
+from brad.utils.streaming_metric import StreamingNumericMetric
 
 
 def get_value_stream(start: datetime) -> List[Tuple[float, datetime]]:
@@ -14,14 +14,14 @@ def get_value_stream(start: datetime) -> List[Tuple[float, datetime]]:
 
 def test_empty():
     start = datetime(year=2023, month=7, day=19)
-    sm = StreamingMetric[float]()
+    sm = StreamingNumericMetric()
     val = sm.average_since(start)
     assert val == 0.0
 
 
 def test_multiple():
     start = datetime(year=2023, month=7, day=19)
-    sm = StreamingMetric[float]()
+    sm = StreamingNumericMetric()
     for val, ts in get_value_stream(start):
         sm.add_sample(val, ts)
 
@@ -40,7 +40,7 @@ def test_multiple():
 
 def test_all():
     start = datetime(year=2023, month=7, day=19)
-    sm = StreamingMetric[float]()
+    sm = StreamingNumericMetric()
     for val, ts in get_value_stream(start):
         sm.add_sample(val, ts)
 
@@ -59,7 +59,7 @@ def test_all():
 
 def test_window_average():
     start = datetime(year=2023, month=7, day=26)
-    sm = StreamingMetric[float]()
+    sm = StreamingNumericMetric()
     sm.add_sample(3.0, start)
     sm.add_sample(10.0, start + timedelta(seconds=10))
     sm.add_sample(20.0, start + timedelta(seconds=20))
@@ -126,7 +126,7 @@ def test_reverse_initial_iterator():
         (3.0, datetime.min.replace(tzinfo=timestamps[0].tzinfo), timestamps[0]),
     ]
 
-    sm = StreamingMetric[float]()
+    sm = StreamingNumericMetric()
     sm.add_sample(3.0, start)
     sm.add_sample(10.0, start + timedelta(seconds=10))
     sm.add_sample(20.0, start + timedelta(seconds=20))
@@ -138,13 +138,13 @@ def test_reverse_initial_iterator():
     assert expected == retrieved
 
     # Empty.
-    sm = StreamingMetric[float]()
+    sm = StreamingNumericMetric()
     # pylint: disable-next=protected-access
     retrieved = list(sm._reverse_interval_iterator())
     assert [] == retrieved
 
     # Single metric.
-    sm = StreamingMetric[float]()
+    sm = StreamingNumericMetric()
     sm.add_sample(3.0, start)
     # pylint: disable-next=protected-access
     retrieved = list(sm._reverse_interval_iterator())
@@ -158,7 +158,7 @@ def test_most_recent_in_window():
         start + timedelta(seconds=10),
         start + timedelta(seconds=20),
     ]
-    sm = StreamingMetric[float]()
+    sm = StreamingNumericMetric()
     sm.add_sample(3.0, timestamps[0])
     sm.add_sample(10.0, timestamps[1])
     sm.add_sample(20.0, timestamps[2])
