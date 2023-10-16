@@ -494,7 +494,15 @@ class BradFrontEnd(BradInterface):
     async def _report_metrics_to_daemon(self) -> None:
         try:
             period_start = time.time()
+
+            # We want to stagger the reports across the front ends to avoid
+            # overwhelming the daemon.
+            await asyncio.sleep(0.1 * self._fe_index)
+
             while True:
+                # Ideally we adjust for delays here too
+                await asyncio.sleep(self._config.front_end_metrics_reporting_period_seconds)
+
                 txn_value = self._transaction_end_counter.value()
                 period_end = time.time()
                 self._transaction_end_counter.reset()
@@ -516,11 +524,6 @@ class BradFrontEnd(BradInterface):
                 period_start = time.time()
                 self._reset_latency_sketches()
 
-                # NOTE: Once we add multiple front end servers, we should stagger
-                # the sleep period.
-                await asyncio.sleep(
-                    self._config.front_end_metrics_reporting_period_seconds
-                )
         except:  # pylint: disable=bare-except
             # This should be a fatal error.
             logger.exception("Unexpected error in the metrics reporting task.")
@@ -615,8 +618,9 @@ class BradFrontEnd(BradInterface):
             await self._blueprint_mgr.load()
 
     def _reset_latency_sketches(self) -> None:
-        self._query_latency_sketch = DDSketch()
-        self._txn_latency_sketch = DDSketch()
+        sketch_rel_accuracy = 0.01
+        self._query_latency_sketch = DDSketch(relative_accuracy=sketch_rel_accuracy)
+        self._txn_latency_sketch = DDSketch(relative_accuracy=sketch_rel_accuracy)
 
 
 async def _orchestrate_shutdown() -> None:
