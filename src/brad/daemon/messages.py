@@ -55,10 +55,10 @@ class MetricsReport(IpcMessage):
             txn_completions_per_s,
             serialized_txn_latency_sketch=DDSketchProto.to_proto(
                 txn_latency_sketch
-            ).SerializeAsString(),
+            ).SerializeToString(),
             serialized_query_latency_sketch=DDSketchProto.to_proto(
                 query_latency_sketch
-            ).SerializeAsString(),
+            ).SerializeToString(),
         )
 
     def __init__(

@@ -492,39 +492,38 @@ class BradFrontEnd(BradInterface):
                 logger.info("Received message from the daemon: %s", message)
 
     async def _report_metrics_to_daemon(self) -> None:
-        period_start = time.time()
-        while True:
-            txn_value = self._transaction_end_counter.value()
-            period_end = time.time()
-            self._transaction_end_counter.reset()
-            elapsed_time_s = period_end - period_start
-
-            # If the input queue is full, we just drop this message.
-            sampled_thpt = txn_value / elapsed_time_s
-            metrics_report = MetricsReport.from_data(
-                self._fe_index,
-                sampled_thpt,
-                self._txn_latency_sketch,
-                self._query_latency_sketch,
-            )
-            logger.debug(
-                "Sending metrics report: txn_completions_per_s: %.2f, "
-                "txn_lat_s (p50): %.2f, txn_lat_s (p90): %.2f, "
-                "query_lat_s (p50): %.2f, query_lat_s (p90): %.2f",
-                sampled_thpt,
-                self._txn_latency_sketch.get_quantile_value(0.5),
-                self._txn_latency_sketch.get_quantile_value(0.9),
-                self._query_latency_sketch.get_quantile_value(0.5),
-                self._query_latency_sketch.get_quantile_value(0.9),
-            )
-            self._output_queue.put_nowait(metrics_report)
-
+        try:
             period_start = time.time()
-            self._reset_latency_sketches()
+            while True:
+                txn_value = self._transaction_end_counter.value()
+                period_end = time.time()
+                self._transaction_end_counter.reset()
+                elapsed_time_s = period_end - period_start
 
-            # NOTE: Once we add multiple front end servers, we should stagger
-            # the sleep period.
-            await asyncio.sleep(self._config.front_end_metrics_reporting_period_seconds)
+                # If the input queue is full, we just drop this message.
+                sampled_thpt = txn_value / elapsed_time_s
+                metrics_report = MetricsReport.from_data(
+                    self._fe_index,
+                    sampled_thpt,
+                    self._txn_latency_sketch,
+                    self._query_latency_sketch,
+                )
+                logger.debug(
+                    "Sending metrics report: txn_completions_per_s: %.2f", sampled_thpt
+                )
+                self._output_queue.put_nowait(metrics_report)
+
+                period_start = time.time()
+                self._reset_latency_sketches()
+
+                # NOTE: Once we add multiple front end servers, we should stagger
+                # the sleep period.
+                await asyncio.sleep(
+                    self._config.front_end_metrics_reporting_period_seconds
+                )
+        except:  # pylint: disable=bare-except
+            # This should be a fatal error.
+            logger.exception("Unexpected error in the metrics reporting task.")
 
     def _clean_query_str(self, raw_sql: str) -> str:
         sql = raw_sql.strip()

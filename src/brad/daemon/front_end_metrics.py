@@ -35,7 +35,7 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             _MetricKey, List[StreamingNumericMetric]
         ] = {
             _MetricKey.TxnEndPerSecond: [
-                StreamingNumericMetric(sm_window_size)
+                StreamingNumericMetric(window_size=sm_window_size)
                 for _ in range(self._config.num_front_ends)
             ],
         }
@@ -43,11 +43,11 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             _MetricKey, List[StreamingMetric[DDSketch]]
         ] = {
             _MetricKey.QueryLatencySecond: [
-                StreamingMetric[DDSketch](sm_window_size)
+                StreamingMetric[DDSketch](window_size=sm_window_size)
                 for _ in range(self._config.num_front_ends)
             ],
             _MetricKey.TxnLatencySecond: [
-                StreamingMetric[DDSketch](sm_window_size)
+                StreamingMetric[DDSketch](window_size=sm_window_size)
                 for _ in range(self._config.num_front_ends)
             ],
         }
