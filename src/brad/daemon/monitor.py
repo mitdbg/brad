@@ -155,15 +155,20 @@ class Monitor:
         )
         logger.debug("Redshift metrics:\n%s", redshift)
 
-        aurora = self.aurora_writer_metrics().read_k_most_recent(
-            2,
-            [
-                "os.cpuUtilization.total.avg",
-                "os.loadAverageMinute.one.avg",
-                "BufferCacheHitRatio_Average",
-            ],
-        )
-        logger.debug("Aurora metrics:\n%s", aurora)
+        aurora_metric_names = [
+            "os.cpuUtilization.total.avg",
+            "os.loadAverageMinute.one.avg",
+            "BufferCacheHitRatio_Average",
+        ]
+        aurora = self.aurora_writer_metrics().read_k_most_recent(2, aurora_metric_names)
+        logger.debug("Aurora writer metrics:\n%s", aurora)
+
+        aurora_readers = self.aurora_reader_metrics()
+        if len(aurora_readers) > 0:
+            aurora_reader_metrics = aurora_readers[0].read_k_most_recent(
+                2, aurora_metric_names
+            )
+            logger.debug("Aurora reader (0) metrics:\n%s", aurora_reader_metrics)
 
     # The methods below are used to retrieve metrics.
 
