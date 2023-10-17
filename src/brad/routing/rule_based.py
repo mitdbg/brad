@@ -294,9 +294,9 @@ class RuleBased(Router):
             assert False
         else:
             # Todo(Ziniu): this can be stored in this class to reduce latency
-            raw_aurora_metrics = self._monitor.aurora_metrics(
-                reader_index=None
-            ).read_k_most_recent(k=1)
+            raw_aurora_metrics = (
+                self._monitor.aurora_writer_metrics().read_k_most_recent(k=1)
+            )
             raw_redshift_metrics = self._monitor.redshift_metrics().read_k_most_recent(
                 k=1
             )

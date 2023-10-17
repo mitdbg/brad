@@ -36,24 +36,45 @@ class AuroraCpuUtilization(Trigger):
             )
             return False
 
-        # TODO: May want to consider read replica metrics too.
-        past = self._monitor.aurora_metrics(reader_index=None).read_k_most_recent(
+        past = self._monitor.aurora_writer_metrics().read_k_most_recent(
             k=self._sustained_epochs, metric_ids=[_UTILIZATION_METRIC]
         )
         if self._impl.exceeds_thresholds(
-            past[_UTILIZATION_METRIC], "Aurora CPU utilization"
+            past[_UTILIZATION_METRIC], "Aurora writer CPU utilization"
         ):
             return True
+
+        for idx, reader_metrics in enumerate(self._monitor.aurora_reader_metrics()):
+            past = reader_metrics.read_k_most_recent(
+                k=self._sustained_epochs, metric_ids=[_UTILIZATION_METRIC]
+            )
+            if self._impl.exceeds_thresholds(
+                past[_UTILIZATION_METRIC], f"Aurora reader {idx} CPU utilization"
+            ):
+                return True
 
         if self._lookahead_epochs is None:
             return False
 
-        future = self._monitor.aurora_metrics(reader_index=None).read_k_upcoming(
+        future = self._monitor.aurora_writer_metrics().read_k_upcoming(
             k=self._lookahead_epochs, metric_ids=[_UTILIZATION_METRIC]
         )
-        return self._impl.exceeds_thresholds(
-            future[_UTILIZATION_METRIC], "forecasted Aurora CPU Utilization"
-        )
+        if self._impl.exceeds_thresholds(
+            future[_UTILIZATION_METRIC], "forecasted Aurora writer CPU Utilization"
+        ):
+            return True
+
+        for idx, reader_metrics in enumerate(self._monitor.aurora_reader_metrics()):
+            future = reader_metrics.read_k_upcoming(
+                k=self._lookahead_epochs, metric_ids=[_UTILIZATION_METRIC]
+            )
+            if self._impl.exceeds_thresholds(
+                future[_UTILIZATION_METRIC],
+                f"forecasted Aurora reader {idx} CPU utilization",
+            ):
+                return True
+
+        return False
 
 
 _UTILIZATION_METRIC = "os.cpuUtilization.total.avg"
