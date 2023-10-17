@@ -526,6 +526,14 @@ class BradFrontEnd(BradInterface):
                 )
                 self._output_queue.put_nowait(metrics_report)
 
+                txn_p90 = self._txn_latency_sketch.get_quantile_value(0.9)
+                if txn_p90 is not None:
+                    logger.debug("Transaction latency p90 (s): %.4f", txn_p90)
+
+                query_p90 = self._query_latency_sketch.get_quantile_value(0.9)
+                if query_p90 is not None:
+                    logger.debug("Query latency p90 (s): %.4f", query_p90)
+
                 period_start = time.time()
                 self._reset_latency_sketches()
 

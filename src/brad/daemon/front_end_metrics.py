@@ -3,6 +3,7 @@ import math
 import logging
 import pandas as pd
 import pytz
+import copy
 from typing import Dict, List, Optional
 from datetime import datetime, timezone
 from ddsketch import DDSketch
@@ -83,6 +84,11 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
         for offset in range(num_epochs):
             window_start = start_time + offset * self._epoch_length
             window_end = window_start + self._epoch_length
+
+            logger.debug(
+                "Loading front end metrics for %s -- %s", window_start, window_end
+            )
+
             for metric_key, values in self._numeric_front_end_metrics.items():
                 if metric_key == _MetricKey.TxnEndPerSecond:
                     total = sum(
@@ -102,14 +108,41 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
                     or metric_key == _MetricKey.TxnLatencySecond
                 ):
                     merged = None
-                    for sketches in fe_sketches:
-                        for sketch, _ in sketches.window_iterator(
+                    for fidx, sketches in enumerate(fe_sketches):
+                        num_matching = 0
+                        min_ts = None
+                        max_ts = None
+
+                        for sketch, ts in sketches.window_iterator(
                             window_start, window_end
                         ):
-                            if merged is None:
-                                merged = sketch
+                            # These stats are for debug logging.
+                            num_matching += 1
+                            if min_ts is not None:
+                                min_ts = min(min_ts, ts)
                             else:
-                                merged = merged.merge(sketch)
+                                min_ts = ts
+                            if max_ts is not None:
+                                max_ts = max(max_ts, ts)
+                            else:
+                                max_ts = ts
+
+                            if merged is not None:
+                                merged.merge(sketch)
+                            else:
+                                # DDSketch.merge() is an inplace method. We want
+                                # to avoid modifying the stored sketches so we
+                                # make a copy.
+                                merged = copy.deepcopy(sketch)
+
+                        logger.debug(
+                            "[%s] [%d] Matched %d sketches with range %s -- %s",
+                            metric_key,
+                            fidx,
+                            num_matching,
+                            min_ts,
+                            max_ts,
+                        )
 
                     if merged is None:
                         logger.warning(
