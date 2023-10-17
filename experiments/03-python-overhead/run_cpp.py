@@ -12,7 +12,7 @@ def main():
     parser.add_argument("--iters", type=int, default=50)
     args = parser.parse_args()
 
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     db = DBType.from_str(args.dbname)
     cstr = config.get_odbc_connection_string(db)
 

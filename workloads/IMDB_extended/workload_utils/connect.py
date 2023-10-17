@@ -28,7 +28,7 @@ def connect_to_db(
         assert args.schema_name is not None
         assert args.config_file is not None
 
-        config = ConfigFile(args.config_file)
+        config = ConfigFile.load(args.config_file)
         if directory is None:
             directory_to_use = Directory(config)
             asyncio.run(directory_to_use.refresh())

@@ -328,7 +328,7 @@ async def _truncate_aurora_tables(
 
 
 async def bulk_load_impl(args, manifest: Dict[str, Any]) -> None:
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     assets = AssetManager(config)
     blueprint_mgr = BlueprintManager(config, assets, manifest["schema_name"])
     await blueprint_mgr.load()

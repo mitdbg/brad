@@ -111,7 +111,7 @@ async def set_up_estimator(
 # This method is called by `brad.exec.admin.main`.
 def train_router(args):
     schema_name = extract_schema_name(args.schema_file)
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     policy = RoutingPolicy.from_str(args.policy)
 
     if args.std_dataset_path is not None:

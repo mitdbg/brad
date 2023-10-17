@@ -48,7 +48,7 @@ def register_admin_action(subparser) -> None:
 # This method is called by `brad.exec.admin.main`.
 def bootstrap_schema(args):
     # 1. Load the config.
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
 
     # 2. Load and validate the user-provided schema.
     user = UserProvidedBlueprint.load_from_yaml_file(args.schema_file)

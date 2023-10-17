@@ -98,7 +98,7 @@ def main():
             instance_identifier=args.instance_id
         )
     elif args.config_file is not None:
-        config = ConfigFile(args.config_file)
+        config = ConfigFile.load(args.config_file)
         directory = Directory(config)
         asyncio.run(directory.refresh())
         client = PerfInsightsClient(resource_id=directory.aurora_writer().resource_id())

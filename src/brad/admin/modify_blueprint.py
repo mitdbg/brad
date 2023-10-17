@@ -186,7 +186,7 @@ async def run_transition(
 # This method is called by `brad.exec.admin.main`.
 def modify_blueprint(args):
     # 1. Load the config.
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
 
     # 2. Load the existing blueprint.
     assets = AssetManager(config)

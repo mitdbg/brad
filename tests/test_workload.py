@@ -3,7 +3,7 @@ from brad.config.file import ConfigFile
 
 
 def test_read_from_s3():
-    config = ConfigFile("./config/config.yml")
+    config = ConfigFile.load("./config/config.yml")
 
     workload = workload_from_s3_logs(config, 3)
 

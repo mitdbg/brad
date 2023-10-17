@@ -244,7 +244,7 @@ def main():
     if args.brad_direct:
         assert args.config_file is not None
         assert args.schema_name is not None
-        config = ConfigFile(args.config_file)
+        config = ConfigFile.load(args.config_file)
         directory = Directory(config)
         asyncio.run(directory.refresh())
     else:

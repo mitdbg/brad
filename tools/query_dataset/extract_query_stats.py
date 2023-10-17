@@ -95,7 +95,7 @@ def main():
     parser.add_argument("--queries-file", type=str, required=True)
     args = parser.parse_args()
 
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     conn = asyncio.run(ConnectionFactory.connect_to_sidecar(args.schema_name, config))
     cursor = conn.cursor_sync()
 

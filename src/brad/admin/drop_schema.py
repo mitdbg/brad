@@ -33,7 +33,7 @@ def register_admin_action(subparser) -> None:
 # This method is called by `brad.exec.admin.main`.
 def drop_schema(args):
     # 1. Load the config and blueprint.
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
 
     # 2. Connect to the underlying engines without an explicit database.
     directory = Directory(config)
