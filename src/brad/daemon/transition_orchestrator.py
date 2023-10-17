@@ -272,6 +272,11 @@ class TransitionOrchestrator:
                     index=str(next_index).zfill(2),
                 )
                 logger.debug("Creating replica %s", new_replica_id)
+                # Ideally we wait for the replicas to finish creation in
+                # parallel. Because of how we make the boto3 client async,
+                # there's a possibility of having multiple API calls in flight
+                # at the same time, which boto3 does not support. To be safe, we
+                # just run these replica creations sequentially.
                 await self._rds.create_replica(
                     self._config.aurora_cluster_id,
                     new_replica_id,
