@@ -185,6 +185,7 @@ table_extract_bytes_per_row:
 
 
 ###
+### [Deprecated]
 ### Performance metrics scaling modifiers.
 ### (Used by neighborhood planning.)
 ###
@@ -206,11 +207,13 @@ aurora_resource_scaling:
   aurora_WRITER_ReadIOPS_Average: 1.0
   aurora_WRITER_WriteIOPS_Average: 1.0
 
+# [Deprecated]
 # Legacy Aurora scan cost estimator.
 # $0.000025 per MB scanned.
 aurora_usd_per_mb_scanned: 0.000025
 
 ###
+### [Deprecated]
 ### Query latency scaling modifiers (across provisionings).
 ###
 
@@ -222,6 +225,7 @@ redshift_gamma: 0.635405229
 
 
 ###
+### [Deprecated]
 ### Load factor scaling modifiers.
 ###
 
@@ -235,6 +239,7 @@ redshift_load_factor:
   cpu_to_load_alpha: 0.7861541
   min_scaling_cpu: 30
 
+# [Deprecated]
 aurora_load_factor:
   # Proportionality factor for cross-provisioning CPU changes.
   resource_alpha: 1.0
@@ -266,6 +271,11 @@ aurora_txns:
   # We used the number of CPUs as the "resource score".
   # Should be a bit more precise.
   prov_to_peak_cpu_denorm: 0.6800294117647058
+
+  imdb_extended_20g:
+    K_l: 0.874
+    b_p50: 0.00629548
+    b_p90: 0.00629548  # TODO: Adjust
 
 
 aurora_scaling:

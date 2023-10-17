@@ -15,6 +15,7 @@ class AuroraProvisioningScore:
     def __init__(
         self,
         scaled_run_times: npt.NDArray,
+        scaled_txn_lats: npt.NDArray,
         overall_system_load: float,
         overall_cpu_denorm: float,
         pred_txn_peak_cpu_denorm: float,
@@ -27,6 +28,7 @@ class AuroraProvisioningScore:
         self.overall_cpu_denorm = overall_cpu_denorm
         self.pred_txn_peak_cpu_denorm = pred_txn_peak_cpu_denorm
         self.for_next_prov = for_next_prov
+        self.scaled_txn_lats = scaled_txn_lats
 
     @classmethod
     def compute(
@@ -50,9 +52,8 @@ class AuroraProvisioningScore:
         #   default?
         overall_forecasted_load = ctx.metrics.aurora_load_minute_avg
         overall_forecasted_cpu_util_pct = ctx.metrics.aurora_cpu_avg
-        overall_cpu_util_denorm = (
-            overall_forecasted_cpu_util_pct / 100
-        ) * aurora_num_cpus(curr_prov)
+        overall_cpu_util = overall_forecasted_cpu_util_pct / 100
+        overall_cpu_util_denorm = overall_cpu_util * aurora_num_cpus(curr_prov)
 
         # 1. Compute the transaction portion of load.
         client_txns_per_s = ctx.metrics.txn_completions_per_s
@@ -105,8 +106,8 @@ class AuroraProvisioningScore:
         adjusted_overall_load = analytics_load + pred_txn_load
         adjusted_overall_cpu_denorm = analytics_cpu_denorm + pred_txn_cpu_denorm
 
-        # 4. Scale query execution times based on load and provisioning.
-        scaled_rt = cls._scale_load_resources(
+        # 4. Predict query execution times based on load and provisioning.
+        scaled_rt = cls._query_latency_load_resources(
             base_query_run_times, next_prov, adjusted_overall_load, ctx
         )
 
@@ -116,8 +117,14 @@ class AuroraProvisioningScore:
             * ctx.planner_config.aurora_prov_to_peak_cpu_denorm()
         )
 
+        # 6. Compute the transactional latencies.
+        scaled_txn_lats = cls._scale_txn_latency(
+            overall_cpu_util, curr_prov, next_prov, ctx
+        )
+
         return cls(
             scaled_rt,
+            scaled_txn_lats,
             adjusted_overall_load,
             adjusted_overall_cpu_denorm,
             peak_cpu_denorm,
@@ -132,12 +139,13 @@ class AuroraProvisioningScore:
         )
 
     @staticmethod
-    def _scale_load_resources(
+    def _query_latency_load_resources(
         base_predicted_latency: npt.NDArray,
         to_prov: Provisioning,
         overall_load: float,
         ctx: ScoringContext,
     ) -> npt.NDArray:
+        # This method is used to compute the predicted query latencies.
         resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(to_prov)
         basis = np.array(
             [overall_load * resource_factor, overall_load, resource_factor, 1.0]
@@ -152,9 +160,45 @@ class AuroraProvisioningScore:
 
         return np.dot(lat_vals, coefs)
 
+    @staticmethod
+    def _scale_txn_latency(
+        curr_cpu_util: float,
+        curr_prov: Provisioning,
+        to_prov: Provisioning,
+        ctx: ScoringContext,
+    ) -> npt.NDArray:
+        observed_lats = np.array([ctx.metrics.txn_lat_s_p50, ctx.metrics.txn_lat_s_p90])
+
+        # Q(u, r_c, r_d) = a (K_l K_r) / (K_l r_d - u r_c) + b
+        # We compute (a (K_l K_r)) based on the current observations.
+        # Then use this value to predict the run time based on the load and resource differences.
+        model = ctx.planner_config.aurora_txn_coefs(ctx.schema_name)
+        K_l = model["K_l"]
+        b = np.array([model["b_p50"], model["b_p90"]])
+
+        curr_num_cpus = aurora_num_cpus(curr_prov)
+        coef_base = 1.0 / ((K_l - curr_cpu_util) * curr_num_cpus)
+        base_wo_b = observed_lats - b
+        eps = b * 0.01
+        base_wo_b = np.maximum(base_wo_b, eps)  # Used to avoid degenerate cases.
+        comp_const = base_wo_b / coef_base
+
+        dest_num_cpus = aurora_num_cpus(to_prov)
+        dest_cpu_util = curr_cpu_util * curr_num_cpus / dest_num_cpus
+        dest_cpu_util = min(dest_cpu_util, K_l - 0.01)  # To avoid degenerate cases.
+        coef_dest = 1.0 / ((K_l - dest_cpu_util) * dest_num_cpus)
+        pred_dest = b + (comp_const * coef_dest)
+
+        # If the observed latencies were not defined, we should not make a prediction.
+        pred_dest[observed_lats == 0.0] = np.nan
+        pred_dest[~np.isfinite(observed_lats)] = np.nan
+
+        return pred_dest
+
     def copy(self) -> "AuroraProvisioningScore":
         return AuroraProvisioningScore(
             self.scaled_run_times,
+            self.scaled_txn_lats,
             self.overall_system_load,
             self.overall_cpu_denorm,
             self.pred_txn_peak_cpu_denorm,

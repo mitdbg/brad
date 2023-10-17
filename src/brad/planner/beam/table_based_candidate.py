@@ -167,6 +167,10 @@ class BlueprintCandidate(ComparableBlueprint):
             values[
                 "pred_txn_peak_cpu_denorm"
             ] = self.aurora_score.pred_txn_peak_cpu_denorm
+            (
+                values["pred_txn_lat_s_p50"],
+                values["pred_txn_lat_s_p90"],
+            ) = self.aurora_score.scaled_txn_lats
             values.update(self.aurora_score.debug_values)
 
         if self.redshift_score is not None:

@@ -21,6 +21,8 @@ Metrics = namedtuple(
         "buffer_hit_pct_avg",
         "aurora_load_minute_avg",
         "txn_completions_per_s",
+        "txn_lat_s_p50",
+        "txn_lat_s_p90",
     ],
 )
 
@@ -101,7 +103,7 @@ class MetricsFromMonitor(MetricsProvider):
         if redshift.empty and aurora.empty and front_end.empty:
             logger.warning("All metrics are empty.")
             now = datetime.now().astimezone(pytz.utc)
-            return (Metrics(1.0, 1.0, 100.0, 1.0, 1.0), now)
+            return (Metrics(1.0, 1.0, 100.0, 1.0, 1.0, 0.0, 0.0), now)
 
         assert not front_end.empty, "Front end metrics are empty."
 
@@ -140,6 +142,22 @@ class MetricsFromMonitor(MetricsProvider):
             default_value=0.0,
             name="txn_per_s",
         )
+        txn_lat_s_p50 = self._extract_most_recent_possibly_missing(
+            front_end.loc[
+                front_end.index <= most_recent_common,
+                FrontEndMetric.TxnLatencySecondP50.value,
+            ],
+            default_value=0.0,
+            name="txn_lat_s_p50",
+        )
+        txn_lat_s_p90 = self._extract_most_recent_possibly_missing(
+            front_end.loc[
+                front_end.index <= most_recent_common,
+                FrontEndMetric.TxnLatencySecondP90.value,
+            ],
+            default_value=0.0,
+            name="txn_lat_s_p90",
+        )
 
         aurora_rel = aurora.loc[aurora.index <= most_recent_common]
         aurora_cpu = self._extract_most_recent_possibly_missing(
@@ -177,6 +195,8 @@ class MetricsFromMonitor(MetricsProvider):
                 buffer_hit_pct_avg=hit_rate_pct,
                 aurora_load_minute_avg=load_minute,
                 txn_completions_per_s=txn_per_s,
+                txn_lat_s_p50=txn_lat_s_p50,
+                txn_lat_s_p90=txn_lat_s_p90,
             ),
             most_recent_common.to_pydatetime(),
         )
@@ -216,4 +236,6 @@ _REDSHIFT_METRICS = [
 
 _FRONT_END_METRICS = [
     FrontEndMetric.TxnEndPerSecond.value,
+    FrontEndMetric.TxnLatencySecondP50.value,
+    FrontEndMetric.TxnLatencySecondP90.value,
 ]
