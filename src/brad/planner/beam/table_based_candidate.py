@@ -524,17 +524,8 @@ class BlueprintCandidate(ComparableBlueprint):
             # Already ran.
             return
 
-        if self.aurora_score is not None:
-            # TODO: Check whether there are transactions or not.
-            if (
-                self.aurora_score.overall_cpu_denorm
-                >= self.aurora_score.pred_txn_peak_cpu_denorm
-            ):
-                self.feasibility = BlueprintFeasibility.Infeasible
-            return
-
-        # Might need to check for Redshift load feasibility.
-
+        # We used to check for transactional load here. Now it's scored as part
+        # of performance.
         self.feasibility = BlueprintFeasibility.Feasible
 
     def update_aurora_provisioning(self, prov: Provisioning) -> None:
