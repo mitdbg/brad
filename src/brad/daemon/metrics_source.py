@@ -172,14 +172,9 @@ class MetricsSourceWithForecasting:
         values = self._metrics_values()
         if new_metrics.empty:
             return values
+        if values.empty:
+            return new_metrics
 
-        return (
-            pd.concat(
-                [
-                    values,
-                    new_metrics.loc[new_metrics.index > values.index[-1]],
-                ]
-            )
-            if not values.empty
-            else pd.concat([values, new_metrics])
+        return pd.concat(
+            [values, new_metrics.loc[new_metrics.index > values.index[-1]]]
         )
