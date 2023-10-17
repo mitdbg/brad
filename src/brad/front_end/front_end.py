@@ -529,9 +529,10 @@ class BradFrontEnd(BradInterface):
                 period_start = time.time()
                 self._reset_latency_sketches()
 
-        except:  # pylint: disable=bare-except
-            # This should be a fatal error.
-            logger.exception("Unexpected error in the metrics reporting task.")
+        except Exception as ex:
+            if not isinstance(ex, asyncio.CancelledError):
+                # This should be a fatal error.
+                logger.exception("Unexpected error in the metrics reporting task.")
 
     def _clean_query_str(self, raw_sql: str) -> str:
         sql = raw_sql.strip()
