@@ -40,7 +40,7 @@ def register_admin_action(subparser) -> None:
 def run_on(args):
     # 1. Load the config and blueprint.
     engine = Engine.from_str(args.engine)
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     assets = AssetManager(config)
     blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
     blueprint_mgr.load_sync()

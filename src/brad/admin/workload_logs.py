@@ -59,7 +59,7 @@ def workload_logs(args) -> None:
 
 
 def inspect_logs(args) -> None:
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
 
     timestamp_format = "%Y-%m-%d %H:%M:%S"
     window_start = datetime.strptime(args.window_start, timestamp_format)

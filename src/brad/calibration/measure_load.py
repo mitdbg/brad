@@ -142,7 +142,7 @@ def main() -> None:
         return
 
     schema_name = os.environ[args.schema_name_var]
-    config = ConfigFile(os.environ[args.config_file_var])
+    config = ConfigFile.load(os.environ[args.config_file_var])
     queries = load_queries(args.query_file)
 
     directory = Directory(config)

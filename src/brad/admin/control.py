@@ -40,7 +40,7 @@ def register_admin_action(subparser) -> None:
 
 async def control_impl(args) -> None:
     # 1. Load the config, blueprint, and provisioning.
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     assets = AssetManager(config)
 
     blueprint_mgr = BlueprintManager(config, assets, args.schema_name)

@@ -35,7 +35,7 @@ def main():
 
     engine = Engine.from_str(args.engine)
     queries = load_queries(args.queries_file)
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     conn = asyncio.run(ConnectionFactory.connect_to_sidecar(args.schema_name, config))
 
     model = TrainedModel.load(

@@ -71,7 +71,7 @@ def main(args):
     # descriptors!).
     mp.set_start_method("spawn")
 
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     temp_config = (
         TempConfig.load_from_file(args.temp_config_file)
         if args.temp_config_file is not None

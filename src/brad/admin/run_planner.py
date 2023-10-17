@@ -127,7 +127,7 @@ def run_planner(args) -> None:
     independently of the rest of BRAD.
     """
     # 1. Load the config.
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
 
     # 2. Load the planner config.
     planner_config = PlannerConfig(args.planner_config_file)

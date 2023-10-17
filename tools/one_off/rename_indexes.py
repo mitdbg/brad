@@ -13,7 +13,7 @@ def main():
     args = parser.parse_args()
 
     bp = UserProvidedBlueprint.load_from_yaml_file(args.schema_file)
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     ecs = EngineConnections.connect_sync(
         config, bp.schema_name, autocommit=False, specific_engines={Engine.Aurora}
     )

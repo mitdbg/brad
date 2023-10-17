@@ -30,7 +30,7 @@ def delete_s3_object(client, bucket: str, key: str) -> None:
 
 
 async def main_impl(args) -> None:
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     assets = AssetManager(config)
     mgr = BlueprintManager(config, assets, args.schema_name)
     await mgr.load()

@@ -56,7 +56,7 @@ def runner(
     else:
         out_dir = pathlib.Path(".")
 
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     directory = Directory(config)
     asyncio.run(directory.refresh())
     ec = EngineConnections.connect_sync(
@@ -120,7 +120,7 @@ def runner(
 
 
 def run_warmup(args, query_bank: List[str], queries: List[int], engine: Engine):
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     directory = Directory(config)
     asyncio.run(directory.refresh())
     ec = EngineConnections.connect_sync(
