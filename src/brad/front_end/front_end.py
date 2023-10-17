@@ -304,7 +304,7 @@ class BradFrontEnd(BradInterface):
             # 3. Actually execute the query.
             try:
                 if transactional_query:
-                    connection = session.engines.get_reader_connection(engine_to_use)
+                    connection = session.engines.get_connection(engine_to_use)
                     cursor = connection.cursor_sync()
                     start = datetime.now(tz=timezone.utc)
                     # Using execute_sync() is lower overhead than the async
@@ -312,7 +312,7 @@ class BradFrontEnd(BradInterface):
                     # async interface.
                     cursor.execute_sync(query_rep.raw_query)
                 else:
-                    connection = session.engines.get_connection(engine_to_use)
+                    connection = session.engines.get_reader_connection(engine_to_use)
                     cursor = connection.cursor_sync()
                     start = datetime.now(tz=timezone.utc)
                     await cursor.execute(query_rep.raw_query)
