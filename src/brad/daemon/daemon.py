@@ -34,7 +34,7 @@ from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.front_end.start_front_end import start_front_end
 from brad.planner.abstract import BlueprintPlanner
-from brad.planner.compare.cost import best_cost_under_p99_latency
+from brad.planner.compare.cost import best_cost_under_perf_ceilings
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import MetricsFromMonitor
@@ -172,8 +172,9 @@ class BradDaemon:
                     aurora_accessed_pages_path=self._temp_config.aurora_data_access_path(),
                     athena_accessed_bytes_path=self._temp_config.athena_data_access_path(),
                 )
-            comparator = best_cost_under_p99_latency(
-                max_latency_ceiling_s=self._temp_config.latency_ceiling_s()
+            comparator = best_cost_under_perf_ceilings(
+                max_query_latency_s=self._temp_config.latency_ceiling_s(),
+                max_txn_p50_latency_s=self._temp_config.txn_latency_p50_ceiling_s(),
             )
         else:
             logger.warning(
@@ -181,7 +182,9 @@ class BradDaemon:
             )
             latency_scorer = _NoopAnalyticsScorer()
             data_access_provider = _NoopDataAccessProvider()
-            comparator = best_cost_under_p99_latency(max_latency_ceiling_s=10)
+            comparator = best_cost_under_perf_ceilings(
+                max_query_latency_s=10, max_txn_p50_latency_s=0.020
+            )
 
         self._planner = BlueprintPlannerFactory.create(
             planner_config=self._planner_config,

@@ -628,6 +628,10 @@ class BlueprintCandidate(ComparableBlueprint):
         relevant.append(np.array(self.base_query_latencies[Engine.Athena]))
         return np.concatenate(relevant)
 
+    def get_predicted_transactional_latencies(self) -> npt.NDArray:
+        assert self.aurora_score is not None
+        return self.aurora_score.scaled_txn_lats
+
     def get_operational_monetary_cost(self) -> float:
         return self.storage_cost + self.provisioning_cost + self.workload_scan_cost
 

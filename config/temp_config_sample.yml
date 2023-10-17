@@ -1,7 +1,12 @@
 latency_ceiling_s: 30.0
+txn_latency_p50_ceiling_s: 0.020
+txn_latency_p90_ceiling_s: 0.030
 
 # Use this instead of the individual paths below.
 std_dataset_path: workloads/IMDB_20GB/regular_test/
+
+# The configurations below are deprecated. Do not use them in new experiment
+# code (they don't need to be included either).
 
 aurora_preds_path: workloads/IMDB/OLAP_queries_new/pred_aurora_300.npy
 redshift_preds_path: workloads/IMDB/OLAP_queries_new/pred_redshift_300.npy
