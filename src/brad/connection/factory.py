@@ -1,6 +1,6 @@
 from typing import Dict, Optional
 
-from .connection import Connection
+from .connection import Connection, ConnectionFailed
 from .odbc_connection import OdbcConnection
 from .pyathena_connection import PyAthenaConnection
 from .redshift_connection import RedshiftConnection
@@ -39,7 +39,13 @@ class ConnectionFactory:
                 address, port = directory.aurora_writer_endpoint()
             else:
                 # N.B. The caller needs to specify a valid replica index.
-                instance = directory.aurora_readers()[aurora_read_replica]
+                aurora_readers = directory.aurora_readers()
+                if aurora_read_replica >= len(aurora_readers):
+                    raise ConnectionFailed(
+                        f"Requested replica index {aurora_read_replica}, "
+                        f"but there are only {len(aurora_readers)} replicas."
+                    )
+                instance = aurora_readers[aurora_read_replica]
                 address, port = instance.endpoint()
             cstr = cls._pg_aurora_odbc_connection_string(
                 address, port, connection_details, schema_name
