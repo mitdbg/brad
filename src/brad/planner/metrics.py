@@ -63,7 +63,7 @@ class MetricsFromMonitor(MetricsProvider):
         redshift_on = blueprint.redshift_provisioning().num_nodes() > 0
 
         redshift_source = self._monitor.redshift_metrics()
-        aurora_source = self._monitor.aurora_metrics(reader_index=None)
+        aurora_source = self._monitor.aurora_writer_metrics()
         front_end_source = self._monitor.front_end_metrics()
 
         # The `max()` of `real_time_delay()` indicates the number of previous

@@ -1,6 +1,7 @@
 import logging
 import math
 import pytz
+import pandas as pd
 from datetime import datetime, timedelta
 from typing import List
 
@@ -141,10 +142,23 @@ class VariableCosts(Trigger):
             self._planner_config.planning_window() / self._config.epoch_length
         )
         # TODO: If there are read replicas, we should use the hit rate from them instead.
-        metrics = self._monitor.aurora_metrics(reader_index=None).read_k_most_recent(
-            k=lookback_epochs, metric_ids=[_HIT_RATE_METRIC]
-        )
-        hit_rate_avg = metrics[_HIT_RATE_METRIC].mean() / 100.0
+        aurora_reader_metrics = self._monitor.aurora_reader_metrics()
+        if len(aurora_reader_metrics) > 0:
+            reader_hit_rates = []
+            for reader_metrics in aurora_reader_metrics:
+                reader_hit_rates.append(
+                    reader_metrics.read_k_most_recent(
+                        k=lookback_epochs, metric_ids=[_HIT_RATE_METRIC]
+                    )
+                )
+            all_metrics = pd.concat(reader_hit_rates)
+            hit_rate_avg = all_metrics[_HIT_RATE_METRIC].mean() / 100.0
+        else:
+            aurora_writer_metrics = self._monitor.aurora_writer_metrics()
+            metrics = aurora_writer_metrics.read_k_most_recent(
+                k=lookback_epochs, metric_ids=[_HIT_RATE_METRIC]
+            )
+            hit_rate_avg = metrics[_HIT_RATE_METRIC].mean() / 100.0
 
         aurora_scan_cost = compute_aurora_scan_cost(
             aurora_accessed_pages, hit_rate_avg, self._planner_config

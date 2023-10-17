@@ -58,7 +58,7 @@ class PhysicalProvisioning:
     # Can override certain metrics by providing Dict[metric_id -> value]
     def should_trigger_replan(self, overrides=None) -> bool:
         redshift = self._monitor.redshift_metrics().read_k_most_recent(1)
-        aurora = self._monitor.aurora_metrics(reader_index=None).read_k_most_recent(1)
+        aurora = self._monitor.aurora_writer_metrics().read_k_most_recent(1)
         print("TRIGGER REPLAN")
         print("REDSHIFT")
         print(redshift)

@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from itertools import chain
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
@@ -155,26 +155,29 @@ class Monitor:
         )
         logger.debug("Redshift metrics:\n%s", redshift)
 
-        aurora = self.aurora_metrics(reader_index=None).read_k_most_recent(
-            2,
-            [
-                "os.cpuUtilization.total.avg",
-                "os.loadAverageMinute.one.avg",
-                "BufferCacheHitRatio_Average",
-            ],
-        )
-        logger.debug("Aurora metrics:\n%s", aurora)
+        aurora_metric_names = [
+            "os.cpuUtilization.total.avg",
+            "os.loadAverageMinute.one.avg",
+            "BufferCacheHitRatio_Average",
+        ]
+        aurora = self.aurora_writer_metrics().read_k_most_recent(2, aurora_metric_names)
+        logger.debug("Aurora writer metrics:\n%s", aurora)
+
+        aurora_readers = self.aurora_reader_metrics()
+        if len(aurora_readers) > 0:
+            aurora_reader_metrics = aurora_readers[0].read_k_most_recent(
+                2, aurora_metric_names
+            )
+            logger.debug("Aurora reader (0) metrics:\n%s", aurora_reader_metrics)
 
     # The methods below are used to retrieve metrics.
 
-    def aurora_metrics(
-        self, reader_index: Optional[int]
-    ) -> MetricsSourceWithForecasting:
-        if reader_index is None:
-            assert self._aurora_writer_metrics is not None
-            return self._aurora_writer_metrics
-        else:
-            return self._aurora_reader_metrics[reader_index]
+    def aurora_writer_metrics(self) -> MetricsSourceWithForecasting:
+        assert self._aurora_writer_metrics is not None
+        return self._aurora_writer_metrics
+
+    def aurora_reader_metrics(self) -> Tuple[MetricsSourceWithForecasting, ...]:
+        return tuple(self._aurora_reader_metrics)
 
     def redshift_metrics(self) -> MetricsSourceWithForecasting:
         assert self._redshift_metrics is not None
