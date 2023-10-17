@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def start_front_end(
     fe_index: int,
-    config_path: str,
+    config: ConfigFile,
     schema_name: str,
     path_to_planner_config: str,
     debug_mode: bool,
@@ -23,7 +23,6 @@ def start_front_end(
     Schedule this method to run in a child process to launch a BRAD front
     end server.
     """
-    config = ConfigFile(config_path)
     set_up_logging(filename=config.front_end_log_file(fe_index), debug_mode=debug_mode)
 
     event_loop = asyncio.new_event_loop()

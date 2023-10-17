@@ -217,7 +217,7 @@ class BradDaemon:
                 target=start_front_end,
                 args=(
                     fe_index,
-                    self._config.raw_path,
+                    self._config,
                     self._schema_name,
                     self._path_to_planner_config,
                     self._debug_mode,
