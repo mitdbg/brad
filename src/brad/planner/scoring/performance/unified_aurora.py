@@ -50,8 +50,8 @@ class AuroraProvisioningScore:
         # - We may need a read replica routing policy. For example, if one
         #   exists, do *all* analytical queries go to the read replica(s) by
         #   default?
-        overall_forecasted_load = ctx.metrics.aurora_load_minute_avg
-        overall_forecasted_cpu_util_pct = ctx.metrics.aurora_cpu_avg
+        overall_forecasted_load = ctx.metrics.aurora_writer_load_minute_avg
+        overall_forecasted_cpu_util_pct = ctx.metrics.aurora_writer_cpu_avg
         overall_cpu_util = overall_forecasted_cpu_util_pct / 100
         overall_cpu_util_denorm = overall_cpu_util * aurora_num_cpus(curr_prov)
 
