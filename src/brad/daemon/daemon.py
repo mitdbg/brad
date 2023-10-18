@@ -5,7 +5,7 @@ import pytz
 import os
 import multiprocessing as mp
 import numpy as np
-from typing import Optional, List
+from typing import Optional, List, Set
 from datetime import datetime
 
 from brad.asset_manager import AssetManager
@@ -102,6 +102,10 @@ class BradDaemon:
         self._transition_task: Optional[asyncio.Task[None]] = None
 
         self._system_event_logger = SystemEventLogger.create_if_requested(self._config)
+
+        # This is used to hold references to internal command tasks we create.
+        # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
+        self._internal_command_tasks: Set[asyncio.Task] = set()
 
     async def run_forever(self) -> None:
         """
@@ -295,9 +299,11 @@ class BradDaemon:
                 self._monitor.handle_metric_report(message)
 
             elif isinstance(message, InternalCommandRequest):
-                asyncio.create_task(
+                task = asyncio.create_task(
                     self._run_internal_command_request_response(message)
                 )
+                self._internal_command_tasks.add(task)
+                task.add_done_callback(self._internal_command_tasks.discard)
 
             elif isinstance(message, NewBlueprintAck):
                 if self._transition_orchestrator is None:
@@ -427,12 +433,22 @@ class BradDaemon:
     async def _run_internal_command_request_response(
         self, msg: InternalCommandRequest
     ) -> None:
-        results = await self._handle_internal_command(msg.request)
-        response = InternalCommandResponse(msg.fe_index, results)
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None, self._front_ends[msg.fe_index].input_queue.put, response
-        )
+        try:
+            results = await self._handle_internal_command(msg.request)
+            response = InternalCommandResponse(msg.fe_index, results)
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                None, self._front_ends[msg.fe_index].input_queue.put, response
+            )
+        except Exception as ex:
+            logger.exception(
+                "Unexpected exception when handling internal command: %s", msg.request
+            )
+            await loop.run_in_executor(
+                None,
+                self._front_ends[msg.fe_index].input_queue.put,
+                InternalCommandResponse(msg.fe_index, [(str(ex),)]),
+            )
 
     async def _handle_internal_command(self, command: str) -> RowList:
         if command == "BRAD_SYNC":
