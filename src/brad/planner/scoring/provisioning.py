@@ -30,7 +30,7 @@ def _load_instance_specs(file_name: str) -> Dict[str, ProvisioningResources]:
             config["usd_per_hour"],
             config["vcpus"],
             config["memory_mib"],
-            config["io_opt_usd_per_hour"] if "io_opt_used_per_hour" in config else None,
+            config["io_opt_usd_per_hour"] if "io_opt_usd_per_hour" in config else None,
         )
         for config in raw_json
     }
