@@ -10,7 +10,10 @@ from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.query_based_candidate import BlueprintCandidate
 from brad.planner.beam.triggers import get_beam_triggers
 from brad.planner.router_provider import RouterProvider
-from brad.planner.debug_logger import BlueprintPlanningDebugLogger
+from brad.planner.debug_logger import (
+    BlueprintPlanningDebugLogger,
+    BlueprintPickleDebugLogger,
+)
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
@@ -172,6 +175,14 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                             # worse score compared to `next_top_k[0]` (the
                             # worst scoring blueprint candidate in the
                             # top-k).
+                            if next_candidate.redshift_provisioning.num_nodes() == 0:
+                                logger.info("Eliminating BP with turned off Redshift.")
+                                logger.info(
+                                    "Score: %s",
+                                    json.dumps(
+                                        next_candidate.to_debug_values(), indent=2
+                                    ),
+                                )
                             continue
 
                         while (
@@ -187,7 +198,13 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                             heapq.heappush(next_top_k, current_worst)
 
                         if next_candidate.is_better_than(next_top_k[0]):
-                            heapq.heappushpop(next_top_k, next_candidate)
+                            removed = heapq.heappushpop(next_top_k, next_candidate)
+                            if removed.redshift_provisioning.num_nodes() == 0:
+                                logger.info("Eliminating BP with turned off Redshift.")
+                                logger.info(
+                                    "Score: %s",
+                                    json.dumps(removed.to_debug_values(), indent=2),
+                                )
 
             current_top_k = next_top_k
 
@@ -273,7 +290,15 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                         if len(final_top_k) == beam_size:
                             heapq.heapify(final_top_k)
                     elif new_candidate.is_better_than(final_top_k[0]):
-                        heapq.heappushpop(final_top_k, new_candidate)
+                        removed = heapq.heappushpop(final_top_k, new_candidate)
+                        if removed.redshift_provisioning.num_nodes() == 0:
+                            logger.info(
+                                "Eliminating BP with turned off Redshift (2nd step)."
+                            )
+                            logger.info(
+                                "Score: %s",
+                                json.dumps(removed.to_debug_values(), indent=2),
+                            )
 
         if len(final_top_k) == 0:
             logger.error(
@@ -284,6 +309,11 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         # The best blueprint will be ordered first (we have a negated
         # `__lt__` method to work with `heapq` to create a max heap).
         final_top_k.sort(reverse=True)
+
+        # For later interactive inspection in Python.
+        BlueprintPickleDebugLogger.log_candidates_if_requested(
+            self._config, "final_query_based_blueprints", final_top_k
+        )
 
         # Log the final top k for debugging purposes, if needed.
         final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
