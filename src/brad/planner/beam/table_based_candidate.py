@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import numpy.typing as npt
 from datetime import timedelta
@@ -30,6 +31,8 @@ from brad.planner.scoring.table_placement import (
     compute_single_table_movement_time_and_cost,
 )
 from brad.routing.router import Router
+
+logger = logging.getLogger(__name__)
 
 
 class BlueprintCandidate(ComparableBlueprint):
@@ -611,3 +614,14 @@ class BlueprintCandidate(ComparableBlueprint):
             return self._memoized[key]
         except KeyError:
             return None
+
+    def __getstate__(self) -> Dict[Any, Any]:
+        # This is used for debug logging purposes.
+        copied = self.__dict__.copy()
+        # This is not serializable, nor do we need it to be (for debug purposes).
+        copied["_comparator"] = None
+        return copied
+
+    def __setstate__(self, d: Dict[Any, Any]) -> None:
+        self.__dict__ = d
+        logger.info("Note: Deserializing table-based blueprint candidate.")

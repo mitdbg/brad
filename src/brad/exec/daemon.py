@@ -68,7 +68,8 @@ def handle_exception(event_loop, context):
 def drop_into_pdb():
     import pdb
 
-    pdb.set_trace()
+    # N.B. Leaving this in is intentional.
+    pdb.set_trace()  # pylint: disable=forgotten-debug-statement
 
 
 def main(args):
