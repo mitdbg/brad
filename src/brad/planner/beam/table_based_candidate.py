@@ -237,12 +237,22 @@ class BlueprintCandidate(ComparableBlueprint):
 
         self.workload_scan_cost = compute_athena_scan_cost(
             self.athena_scanned_bytes, ctx.planner_config
-        ) + compute_aurora_scan_cost(
-            self.aurora_accessed_pages,
-            # TODO: Consider read replicas.
-            buffer_pool_hit_rate=ctx.metrics.aurora_writer_buffer_hit_pct_avg / 100,
-            planner_config=ctx.planner_config,
         )
+
+        if not ctx.planner_config.use_io_optimized_aurora():
+            has_read_replicas = (
+                ctx.current_blueprint.aurora_provisioning().num_nodes() > 1
+            )
+            if has_read_replicas:
+                hit_rate = ctx.metrics.aurora_reader_buffer_hit_pct_avg / 100.0
+            else:
+                hit_rate = ctx.metrics.aurora_writer_buffer_hit_pct_avg / 100.0
+
+            self.workload_scan_cost += compute_aurora_scan_cost(
+                self.aurora_accessed_pages,
+                buffer_pool_hit_rate=hit_rate,
+                planner_config=ctx.planner_config,
+            )
 
         self.queries.extend(query_cluster)
 
@@ -347,7 +357,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
         # Provisioning costs.
         aurora_prov_cost = compute_aurora_hourly_operational_cost(
-            self.aurora_provisioning
+            self.aurora_provisioning, ctx
         )
         redshift_prov_cost = compute_redshift_hourly_operational_cost(
             self.redshift_provisioning
