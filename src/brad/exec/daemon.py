@@ -65,6 +65,11 @@ def handle_exception(event_loop, context):
     event_loop.create_task(shutdown_daemon(event_loop))
 
 
+def drop_into_pdb(_sig, frame):
+    import pdb
+    pdb.Pdb().set_trace(frame)
+
+
 def main(args):
     # On Unix platforms, the default way to start a process is by forking, which
     # is not ideal (we do not want to duplicate this process' file
@@ -91,6 +96,8 @@ def main(args):
         event_loop.add_signal_handler(
             sig, lambda: asyncio.create_task(shutdown_daemon(event_loop))
         )
+    # This is useful for debugging purposes.
+    event_loop.add_signal_handler(signal.SIGUSR1, drop_into_pdb)
     event_loop.set_exception_handler(handle_exception)
 
     try:

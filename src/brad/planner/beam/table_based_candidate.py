@@ -162,23 +162,10 @@ class BlueprintCandidate(ComparableBlueprint):
         values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
 
         if self.aurora_score is not None:
-            values["aurora_analytics_load"] = self.aurora_score.analytics_affected_load
-            values[
-                "aurora_analytics_cpu_denorm"
-            ] = self.aurora_score.analytics_affected_cpu_denorm
-            values["aurora_txn_cpu_denorm"] = self.aurora_score.txn_affected_cpu_denorm
-            values[
-                "pred_txn_peak_cpu_denorm"
-            ] = self.aurora_score.pred_txn_peak_cpu_denorm
-            (
-                values["pred_txn_lat_s_p50"],
-                values["pred_txn_lat_s_p90"],
-            ) = self.aurora_score.scaled_txn_lats
-            values.update(self.aurora_score.debug_values)
+            self.aurora_score.add_debug_values(values)
 
         if self.redshift_score is not None:
-            values["redshift_cpu_denorm"] = self.redshift_score.overall_cpu_denorm
-            values.update(self.redshift_score.debug_values)
+            self.redshift_score.add_debug_values(values)
 
         return values
 

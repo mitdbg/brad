@@ -83,8 +83,7 @@ class RedshiftProvisioningScore:
             adjusted_cpu_denorm,
             next_prov,
             {
-                "query_factor": query_factor,
-                "adjusted_cpu_denorm": adjusted_cpu_denorm,
+                "redshift_query_factor": query_factor,
             },
         )
 
@@ -123,6 +122,10 @@ class RedshiftProvisioningScore:
             self.for_next_prov,
             self.debug_values.copy(),
         )
+
+    def add_debug_values(self, dest: Dict[str, int | float | str]) -> None:
+        dest["redshift_cpu_denorm"] = self.overall_cpu_denorm
+        dest.update(self.debug_values)
 
 
 _REDSHIFT_BASE_RESOURCE_VALUE = redshift_num_cpus(Provisioning("dc2.large", 1))

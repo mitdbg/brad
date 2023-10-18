@@ -169,11 +169,11 @@ class AuroraProvisioningScore:
             peak_cpu_denorm,
             next_prov,
             {
-                "pred_txn_load": pred_txn_load,
-                "pred_txn_cpu_denorm": pred_txn_cpu_denorm,
-                "query_factor": query_factor,
-                "adjusted_analytics_load": analytics_load,
-                "adjusted_analytics_cpu_denorm": analytics_cpu_denorm,
+                "aurora_pred_txn_load": pred_txn_load,
+                "aurora_pred_txn_cpu_denorm": pred_txn_cpu_denorm,
+                "aurora_query_factor": query_factor,
+                "aurora_internal_analytics_load": analytics_load,
+                "aurora_internal_analytics_cpu_denorm": analytics_cpu_denorm,
             },
         )
 
@@ -247,6 +247,22 @@ class AuroraProvisioningScore:
             self.for_next_prov,
             self.debug_values.copy(),
         )
+
+    def add_debug_values(self, dest: Dict[str, int | float | str]) -> None:
+        """
+        Adds this score instance's debug values to the `dest` dict.
+        """
+        dest["aurora_analytics_affected_load"] = self.analytics_affected_load
+        dest[
+            "aurora_analytics_affected_cpu_denorm"
+        ] = self.analytics_affected_cpu_denorm
+        dest["aurora_txn_affected_cpu_denorm"] = self.txn_affected_cpu_denorm
+        dest["aurora_pred_txn_peak_cpu_denorm"] = self.pred_txn_peak_cpu_denorm
+        (
+            dest["aurora_pred_txn_lat_s_p50"],
+            dest["aurora_pred_txn_lat_s_p90"],
+        ) = self.scaled_txn_lats
+        dest.update(self.debug_values)
 
 
 _AURORA_BASE_RESOURCE_VALUE = aurora_num_cpus(Provisioning("db.r6g.large", 1))
