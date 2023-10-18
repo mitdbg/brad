@@ -67,6 +67,7 @@ def handle_exception(event_loop, context):
 
 def drop_into_pdb(_sig, frame):
     import pdb
+
     pdb.Pdb().set_trace(frame)
 
 
