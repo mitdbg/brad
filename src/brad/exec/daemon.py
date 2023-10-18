@@ -65,10 +65,10 @@ def handle_exception(event_loop, context):
     event_loop.create_task(shutdown_daemon(event_loop))
 
 
-def drop_into_pdb(_sig, frame):
+def drop_into_pdb():
     import pdb
 
-    pdb.Pdb().set_trace(frame)
+    pdb.set_trace()
 
 
 def main(args):
