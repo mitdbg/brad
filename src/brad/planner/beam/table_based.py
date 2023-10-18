@@ -11,7 +11,10 @@ from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.triggers import get_beam_triggers
 from brad.planner.router_provider import RouterProvider
 from brad.planner.beam.table_based_candidate import BlueprintCandidate
-from brad.planner.debug_logger import BlueprintPlanningDebugLogger
+from brad.planner.debug_logger import (
+    BlueprintPlanningDebugLogger,
+    BlueprintPickleDebugLogger,
+)
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
@@ -269,6 +272,11 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                 "The table-based beam planner failed to find any feasible blueprints."
             )
             return
+
+        # For later interactive inspection in Python.
+        BlueprintPickleDebugLogger.log_candidates_if_requested(
+            self._config, "final_table_based_blueprints", final_top_k
+        )
 
         # Log the final top k for debugging purposes, if needed.
         final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(

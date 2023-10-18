@@ -198,6 +198,9 @@ class PlannerConfig:
             )
         return self._aurora_scaling_coefs
 
+    def aurora_txn_coefs(self, schema_name: str) -> Dict[str, float]:
+        return self._raw["aurora_txns"][schema_name]
+
     ###
     ### Unified Redshift scaling
     ###

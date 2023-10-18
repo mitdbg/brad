@@ -171,16 +171,10 @@ class BlueprintCandidate(ComparableBlueprint):
         values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
 
         if self.aurora_score is not None:
-            values["aurora_load"] = self.aurora_score.overall_system_load
-            values["aurora_cpu_denorm"] = self.aurora_score.overall_cpu_denorm
-            values[
-                "pred_txn_peak_cpu_denorm"
-            ] = self.aurora_score.pred_txn_peak_cpu_denorm
-            values.update(self.aurora_score.debug_values)
+            self.aurora_score.add_debug_values(values)
 
         if self.redshift_score is not None:
-            values["redshift_cpu_denorm"] = self.redshift_score.overall_cpu_denorm
-            values.update(self.redshift_score.debug_values)
+            self.redshift_score.add_debug_values(values)
 
         return values
 
@@ -228,7 +222,8 @@ class BlueprintCandidate(ComparableBlueprint):
             self.athena_scanned_bytes, ctx.planner_config
         ) + compute_aurora_scan_cost(
             self.aurora_accessed_pages,
-            buffer_pool_hit_rate=ctx.metrics.buffer_hit_pct_avg / 100,
+            # TODO: Consider read replicas.
+            buffer_pool_hit_rate=ctx.metrics.aurora_writer_buffer_hit_pct_avg / 100,
             planner_config=ctx.planner_config,
         )
 
@@ -320,7 +315,8 @@ class BlueprintCandidate(ComparableBlueprint):
             self.athena_scanned_bytes, ctx.planner_config
         ) + compute_aurora_scan_cost(
             self.aurora_accessed_pages,
-            buffer_pool_hit_rate=ctx.metrics.buffer_hit_pct_avg / 100,
+            # TODO: Consider read replicas.
+            buffer_pool_hit_rate=ctx.metrics.aurora_writer_buffer_hit_pct_avg / 100,
             planner_config=ctx.planner_config,
         )
 
@@ -534,23 +530,8 @@ class BlueprintCandidate(ComparableBlueprint):
             # Already ran.
             return
 
-        if self.aurora_score is not None:
-            # TODO: Check whether there are transactions or not.
-            if (
-                self.aurora_score.overall_cpu_denorm
-                >= self.aurora_score.pred_txn_peak_cpu_denorm
-            ):
-                # logger.debug(
-                #     "Txn not feasible. %s, pred denorm %.2f, peak denorm %.2f",
-                #     self.aurora_provisioning,
-                #     self.aurora_score.overall_cpu_denorm,
-                #     self.aurora_score.pred_txn_peak_cpu_denorm,
-                # )
-                self.feasibility = BlueprintFeasibility.Infeasible
-            return
-
-        # Might need to validate Redshift load values here.
-
+        # We used to check for transactional load here. Now it's scored as part
+        # of performance.
         self.feasibility = BlueprintFeasibility.Feasible
 
     def update_aurora_provisioning(self, prov: Provisioning) -> None:
@@ -624,6 +605,10 @@ class BlueprintCandidate(ComparableBlueprint):
         relevant.append(np.array(self.base_query_latencies[Engine.Athena]))
         return np.concatenate(relevant)
 
+    def get_predicted_transactional_latencies(self) -> npt.NDArray:
+        assert self.aurora_score is not None
+        return self.aurora_score.scaled_txn_lats
+
     def get_operational_monetary_cost(self) -> float:
         return self.storage_cost + self.provisioning_cost + self.workload_scan_cost
 
@@ -641,3 +626,14 @@ class BlueprintCandidate(ComparableBlueprint):
             return self._memoized[key]
         except KeyError:
             return None
+
+    def __getstate__(self) -> Dict[Any, Any]:
+        # This is used for debug logging purposes.
+        copied = self.__dict__.copy()
+        # This is not serializable, nor do we need it to be (for debug purposes).
+        copied["_comparator"] = None
+        return copied
+
+    def __setstate__(self, d: Dict[Any, Any]) -> None:
+        self.__dict__ = d
+        logger.info("Note: Deserializing table-based blueprint candidate.")
