@@ -43,8 +43,7 @@ class RedshiftProvisioningScore:
                 0.0,
                 next_prov,
                 {
-                    "query_factor": 0.0,
-                    "adjusted_cpu_denorm": 0.0,
+                    "redshift_query_factor": 0.0,
                 },
             )
 
