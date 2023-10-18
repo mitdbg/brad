@@ -211,3 +211,10 @@ class PlannerConfig:
                 [coefs["coef1"], coefs["coef2"], coefs["coef3"], coefs["coef4"]]
             )
         return self._redshift_scaling_coefs
+
+    def use_io_optimized_aurora(self) -> bool:
+        if "use_io_optimized_aurora" not in self._raw:
+            # By default.
+            return True
+        else:
+            return self._raw["use_io_optimized_aurora"]

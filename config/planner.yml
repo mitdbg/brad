@@ -293,3 +293,5 @@ redshift_scaling:
   coef2: 0.00370447
   coef3: 0.49948713
   coef4: 0.36256359
+
+use_io_optimized_aurora: true

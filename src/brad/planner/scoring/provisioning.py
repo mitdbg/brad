@@ -9,12 +9,14 @@ import brad.planner.scoring.data as score_data
 from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.provisioning import Provisioning
 from brad.config.planner import PlannerConfig
+from brad.planner.scoring.context import ScoringContext
 from brad.planner.workload.query import Query
 from brad.provisioning.redshift import RedshiftProvisioningManager
 
 
 ProvisioningResources = namedtuple(
-    "ProvisioningResources", ["instance_type", "usd_per_hour", "vcpus", "mem_mib"]
+    "ProvisioningResources",
+    ["instance_type", "usd_per_hour", "vcpus", "mem_mib", "io_opt_usd_per_hour"],
 )
 
 
@@ -28,6 +30,7 @@ def _load_instance_specs(file_name: str) -> Dict[str, ProvisioningResources]:
             config["usd_per_hour"],
             config["vcpus"],
             config["memory_mib"],
+            config["io_opt_usd_per_hour"] if "io_opt_used_per_hour" in config else None,
         )
         for config in raw_json
     }
@@ -37,11 +40,15 @@ AuroraSpecs = _load_instance_specs("aurora_postgresql_instances.json")
 RedshiftSpecs = _load_instance_specs("redshift_instances.json")
 
 
-def compute_aurora_hourly_operational_cost(provisioning: Provisioning) -> float:
-    return (
-        AuroraSpecs[provisioning.instance_type()].usd_per_hour
-        * provisioning.num_nodes()
-    )
+def compute_aurora_hourly_operational_cost(
+    provisioning: Provisioning, ctx: ScoringContext
+) -> float:
+    prov = AuroraSpecs[provisioning.instance_type()]
+    if ctx.planner_config.use_io_optimized_aurora():
+        hourly_cost = prov.usd_per_hour
+    else:
+        hourly_cost = prov.io_opt_usd_per_hour
+    return hourly_cost * provisioning.num_nodes()
 
 
 def compute_redshift_hourly_operational_cost(provisioning: Provisioning) -> float:
