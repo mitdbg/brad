@@ -45,9 +45,9 @@ def compute_aurora_hourly_operational_cost(
 ) -> float:
     prov = AuroraSpecs[provisioning.instance_type()]
     if ctx.planner_config.use_io_optimized_aurora():
-        hourly_cost = prov.usd_per_hour
-    else:
         hourly_cost = prov.io_opt_usd_per_hour
+    else:
+        hourly_cost = prov.usd_per_hour
     return hourly_cost * provisioning.num_nodes()
 
 
