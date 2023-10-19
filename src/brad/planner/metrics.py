@@ -25,7 +25,7 @@ Metrics = namedtuple(
         "aurora_reader_load_minute_avg",
         "txn_completions_per_s",
         "txn_lat_s_p50",
-        "txn_lat_s_p90",
+        "txn_lat_s_p95",
     ],
 )
 
@@ -86,6 +86,8 @@ class MetricsFromMonitor(MetricsProvider):
         )
 
         # TODO: Need to support forecasted metrics.
+        # TODO: We should extract all metric values over the planning window and
+        # provide them to the downstream consumer (e.g., the planner).
         redshift = (
             redshift_source.read_k_most_recent(
                 k=max_available_after_epochs, metric_ids=_REDSHIFT_METRICS
@@ -172,13 +174,13 @@ class MetricsFromMonitor(MetricsProvider):
             default_value=0.0,
             name="txn_lat_s_p50",
         )
-        txn_lat_s_p90 = self._extract_most_recent_possibly_missing(
+        txn_lat_s_p95 = self._extract_most_recent_possibly_missing(
             front_end.loc[
                 front_end.index <= most_recent_common,
-                FrontEndMetric.TxnLatencySecondP90.value,
+                FrontEndMetric.TxnLatencySecondP95.value,
             ],
             default_value=0.0,
-            name="txn_lat_s_p90",
+            name="txn_lat_s_p95",
         )
 
         aurora_writer_rel = aurora_writer.loc[aurora_writer.index <= most_recent_common]
@@ -224,7 +226,7 @@ class MetricsFromMonitor(MetricsProvider):
                 aurora_reader_load_minute_avg=aurora_reader_load_minute,
                 txn_completions_per_s=txn_per_s,
                 txn_lat_s_p50=txn_lat_s_p50,
-                txn_lat_s_p90=txn_lat_s_p90,
+                txn_lat_s_p95=txn_lat_s_p95,
             ),
             most_recent_common.to_pydatetime(),
         )
@@ -290,5 +292,5 @@ _REDSHIFT_METRICS = [
 _FRONT_END_METRICS = [
     FrontEndMetric.TxnEndPerSecond.value,
     FrontEndMetric.TxnLatencySecondP50.value,
-    FrontEndMetric.TxnLatencySecondP90.value,
+    FrontEndMetric.TxnLatencySecondP95.value,
 ]

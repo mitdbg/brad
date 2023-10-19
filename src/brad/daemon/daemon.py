@@ -178,7 +178,7 @@ class BradDaemon:
                 )
             comparator = best_cost_under_perf_ceilings(
                 max_query_latency_s=self._temp_config.latency_ceiling_s(),
-                max_txn_p50_latency_s=self._temp_config.txn_latency_p50_ceiling_s(),
+                max_txn_p95_latency_s=self._temp_config.txn_latency_p95_ceiling_s(),
             )
         else:
             logger.warning(
@@ -187,7 +187,7 @@ class BradDaemon:
             latency_scorer = _NoopAnalyticsScorer()
             data_access_provider = _NoopDataAccessProvider()
             comparator = best_cost_under_perf_ceilings(
-                max_query_latency_s=10, max_txn_p50_latency_s=0.020
+                max_query_latency_s=10, max_txn_p95_latency_s=0.030
             )
 
         self._planner = BlueprintPlannerFactory.create(

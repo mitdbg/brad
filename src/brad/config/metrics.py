@@ -8,7 +8,7 @@ class FrontEndMetric(enum.Enum):
     TxnEndPerSecond = "txn_end_per_s"
 
     QueryLatencySecondP50 = "query_latency_s_p50"
-    QueryLatencySecondP90 = "query_latency_s_p90"
+    QueryLatencySecondP95 = "query_latency_s_p95"
 
     TxnLatencySecondP50 = "txn_latency_s_p50"
-    TxnLatencySecondP90 = "txn_latency_s_p90"
+    TxnLatencySecondP95 = "txn_latency_s_p95"
