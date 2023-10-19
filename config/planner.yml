@@ -278,7 +278,7 @@ aurora_txns:
   imdb_extended_20g:
     K_l: 0.874
     b_p50: 0.00629548
-    b_p90: 0.00629548  # TODO: Adjust
+    b_p95: 0.00629548  # TODO: Adjust
 
 
 aurora_scaling:

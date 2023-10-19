@@ -34,6 +34,8 @@ def start_front_end(
     # daemon directly.
     for sig in [signal.SIGTERM, signal.SIGINT]:
         event_loop.add_signal_handler(sig, _noop)
+    # This is useful for debugging purposes.
+    event_loop.add_signal_handler(signal.SIGUSR1, _drop_into_pdb)
     event_loop.set_exception_handler(_handle_exception)
 
     try:
@@ -60,6 +62,13 @@ def _handle_exception(event_loop, context):
     logging.error("%s", context)
     if event_loop.is_closed():
         return
+
+
+def _drop_into_pdb():
+    import pdb
+
+    # N.B. Leaving this in is intentional.
+    pdb.set_trace()  # pylint: disable=forgotten-debug-statement
 
 
 def _noop():
