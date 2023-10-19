@@ -5,7 +5,7 @@ import os.path
 
 from brad.cost_model.preprocessing.feature_statistics import gather_feature_statistics
 from brad.cost_model.training.train import train_default, train_readout_hyperparams
-from brad.cost_model.dataset.dataset_argment import argment_dataset
+from brad.cost_model.dataset.dataset_argment import augment_dataset
 from brad.cost_model.training.infer_brad import online_inference_brad
 from workloads.cross_db_benchmark.benchmark_tools.autoscale_db import auto_scale
 from workloads.cross_db_benchmark.benchmark_tools.database import DatabaseSystem
@@ -136,7 +136,8 @@ if __name__ == "__main__":
     parser.add_argument("--max_runtime", default=200000, type=int)
     parser.add_argument("--explain_only", action="store_true")
     parser.add_argument("--aurora_workload_runs", default=None, nargs="+")
-    parser.add_argument("--argment_dataset", action="store_true")
+    parser.add_argument("--augment_dataset", action="store_true")
+    parser.add_argument("--augment_dataset_dist", type=str)
     parser.add_argument("--is_brad", action="store_true")
     parser.add_argument("--include_no_joins", action="store_true")
 
@@ -349,13 +350,13 @@ if __name__ == "__main__":
                 args.is_brad,
             )
 
-    if args.argment_dataset:
+    if args.augment_dataset:
         for i, workload_file in enumerate(args.workload_runs):
             target = os.path.join(
                 args.target,
                 workload_file.split("/")[-1].split(".json")[0] + "_augmented.json",
             )
-            argment_dataset(workload_file, target)
+            augment_dataset(workload_file, target, args.augment_dataset_dist)
 
     if args.gather_feature_statistics:
         # gather_feature_statistics

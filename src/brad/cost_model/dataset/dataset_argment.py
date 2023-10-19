@@ -1,11 +1,23 @@
 import json
+from typing import Optional
 from workloads.cross_db_benchmark.benchmark_tools.utils import load_json, dumper
 
 
-DATA_ARG_DIST = {10: 1, 20: 4, 50: 10, 100: 20, 500: 40}
+DATA_AUG_DIST = {10: 1, 20: 4, 50: 10, 100: 20, 500: 40}
+
+# AUG_DIST_AURORA_100 = {2: 1, 20: 2, 50: 5, 100: 15, 500: 30}
+# AUG_DIST_REDSHIFT_100 = {10: 1, 20: 8, 50: 20, 100: 40, 500: 80}
+
+AUG_DIST_AURORA_100 = {2: 1, 20: 2, 50: 5, 100: 12, 500: 30}
+AUG_DIST_REDSHIFT_100 = {3: 1, 10: 2, 20: 8, 50: 20, 100: 40, 500: 80}
+
+_custom_dists = {
+    "redshift_100g": AUG_DIST_REDSHIFT_100,
+    "aurora_100g": AUG_DIST_AURORA_100,
+}
 
 
-def argment_dataset(source, target):
+def augment_dataset(source, target, custom_dist_name: Optional[str] = None):
     # Some dataset contains very few long-running queries. For the purpose of identifying bad queries, we duplicate
     # long-running queries.
     runs = load_json(source, namespace=False)
@@ -17,11 +29,19 @@ def argment_dataset(source, target):
         runtime = q["plan_runtime"] / 1000  # ms to s convertion
         plan = runs["parsed_plans"][i]
         matched = False
-        for upper_limit in DATA_ARG_DIST:
+
+        if custom_dist_name is not None:
+            dist = _custom_dists[custom_dist_name]
+            print(f"Using {custom_dist_name} distribution.")
+        else:
+            dist = DATA_AUG_DIST
+            print("Using default distribution.")
+
+        for upper_limit, dup_times in dist.items():
             if runtime <= upper_limit:
-                duplicated_query = [q] * DATA_ARG_DIST[upper_limit]
-                duplicated_sql = [sql] * DATA_ARG_DIST[upper_limit]
-                duplicated_plan = [plan] * DATA_ARG_DIST[upper_limit]
+                duplicated_query = [q] * dup_times
+                duplicated_sql = [sql] * dup_times
+                duplicated_plan = [plan] * dup_times
                 new_parsed_queries.extend(duplicated_query)
                 new_sql_queries.extend(duplicated_sql)
                 new_parsed_plans.extend(duplicated_plan)

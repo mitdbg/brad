@@ -7,8 +7,12 @@ script_loc=$(cd $(dirname $0) && pwd -P)
 cd $script_loc
 
 if [ -z $5 ]; then
-  >&2 echo "Usage: $0 out_name dataset_dir_prefix athena_parsed aurora_parsed redshift_parsed"
+  >&2 echo "Usage: $0 out_name dataset_dir_prefix athena_parsed aurora_parsed redshift_parsed is_100g"
   exit 1
+fi
+
+if [ -n $6 ]; then
+  is_100g=1
 fi
 
 out_name=$1
@@ -72,12 +76,24 @@ popd
 mkdir -p $out_dir/run_time_augmented
 
 function run_augmentation() {
-  python3 ../../run_cost_model.py --argment_dataset --workload_runs $2 --target $1
+  if [[ -n $3 ]]; then
+    python3 ../../run_cost_model.py --augment_dataset --workload_runs $2 --target $1 --augment_dataset_dist $3
+  else
+    python3 ../../run_cost_model.py --augment_dataset --workload_runs $2 --target $1
+  fi
 }
 
 echo "--- Running data augmentation ---"
 for datafile in $(find "$out_dir/run_time" -type f -name "*_train.json"); do
-  run_augmentation $out_dir/run_time_augmented $datafile
+  if [[ $datafile == *"redshift"* ]] && [[ -n $is_100g ]]; then
+    >&2 echo "Passing in redshift_100 dist for augmentation"
+    run_augmentation $out_dir/run_time_augmented $datafile redshift_100
+  elif [[ $datafile == *"aurora"* ]] && [[ -n $is_100g ]]; then
+    >&2 echo "Passing in aurora_100 dist for augmentation"
+    run_augmentation $out_dir/run_time_augmented $datafile aurora_100
+  else
+    run_augmentation $out_dir/run_time_augmented $datafile
+  fi
 done
 
 # 5. Create data accessed stats.
