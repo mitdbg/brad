@@ -1,6 +1,6 @@
 latency_ceiling_s: 30.0
-txn_latency_p50_ceiling_s: 0.020
-txn_latency_p90_ceiling_s: 0.030
+txn_latency_p50_ceiling_s: 0.020  # Currently unused.
+txn_latency_p95_ceiling_s: 0.030
 
 # Use this instead of the individual paths below.
 std_dataset_path: workloads/IMDB_20GB/regular_test/
