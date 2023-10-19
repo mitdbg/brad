@@ -260,7 +260,7 @@ class AuroraProvisioningScore:
         dest["aurora_pred_txn_peak_cpu_denorm"] = self.pred_txn_peak_cpu_denorm
         (
             dest["aurora_pred_txn_lat_s_p50"],
-            dest["aurora_pred_txn_lat_s_p90"],
+            dest["aurora_pred_txn_lat_s_p95"],
         ) = self.scaled_txn_lats
         dest.update(self.debug_values)
 
