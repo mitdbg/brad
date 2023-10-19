@@ -32,6 +32,34 @@ def compute_single_athena_table_cost(table_name: str, ctx: ScoringContext) -> fl
     )
 
 
+def compute_single_aurora_table_cost(table_name: str, ctx: ScoringContext) -> float:
+    storage_usd_per_mb_per_month = 0.0
+
+    num_rows = ctx.next_workload.table_num_rows(table_name)
+    raw_extract_bytes = num_rows * ctx.planner_config.extract_table_bytes_per_row(
+        ctx.schema_name, table_name
+    )
+    raw_extract_mb = raw_extract_bytes / 1000 / 1000
+
+    if ctx.planner_config.use_io_optimized_aurora():
+        storage_usd_per_mb_per_month += (
+            raw_extract_mb * ctx.planner_config.aurora_io_opt_usd_per_mb_per_month()
+        )
+    else:
+        storage_usd_per_mb_per_month += (
+            raw_extract_mb * ctx.planner_config.aurora_regular_usd_per_mb_per_month()
+        )
+
+    source_period = timedelta(days=30)
+    dest_period = ctx.next_workload.period()
+
+    return (
+        storage_usd_per_mb_per_month
+        * (1.0 / source_period.total_seconds())
+        * dest_period.total_seconds()
+    )
+
+
 TableMovementScore = namedtuple(
     "TableMovementScore", ["movement_cost", "movement_time_s"]
 )

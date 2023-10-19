@@ -28,6 +28,7 @@ from brad.planner.scoring.provisioning import (
 from brad.planner.scoring.score import Score
 from brad.planner.scoring.table_placement import (
     compute_single_athena_table_cost,
+    compute_single_aurora_table_cost,
     compute_single_table_movement_time_and_cost,
 )
 from brad.routing.router import Router
@@ -325,11 +326,15 @@ class BlueprintCandidate(ComparableBlueprint):
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
 
-            # If we added the table to Athena, we need to take into account its
-            # storage costs.
+            # If we added the table to Athena or Aurora, we need to take into
+            # account its storage costs.
             if (((~cur) & nxt) & (EngineBitmapValues[Engine.Athena])) != 0:
                 # We added the table to Athena.
                 self.storage_cost += compute_single_athena_table_cost(tbl, ctx)
+
+            if (((~cur) & nxt) & (EngineBitmapValues[Engine.Aurora])) != 0:
+                # Added table to Aurora.
+                self.storage_cost += compute_single_aurora_table_cost(tbl, ctx)
 
     def try_to_make_feasible_if_needed(self, ctx: ScoringContext) -> None:
         """

@@ -27,6 +27,7 @@ from brad.planner.scoring.provisioning import (
 from brad.planner.scoring.score import Score
 from brad.planner.scoring.table_placement import (
     compute_single_athena_table_cost,
+    compute_single_aurora_table_cost,
     compute_single_table_movement_time_and_cost,
 )
 from brad.planner.workload.query import Query
@@ -250,11 +251,15 @@ class BlueprintCandidate(ComparableBlueprint):
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
 
-            # If we added a table to Athena, we need to take into account its
-            # storage costs.
+            # If we added a table to Athena or Aurora, we need to take into
+            # account its storage costs.
             if (((~curr) & next_placement) & (EngineBitmapValues[Engine.Athena])) != 0:
                 # We added the table to Athena.
                 self.storage_cost += compute_single_athena_table_cost(name, ctx)
+
+            if (((~curr) & next_placement) & (EngineBitmapValues[Engine.Aurora])) != 0:
+                # Added table to Aurora.
+                self.storage_cost += compute_single_aurora_table_cost(name, ctx)
 
         # Adding a new query can affect the feasibility of the provisioning.
         self.feasibility = BlueprintFeasibility.Unchecked

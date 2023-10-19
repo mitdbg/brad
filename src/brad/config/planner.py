@@ -113,6 +113,12 @@ class PlannerConfig:
     def s3_usd_per_mb_per_month(self) -> float:
         return float(self._raw["s3_usd_per_mb_per_month"])
 
+    def aurora_regular_usd_per_mb_per_month(self) -> float:
+        return float(self._raw["aurora_regular_usd_per_mb_per_month"])
+
+    def aurora_io_opt_usd_per_mb_per_month(self) -> float:
+        return float(self._raw["aurora_io_opt_usd_per_mb_per_month"])
+
     def sample_set_size(self) -> int:
         return int(self._raw["sample_set_size"])
 
