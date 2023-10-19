@@ -86,11 +86,11 @@ function run_augmentation() {
 echo "--- Running data augmentation ---"
 for datafile in $(find "$out_dir/run_time" -type f -name "*_train.json"); do
   if [[ $datafile == *"redshift"* ]] && [[ -n $is_100g ]]; then
-    >&2 echo "Passing in redshift_100 dist for augmentation"
-    run_augmentation $out_dir/run_time_augmented $datafile redshift_100
+    >&2 echo "Passing in redshift_100 dist for augmentation for file $datafile"
+    run_augmentation $out_dir/run_time_augmented $datafile redshift_100g
   elif [[ $datafile == *"aurora"* ]] && [[ -n $is_100g ]]; then
-    >&2 echo "Passing in aurora_100 dist for augmentation"
-    run_augmentation $out_dir/run_time_augmented $datafile aurora_100
+    >&2 echo "Passing in aurora_100 dist for augmentation for file $datafile"
+    run_augmentation $out_dir/run_time_augmented $datafile aurora_100g
   else
     run_augmentation $out_dir/run_time_augmented $datafile
   fi
@@ -98,6 +98,7 @@ done
 
 # 5. Create data accessed stats.
 mkdir -p $out_dir/data_accessed
+mkdir -p $out_dir/data_accessed_augmented
 
 function add_data() {
   python3 add_data_accessed.py \
@@ -119,5 +120,13 @@ for db in athena aurora; do
       ${dataset_dir_prefix}_${mode}/data_accessed-athena-aurora.npy \
       ${db} \
       $out_dir/data_accessed/${db}_${out_name}_${mode}.json
+
+    if [[ $mode == "train" ]]; then
+      add_data $out_dir/run_time_augmented/${db}_${out_name}_${mode}_augmented.json \
+        ${dataset_dir_prefix}_${mode}/queries.sql \
+        ${dataset_dir_prefix}_${mode}/data_accessed-athena-aurora.npy \
+        ${db} \
+        $out_dir/data_accessed_augmented/${db}_${out_name}_${mode}.json
+    fi
   done
 done

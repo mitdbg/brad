@@ -24,18 +24,19 @@ def augment_dataset(source, target, custom_dist_name: Optional[str] = None):
     new_parsed_queries = []
     new_sql_queries = []
     new_parsed_plans = []
+
+    if custom_dist_name is not None:
+        dist = _custom_dists[custom_dist_name]
+        print(f"Using {custom_dist_name} distribution.")
+    else:
+        dist = DATA_AUG_DIST
+        print("Using default distribution.")
+
     for i, q in enumerate(runs["parsed_queries"]):
         sql = runs["sql_queries"][i]
         runtime = q["plan_runtime"] / 1000  # ms to s convertion
         plan = runs["parsed_plans"][i]
         matched = False
-
-        if custom_dist_name is not None:
-            dist = _custom_dists[custom_dist_name]
-            print(f"Using {custom_dist_name} distribution.")
-        else:
-            dist = DATA_AUG_DIST
-            print("Using default distribution.")
 
         for upper_limit, dup_times in dist.items():
             if runtime <= upper_limit:
