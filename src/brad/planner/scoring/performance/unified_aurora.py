@@ -207,14 +207,14 @@ class AuroraProvisioningScore:
         to_prov: Provisioning,
         ctx: ScoringContext,
     ) -> npt.NDArray:
-        observed_lats = np.array([ctx.metrics.txn_lat_s_p50, ctx.metrics.txn_lat_s_p90])
+        observed_lats = np.array([ctx.metrics.txn_lat_s_p50, ctx.metrics.txn_lat_s_p95])
 
         # Q(u, r_c, r_d) = a (K_l K_r) / (K_l r_d - u r_c) + b
         # We compute (a (K_l K_r)) based on the current observations.
         # Then use this value to predict the run time based on the load and resource differences.
         model = ctx.planner_config.aurora_txn_coefs(ctx.schema_name)
         K_l = model["K_l"]
-        b = np.array([model["b_p50"], model["b_p90"]])
+        b = np.array([model["b_p50"], model["b_p95"]])
 
         curr_num_cpus = aurora_num_cpus(curr_prov)
         curr_cpu_util = curr_cpu_denorm / curr_num_cpus

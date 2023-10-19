@@ -86,28 +86,27 @@ def best_cost_under_max_latency(max_latency_ceiling_s: float) -> BlueprintCompar
 
 def best_cost_under_perf_ceilings(
     max_query_latency_s: float,
-    # TODO: Use p90 latency.
-    max_txn_p50_latency_s: float,
+    max_txn_p95_latency_s: float,
 ) -> BlueprintComparator:
     def is_better_than(left: ComparableBlueprint, right: ComparableBlueprint) -> bool:
         # Check transactional latency ceilings first.
-        left_txn_p50 = left.get_predicted_transactional_latencies()[0]
-        right_txn_p50 = right.get_predicted_transactional_latencies()[0]
+        left_txn_p95 = left.get_predicted_transactional_latencies()[0]
+        right_txn_p95 = right.get_predicted_transactional_latencies()[0]
 
         # If one of these candidates have NaN predictions, we need to
         # consider other factors. NaN indicates that a prediction is not
         # available (e.g., due to missing metrics).
-        if not math.isnan(left_txn_p50) and not math.isnan(right_txn_p50):
+        if not math.isnan(left_txn_p95) and not math.isnan(right_txn_p95):
             # Both above the ceiling, return the blueprint that does better on
             # performance.
             if (
-                left_txn_p50 > max_txn_p50_latency_s
-                and right_txn_p50 > max_txn_p50_latency_s
+                left_txn_p95 > max_txn_p95_latency_s
+                and right_txn_p95 > max_txn_p95_latency_s
             ):
-                return left_txn_p50 < right_txn_p50
-            elif left_txn_p50 > max_txn_p50_latency_s:
+                return left_txn_p95 < right_txn_p95
+            elif left_txn_p95 > max_txn_p95_latency_s:
                 return False
-            elif right_txn_p50 > max_txn_p50_latency_s:
+            elif right_txn_p95 > max_txn_p95_latency_s:
                 return True
 
         # Query latency ceilings.
