@@ -170,19 +170,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                             next_candidate.find_best_provisioning(ctx)
 
                         if not (next_candidate.is_better_than(next_top_k[0])):
-                            # We eliminate `next_candidate`. Even after
-                            # looking for the best provisioning, it has a
-                            # worse score compared to `next_top_k[0]` (the
-                            # worst scoring blueprint candidate in the
-                            # top-k).
-                            if next_candidate.redshift_provisioning.num_nodes() == 0:
-                                logger.info("Eliminating BP with turned off Redshift.")
-                                logger.info(
-                                    "Score: %s",
-                                    json.dumps(
-                                        next_candidate.to_debug_values(), indent=2
-                                    ),
-                                )
+                            # We eliminate `next_candidate`. Even after looking
+                            # for the best provisioning, it has a worse score
+                            # compared to `next_top_k[0]` (the worst scoring
+                            # blueprint candidate in the top-k).
                             continue
 
                         while (
@@ -198,13 +189,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                             heapq.heappush(next_top_k, current_worst)
 
                         if next_candidate.is_better_than(next_top_k[0]):
-                            removed = heapq.heappushpop(next_top_k, next_candidate)
-                            if removed.redshift_provisioning.num_nodes() == 0:
-                                logger.info("Eliminating BP with turned off Redshift.")
-                                logger.info(
-                                    "Score: %s",
-                                    json.dumps(removed.to_debug_values(), indent=2),
-                                )
+                            heapq.heappushpop(next_top_k, next_candidate)
 
             current_top_k = next_top_k
 
@@ -290,15 +275,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                         if len(final_top_k) == beam_size:
                             heapq.heapify(final_top_k)
                     elif new_candidate.is_better_than(final_top_k[0]):
-                        removed = heapq.heappushpop(final_top_k, new_candidate)
-                        if removed.redshift_provisioning.num_nodes() == 0:
-                            logger.info(
-                                "Eliminating BP with turned off Redshift (2nd step)."
-                            )
-                            logger.info(
-                                "Score: %s",
-                                json.dumps(removed.to_debug_values(), indent=2),
-                            )
+                        heapq.heappushpop(final_top_k, new_candidate)
 
         if len(final_top_k) == 0:
             logger.error(
