@@ -4,6 +4,7 @@ from typing import Optional, Callable
 
 from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.blueprint.diff.provisioning import ProvisioningDiff
+from brad.blueprint.diff.table import TableDiff
 from brad.blueprint.manager import BlueprintManager
 from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.state import TransitionState
@@ -61,6 +62,7 @@ class TransitionOrchestrator:
         assert self._next_blueprint is not None
         assert self._next_version is not None
 
+        # Re-provision Aurora and Redshift as needed
         aurora_diff = self._diff.aurora_diff()
         redshift_diff = self._diff.redshift_diff()
 
@@ -77,10 +79,24 @@ class TransitionOrchestrator:
             redshift_diff,
         )
         await asyncio.gather(aurora_awaitable, redshift_awaitable)
-        logger.debug("Pre-transition steps complete.")
+        logger.debug("Aurora and Redshift provisioning changes complete.")
 
-        # N.B. We do not yet execute any table movements (assume they are
-        # available everywhere).
+        # Move tables as needed
+        table_awaitables = []
+        for diff in self._diff.table_diffs():
+            # This assumes that all engines in the current blueprint on which
+            # a given table is present have an *up-to-date* copy of the table.
+            # Can relax this later using the sync infrastructure.
+            #
+            # Only need to write table out if we're planning on loading it to
+            # an additional engine.
+            if diff.added_locations is not None:
+                table_awaitables.append(self._enforce_table_diff_additions(diff))
+        await asyncio.gather(table_awaitables)
+
+        logger.debug("Table movement complete.")
+
+        logger.debug("Pre-transition steps complete.")
 
         await self._blueprint_mgr.update_transition_state(
             TransitionState.TransitionedPreCleanUp
@@ -379,6 +395,18 @@ class TransitionOrchestrator:
                 "Pausing Redshift cluster %s", self._config.redshift_cluster_id
             )
             await self._redshift.pause_cluster(self._config.redshift_cluster_id)
+
+    async def _enforce_table_diff_additions(self, diff: TableDiff) -> None:
+        await self._write_table_out(diff.table)
+        table_loading_awaitables = []
+        for e in diff.added_locations:
+            table_loading_awaitables.append(self._load_table_to_engine(diff))    
+
+    async def _write_table_out(self, table_name: str) -> None:
+        return
+    
+    async def _add_table_to_new_engines(self, diff: TableDiff) -> None:
+        return
 
 
 # Note that `version` is the blueprint version when the instance was created. It
