@@ -4,15 +4,12 @@ from functionality_catalog import Functionality
 from brad.data_stats.estimator import Estimator
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.query_rep import QueryRep
-from brad.front_end.session import Session
-
 
 if TYPE_CHECKING:
     from brad.blueprint import Blueprint
 
 
 class Router:
-
     def __init__(self):
         self.functionality_catalog = Functionality()
 
@@ -30,7 +27,7 @@ class Router:
         location bitmaps).
         """
 
-    async def engine_for(self, query: QueryRep, session: Session) -> Engine:
+    async def engine_for(self, query: QueryRep) -> Engine:
         """
         Selects an engine for the provided SQL query.
 
@@ -41,9 +38,9 @@ class Router:
         You should override this method if the routing policy needs to depend on
         any asynchronous methods.
         """
-        return self.engine_for_sync(query, session)
+        return self.engine_for_sync(query)
 
-    def engine_for_sync(self, query: QueryRep, session: Session) -> Engine:
+    def engine_for_sync(self, query: QueryRep) -> Engine:
         """
         Selects an engine for the provided SQL query.
 
@@ -54,11 +51,10 @@ class Router:
         raise NotImplementedError
 
     def _filter_on_constraints(
-        self, query: QueryRep, location_bitmap: Dict[str, int], session: Session
+        self, query: QueryRep, location_bitmap: Dict[str, int]
     ) -> Tuple[int, Optional[Engine]]:
-
         # First constrain based on functinality catalog
-        func_support = self._run_functionality_routing(query, session)
+        func_support = self._run_functionality_routing(query)
 
         # Then constrain based on table placement
         place_support = self._run_location_routing(query, location_bitmap)
@@ -80,16 +76,14 @@ class Router:
 
         return (supported_engines, None)
 
-    def _run_functionality_routing(
-        self, query: QueryRep, session: Session
-    ) -> Tuple[int, Optional[Engine]]:
+    def _run_functionality_routing(self, query: QueryRep) -> int:
         """
         Based on the functinalities required by the query (e.g. geospatial),
         compute the set of engines that are able to serve this query.
         """
 
         # Bitmap describing what functionality is required for running query
-        req_bitmap = query.get_required_functionality(session)
+        req_bitmap = query.get_required_functionality()
 
         # Bitmap for each engine which features it supports
         engine_support = self.functionality_catalog.get_engine_functionalities()
@@ -99,7 +93,6 @@ class Router:
         # engine functionality
         valid_locations_list = []
         for engine, sup_bitmap in zip(engines, engine_support):
-
             query_supported = (~req_bitmap | (req_bitmap & sup_bitmap)) == -1
 
             if query_supported:
@@ -109,7 +102,7 @@ class Router:
 
     def _run_location_routing(
         self, query: QueryRep, location_bitmap: Dict[str, int]
-    ) -> Tuple[int, Optional[Engine]]:
+    ) -> int:
         """
         Based on the provided location bitmap, compute the set of engines that
         are able to serve this query. If there is only one possible engine, this

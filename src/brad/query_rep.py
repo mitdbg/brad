@@ -22,7 +22,9 @@ _DATA_MODIFICATION_PREFIXES = [
 ]
 
 # Load geospatial keywords used to detect if geospatial query
-_GEOSPATIAL_KEYWORDS_PATH = os.path.join(pathlib.Path(__file__).parent.resolve(), "routing/geospatial_keywords.yml")
+_GEOSPATIAL_KEYWORDS_PATH = os.path.join(
+    pathlib.Path(__file__).parent.resolve(), "routing/geospatial_keywords.yml"
+)
 with open(_GEOSPATIAL_KEYWORDS_PATH, "r") as f:
     _GEOSPATIAL_KEYWORDS = yaml.safe_load(f)
 _GEOSPATIAL_KEYWORDS = [k.upper() for k in _GEOSPATIAL_KEYWORDS]
@@ -39,13 +41,17 @@ class QueryRep:
     Objects of this class are logically immutable.
     """
 
-    def __init__(self, sql_query: str):
+    def __init__(self, sql_query: str, session: Session = None):
         self._raw_sql_query = sql_query
 
         # Lazily computed.
         self._ast: Optional[sqlglot.Expression] = None
         self._is_data_modification: Optional[bool] = None
         self._tables: Optional[List[str]] = None
+        if session is None:
+            self.in_transaction = False
+        else:
+            self.in_transaction = session.in_transaction
 
     @property
     def raw_query(self) -> str:
@@ -72,14 +78,14 @@ class QueryRep:
                 return True
         return False
 
-    def is_transaction(self, session: Session) -> bool:
-        return self.is_data_modification_query() or session.in_transaction
+    def is_transaction(self) -> bool:
+        return self.is_data_modification_query() or self.in_transaction
 
-    def get_required_functionality(self, session: Session) -> int:
+    def get_required_functionality(self) -> int:
         req_functionality = []
         if self.is_geospatial():
             req_functionality.append(Functionality.Geospatial)
-        if self.is_transaction(session):
+        if self.is_transaction():
             req_functionality.append(Functionality.Transaction)
 
         return Functionality.to_bitmap(req_functionality)

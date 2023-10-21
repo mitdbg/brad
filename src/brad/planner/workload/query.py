@@ -9,6 +9,7 @@ from brad.data_stats.plan_parsing import (
     extract_base_cardinalities,
 )
 from brad.front_end.engine_connections import EngineConnections
+from brad.front_end.session import Session
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +22,8 @@ class Query(QueryRep):
     Objects of this class are logically immutable.
     """
 
-    def __init__(self, sql_query: str, arrival_count: int = 1):
-        super().__init__(sql_query)
+    def __init__(self, sql_query: str, arrival_count: int = 1, session: Session = None):
+        super().__init__(sql_query, session)
         self._arrival_count = arrival_count
 
         # Legacy statistics.

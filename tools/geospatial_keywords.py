@@ -4,7 +4,6 @@ import re
 import yaml
 
 if __name__ == "__main__":
-
     # URL of PostGIS special functions index
     url = "https://postgis.net/docs/manual-1.5/ch08.html"
 
