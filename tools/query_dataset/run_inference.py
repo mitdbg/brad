@@ -31,6 +31,7 @@ def main():
     parser.add_argument("--schema-name", type=str, required=True)
     parser.add_argument("--out-file", type=str, required=True)
     parser.add_argument("--undo-log", action="store_true")
+    parser.add_argument("--undo-mega", action="store_true")
     args = parser.parse_args()
 
     engine = Engine.from_str(args.engine)
@@ -43,9 +44,16 @@ def main():
     )
     predictions = model.predict(queries, conn)
 
+    if args.undo_log and args.undo_mega:
+        print("WARNING: Both --undo-log and --undo-mega used.")
+
     if args.undo_log:
         print("Undoing natural log...")
         predictions = np.exp(predictions)
+
+    if args.undo_mega:
+        print("Undoing the mega conversion...")
+        predictions = predictions * 1e6
 
     np.save(args.out_file, predictions)
     print("Done!")
