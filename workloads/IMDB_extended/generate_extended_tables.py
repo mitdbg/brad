@@ -17,7 +17,7 @@ from workload_utils.dataset_config import (
     MIN_ORDERS_PER_SHOWING,
     MAX_ORDERS_PER_SHOWING,
     MIN_MOVIE_ID,
-    NUM_TELEMETRY_POINTS
+    NUM_TELEMETRY_POINTS,
 )
 
 
@@ -173,18 +173,36 @@ def random_timestamp(prng):
     return f"{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}.{millisecond:03}"
 
 
-def generate_telemetry_data(ctx: Context, delimiter: str="|"):
+def generate_telemetry_data(ctx: Context, delimiter: str = "|"):
     # NOTE: For AWS Glue Crawler to work, delimit with , not |
 
-    sampled_movie_ids = [2415848, 185208, 1907958, 2440851, 2056744, 2034439,
-                         2350425, 2340175, 2244960, 2108934, 2203453, 882312,
-                         2163755, 2052817, 1860259, 1814440, 2067594, 1951925,
-                         1811769, 2384774]
+    sampled_movie_ids = [
+        2415848,
+        185208,
+        1907958,
+        2440851,
+        2056744,
+        2034439,
+        2350425,
+        2340175,
+        2244960,
+        2108934,
+        2203453,
+        882312,
+        2163755,
+        2052817,
+        1860259,
+        1814440,
+        2067594,
+        1951925,
+        1811769,
+        2384774,
+    ]
 
     out = open("telemetry.csv", "w", encoding="UTF-8")
     print(f"ip{delimiter}timestamp{delimiter}movie_id{delimiter}event_id", file=out)
 
-    progress_interval = int(NUM_TELEMETRY_POINTS/20)
+    progress_interval = int(NUM_TELEMETRY_POINTS / 20)
 
     for i in range(NUM_TELEMETRY_POINTS):
         if i % progress_interval == 0:
