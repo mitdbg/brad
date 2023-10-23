@@ -209,26 +209,24 @@ class AuroraProvisioningScore:
     ) -> npt.NDArray:
         observed_lats = np.array([ctx.metrics.txn_lat_s_p50, ctx.metrics.txn_lat_s_p95])
 
-        # Q(u, r_c, r_d) = a (K_l K_r) / (K_l r_d - u r_c) + b
-        # We compute (a (K_l K_r)) based on the current observations.
-        # Then use this value to predict the run time based on the load and resource differences.
+        # Q(u) = a / (K - u) + b ; u is CPU utilization in [0, 1]
+        # --> Q(u') = (K - u) / (K - u') (Q(u) - b) + b
+
         model = ctx.planner_config.aurora_txn_coefs(ctx.schema_name)
-        K_l = model["K_l"]
+        K = model["K"]
         b = np.array([model["b_p50"], model["b_p95"]])
 
         curr_num_cpus = aurora_num_cpus(curr_prov)
-        curr_cpu_util = curr_cpu_denorm / curr_num_cpus
-        coef_base = 1.0 / ((K_l - curr_cpu_util) * curr_num_cpus)
-        base_wo_b = observed_lats - b
-        eps = b * 0.01
-        base_wo_b = np.maximum(base_wo_b, eps)  # Used to avoid degenerate cases.
-        comp_const = base_wo_b / coef_base
+        next_num_cpus = aurora_num_cpus(to_prov)
+        curr_cpu_util = min(curr_cpu_denorm / curr_num_cpus, 1.0)
+        next_cpu_util = min(next_cpu_denorm / next_num_cpus, 1.0)
 
-        dest_num_cpus = aurora_num_cpus(to_prov)
-        dest_cpu_util = next_cpu_denorm / dest_num_cpus
-        dest_cpu_util = min(dest_cpu_util, K_l - 0.01)  # To avoid degenerate cases.
-        coef_dest = 1.0 / ((K_l - dest_cpu_util) * dest_num_cpus)
-        pred_dest = b + (comp_const * coef_dest)
+        # To avoid division by zero in degenerate cases.
+        denom = max(K - next_cpu_util, 1e-6)
+        sf = (K - curr_cpu_util) / denom
+
+        without_base = np.clip(observed_lats - b, a_min=0.0, a_max=None)
+        pred_dest = (without_base * sf) + b
 
         # If the observed latencies were not defined, we should not make a prediction.
         pred_dest[observed_lats == 0.0] = np.nan
