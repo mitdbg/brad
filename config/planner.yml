@@ -276,9 +276,9 @@ aurora_txns:
   prov_to_peak_cpu_denorm: 0.6800294117647058
 
   imdb_extended_20g:
-    K: 1.0582
-    b_p50: 0.0023
-    b_p95: 0.0038
+    K: 1.0581694841384888
+    b_p50: 0.0022556402254849672
+    b_p95: 0.00383179122582078
 
 
 aurora_scaling:
