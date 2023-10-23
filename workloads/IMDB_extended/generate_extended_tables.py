@@ -17,6 +17,7 @@ from workload_utils.dataset_config import (
     MIN_ORDERS_PER_SHOWING,
     MAX_ORDERS_PER_SHOWING,
     MIN_MOVIE_ID,
+    NUM_TELEMETRY_POINTS
 )
 
 
@@ -153,6 +154,53 @@ def generate_ticket_orders(ctx: Context, total_showings: int) -> int:
     return total_orders
 
 
+def random_timestamp(prng):
+    year = 2023
+    month = prng.randint(1, 12)
+
+    if month == 2:
+        day = prng.randint(1, 28)
+    elif month in [4, 6, 9, 11]:
+        day = prng.randint(1, 30)
+    else:
+        day = prng.randint(1, 31)
+
+    hour = prng.randint(0, 23)
+    minute = prng.randint(0, 59)
+    second = prng.randint(0, 59)
+    millisecond = prng.randint(0, 999)
+
+    return f"{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}.{millisecond:03}"
+
+
+def generate_telemetry_data(ctx: Context, delimiter: str="|"):
+    # NOTE: For AWS Glue Crawler to work, delimit with , not |
+
+    sampled_movie_ids = [2415848, 185208, 1907958, 2440851, 2056744, 2034439,
+                         2350425, 2340175, 2244960, 2108934, 2203453, 882312,
+                         2163755, 2052817, 1860259, 1814440, 2067594, 1951925,
+                         1811769, 2384774]
+
+    out = open("telemetry.csv", "w", encoding="UTF-8")
+    print(f"ip{delimiter}timestamp{delimiter}movie_id{delimiter}event_id", file=out)
+
+    progress_interval = int(NUM_TELEMETRY_POINTS/20)
+
+    for i in range(NUM_TELEMETRY_POINTS):
+        if i % progress_interval == 0:
+            print(f"{int(i/NUM_TELEMETRY_POINTS*100)}% progress")
+
+        ip = ".".join(str(ctx.prng.randint(0, 255)) for _ in range(4))
+        timestamp = random_timestamp(ctx.prng)
+        movie_id = random.choice(sampled_movie_ids)
+        event_id = random.randint(0, 20)
+
+        print(
+            f"{ip}{delimiter}{timestamp}{delimiter}{movie_id}{delimiter}{event_id}",
+            file=out,
+        )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--scale-factor", type=int, default=1)
@@ -197,6 +245,8 @@ def main():
     generate_ticket_orders(ctx, total_showings)
     print("Generating homes...")
     generate_homes(ctx)
+    print("Generating telemetry data...")
+    generate_telemetry_data(ctx, delimiter=",")
 
 
 if __name__ == "__main__":
