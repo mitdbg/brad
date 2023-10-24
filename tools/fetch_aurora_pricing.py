@@ -29,20 +29,24 @@ def append_pricing(instance_configs):
                     "Value": "US East (N. Virginia)",
                 },
             ],
-            MaxResults=1,
+            MaxResults=2,
         )
 
-        pl = response["PriceList"][0]
-        inner = json.loads(pl)
-        rel = inner["terms"]["OnDemand"]
-        rel = next(iter(rel.values()))
-        rel = rel["priceDimensions"]
-        rel = next(iter(rel.values()))
-        hourly_pricing = rel["pricePerUnit"]["USD"]
-        # results.append((instance_config["instance_type"], float(hourly_pricing)))
-        instance_config["usd_per_hour"] = float(
-            hourly_pricing
-        )  # N.B. `float` may not be the most ideal.
+        for pl in response["PriceList"]:
+            inner = json.loads(pl)
+            storage_type = inner["product"]["attributes"]["storage"]
+            is_io_optimized = "IO Optimization" in storage_type
+            rel = inner["terms"]["OnDemand"]
+            rel = next(iter(rel.values()))
+            rel = rel["priceDimensions"]
+            rel = next(iter(rel.values()))
+            hourly_pricing = rel["pricePerUnit"]["USD"]
+            # results.append((instance_config["instance_type"], float(hourly_pricing)))
+            if is_io_optimized:
+                instance_config["io_opt_usd_per_hour"] = float(hourly_pricing)
+            else:
+                # N.B. `float` may not be the most ideal.
+                instance_config["usd_per_hour"] = float(hourly_pricing)
 
 
 def main():
@@ -54,12 +58,12 @@ def main():
     )
     args = parser.parse_args()
 
-    with open(args.in_out_file, "r") as file:
+    with open(args.in_out_file, "r", encoding="UTF-8") as file:
         instance_configs = json.load(file)
 
     append_pricing(instance_configs)
 
-    with open(args.in_out_file, "w") as file:
+    with open(args.in_out_file, "w", encoding="UTF-8") as file:
         json.dump(instance_configs, file, indent=2)
         file.write("\n")
 

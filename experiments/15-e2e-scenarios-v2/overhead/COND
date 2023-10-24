@@ -1,0 +1,82 @@
+include("../common.cond")
+
+# Want a nice mix of long and short-running queries.
+QUERY_INDEXES = "0,1,2,25,26,27,50,51,52"
+
+combine(
+  name="overhead",
+  deps=[
+    ":olap_brad",
+    ":olap_direct",
+    ":oltp_brad",
+    ":oltp_direct",
+  ],
+)
+
+group(
+  name="olap",
+  deps=[
+    ":olap_direct_athena",
+    ":olap_direct_aurora",
+    ":olap_direct_redshift",
+    ":olap_brad",
+  ],
+)
+
+run_experiment(
+  name=f"olap_brad",
+  run="./run_ana_via_brad.sh",
+  options={
+    "config-file": "config/config_large.yml",
+    "planner-config-file": "config/planner.yml",
+    "ra-query-indexes": QUERY_INDEXES,
+    "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
+    "schema-name": "imdb_extended_20g",
+    "num-front-ends": 4,
+  },
+)
+
+run_experiment_group(
+  name=f"olap_direct",
+  run="python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py",
+  experiments=[
+    ExperimentInstance(
+      name=f"olap_direct_{engine}",
+      args=["--brad-direct", "--run-warmup"],
+      options={
+        "config-file": "../../../config/config_large.yml",
+        "schema-name": "imdb_extended_20g",
+        "query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
+        "query-indexes": QUERY_INDEXES,
+        "engine": engine,
+        "run-for-s": 3 * 60,
+        "run-warmup-times": 5,
+      },
+      parallelizable=True,
+    )
+    for engine in ["redshift", "aurora", "athena"]
+  ]
+)
+
+run_experiment(
+  name="oltp_brad",
+  run="./run_txn_via_brad.sh",
+  options={
+    "config-file": "config/config_large.yml",
+    "planner-config-file": "config/planner.yml",
+    "schema-name": "imdb_extended_20g",
+    "num-front-ends": 4,
+  },
+)
+
+run_experiment(
+  name="oltp_direct",
+  run="python3 ../../../workloads/IMDB_extended/run_transactions.py",
+  args=["--brad-direct"],
+  options={
+    "config-file": "../../../config/config_large.yml",
+    "schema-name": "imdb_extended_20g",
+    "run-for-s": 3 * 60,
+    "num-clients": 2,
+  },
+)

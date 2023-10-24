@@ -25,14 +25,14 @@ class QueryLatencyCeiling(Trigger):
     async def should_replan(self) -> bool:
         past = self._monitor.front_end_metrics().read_k_most_recent(
             k=self._sustained_epochs,
-            metric_ids=[FrontEndMetric.QueryLatencyMaxSecond.value],
+            metric_ids=[FrontEndMetric.QueryLatencySecondP95.value],
         )
-        rel = past[FrontEndMetric.QueryLatencyMaxSecond.value]
+        rel = past[FrontEndMetric.QueryLatencySecondP95.value]
         if len(rel) >= self._sustained_epochs and (rel > self._latency_ceiling_s).all():
-            max_lat_s = rel.iloc[-1]
+            p95_lat_s = rel.iloc[-1]
             logger.info(
-                "Triggering replan because maximum query latency (%f) is above %f.",
-                max_lat_s,
+                "Triggering replan because p95 query latency (%f) is above %f.",
+                p95_lat_s,
                 self._latency_ceiling_s,
             )
             return True
@@ -42,18 +42,18 @@ class QueryLatencyCeiling(Trigger):
 
         future = self._monitor.front_end_metrics().read_k_upcoming(
             k=self._lookahead_epochs,
-            metric_ids=[FrontEndMetric.QueryLatencyMaxSecond.value],
+            metric_ids=[FrontEndMetric.QueryLatencySecondP95.value],
         )
-        rel = future[FrontEndMetric.QueryLatencyMaxSecond.value]
+        rel = future[FrontEndMetric.QueryLatencySecondP95.value]
         rel = rel[-self._sustained_epochs :]
         if len(rel) < self._sustained_epochs:
             return False
 
         if (rel > self._latency_ceiling_s).all():
-            max_lat_s = rel.iloc[-1]
+            p95_lat_s = rel.iloc[-1]
             logger.info(
-                "Triggering replan because maximum query latency (%f) is forecasted to be above %f.",
-                max_lat_s,
+                "Triggering replan because p95 query latency (%f) is forecasted to be above %f.",
+                p95_lat_s,
                 self._latency_ceiling_s,
             )
             return True

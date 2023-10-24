@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def start_front_end(
     fe_index: int,
-    config_path: str,
+    config: ConfigFile,
     schema_name: str,
     path_to_planner_config: str,
     debug_mode: bool,
@@ -23,7 +23,6 @@ def start_front_end(
     Schedule this method to run in a child process to launch a BRAD front
     end server.
     """
-    config = ConfigFile(config_path)
     set_up_logging(filename=config.front_end_log_file(fe_index), debug_mode=debug_mode)
 
     event_loop = asyncio.new_event_loop()
@@ -35,6 +34,8 @@ def start_front_end(
     # daemon directly.
     for sig in [signal.SIGTERM, signal.SIGINT]:
         event_loop.add_signal_handler(sig, _noop)
+    # This is useful for debugging purposes.
+    event_loop.add_signal_handler(signal.SIGUSR1, _drop_into_pdb)
     event_loop.set_exception_handler(_handle_exception)
 
     try:
@@ -61,6 +62,13 @@ def _handle_exception(event_loop, context):
     logging.error("%s", context)
     if event_loop.is_closed():
         return
+
+
+def _drop_into_pdb():
+    import pdb
+
+    # N.B. Leaving this in is intentional.
+    pdb.set_trace()  # pylint: disable=forgotten-debug-statement
 
 
 def _noop():

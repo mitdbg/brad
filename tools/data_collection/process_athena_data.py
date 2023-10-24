@@ -59,7 +59,7 @@ def load_all_data(data_path: str, prefix: str) -> pd.DataFrame:
     for file in pathlib.Path(data_path).iterdir():
         if not file.name.startswith("athena+{}".format(prefix)):
             continue
-        with open(file, "r") as f:
+        with open(file, "r", encoding="UTF-8") as f:
             raw = json.load(f)
         dfs.append(extract_relevant(raw))
 

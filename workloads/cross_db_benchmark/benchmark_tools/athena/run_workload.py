@@ -6,22 +6,58 @@ import time
 from json.decoder import JSONDecodeError
 from tqdm import tqdm
 
+from workloads.cross_db_benchmark.benchmark_tools.athena.athena_boto import (
+    AthenaBotoClient,
+)
 from workloads.cross_db_benchmark.benchmark_tools.load_database import create_db_conn
-from workloads.cross_db_benchmark.benchmark_tools.utils import load_json
+from workloads.cross_db_benchmark.benchmark_tools.utils import (
+    load_json,
+    compute_workload_splits,
+)
 
 column_regex = re.compile('"(\S+)"."(\S+)"')
 
 
 def run_athena_workload(
-    workload_path, database, db_name, target_path, run_kwargs, timeout_sec, cap_workload
+    workload_path,
+    database,
+    db_name,
+    target_path,
+    run_kwargs,
+    timeout_sec,
+    cap_workload,
+    rank,
+    world_size,
+    use_boto_client=True,
+    s3_output_path=None,
 ):
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
-    db_conn = create_db_conn(database, db_name, None, None)
+    if not use_boto_client:
+        db_conn = create_db_conn(database, db_name, None, None)
+        boto_client = None
+    else:
+        db_conn = None
+        # NOTE: Using the boto client is preferred because it also collects data
+        # scanned statistics, which we need.
+        assert s3_output_path is not None
+        boto_client = AthenaBotoClient(
+            schema_name=db_name,
+            s3_output_path=s3_output_path,
+            query_timeout_s=timeout_sec,
+        )
 
     with open(workload_path) as f:
         content = f.readlines()
     queries = [x.strip() for x in content]
+
+    start_offset, end_offset = compute_workload_splits(len(queries), rank, world_size)
+    print("----------------------------------")
+    print("Rank:", rank)
+    print("World size:", world_size)
+    print("Running queries in range: [{}, {})".format(start_offset, end_offset))
+    print("----------------------------------")
+    relevant_queries = queries[start_offset:end_offset]
 
     # extract column statistics: do Athena support this? Probably not
     # database_stats = db_conn.collect_db_statistics()
@@ -44,13 +80,20 @@ def run_athena_workload(
     # extract query plans
     start_t = time.perf_counter()
     valid_queries = 0
-    for i, sql_query in enumerate(tqdm(queries)):
+    for i, sql_query in enumerate(tqdm(relevant_queries)):
         if cap_workload and i >= cap_workload:
             break
 
-        curr_statistics = db_conn.run_query_collect_statistics(sql_query, timeout_sec)
-        curr_statistics.update(sql=sql_query)
-        query_list.append(curr_statistics)
+        if not use_boto_client:
+            curr_statistics = db_conn.run_query_collect_statistics(
+                sql_query, timeout_sec
+            )
+            curr_statistics.update(sql=sql_query)
+            query_list.append(curr_statistics)
+        else:
+            results = boto_client.run_query(sql_query)
+            results["query_index"] = i
+            query_list.append(results)
 
         run_stats = dict(
             query_list=query_list,
@@ -80,5 +123,5 @@ def save_workload(run_stats, target_path):
         os.path.dirname(target_path), f"{os.path.basename(target_path)}_temp"
     )
     with open(target_temp_path, "w") as outfile:
-        json.dump(run_stats, outfile)
+        json.dump(run_stats, outfile, default=str)
     shutil.move(target_temp_path, target_path)

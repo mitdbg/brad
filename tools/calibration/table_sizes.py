@@ -3,6 +3,7 @@ import asyncio
 import argparse
 import logging
 import json
+import yaml
 from typing import Dict
 
 from brad.asset_manager import AssetManager
@@ -10,7 +11,8 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.data_sync.execution.context import ExecutionContext
 from brad.data_sync.operators.unload_to_s3 import UnloadToS3
-from brad.blueprint_manager import BlueprintManager
+from brad.provisioning.directory import Directory
+from brad.blueprint.manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
 from brad.utils import set_up_logging
@@ -27,8 +29,8 @@ def delete_s3_object(client, bucket: str, key: str) -> None:
     client.delete_object(Bucket=bucket, Key=key)
 
 
-async def main_impl(args):
-    config = ConfigFile(args.config_file)
+async def main_impl(args) -> None:
+    config = ConfigFile.load(args.config_file)
     assets = AssetManager(config)
     mgr = BlueprintManager(config, assets, args.schema_name)
     await mgr.load()
@@ -36,11 +38,22 @@ async def main_impl(args):
     bp = mgr.get_blueprint()
     logger.info("Using blueprint: %s", bp)
 
+    directory = Directory(config)
+    await directory.refresh()
+
     engines_sync = EngineConnections.connect_sync(
-        config, args.schema_name, autocommit=True, specific_engines={Engine.Aurora}
+        config,
+        directory,
+        args.schema_name,
+        autocommit=True,
+        specific_engines={Engine.Aurora},
     )
     engines = await EngineConnections.connect(
-        config, args.schema_name, autocommit=True, specific_engines={Engine.Aurora}
+        config,
+        directory,
+        args.schema_name,
+        autocommit=True,
+        specific_engines={Engine.Aurora},
     )
 
     boto_client = boto3.client(
@@ -70,16 +83,17 @@ async def main_impl(args):
         full_extract_path = f"{config.s3_extract_path}{extract_file}"
 
         num_rows = table_sizer.table_size_rows(table.name, Engine.Aurora)
-        op = UnloadToS3(table.name, extract_file, Engine.Aurora)
+        extract_limit = min(num_rows, args.max_rows)
+        op = UnloadToS3(table.name, extract_file, Engine.Aurora, extract_limit)
         await op.execute(ctx)
 
         table_bytes = s3_object_size_bytes(
             boto_client, config.s3_extract_bucket, full_extract_path
         )
 
-        b_per_row = table_bytes / num_rows
+        b_per_row = table_bytes / extract_limit
         logger.info(
-            "%s: %d rows, extracted %d B total", table.name, num_rows, table_bytes
+            "%s: %d rows, extracted %d B total", table.name, extract_limit, table_bytes
         )
         bytes_per_row[table.name] = b_per_row
 
@@ -90,8 +104,11 @@ async def main_impl(args):
 
     print("table_extract_bytes_per_row:", flush=True)
     print(f"  {args.schema_name}:")
-    for table, bpr in bytes_per_row.items():
-        print(f"    {table}: {bpr}", flush=True)
+    for table_name, bpr in bytes_per_row.items():
+        print(f"    {table_name}: {bpr}", flush=True)
+
+    with open(args.schema_name + "_data.yaml", "w", encoding="UTF-8") as file:
+        yaml.dump(bytes_per_row, file, default_flow_style=False)
 
     await engines.close()
     engines_sync.close_sync()
@@ -105,6 +122,9 @@ def main():
     parser.add_argument("--config-file", type=str, required=True)
     parser.add_argument("--schema-name", type=str, required=True)
     parser.add_argument("--debug", action="store_true")
+    # Unloading is slow - we do not need to unload the entire table to get a
+    # reasonable idea of the size per row.
+    parser.add_argument("--max-rows", type=int, default=500_000)
     args = parser.parse_args()
 
     set_up_logging(debug_mode=args.debug)

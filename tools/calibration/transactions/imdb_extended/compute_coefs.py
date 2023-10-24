@@ -85,7 +85,7 @@ def load_data(prefix):
         if not exp.is_dir() or exp.name.startswith("."):
             continue
         parts = exp.name.split("-")
-        num_clients = int(parts[1])
+        num_clients = int(parts[2])
 
         metrics_df = extract_metrics(exp / "pi_metrics.csv")
         metrics = process_metrics(metrics_df)
@@ -135,7 +135,9 @@ def load_data(prefix):
     )
 
 
-def combine_data(data_path_str: str, instances: List[str]):
+def combine_data(
+    data_path_str: str, instances: List[str]
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     cpu_count = {
         "r6g_large": 2,
         "r6g_xlarge": 4,
@@ -146,7 +148,7 @@ def combine_data(data_path_str: str, instances: List[str]):
     all_stats = []
     data_path = pathlib.Path(data_path_str)
     for inst in instances:
-        metrics, lats, stats = load_data(data_path / inst)
+        metrics, lats, stats = load_data(data_path / (inst + "-imdb_extended_20g"))
         comb = pd.merge(lats, metrics, on=["num_clients"])
         comb.insert(0, "instance", inst)
         comb.insert(1, "num_cpus", cpu_count[inst])
@@ -157,10 +159,10 @@ def combine_data(data_path_str: str, instances: List[str]):
         all_stats.append(stats)
 
     all_data = pd.concat(results, ignore_index=True)
-    all_stats = pd.concat(all_stats, ignore_index=True)
-    return all_data.sort_values(by=["num_cpus", "num_clients"]), all_stats.sort_values(
+    all_stats_df = pd.concat(all_stats, ignore_index=True)
+    return all_data.sort_values(
         by=["num_cpus", "num_clients"]
-    )
+    ), all_stats_df.sort_values(by=["num_cpus", "num_clients"])
 
 
 def compute_client_txn_rate(df: pd.DataFrame) -> pd.DataFrame:
@@ -176,11 +178,11 @@ def compute_client_txn_rate(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def compute_diffs(load_data: pd.DataFrame) -> pd.DataFrame:
-    instances = load_data["instance"].unique()
+def compute_diffs(load_data_df: pd.DataFrame) -> pd.DataFrame:
+    instances = load_data_df["instance"].unique()
     all_data = []
     for inst in instances:
-        rel = load_data[load_data["instance"] == inst].copy()
+        rel = load_data_df[load_data_df["instance"] == inst].copy()
         rel["diff"] = rel["completions_per_s"] / rel["completions_per_s"].shift(1)
         rel = rel.dropna()
         all_data.append(rel)
@@ -357,16 +359,16 @@ def main() -> None:
     )
 
     rates = compute_client_txn_rate(stats)
-    load_data = load_translation(data, rates)
+    load_data_df = load_translation(data, rates)
 
     # Compute the "saturation load" for each provisioning.
     cutoffs = find_cutoffs(
-        compute_diffs(load_data), threshold=args.saturation_threshold
+        compute_diffs(load_data_df), threshold=args.saturation_threshold
     )
     cutoff_models, cutoff_scores = compute_cutoff_models(cutoffs)
 
     # Compute "translation models" (mapping client-side metrics to system metrics)
-    fld = filter_cutoff(load_data, cutoffs)
+    fld = filter_cutoff(load_data_df, cutoffs)
     translation_models, translation_scores = compute_translation_models(fld)
 
     # Print out the results.

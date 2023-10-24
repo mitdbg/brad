@@ -6,7 +6,12 @@ planning_window:
   weeks: 0
   days: 0
   hours: 0
-  minutes: 3
+  minutes: 5
+
+# Each second in the previous workload is treated as 10 seconds (so a 5 min
+# planning window is treated as 50 mins). This is to make scenario run times
+# more managable.
+reinterpret_second_as: 10
 
 # The query distribution must change by at least this much for a new blueprint
 # to be accepted.
@@ -94,7 +99,10 @@ aurora_load_rate_mb_per_s: 10.0
 athena_extract_rate_mb_per_s: 10.0
 athena_load_rate_mb_per_s: 10.0
 
+# Storage costs.
 s3_usd_per_mb_per_month: 0.000023
+aurora_regular_usd_per_mb_per_month: 0.00010
+aurora_io_opt_usd_per_mb_per_month: 0.000225
 
 ###
 ### Dataset-specific Transition Constants
@@ -151,7 +159,36 @@ table_extract_bytes_per_row:
     movie_info: 66.48728137225561
     person_info: 133.20102076348735
 
+  imdb_extended_20g:
+    homes: 20.556198
+    theatres: 32.4135
+    showings: 46.01808
+    ticket_orders: 36.773404
+    aka_name: 81.795698
+    aka_title: 115.56834554266997
+    cast_info: 35.296638
+    char_name: 71.25104
+    comp_cast_type: 11.25
+    company_name: 78.345222
+    company_type: 23.0
+    complete_cast: 17.87376189982678
+    info_type: 17.061946902654867
+    keyword: 28.256227174480138
+    kind_type: 12.142857142857142
+    link_type: 14.5
+    movie_companies: 42.636226
+    movie_info_idx: 26.61975
+    movie_keyword: 18.729882
+    movie_link: 21.888322165549887
+    name: 78.5697
+    role_type: 13.333333333333334
+    title: 88.5209
+    movie_info: 29.449154
+    person_info: 133.458044
+
+
 ###
+### [Deprecated]
 ### Performance metrics scaling modifiers.
 ### (Used by neighborhood planning.)
 ###
@@ -173,11 +210,13 @@ aurora_resource_scaling:
   aurora_WRITER_ReadIOPS_Average: 1.0
   aurora_WRITER_WriteIOPS_Average: 1.0
 
+# [Deprecated]
 # Legacy Aurora scan cost estimator.
 # $0.000025 per MB scanned.
 aurora_usd_per_mb_scanned: 0.000025
 
 ###
+### [Deprecated]
 ### Query latency scaling modifiers (across provisionings).
 ###
 
@@ -189,6 +228,7 @@ redshift_gamma: 0.635405229
 
 
 ###
+### [Deprecated]
 ### Load factor scaling modifiers.
 ###
 
@@ -202,6 +242,7 @@ redshift_load_factor:
   cpu_to_load_alpha: 0.7861541
   min_scaling_cpu: 30
 
+# [Deprecated]
 aurora_load_factor:
   # Proportionality factor for cross-provisioning CPU changes.
   resource_alpha: 1.0
@@ -234,6 +275,11 @@ aurora_txns:
   # Should be a bit more precise.
   prov_to_peak_cpu_denorm: 0.6800294117647058
 
+  imdb_extended_20g:
+    K: 1.0581694841384888
+    b_p50: 0.0022556402254849672
+    b_p95: 0.00383179122582078
+
 
 aurora_scaling:
   # [coef1(load)^2(resource ratio)^2 + coef2(load)^2 + coef3(resource ratio)^2 + coef4] * base
@@ -250,3 +296,5 @@ redshift_scaling:
   coef2: 0.00370447
   coef3: 0.49948713
   coef4: 0.36256359
+
+use_io_optimized_aurora: true

@@ -10,7 +10,10 @@ from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.query_based_candidate import BlueprintCandidate
 from brad.planner.beam.triggers import get_beam_triggers
 from brad.planner.router_provider import RouterProvider
-from brad.planner.debug_logger import BlueprintPlanningDebugLogger
+from brad.planner.debug_logger import (
+    BlueprintPlanningDebugLogger,
+    BlueprintPickleDebugLogger,
+)
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
@@ -167,11 +170,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                             next_candidate.find_best_provisioning(ctx)
 
                         if not (next_candidate.is_better_than(next_top_k[0])):
-                            # We eliminate `next_candidate`. Even after
-                            # looking for the best provisioning, it has a
-                            # worse score compared to `next_top_k[0]` (the
-                            # worst scoring blueprint candidate in the
-                            # top-k).
+                            # We eliminate `next_candidate`. Even after looking
+                            # for the best provisioning, it has a worse score
+                            # compared to `next_top_k[0]` (the worst scoring
+                            # blueprint candidate in the top-k).
                             continue
 
                         while (
@@ -284,6 +286,11 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         # The best blueprint will be ordered first (we have a negated
         # `__lt__` method to work with `heapq` to create a max heap).
         final_top_k.sort(reverse=True)
+
+        # For later interactive inspection in Python.
+        BlueprintPickleDebugLogger.log_candidates_if_requested(
+            self._config, "final_query_based_blueprints", final_top_k
+        )
 
         # Log the final top k for debugging purposes, if needed.
         final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(

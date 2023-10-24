@@ -23,5 +23,12 @@ if [ "$1" == "--virtualenv" ]; then
   fi
 fi
 
-pip3 install --prefix $HOME/.local/ --editable ".[dev]"
+is_venv=$(python3 -c "import sys; print(sys.prefix != sys.base_prefix)")
+
+if [ $is_venv = "True" ]; then
+  pip3 install --editable ".[dev]"
+else
+  pip3 install --prefix $HOME/.local/ --editable ".[dev]"
+fi
+
 echo_green "✓ Done"

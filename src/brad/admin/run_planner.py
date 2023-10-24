@@ -11,9 +11,7 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.data_stats.postgres_estimator import PostgresEstimator
-from brad.planner.compare.cost import (
-    best_cost_under_p99_latency,
-)
+from brad.planner.compare.cost import best_cost_under_perf_ceilings
 from brad.planner.estimator import EstimatorProvider, FixedEstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.scoring.score import Score
@@ -127,7 +125,7 @@ def run_planner(args) -> None:
     independently of the rest of BRAD.
     """
     # 1. Load the config.
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
 
     # 2. Load the planner config.
     planner_config = PlannerConfig(args.planner_config_file)
@@ -234,8 +232,9 @@ def run_planner(args) -> None:
         # Used for debugging purposes.
         analytics_latency_scorer=prediction_provider,
         # TODO: Make this configurable.
-        comparator=best_cost_under_p99_latency(
-            max_latency_ceiling_s=args.latency_ceiling_s
+        comparator=best_cost_under_perf_ceilings(
+            max_query_latency_s=args.latency_ceiling_s,
+            max_txn_p95_latency_s=0.020,  # FIXME: Add command-line argument if needed.
         ),
         metrics_provider=metrics_provider,
         data_access_provider=data_access_provider,

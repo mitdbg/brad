@@ -27,6 +27,10 @@ class ComparableBlueprint:
     def get_predicted_analytical_latencies(self) -> npt.NDArray:
         raise NotImplementedError
 
+    def get_predicted_transactional_latencies(self) -> npt.NDArray:
+        # Returns (p50, p90) overall latency.
+        raise NotImplementedError
+
     # TODO: For more sophisticated comparisons, the user might want access to
     # predicted latency on a per-query basis.
 

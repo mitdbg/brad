@@ -1,3 +1,4 @@
+import math
 import numpy as np
 
 from .blueprint import ComparableBlueprint
@@ -83,21 +84,45 @@ def best_cost_under_max_latency(max_latency_ceiling_s: float) -> BlueprintCompar
     return is_better_than
 
 
-def best_cost_under_p99_latency(max_latency_ceiling_s: float) -> BlueprintComparator:
+def best_cost_under_perf_ceilings(
+    max_query_latency_s: float,
+    max_txn_p95_latency_s: float,
+) -> BlueprintComparator:
     def is_better_than(left: ComparableBlueprint, right: ComparableBlueprint) -> bool:
+        # Check transactional latency ceilings first.
+        left_txn_p95 = left.get_predicted_transactional_latencies()[0]
+        right_txn_p95 = right.get_predicted_transactional_latencies()[0]
+
+        # If one of these candidates have NaN predictions, we need to
+        # consider other factors. NaN indicates that a prediction is not
+        # available (e.g., due to missing metrics).
+        if not math.isnan(left_txn_p95) and not math.isnan(right_txn_p95):
+            # Both above the ceiling, return the blueprint that does better on
+            # performance.
+            if (
+                left_txn_p95 > max_txn_p95_latency_s
+                and right_txn_p95 > max_txn_p95_latency_s
+            ):
+                return left_txn_p95 < right_txn_p95
+            elif left_txn_p95 > max_txn_p95_latency_s:
+                return False
+            elif right_txn_p95 > max_txn_p95_latency_s:
+                return True
+
+        # Query latency ceilings.
         left_lat = _get_or_compute_p99_latency(left)
         right_lat = _get_or_compute_p99_latency(right)
 
-        if left_lat > max_latency_ceiling_s and right_lat > max_latency_ceiling_s:
+        if left_lat > max_query_latency_s and right_lat > max_query_latency_s:
             # Both are above the latency ceiling.
             # So the better blueprint is the one that does better on performance.
             return left_lat < right_lat
-        elif left_lat > max_latency_ceiling_s:
+        elif left_lat > max_query_latency_s:
             return False
-        elif right_lat > max_latency_ceiling_s:
+        elif right_lat > max_query_latency_s:
             return True
 
-        # Both are under the latency ceiling.
+        # Both are under the performance ceilings.
         left_cost = left.get_operational_monetary_cost() + left.get_transition_cost()
         right_cost = right.get_operational_monetary_cost() + right.get_transition_cost()
 

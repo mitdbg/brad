@@ -44,7 +44,7 @@ def test_neighborhood_change():
     initial = bootstrap_blueprint(user)
     print()  # Flush stdout.
     print("Running test")
-    config = ConfigFile(
+    config = ConfigFile.load(
         "config.yml"
     )  # TODO: Support configs in tests. This will not work.
     assets = AssetManager(config)

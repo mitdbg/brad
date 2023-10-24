@@ -1,0 +1,403 @@
+import argparse
+import multiprocessing as mp
+import time
+import os
+import numpy as np
+import pathlib
+import random
+import queue
+import sys
+import threading
+import signal
+import pytz
+import logging
+from typing import List, Optional
+import numpy.typing as npt
+from datetime import datetime, timedelta
+
+from workload_utils.connect import connect_to_db
+from brad.config.engine import Engine
+from brad.grpc_client import BradClientError
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
+
+logger = logging.getLogger(__name__)
+
+
+def runner(
+    runner_idx: int,
+    start_queue: mp.Queue,
+    stop_queue: mp.Queue,
+    args,
+    query_bank: List[str],
+    queries: List[int],
+    query_frequency: Optional[npt.NDArray] = None,
+) -> None:
+    def noop(_signal, _frame):
+        pass
+
+    signal.signal(signal.SIGINT, noop)
+
+    # For printing out results.
+    if "COND_OUT" in os.environ:
+        # pylint: disable-next=import-error
+        import conductor.lib as cond
+
+        out_dir = cond.get_output_path()
+    else:
+        out_dir = pathlib.Path(".")
+
+    if args.engine is not None:
+        engine = Engine.from_str(args.engine)
+    else:
+        engine = None
+
+    database = connect_to_db(
+        args,
+        runner_idx,
+        direct_engine=engine,
+        # Ensure we disable the result cache if we are running directly on
+        # Redshift.
+        disable_direct_redshift_result_cache=True,
+    )
+
+    if query_frequency is not None:
+        query_frequency = query_frequency[queries]
+        query_frequency = query_frequency / np.sum(query_frequency)
+
+    try:
+        with open(
+            out_dir / "repeating_olap_batch_{}.csv".format(runner_idx),
+            "w",
+            encoding="UTF-8",
+        ) as file:
+            print("timestamp,query_idx,run_time_s,engine", file=file, flush=True)
+
+            prng = random.Random(args.seed ^ runner_idx)
+            rand_backoff = None
+
+            logger.info(
+                "[Repeating Analytics Runner %d] Queries to run: %s",
+                runner_idx,
+                queries,
+            )
+            query_order = queries.copy()
+            prng.shuffle(query_order)
+
+            # Signal that we're ready to start and wait for the controller.
+            start_queue.put_nowait("")
+            _ = stop_queue.get()
+
+            while True:
+                if args.avg_gap_s is not None:
+                    # Wait times are normally distributed right now.
+                    # TODO: Consider using a different distribution (e.g., exponential).
+                    # TODO: load gap distribution from a path that mimics snowset
+                    wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
+                    if wait_for_s < 0.0:
+                        wait_for_s = 0.0
+                    time.sleep(wait_for_s)
+
+                if query_frequency is not None:
+                    qidx = prng.choices(queries, list(query_frequency))[0]
+                else:
+                    if len(query_order) == 0:
+                        query_order = queries.copy()
+                        prng.shuffle(query_order)
+
+                    qidx = query_order.pop()
+                logger.debug("Executing qidx: %d", qidx)
+                query = query_bank[qidx]
+
+                try:
+                    engine = None
+                    now = datetime.now().astimezone(pytz.utc)
+                    start = time.time()
+                    _, engine = database.execute_sync_with_engine(query)
+                    end = time.time()
+                    print(
+                        "{},{},{},{}".format(
+                            now,
+                            qidx,
+                            end - start,
+                            engine.value if engine is not None else "unknown",
+                        ),
+                        file=file,
+                        flush=True,
+                    )
+                    rand_backoff = None
+
+                except BradClientError as ex:
+                    if ex.is_transient():
+                        print(
+                            "Transient query error:",
+                            ex.message(),
+                            flush=True,
+                            file=sys.stderr,
+                        )
+
+                        if rand_backoff is None:
+                            rand_backoff = RandomizedExponentialBackoff(
+                                max_retries=10,
+                                base_delay_s=2.0,
+                                max_delay_s=timedelta(minutes=10).total_seconds(),
+                            )
+
+                        # Delay retrying in the case of a transient error (this
+                        # happens during blueprint transitions).
+                        wait_s = rand_backoff.wait_time_s()
+                        if wait_s is None:
+                            print("Aborting benchmark. Too many transient errors.")
+                            break
+                        time.sleep(wait_s)
+
+                    else:
+                        print(
+                            "Unexpected query error:",
+                            ex.message(),
+                            flush=True,
+                            file=sys.stderr,
+                        )
+
+                try:
+                    _ = stop_queue.get_nowait()
+                    break
+                except queue.Empty:
+                    pass
+    finally:
+        database.close_sync()
+
+
+def run_warmup(args, query_bank: List[str], queries: List[int]):
+    if args.engine is not None:
+        engine = Engine.from_str(args.engine)
+    else:
+        engine = None
+
+    database = connect_to_db(
+        args,
+        worker_index=0,
+        direct_engine=engine,
+        # Ensure we disable the result cache if we are running directly on
+        # Redshift.
+        disable_direct_redshift_result_cache=True,
+    )
+
+    # For printing out results.
+    if "COND_OUT" in os.environ:
+        # pylint: disable-next=import-error
+        import conductor.lib as cond
+
+        out_dir = cond.get_output_path()
+    else:
+        out_dir = pathlib.Path(".")
+
+    try:
+        print(
+            f"Starting warmup pass (will run {args.run_warmup_times} times)...",
+            file=sys.stderr,
+            flush=True,
+        )
+        with open(
+            out_dir / "repeating_olap_batch_warmup.csv", "w", encoding="UTF-8"
+        ) as file:
+            print("timestamp,query_idx,run_time_s,engine", file=file)
+            for _ in range(args.run_warmup_times):
+                for idx, qidx in enumerate(queries):
+                    try:
+                        engine = None
+                        query = query_bank[qidx]
+                        now = datetime.now().astimezone(pytz.utc)
+                        start = time.time()
+                        _, engine = database.execute_sync_with_engine(query)
+                        end = time.time()
+                        run_time_s = end - start
+                        print(
+                            "Warmed up {} of {}. Run time (s): {}".format(
+                                idx + 1, len(queries), run_time_s
+                            ),
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                        print(
+                            "{},{},{},{}".format(
+                                now,
+                                qidx,
+                                run_time_s,
+                                engine.value if engine is not None else "unknown",
+                            ),
+                            file=file,
+                            flush=True,
+                        )
+                    except BradClientError as ex:
+                        if ex.is_transient():
+                            print(
+                                "Transient query error:",
+                                ex.message(),
+                                flush=True,
+                                file=sys.stderr,
+                            )
+                        else:
+                            print(
+                                "Unexpected query error:",
+                                ex.message(),
+                                flush=True,
+                                file=sys.stderr,
+                            )
+    finally:
+        database.close_sync()
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--brad-host", type=str, default="localhost")
+    parser.add_argument("--brad-port", type=int, default=6583)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--num-front-ends", type=int, default=1)
+    parser.add_argument("--run-warmup", action="store_true")
+    parser.add_argument(
+        "--run-warmup-times",
+        type=int,
+        default=1,
+        help="Run the warmup query list this many times.",
+    )
+    parser.add_argument(
+        "--cstr-var",
+        type=str,
+        help="Set to connect via ODBC instead of the BRAD client (for use with other baselines).",
+    )
+    parser.add_argument(
+        "--query-bank-file", type=str, required=True, help="Path to a query bank."
+    )
+    parser.add_argument(
+        "--query-frequency-path",
+        type=str,
+        default=None,
+        help="path to the frequency to draw each query in query bank",
+    )
+    parser.add_argument("--num-clients", type=int, default=1)
+    parser.add_argument("--avg-gap-s", type=float)
+    parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
+    parser.add_argument("--query-indexes", type=str)
+    parser.add_argument(
+        "--brad-direct",
+        action="store_true",
+        help="Set to connect directly to Aurora via BRAD's config.",
+    )
+    parser.add_argument(
+        "--config-file",
+        type=str,
+        help="The BRAD config file (if --brad-direct is used).",
+    )
+    parser.add_argument(
+        "--schema-name",
+        type=str,
+        help="The schema name to use, if connecting directly.",
+    )
+    parser.add_argument(
+        "--engine", type=str, help="The engine to use, if connecting directly."
+    )
+    parser.add_argument("--run-for-s", type=int, help="If set, run for this long.")
+    parser.add_argument(
+        "--query-gap-path",
+        type=str,
+        default=None,
+        help="Path to the gaps to run each query",
+    )
+    args = parser.parse_args()
+
+    with open(args.query_bank_file, "r", encoding="UTF-8") as file:
+        query_bank = [line.strip() for line in file]
+
+    if args.query_frequency_path is not None and os.path.exists(
+        args.query_frequency_path
+    ):
+        query_frequency = np.load(args.query_frequency_path)
+        assert len(query_frequency) == len(
+            query_bank
+        ), "query_frequency size does not match total number of queries"
+    else:
+        query_frequency = None
+
+    if args.query_indexes is None:
+        queries = list(range(len(query_bank)))
+    else:
+        queries = list(map(int, args.query_indexes.split(",")))
+
+    for qidx in queries:
+        assert qidx < len(query_bank)
+        assert qidx >= 0
+
+    if args.run_warmup:
+        run_warmup(args, query_bank, queries)
+        return
+
+    mgr = mp.Manager()
+    start_queue = mgr.Queue()
+    stop_queue = mgr.Queue()
+
+    processes = []
+    for idx in range(args.num_clients):
+        p = mp.Process(
+            target=runner,
+            args=(
+                idx,
+                start_queue,
+                stop_queue,
+                args,
+                query_bank,
+                queries,
+                query_frequency,
+            ),
+        )
+        p.start()
+        processes.append(p)
+
+    print("Waiting for startup...", flush=True)
+    for _ in range(args.num_clients):
+        start_queue.get()
+
+    print("Telling {} clients to start.".format(args.num_clients), flush=True)
+    for _ in range(args.num_clients):
+        stop_queue.put("")
+
+    if args.run_for_s:
+        print(
+            "Waiting for {} seconds...".format(args.run_for_s),
+            flush=True,
+            file=sys.stderr,
+        )
+        time.sleep(args.run_for_s)
+    else:
+        # Wait until requested to stop.
+        print(
+            "Repeating analytics waiting until requested to stop... (hit Ctrl-C)",
+            flush=True,
+            file=sys.stderr,
+        )
+        should_shutdown = threading.Event()
+
+        def signal_handler(_signal, _frame):
+            should_shutdown.set()
+
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+
+        should_shutdown.wait()
+
+    print("Stopping clients...", flush=True, file=sys.stderr)
+    for _ in range(args.num_clients):
+        stop_queue.put("")
+
+    print("Waiting for the clients to complete.")
+    for p in processes:
+        p.join()
+
+    print("Done!")
+
+
+if __name__ == "__main__":
+    # On Unix platforms, the default way to start a process is by forking, which
+    # is not ideal (we do not want to duplicate this process' file
+    # descriptors!).
+    mp.set_start_method("spawn")
+    main()

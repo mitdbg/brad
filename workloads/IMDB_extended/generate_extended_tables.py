@@ -2,21 +2,23 @@ import argparse
 import random
 from datetime import datetime, timedelta
 
-
-THEATRES_PER_SF = 1000
-HOMES_PER_SF = 100 * THEATRES_PER_SF
-# N.B. There are only 2900212 movies, so some IDs are non-existent.
-# For simplicity, we do not account for this when generating showings.
-MIN_MOVIE_ID = 1
-MAX_MOVIE_ID = 3870547
-SHOWING_DAYS = 365
-SHOWINGS_PER_MOVIE_PER_DAY = 2
-MOVIES_PER_DAY_MIN = 3
-MOVIES_PER_DAY_MAX = 8
-MIN_CAPACITY = 200
-MAX_CAPACITY = 400
-MIN_ORDERS_PER_SHOWING = 0
-MAX_ORDERS_PER_SHOWING = 15
+from workload_utils.dataset_config import (
+    MAX_MOVIE_ID_100GB,
+    MAX_MOVIE_ID_20GB,
+    MAX_MOVIE_ID_ORIGINAL,
+    THEATRES_PER_SF,
+    HOMES_PER_SF,
+    SHOWING_DAYS,
+    SHOWINGS_PER_MOVIE_PER_DAY,
+    MOVIES_PER_DAY_MIN,
+    MOVIES_PER_DAY_MAX,
+    MIN_CAPACITY,
+    MAX_CAPACITY,
+    MIN_ORDERS_PER_SHOWING,
+    MAX_ORDERS_PER_SHOWING,
+    MIN_MOVIE_ID,
+    NUM_TELEMETRY_POINTS,
+)
 
 
 class Context:
@@ -29,6 +31,15 @@ class Context:
         self.start_datetime = datetime(
             int(datetime_parts[0]), int(datetime_parts[1]), int(datetime_parts[2])
         )
+
+        if args.dataset_type == "original":
+            self.max_movie_id = MAX_MOVIE_ID_ORIGINAL
+        elif args.dataset_type == "20gb":
+            self.max_movie_id = MAX_MOVIE_ID_20GB
+        elif args.dataset_type == "100gb":
+            self.max_movie_id = MAX_MOVIE_ID_100GB
+        else:
+            raise RuntimeError(args.dataset_type)
 
 
 def generate_homes(ctx: Context) -> int:
@@ -55,6 +66,7 @@ def generate_theatres(ctx: Context) -> int:
             loc_x = ctx.prng.random() * ctx.location_range + ctx.args.location_min
             loc_y = ctx.prng.random() * ctx.location_range + ctx.args.location_min
             print(
+                # pylint: disable-next=duplicate-string-formatting-argument
                 "{}|Theatre #{}|{:.4f}|{:.4f}".format(t, t, loc_x, loc_y),
                 file=out,
             )
@@ -67,7 +79,7 @@ def generate_showings(ctx: Context, total_theatres: int) -> int:
     with open("showings.csv", "w", encoding="UTF-8") as out:
         print("id|theatre_id|movie_id|date_time|total_capacity|seats_left", file=out)
 
-        movie_id_range = range(MIN_MOVIE_ID, MAX_MOVIE_ID + 1)
+        movie_id_range = range(MIN_MOVIE_ID, ctx.max_movie_id + 1)
 
         for t in range(total_theatres):
             for day_offset in range(SHOWING_DAYS):
@@ -142,6 +154,71 @@ def generate_ticket_orders(ctx: Context, total_showings: int) -> int:
     return total_orders
 
 
+def random_timestamp(prng):
+    year = 2023
+    month = prng.randint(1, 12)
+
+    if month == 2:
+        day = prng.randint(1, 28)
+    elif month in [4, 6, 9, 11]:
+        day = prng.randint(1, 30)
+    else:
+        day = prng.randint(1, 31)
+
+    hour = prng.randint(0, 23)
+    minute = prng.randint(0, 59)
+    second = prng.randint(0, 59)
+    millisecond = prng.randint(0, 999)
+
+    return f"{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}.{millisecond:03}"
+
+
+def generate_telemetry_data(ctx: Context, delimiter: str = "|"):
+    # NOTE: For AWS Glue Crawler to work, delimit with , not |
+
+    sampled_movie_ids = [
+        2415848,
+        185208,
+        1907958,
+        2440851,
+        2056744,
+        2034439,
+        2350425,
+        2340175,
+        2244960,
+        2108934,
+        2203453,
+        882312,
+        2163755,
+        2052817,
+        1860259,
+        1814440,
+        2067594,
+        1951925,
+        1811769,
+        2384774,
+    ]
+
+    out = open("telemetry.csv", "w", encoding="UTF-8")
+    print(f"ip{delimiter}timestamp{delimiter}movie_id{delimiter}event_id", file=out)
+
+    progress_interval = int(NUM_TELEMETRY_POINTS / 20)
+
+    for i in range(NUM_TELEMETRY_POINTS):
+        if i % progress_interval == 0:
+            print(f"{int(i/NUM_TELEMETRY_POINTS*100)}% progress")
+
+        ip = ".".join(str(ctx.prng.randint(0, 255)) for _ in range(4))
+        timestamp = random_timestamp(ctx.prng)
+        movie_id = random.choice(sampled_movie_ids)
+        event_id = random.randint(0, 20)
+
+        print(
+            f"{ip}{delimiter}{timestamp}{delimiter}{movie_id}{delimiter}{event_id}",
+            file=out,
+        )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--scale-factor", type=int, default=1)
@@ -149,6 +226,12 @@ def main():
     parser.add_argument("--location-max", type=float, default=1e6)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--showing-start-date", type=str, default="2023-07-17")
+    parser.add_argument(
+        "--dataset-type",
+        type=str,
+        choices=["original", "20gb", "100gb"],
+        default="original",
+    )
     args = parser.parse_args()
 
     # Scale
@@ -163,6 +246,11 @@ def main():
     #
     # Ticket orders:
     # - Pre-populated with 0-15 orders per showing
+    #
+    # Sizing:
+    # SF = 1: ~1.7 GB (uncompressed, text format) (used for "original")
+    # SF = 6: ~10.2 GB (uncompressed, text format) (used for "20gb")
+    # SF = 33: ~56.1 GB (uncompressed, text format) (used for "100gb")
 
     print("Scale factor:", args.scale_factor)
 
@@ -174,7 +262,9 @@ def main():
     print("Generating ticket orders...")
     generate_ticket_orders(ctx, total_showings)
     print("Generating homes...")
-    total_homes = generate_homes(ctx)
+    generate_homes(ctx)
+    print("Generating telemetry data...")
+    generate_telemetry_data(ctx, delimiter=",")
 
 
 if __name__ == "__main__":

@@ -9,7 +9,10 @@ from json.decoder import JSONDecodeError
 from tqdm import tqdm
 
 from workloads.cross_db_benchmark.benchmark_tools.load_database import create_db_conn
-from workloads.cross_db_benchmark.benchmark_tools.utils import load_json
+from workloads.cross_db_benchmark.benchmark_tools.utils import (
+    load_json,
+    compute_workload_splits,
+)
 
 column_regex = re.compile('"(\S+)"."(\S+)"')
 
@@ -29,6 +32,8 @@ def run_redshift_workload(
     repetitions_per_query,
     timeout_sec,
     cap_workload,
+    rank,
+    world_size,
 ):
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
@@ -39,6 +44,16 @@ def run_redshift_workload(
     sql_queries = [x.strip() for x in content]
 
     hint_list = ["" for _ in sql_queries]
+
+    start_offset, end_offset = compute_workload_splits(
+        len(sql_queries), rank, world_size
+    )
+    print("----------------------------------")
+    print("Rank:", rank)
+    print("World size:", world_size)
+    print("Running queries in range: [{}, {})".format(start_offset, end_offset))
+    print("----------------------------------")
+    relevant_queries = sql_queries[start_offset:end_offset]
 
     # extract column statistics
     database_stats = db_conn.collect_db_statistics()
@@ -65,7 +80,7 @@ def run_redshift_workload(
     # extract query plans
     start_t = time.perf_counter()
 
-    for i, sql_query in enumerate(tqdm(sql_queries)):
+    for i, sql_query in enumerate(tqdm(relevant_queries)):
         if cap_workload and i >= cap_workload:
             break
         if sql_query in seen_queries:
@@ -82,6 +97,7 @@ def run_redshift_workload(
         curr_statistics.update(runtime=time.perf_counter() - query_start_t)
         curr_statistics.update(sql=sql_query)
         curr_statistics.update(hint=hint)
+        curr_statistics.update(query_index=i)
         query_list.append(curr_statistics)
 
         run_stats = dict(

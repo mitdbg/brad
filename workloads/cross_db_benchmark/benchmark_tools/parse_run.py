@@ -21,6 +21,9 @@ from workloads.cross_db_benchmark.benchmark_tools.aurora.parse_query import (
 from workloads.cross_db_benchmark.benchmark_tools.redshift.parse_query import (
     parse_queries_redshift,
 )
+from workloads.cross_db_benchmark.benchmark_tools.athena.parse_query import (
+    parse_queries_athena,
+)
 from workloads.cross_db_benchmark.benchmark_tools.aurora.utils import plan_statistics
 from workloads.cross_db_benchmark.benchmark_tools.aurora.parse_plan import parse_plan
 from workloads.cross_db_benchmark.benchmark_tools.aurora.parse_query import (
@@ -132,6 +135,7 @@ def parse_queries(
     cap_queries=None,
     target_path=None,
     is_brad=False,
+    include_no_joins=False,
 ):
     if database == DatabaseSystem.POSTGRES:
         return parse_plans_with_query_postgres(
@@ -172,6 +176,7 @@ def parse_queries(
             cap_queries=cap_queries,
             target_path=target_path,
             is_brad=is_brad,
+            include_no_joins=include_no_joins,
         )
     elif database == DatabaseSystem.REDSHIFT:
         return parse_queries_redshift(
@@ -191,10 +196,10 @@ def parse_queries(
             cap_queries=cap_queries,
             target_path=target_path,
             is_brad=is_brad,
+            include_no_joins=include_no_joins,
         )
     elif database == DatabaseSystem.ATHENA:
-        # It is currently the same as parsing on REDSHIFT, might change it later
-        return parse_queries_redshift(
+        return parse_queries_athena(
             run_stats,
             run_stats_aurora,
             min_runtime=min_runtime,
@@ -211,6 +216,7 @@ def parse_queries(
             cap_queries=cap_queries,
             target_path=target_path,
             is_brad=is_brad,
+            include_no_joins=include_no_joins,
         )
     else:
         raise NotImplementedError(f"Database {database} not yet supported.")

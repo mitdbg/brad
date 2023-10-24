@@ -84,6 +84,7 @@ class SessionManager:
             self._blueprint_mgr.get_directory(),
             self._schema_name,
             specific_engines=engines,
+            connect_to_aurora_read_replicas=True,
         )
         session = Session(session_id, connections)
         self._sessions[session_id] = session

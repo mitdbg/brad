@@ -205,7 +205,7 @@ def main():
             query_start_offset,
         )
 
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     client = boto3.client(
         "athena",
         aws_access_key_id=config.aws_access_key,

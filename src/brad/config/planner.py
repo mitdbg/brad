@@ -41,6 +41,11 @@ class PlannerConfig:
     def query_dist_change_frac(self) -> float:
         return float(self._raw["query_dist_change_frac"])
 
+    def reinterpret_second_as(self) -> Optional[timedelta]:
+        if "reinterpret_second_as" not in self._raw:
+            return None
+        return timedelta(seconds=int(self._raw["reinterpret_second_as"]))
+
     def beam_size(self) -> int:
         return int(self._raw["beam_size"])
 
@@ -107,6 +112,12 @@ class PlannerConfig:
 
     def s3_usd_per_mb_per_month(self) -> float:
         return float(self._raw["s3_usd_per_mb_per_month"])
+
+    def aurora_regular_usd_per_mb_per_month(self) -> float:
+        return float(self._raw["aurora_regular_usd_per_mb_per_month"])
+
+    def aurora_io_opt_usd_per_mb_per_month(self) -> float:
+        return float(self._raw["aurora_io_opt_usd_per_mb_per_month"])
 
     def sample_set_size(self) -> int:
         return int(self._raw["sample_set_size"])
@@ -193,6 +204,9 @@ class PlannerConfig:
             )
         return self._aurora_scaling_coefs
 
+    def aurora_txn_coefs(self, schema_name: str) -> Dict[str, float]:
+        return self._raw["aurora_txns"][schema_name]
+
     ###
     ### Unified Redshift scaling
     ###
@@ -203,3 +217,10 @@ class PlannerConfig:
                 [coefs["coef1"], coefs["coef2"], coefs["coef3"], coefs["coef4"]]
             )
         return self._redshift_scaling_coefs
+
+    def use_io_optimized_aurora(self) -> bool:
+        if "use_io_optimized_aurora" not in self._raw:
+            # By default.
+            return True
+        else:
+            return self._raw["use_io_optimized_aurora"]

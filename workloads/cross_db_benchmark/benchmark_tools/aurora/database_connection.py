@@ -2,6 +2,7 @@ import os
 import time
 from pathlib import Path
 import pandas as pd
+from typing import Dict, List, Any
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
@@ -22,7 +23,7 @@ class AuroraDatabaseConnection(DatabaseConnection):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def load_database(self, dataset, data_dir, force=False):
+    def load_database(self, dataset, data_dir, force=False, create_index=False):
         # drop and create database
         exists_res = self.check_if_database_exists()
 
@@ -47,6 +48,32 @@ class AuroraDatabaseConnection(DatabaseConnection):
             )
             self.submit_query(load_cmd)
             print(f"Loaded {t} in {time.perf_counter() - start_t:.2f} secs")
+
+        if create_index:
+            created_index_set = set()
+            for t1, k1s, t2, k2s in schema.relationships:
+                if type(k1s) == list:
+                    for k1 in k1s:
+                        identifier = t1 + "." + k1
+                        if identifier not in created_index_set:
+                            self.create_index(t1, k1)
+                            created_index_set.add(identifier)
+                else:
+                    identifier = t1 + "." + k1s
+                    if identifier not in created_index_set:
+                        self.create_index(t1, k1s)
+                        created_index_set.add(identifier)
+                if type(k2s) == list:
+                    for k2 in k2s:
+                        identifier = t2 + "." + k2
+                        if identifier not in created_index_set:
+                            self.create_index(t2, k2)
+                            created_index_set.add(identifier)
+                else:
+                    identifier = t2 + "." + k2s
+                    if identifier not in created_index_set:
+                        self.create_index(t2, k2s)
+                        created_index_set.add(identifier)
 
         print("Starting vacuum analyze...")
         self.submit_query("VACUUM ANALYZE;")
@@ -192,12 +219,40 @@ class AuroraDatabaseConnection(DatabaseConnection):
         if verbose:
             print(f"Set timeout to {timeout_sec} secs for {self.db_name}.")
 
+    def extract_data_stats(self, cursor) -> Dict[str, List[List[Any]]]:
+        # Used for postgres system stats (blocks accessed, etc)
+        data = cursor.fetchall()
+        cols = [column[0] for column in cursor.description]
+
+        return {
+            "cols": cols,
+            "data": [list(row) for row in data],
+        }
+
+    def extract_all_data_stats(self, cursor) -> Dict[str, Any]:
+        # Extract the statistics we need.
+        cursor.execute("SELECT * FROM pg_stat_user_tables;")
+        logical = self.extract_data_stats(cursor)
+
+        cursor.execute("SELECT * FROM pg_statio_user_tables;")
+        physical = self.extract_data_stats(cursor)
+
+        cursor.execute("SELECT * FROM pg_stat_user_indexes;")
+        index = self.extract_data_stats(cursor)
+
+        return {
+            "logical": logical,
+            "physical": physical,
+            "index": index,
+        }
+
     def run_query_collect_statistics(
         self, sql, repetitions=1, prefix="", explain_only=False
     ):
         analyze_plans = None
         verbose_plan = None
         timeout = False
+        data_stats = []
 
         try:
             verbose_plan = self.get_result(f"{prefix}EXPLAIN VERBOSE {sql}")
@@ -205,10 +260,24 @@ class AuroraDatabaseConnection(DatabaseConnection):
             analyze_plans = []
             if not explain_only:
                 for i in range(repetitions):
+                    conn, cursor = self.get_cursor()
+
+                    pre_stats = self.extract_all_data_stats(cursor)
+
                     statement = f"{prefix}EXPLAIN ANALYZE {sql}"
                     curr_analyze_plan = self.get_result(statement)
 
+                    # Need pre and post to do a diff. The stats are cumulative.
+                    post_stats = self.extract_all_data_stats(cursor)
+
                     analyze_plans.append(curr_analyze_plan)
+                    data_stats.append(
+                        {
+                            "pre": pre_stats,
+                            "post": post_stats,
+                        }
+                    )
+                    self.close_conn(conn, cursor)
         # timeout
         except psycopg2.errors.QueryCanceled as e:
             timeout = True
@@ -221,7 +290,10 @@ class AuroraDatabaseConnection(DatabaseConnection):
             print(f"Skipping query {sql} due to an error")
 
         return dict(
-            analyze_plans=analyze_plans, verbose_plan=verbose_plan, timeout=timeout
+            analyze_plans=analyze_plans,
+            verbose_plan=verbose_plan,
+            timeout=timeout,
+            data_stats=data_stats,
         )
 
     def collect_db_statistics(self):

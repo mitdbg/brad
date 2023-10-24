@@ -33,11 +33,27 @@ class WorkloadBuilder:
         self._table_sizes: Dict[str, int] = {}
         self._prespecified_queries: List[Query] = []
 
-    def build(self, rescale_to_period: Optional[timedelta] = None) -> Workload:
+    def build(
+        self,
+        rescale_to_period: Optional[timedelta] = None,
+        reinterpret_second_as: Optional[timedelta] = None,
+    ) -> Workload:
         """
         Change the workload's period using `rescale_period`. We linearly scale
         the query counts.
         """
+        if reinterpret_second_as is not None:
+            # This is used to "scale up" the workload (in time) without actually
+            # having to wait for the workload to complete.
+            logger.info(
+                "NOTICE: Constructing workload where 1 second is interpreted as %d seconds.",
+                reinterpret_second_as.total_seconds(),
+            )
+            self._period = timedelta(
+                seconds=self._period.total_seconds()
+                * reinterpret_second_as.total_seconds()
+            )
+
         if rescale_to_period is None or self._period.total_seconds() == 0.0:
             multiplier = 1.0
         else:

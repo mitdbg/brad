@@ -1,7 +1,12 @@
 import argparse
+import asyncio
 from datetime import timedelta
+from typing import List
 
-from brad.daemon.perf_insights import AwsPerformanceInsightsClient
+from brad.config.file import ConfigFile
+from brad.provisioning.directory import Directory
+from brad.daemon.metrics_def import MetricDef
+from brad.daemon.perf_insights import PerfInsightsClient
 
 
 BASE_METRICS = [
@@ -55,11 +60,11 @@ BASE_METRICS = [
     "os.diskIO.auroraStorage.writeIOsPS",
 ]
 
-ALL_METRICS = []
+ALL_METRICS: List[MetricDef] = []
 for m in BASE_METRICS:
     # N.B. The metrics are reported no more than once a minute. So
     # average/max/min will all report the same number.
-    ALL_METRICS.append(m + ".avg")
+    ALL_METRICS.append((m, "avg"))
 
 
 def main():
@@ -67,8 +72,12 @@ def main():
     parser.add_argument(
         "--instance-id",
         type=str,
-        required=True,
         help="The Aurora instance's identifier.",
+    )
+    parser.add_argument(
+        "--config-file",
+        type=str,
+        help="Used to specify the Aurora instance instead of by an ID.",
     )
     parser.add_argument(
         "--out-file",
@@ -84,7 +93,18 @@ def main():
     )
     args = parser.parse_args()
 
-    client = AwsPerformanceInsightsClient(args.instance_id)
+    if args.instance_id is not None:
+        client = PerfInsightsClient.from_instance_identifier(
+            instance_identifier=args.instance_id
+        )
+    elif args.config_file is not None:
+        config = ConfigFile.load(args.config_file)
+        directory = Directory(config)
+        asyncio.run(directory.refresh())
+        client = PerfInsightsClient(resource_id=directory.aurora_writer().resource_id())
+    else:
+        raise RuntimeError()
+
     metrics = client.fetch_metrics(
         ALL_METRICS,
         period=timedelta(minutes=1),

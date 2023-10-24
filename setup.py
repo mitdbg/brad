@@ -39,6 +39,7 @@ INSTALL_REQUIRES = [
     "redshift_connector",
     "tabulate",
     "PyAthena",
+    "ddsketch",
 ]
 
 DEV_REQUIRES = [
@@ -55,6 +56,7 @@ DEV_REQUIRES = [
     "attrs",
     "typing-extensions",
     "types-tabulate",
+    "tqdm",
 ]
 
 KEYWORDS = []

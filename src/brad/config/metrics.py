@@ -7,10 +7,8 @@ class FrontEndMetric(enum.Enum):
     # load imposed by BRAD's clients.
     TxnEndPerSecond = "txn_end_per_s"
 
-    # The following two metrics are used to compute average query latencies. Sum
-    # each across all front ends and then divide to get the average.
-    QueryLatencySumSecond = "query_latency_sum_s"
-    NumQueries = "num_queries"
+    QueryLatencySecondP50 = "query_latency_s_p50"
+    QueryLatencySecondP95 = "query_latency_s_p95"
 
-    # The highest recorded query latency.
-    QueryLatencyMaxSecond = "query_latency_max_s"
+    TxnLatencySecondP50 = "txn_latency_s_p50"
+    TxnLatencySecondP95 = "txn_latency_s_p95"

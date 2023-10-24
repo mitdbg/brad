@@ -1,12 +1,14 @@
+import asyncio
 import argparse
-import os
 import json
-import pyodbc
 import sys
 import shutil
 import pathlib
+from tqdm import tqdm
 from typing import Any, Dict, List
 
+from brad.config.file import ConfigFile
+from brad.connection.factory import ConnectionFactory
 from brad.data_stats.plan_parsing import (
     parse_explain_verbose,
     extract_base_cardinalities,
@@ -26,12 +28,12 @@ def base_table_name(table: str) -> str:
 
 def get_table_names(cursor) -> List[str]:
     # Retrieve the table names
-    cursor.execute(
+    cursor.execute_sync(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
     )
 
     # Fetch all the table names
-    table_names = cursor.fetchall()
+    table_names = cursor.fetchall_sync()
 
     return [tn[0] for tn in table_names]
 
@@ -42,10 +44,10 @@ def get_table_sizes(cursor, table_names) -> Dict[str, int]:
     # Iterate over the table names and retrieve the row count for each table
     for table_name in table_names:
         # Execute a count query for each table
-        cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+        cursor.execute_sync(f"SELECT COUNT(*) FROM {table_name}")
 
         # Fetch the row count
-        row_count = cursor.fetchone()[0]
+        row_count = cursor.fetchone_sync()[0]
 
         # Store the table name and row count in the dictionary
         if table_name.endswith("_brad_source"):
@@ -66,8 +68,8 @@ def get_table_widths(cursor, table_names) -> Dict[str, int]:
         else:
             tn = table_name
 
-        cursor.execute(f"EXPLAIN VERBOSE SELECT * FROM {tn}")
-        plan_lines = [row[0] for row in cursor]
+        cursor.execute_sync(f"EXPLAIN VERBOSE SELECT * FROM {tn}")
+        plan_lines = [row[0] for row in cursor.fetchall_sync()]
 
         plan = parse_explain_verbose(plan_lines)
         bc = extract_base_cardinalities(plan)
@@ -86,17 +88,20 @@ def save_checkpoint(data: List[Dict[str, Any]], output_file: pathlib.Path):
 
 
 def main():
+    # Used to extract query features for the forest-based router.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cstr-var", type=str, required=True)
+    parser.add_argument("--config-file", type=str, required=True)
+    parser.add_argument("--schema-name", type=str, required=True)
     parser.add_argument("--queries-file", type=str, required=True)
     args = parser.parse_args()
 
-    connection = pyodbc.connect(os.environ[args.cstr_var], autocommit=True)
-    cursor = connection.cursor()
+    config = ConfigFile.load(args.config_file)
+    conn = asyncio.run(ConnectionFactory.connect_to_sidecar(args.schema_name, config))
+    cursor = conn.cursor_sync()
 
     # Make sure stats are up to date.
     print("Running vacuum + analyze...", file=sys.stderr, flush=True)
-    cursor.execute("VACUUM ANALYZE")
+    cursor.execute_sync("VACUUM ANALYZE")
 
     print("Loading queries...", file=sys.stderr, flush=True)
     queries = load_all_queries(args.queries_file)
@@ -114,9 +119,9 @@ def main():
 
     print("Running...", file=sys.stderr, flush=True)
     results = []
-    for qidx, q in enumerate(queries):
-        cursor.execute("EXPLAIN VERBOSE " + q)
-        plan_lines = [row[0] for row in cursor]
+    for qidx, q in enumerate(tqdm(queries)):
+        cursor.execute_sync("EXPLAIN VERBOSE " + q)
+        plan_lines = [row[0] for row in cursor.fetchall_sync()]
 
         plan = parse_explain_verbose(plan_lines)
         base_cards = extract_base_cardinalities(plan)
