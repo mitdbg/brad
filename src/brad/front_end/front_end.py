@@ -297,6 +297,9 @@ class BradFrontEnd(BradInterface):
 
             # 3. Actually execute the query.
             try:
+                transactional_query: bool = (
+                    session.in_transaction or query_rep.is_data_modification_query()
+                )
                 if transactional_query:
                     connection = session.engines.get_connection(engine_to_use)
                     cursor = connection.cursor_sync()
@@ -339,9 +342,6 @@ class BradFrontEnd(BradInterface):
 
             # Decide whether to log the query.
             run_time_s = end - start
-            transactional_query: bool = (
-                session.in_transaction or query_rep.is_data_modification_query()
-            )
             if not transactional_query or (random.random() < self._config.txn_log_prob):
                 self._qlogger.info(
                     f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {run_time_s}s IsTransaction: {transactional_query}"
