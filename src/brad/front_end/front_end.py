@@ -339,7 +339,7 @@ class BradFrontEnd(BradInterface):
 
             # Decide whether to log the query.
             run_time_s = end - start
-            transactional_query = (
+            transactional_query: bool = (
                 session.in_transaction or query_rep.is_data_modification_query()
             )
             if not transactional_query or (random.random() < self._config.txn_log_prob):

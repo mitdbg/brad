@@ -53,7 +53,7 @@ class Session:
 
 class SessionManager:
     def __init__(
-        self, config: ConfigFile, blueprint_mgr: BlueprintManager, schema_name: str
+        self, config: ConfigFile, blueprint_mgr: "BlueprintManager", schema_name: str
     ) -> None:
         self._config = config
         self._blueprint_mgr = blueprint_mgr
