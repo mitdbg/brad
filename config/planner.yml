@@ -280,6 +280,11 @@ aurora_txns:
     b_p50: 0.0022556402254849672
     b_p95: 0.00383179122582078
 
+  imdb_extended_100g:
+    K: 1.0729172229766846
+    b_p50: 0.001035563531331718
+    b_p95: 0.00274773221462965
+
 
 aurora_scaling:
   # [coef1(load)^2(resource ratio)^2 + coef2(load)^2 + coef3(resource ratio)^2 + coef4] * base
