@@ -3,6 +3,7 @@ from typing import List
 import operator
 import yaml
 from functools import reduce
+from typing import Dict
 
 
 class Functionality:
@@ -39,7 +40,7 @@ class Functionality:
         ]
 
     @staticmethod
-    def to_bitmap(functionalities: List["Functionality"]) -> int:
+    def to_bitmap(functionalities: List[str]) -> int:
         if len(functionalities) == 0:
             return 0
         return reduce(
@@ -57,6 +58,6 @@ class Functionality:
         return self.engine_functionalities
 
 
-FunctionalityBitmapValues = {}
+FunctionalityBitmapValues: Dict[str, int] = {}
 FunctionalityBitmapValues[Functionality.Geospatial] = 0b01
 FunctionalityBitmapValues[Functionality.Transaction] = 0b10

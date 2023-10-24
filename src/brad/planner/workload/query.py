@@ -1,5 +1,5 @@
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
@@ -22,7 +22,9 @@ class Query(QueryRep):
     Objects of this class are logically immutable.
     """
 
-    def __init__(self, sql_query: str, arrival_count: int = 1, session: Session = None):
+    def __init__(
+        self, sql_query: str, arrival_count: int = 1, session: Optional[Session] = None
+    ):
         super().__init__(sql_query, session)
         self._arrival_count = arrival_count
 

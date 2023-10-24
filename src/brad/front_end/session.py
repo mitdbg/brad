@@ -1,12 +1,15 @@
 import asyncio
 import logging
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, TYPE_CHECKING
 
 from brad.config.engine import Engine
-from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.session import SessionId
 from .engine_connections import EngineConnections
+
+if TYPE_CHECKING:
+    from brad.blueprint.manager import BlueprintManager
+
 
 logger = logging.getLogger(__name__)
 

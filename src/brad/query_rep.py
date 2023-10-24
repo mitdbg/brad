@@ -41,16 +41,15 @@ class QueryRep:
     Objects of this class are logically immutable.
     """
 
-    def __init__(self, sql_query: str, session: Session = None):
+    def __init__(self, sql_query: str, session: Optional[Session] = None):
         self._raw_sql_query = sql_query
 
         # Lazily computed.
         self._ast: Optional[sqlglot.Expression] = None
         self._is_data_modification: Optional[bool] = None
         self._tables: Optional[List[str]] = None
-        if session is None:
-            self.in_transaction = False
-        else:
+        self.in_transaction: bool = False
+        if session is not None:
             self.in_transaction = session.in_transaction
 
     @property
@@ -82,7 +81,7 @@ class QueryRep:
         return self.is_data_modification_query() or self.in_transaction
 
     def get_required_functionality(self) -> int:
-        req_functionality = []
+        req_functionality: List[str] = []
         if self.is_geospatial():
             req_functionality.append(Functionality.Geospatial)
         if self.is_transaction():

@@ -1,6 +1,6 @@
 from typing import Dict, Tuple, Optional, TYPE_CHECKING
 
-from functionality_catalog import Functionality
+from brad.routing.functionality_catalog import Functionality
 from brad.data_stats.estimator import Estimator
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.query_rep import QueryRep
