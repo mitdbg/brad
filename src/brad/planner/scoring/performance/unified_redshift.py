@@ -1,12 +1,14 @@
 import logging
 import numpy as np
 import numpy.typing as npt
-from typing import Dict
+from typing import Dict, TYPE_CHECKING
 
 from brad.config.engine import Engine
 from brad.blueprint.provisioning import Provisioning
-from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.provisioning import redshift_num_cpus
+
+if TYPE_CHECKING:
+    from brad.planner.scoring.context import ScoringContext
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,7 @@ class RedshiftProvisioningScore:
         base_query_run_times: npt.NDArray,
         curr_prov: Provisioning,
         next_prov: Provisioning,
-        ctx: ScoringContext,
+        ctx: "ScoringContext",
     ) -> "RedshiftProvisioningScore":
         """
         Computes all of the Redshift provisioning-dependent scoring components in one
@@ -73,7 +75,7 @@ class RedshiftProvisioningScore:
         adjusted_cpu_denorm = query_factor * overall_cpu_util_denorm
 
         # 2. Scale query execution times based on load and provisioning.
-        scaled_rt = cls._scale_load_resources(
+        scaled_rt = cls.scale_load_resources(
             base_query_run_times, next_prov, adjusted_cpu_denorm, ctx
         )
 
@@ -87,11 +89,11 @@ class RedshiftProvisioningScore:
         )
 
     @staticmethod
-    def _scale_load_resources(
+    def scale_load_resources(
         base_predicted_latency: npt.NDArray,
         to_prov: Provisioning,
         overall_cpu_denorm: float,
-        ctx: ScoringContext,
+        ctx: "ScoringContext",
     ) -> npt.NDArray:
         resource_factor = _REDSHIFT_BASE_RESOURCE_VALUE / (
             redshift_num_cpus(to_prov) * to_prov.num_nodes()

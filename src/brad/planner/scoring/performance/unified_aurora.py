@@ -1,12 +1,14 @@
 import logging
 import numpy as np
 import numpy.typing as npt
-from typing import Dict
+from typing import Dict, TYPE_CHECKING
 
 from brad.config.engine import Engine
 from brad.blueprint.provisioning import Provisioning
-from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.provisioning import aurora_num_cpus
+
+if TYPE_CHECKING:
+    from brad.planner.scoring.context import ScoringContext
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +40,7 @@ class AuroraProvisioningScore:
         base_query_run_times: npt.NDArray,
         curr_prov: Provisioning,
         next_prov: Provisioning,
-        ctx: ScoringContext,
+        ctx: "ScoringContext",
     ) -> "AuroraProvisioningScore":
         """
         Computes all of the Aurora provisioning-dependent scoring components in one
@@ -156,7 +158,7 @@ class AuroraProvisioningScore:
             txn_affected_cpu_denorm = analytics_affected_cpu_denorm
 
         # 4. Predict query execution times based on load and provisioning.
-        scaled_rt = cls._query_latency_load_resources(
+        scaled_rt = cls.query_latency_load_resources(
             base_query_run_times, next_prov, analytics_affected_load, ctx
         )
 
@@ -193,11 +195,11 @@ class AuroraProvisioningScore:
         )
 
     @staticmethod
-    def _query_latency_load_resources(
+    def query_latency_load_resources(
         base_predicted_latency: npt.NDArray,
         to_prov: Provisioning,
         overall_load: float,
-        ctx: ScoringContext,
+        ctx: "ScoringContext",
     ) -> npt.NDArray:
         # This method is used to compute the predicted query latencies.
         resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(to_prov)
@@ -220,7 +222,7 @@ class AuroraProvisioningScore:
         next_cpu_denorm: float,
         curr_prov: Provisioning,
         to_prov: Provisioning,
-        ctx: ScoringContext,
+        ctx: "ScoringContext",
     ) -> npt.NDArray:
         observed_lats = np.array([ctx.metrics.txn_lat_s_p50, ctx.metrics.txn_lat_s_p95])
 

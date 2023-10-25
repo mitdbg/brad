@@ -88,7 +88,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 self._current_blueprint.table_locations_bitmap()
             )
         )
-        ctx.compute_engine_latency_weights()
+        ctx.compute_engine_latency_norm_factor()
 
         beam_size = self._planner_config.beam_size()
         engines = [Engine.Aurora, Engine.Redshift, Engine.Athena]

@@ -90,7 +90,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                 self._current_blueprint.table_locations_bitmap(),
             )
         )
-        ctx.compute_engine_latency_weights()
+        ctx.compute_engine_latency_norm_factor()
 
         beam_size = self._planner_config.beam_size()
         placement_options = self._get_table_placement_options_bitmap()

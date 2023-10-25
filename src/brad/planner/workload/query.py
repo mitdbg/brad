@@ -1,4 +1,5 @@
 import logging
+from collections import Counter
 from typing import Dict, List, Tuple, Optional
 
 from brad.blueprint import Blueprint
@@ -122,3 +123,11 @@ class Query(QueryRep):
 
         # MB, so we divide by 1000 twice.
         self._data_accessed_mb[for_engine] = total_storage_bytes // 1000 // 1000
+
+    def primary_execution_location(self) -> Optional[Engine]:
+        if self._past_executions is None or len(self._past_executions) == 0:
+            return None
+
+        counter = Counter([execution[0] for execution in self._past_executions])
+        most_common, _ = counter.most_common(1)[0]
+        return most_common
