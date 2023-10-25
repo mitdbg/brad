@@ -38,6 +38,7 @@ class AuroraProvisioningScore:
     def compute(
         cls,
         base_query_run_times: npt.NDArray,
+        query_arrival_counts: npt.NDArray,
         curr_prov: Provisioning,
         next_prov: Provisioning,
         ctx: "ScoringContext",
@@ -114,20 +115,21 @@ class AuroraProvisioningScore:
 
         # 2. Adjust the analytical portion of the system load for query movement
         #    (compute `query_factor``).
-        if Engine.Aurora not in ctx.current_latency_weights:
+        if Engine.Aurora not in ctx.engine_latency_norm_factor:
             # Special case. We cannot reweigh the queries because nothing in the
             # current workload ran on Aurora.
             query_factor = 1.0
         else:
             # Query movement scaling factor.
             # Captures change in queries routed to this engine.
-            base_latency = ctx.current_latency_weights[Engine.Aurora]
-            assert base_latency != 0.0
-            total_next_latency = base_query_run_times.sum()
-            query_factor = total_next_latency / base_latency
+            norm_factor = ctx.engine_latency_norm_factor[Engine.Aurora]
+            assert norm_factor != 0.0
+            total_next_latency = np.dot(base_query_run_times, query_arrival_counts)
+            query_factor = total_next_latency / norm_factor
 
         # 3. Compute the analytics portion of the load and adjust it by the query factor.
         if current_aurora_has_replicas:
+            # TODO: Reconsider load calculation here.
             num_read_replicas = curr_prov.num_nodes() - 1
             analytics_load = (
                 ctx.metrics.aurora_reader_load_minute_avg * num_read_replicas

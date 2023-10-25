@@ -30,6 +30,7 @@ class RedshiftProvisioningScore:
     def compute(
         cls,
         base_query_run_times: npt.NDArray,
+        query_arrival_counts: npt.NDArray,
         curr_prov: Provisioning,
         next_prov: Provisioning,
         ctx: "ScoringContext",
@@ -58,7 +59,7 @@ class RedshiftProvisioningScore:
 
         # 1. Adjust the analytical portion of the system load for query movement.
         if (
-            Engine.Redshift not in ctx.current_latency_weights
+            Engine.Redshift not in ctx.engine_latency_norm_factor
             or curr_prov.num_nodes() == 0
         ):
             # Special case. We cannot reweigh the queries because nothing in the
@@ -67,10 +68,10 @@ class RedshiftProvisioningScore:
         else:
             # Query movement scaling factor.
             # Captures change in queries routed to this engine.
-            base_latency = ctx.current_latency_weights[Engine.Redshift]
-            assert base_latency != 0.0
-            total_next_latency = base_query_run_times.sum()
-            query_factor = total_next_latency / base_latency
+            norm_factor = ctx.engine_latency_norm_factor[Engine.Redshift]
+            assert norm_factor != 0.0
+            total_next_latency = np.dot(base_query_run_times, query_arrival_counts)
+            query_factor = total_next_latency / norm_factor
 
         adjusted_cpu_denorm = query_factor * overall_cpu_util_denorm
 

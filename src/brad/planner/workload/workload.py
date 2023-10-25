@@ -80,10 +80,19 @@ class Workload:
         self._predicted_aurora_pages_accessed: Optional[npt.NDArray] = None
         self._predicted_athena_bytes_accessed: Optional[npt.NDArray] = None
 
-        # Used for debug purposes. Stores the "query index" for each query in
-        # the data structures above. This is used to recover the predicted run
-        # times for plotting or analysis purposes later on.
+        # Used for debug purposes. Stores the "overall query index" for each
+        # query in the data structures above. (Overall refers to an index
+        # relative to the query bank used to run a workload against BRAD.) This
+        # is used to recover the predicted run times for plotting or analysis
+        # purposes later on.
         self._query_index_mapping: List[int] = []
+
+        # Used for reweighing queries.
+        # NOTE: Using these weights directly assumes a static routing decision
+        # (i.e., this query is _always_ routed to one engine in the workload).
+        self._analytical_query_arrival_counts: npt.NDArray = np.array(
+            [q.arrival_count() for q in self._analytical_queries]
+        )
 
         ###
         ### Legacy properties below.
@@ -190,6 +199,9 @@ class Workload:
     ) -> npt.NDArray:
         assert self._predicted_athena_bytes_accessed is not None
         return self._predicted_athena_bytes_accessed[query_indicies]
+
+    def get_arrival_counts_batch(self, query_indices: List[int]) -> npt.NDArray:
+        return self._analytical_query_arrival_counts[query_indices]
 
     def compute_latency_gains(self) -> npt.NDArray:
         """

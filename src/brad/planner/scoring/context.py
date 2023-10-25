@@ -6,9 +6,6 @@ from brad.config.engine import Engine
 from brad.blueprint import Blueprint
 from brad.config.planner import PlannerConfig
 from brad.planner.metrics import Metrics
-from brad.planner.scoring.performance.unified_aurora import AuroraProvisioningScore
-from brad.planner.scoring.performance.unified_redshift import RedshiftProvisioningScore
-from brad.planner.scoring.provisioning import redshift_num_cpus
 from brad.planner.workload import Workload
 from brad.routing.router import Router
 
@@ -67,17 +64,16 @@ class ScoringContext:
             self.current_query_locations[eng].append(qidx)
 
     def compute_engine_latency_norm_factor(self) -> None:
-        use_recorded_run_time_if_available = self.planner_config.flag(
-            "use_recorded_run_time_if_available", default=False
-        )
-
         for engine in [Engine.Aurora, Engine.Redshift, Engine.Athena]:
             if len(self.current_query_locations[engine]) == 0:
                 # Avoid having an explicit entry for engines that receive no
                 # queries (the engine could be off).
                 continue
 
-            queries = self.current_workload.analytical_queries()
+            all_queries = self.current_workload.analytical_queries()
+            relevant_queries = []
+            for qidx in self.current_query_locations[engine]:
+                relevant_queries.append(all_queries[qidx])
 
             # 1. Get predicted base latencies.
             predicted_base_latencies = (
@@ -86,76 +82,21 @@ class ScoringContext:
                 )
             )
 
-            # 2. Scale the predictions to the current provisioning, if applicable
-            if engine == Engine.Aurora:
-                aurora_prov = self.current_blueprint.aurora_provisioning()
-                if aurora_prov.num_nodes() > 1:
-                    # There are read replicas
-                    aurora_load = self.metrics.aurora_reader_load_minute_avg
-                else:
-                    # No read replicas.
-                    aurora_load = self.metrics.aurora_writer_load_minute_avg
-                pred_prov_latencies = (
-                    AuroraProvisioningScore.query_latency_load_resources(
-                        predicted_base_latencies, aurora_prov, aurora_load, self
-                    )
-                )
+            # N.B. Using the actual recorded run times is slightly problematic
+            # here. We use this normalization factor as a part of predicting a
+            # query's execution time on a different blueprint. We need to use
+            # query execution times on the same provisioning (and system load)
+            # as the recorded run times. Scaling the recorded run times to a
+            # base provisioning or vice-versa is difficult to do accurately
+            # without having this normalization factor.
 
-            elif engine == Engine.Redshift:
-                redshift_prov = self.current_blueprint.redshift_provisioning()
-                redshift_cpu_denorm = (
-                    redshift_prov.num_nodes()
-                    * redshift_num_cpus(redshift_prov)
-                    * self.metrics.redshift_cpu_avg
-                    / 100.0
-                )
-                pred_prov_latencies = RedshiftProvisioningScore.scale_load_resources(
-                    predicted_base_latencies,
-                    self.current_blueprint.redshift_provisioning(),
-                    redshift_cpu_denorm,
-                    self,
-                )
-
-            else:
-                # Athena: No changes needed.
-                pred_prov_latencies = predicted_base_latencies
-
-            # 3. Use the recorded run times, if applicable.
-            if use_recorded_run_time_if_available:
-                # Extract the recorded run time.
-                recorded_times = np.zeros_like(pred_prov_latencies)
-                recorded_times += np.nan
-
-                for qidx, query in enumerate(queries):
-                    past_execs = query.past_executions()
-                    if past_execs is None or len(past_execs) == 0:
-                        continue
-                    this_engine_rt_s = np.array(
-                        [
-                            exec_rt_s
-                            for exec_engine, exec_rt_s in past_execs
-                            if exec_engine == engine
-                        ]
-                    )
-                    if len(this_engine_rt_s) == 0:
-                        logger.warning(
-                            "No recorded run times for query index %d on %s",
-                            qidx,
-                            engine,
-                        )
-                        continue
-                    recorded_times[qidx] = this_engine_rt_s.mean()
-
-                # Use the predictions if a recorded run time is not available.
-                pred_prov_latencies = np.where(
-                    np.isnan(recorded_times), pred_prov_latencies, recorded_times
-                )
-
-            # 3. Extract query weights (based on arrival frequency) and scale
+            # 2. Extract query weights (based on arrival frequency) and scale
             # the run times.
-            query_weights = np.array([q.arrival_count() for q in queries])
-            assert query_weights.shape == pred_prov_latencies.shape
+            query_weights = self.current_workload.get_arrival_counts_batch(
+                self.current_query_locations[engine]
+            )
+            assert query_weights.shape == predicted_base_latencies.shape
 
             self.engine_latency_norm_factor[engine] = np.dot(
-                pred_prov_latencies, query_weights
+                predicted_base_latencies, query_weights
             )
