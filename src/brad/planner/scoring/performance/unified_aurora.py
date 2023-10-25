@@ -18,8 +18,8 @@ class AuroraProvisioningScore:
         self,
         scaled_run_times: npt.NDArray,
         scaled_txn_lats: npt.NDArray,
-        analytics_affected_load: float,
-        analytics_affected_cpu_denorm: float,
+        analytics_affected_per_machine_load: float,
+        analytics_affected_per_machine_cpu_denorm: float,
         txn_affected_cpu_denorm: float,
         pred_txn_peak_cpu_denorm: float,
         for_next_prov: Provisioning,
@@ -27,8 +27,10 @@ class AuroraProvisioningScore:
     ) -> None:
         self.scaled_run_times = scaled_run_times
         self.debug_values = debug_values
-        self.analytics_affected_load = analytics_affected_load
-        self.analytics_affected_cpu_denorm = analytics_affected_cpu_denorm
+        self.analytics_affected_per_machine_load = analytics_affected_per_machine_load
+        self.analytics_affected_per_machine_cpu_denorm = (
+            analytics_affected_per_machine_cpu_denorm
+        )
         self.txn_affected_cpu_denorm = txn_affected_cpu_denorm
         self.pred_txn_peak_cpu_denorm = pred_txn_peak_cpu_denorm
         self.for_next_prov = for_next_prov
@@ -129,39 +131,51 @@ class AuroraProvisioningScore:
 
         # 3. Compute the analytics portion of the load and adjust it by the query factor.
         if current_aurora_has_replicas:
-            # TODO: Reconsider load calculation here.
-            num_read_replicas = curr_prov.num_nodes() - 1
-            analytics_load = (
-                ctx.metrics.aurora_reader_load_minute_avg * num_read_replicas
+            curr_num_read_replicas = curr_prov.num_nodes() - 1
+            total_analytics_load = (
+                ctx.metrics.aurora_reader_load_minute_avg * curr_num_read_replicas
             )
-            analytics_cpu_denorm = (
+            total_analytics_cpu_denorm = (
                 (ctx.metrics.aurora_reader_cpu_avg / 100)
                 * aurora_num_cpus(curr_prov)
-                * num_read_replicas
+                * curr_num_read_replicas
             )
+
         else:
-            analytics_load = max(0, overall_writer_load - pred_txn_load)
-            analytics_cpu_denorm = max(
+            total_analytics_load = max(0, overall_writer_load - pred_txn_load)
+            total_analytics_cpu_denorm = max(
                 0, overall_writer_cpu_util_denorm - pred_txn_cpu_denorm
             )
-        analytics_load *= query_factor
-        analytics_cpu_denorm *= query_factor
+
+        total_analytics_load *= query_factor
+        total_analytics_cpu_denorm *= query_factor
 
         # 4. Compute the workload-affected metrics.
         # Basically, if there are no replicas, both the analytical and
         # transactional load fall onto one instance (which we need to capture).
         if next_aurora_has_replicas:
-            analytics_affected_load = analytics_load
-            analytics_affected_cpu_denorm = analytics_cpu_denorm
+            next_num_read_replicas = next_prov.num_nodes() - 1
+            assert next_num_read_replicas > 0
+            # Divide by the number of read replicas: we assume the load can
+            # be equally divided amongst the replicas.
+            analytics_affected_per_machine_load = (
+                total_analytics_load / next_num_read_replicas
+            )
+            analytics_affected_per_machine_cpu_denorm = (
+                total_analytics_cpu_denorm / next_num_read_replicas
+            )
             txn_affected_cpu_denorm = pred_txn_cpu_denorm
         else:
-            analytics_affected_load = analytics_load + pred_txn_load
-            analytics_affected_cpu_denorm = analytics_cpu_denorm + pred_txn_cpu_denorm
-            txn_affected_cpu_denorm = analytics_affected_cpu_denorm
+            analytics_affected_per_machine_load = total_analytics_load + pred_txn_load
+            analytics_affected_per_machine_cpu_denorm = (
+                total_analytics_cpu_denorm + pred_txn_cpu_denorm
+            )
+            # Basically the same as above, because they are running together.
+            txn_affected_cpu_denorm = analytics_affected_per_machine_cpu_denorm
 
         # 4. Predict query execution times based on load and provisioning.
         scaled_rt = cls.query_latency_load_resources(
-            base_query_run_times, next_prov, analytics_affected_load, ctx
+            base_query_run_times, next_prov, analytics_affected_per_machine_load, ctx
         )
 
         # 5. Compute the expected peak CPU.
@@ -182,8 +196,8 @@ class AuroraProvisioningScore:
         return cls(
             scaled_rt,
             scaled_txn_lats,
-            analytics_affected_load,
-            analytics_affected_cpu_denorm,
+            analytics_affected_per_machine_load,
+            analytics_affected_per_machine_cpu_denorm,
             txn_affected_cpu_denorm,
             peak_cpu_denorm,
             next_prov,
@@ -191,8 +205,8 @@ class AuroraProvisioningScore:
                 "aurora_pred_txn_load": pred_txn_load,
                 "aurora_pred_txn_cpu_denorm": pred_txn_cpu_denorm,
                 "aurora_query_factor": query_factor,
-                "aurora_internal_analytics_load": analytics_load,
-                "aurora_internal_analytics_cpu_denorm": analytics_cpu_denorm,
+                "aurora_internal_total_analytics_load": total_analytics_load,
+                "aurora_internal_total_analytics_cpu_denorm": total_analytics_cpu_denorm,
             },
         )
 
@@ -257,8 +271,8 @@ class AuroraProvisioningScore:
         return AuroraProvisioningScore(
             self.scaled_run_times,
             self.scaled_txn_lats,
-            self.analytics_affected_load,
-            self.analytics_affected_cpu_denorm,
+            self.analytics_affected_per_machine_load,
+            self.analytics_affected_per_machine_cpu_denorm,
             self.txn_affected_cpu_denorm,
             self.pred_txn_peak_cpu_denorm,
             self.for_next_prov,
@@ -269,10 +283,12 @@ class AuroraProvisioningScore:
         """
         Adds this score instance's debug values to the `dest` dict.
         """
-        dest["aurora_analytics_affected_load"] = self.analytics_affected_load
         dest[
-            "aurora_analytics_affected_cpu_denorm"
-        ] = self.analytics_affected_cpu_denorm
+            "aurora_analytics_affected_per_machine_load"
+        ] = self.analytics_affected_per_machine_load
+        dest[
+            "aurora_analytics_affected_per_machine_cpu_denorm"
+        ] = self.analytics_affected_per_machine_cpu_denorm
         dest["aurora_txn_affected_cpu_denorm"] = self.txn_affected_cpu_denorm
         dest["aurora_pred_txn_peak_cpu_denorm"] = self.pred_txn_peak_cpu_denorm
         (
