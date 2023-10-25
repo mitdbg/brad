@@ -334,6 +334,8 @@ class BlueprintCandidate(ComparableBlueprint):
 
             if (((~cur) & nxt) & (EngineBitmapValues[Engine.Aurora])) != 0:
                 # Added table to Aurora.
+                # You only pay for 1 copy of the table on Aurora, regardless of
+                # how many read replicas you have.
                 self.storage_cost += compute_single_aurora_table_cost(tbl, ctx)
 
     def try_to_make_feasible_if_needed(self, ctx: ScoringContext) -> None:
