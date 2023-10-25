@@ -190,7 +190,7 @@ class WorkloadBuilder:
         range_start: Optional[datetime] = None
         epoch_length = config.epoch_length
 
-        log_regex_str = r"Query: (?P<query>.*?) Engine: (?P<engine>.*?) Duration: (?P<duration>[0-9.]+)s"
+        log_regex_str = r"Query: (?P<query>.*) Engine: (?P<engine>[a-zA-Z]+) Duration \(s\): (?P<duration>[0-9\.]+)"
         log_regex = re.compile(log_regex_str)
 
         # The logic below extracts data from log files that represent epochs
@@ -209,8 +209,13 @@ class WorkloadBuilder:
 
             if "analytical" in log_file.file_key:
                 for line in log_file.contents.strip().split("\n"):
+                    clean_line = line.strip()
+                    if len(clean_line) == 0:
+                        continue
+
                     matches = log_regex.search(line)
                     if matches is None:
+                        logger.debug("Failed to parse log entry: %s", line)
                         continue
                     q = matches.group("query")
                     engine = Engine.from_str(matches.group("engine"))

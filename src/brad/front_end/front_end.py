@@ -347,7 +347,10 @@ class BradFrontEnd(BradInterface):
             run_time_s = end - start
             if not transactional_query or (random.random() < self._config.txn_log_prob):
                 self._qlogger.info(
-                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {run_time_s}s IsTransaction: {transactional_query}"
+                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} "
+                    f"Engine: {engine_to_use.value} "
+                    f"Duration (s): {run_time_s.total_seconds()} "
+                    f"IsTransaction: {transactional_query}"
                 )
                 run_time_s_float = run_time_s.total_seconds()
                 if transactional_query:
