@@ -117,4 +117,6 @@ class PrecomputedPredictions(AnalyticsLatencyScorer):
 
         if has_unmatched:
             raise RuntimeError("Workload contains unmatched queries.")
-        workload.set_predicted_analytical_latencies(self._predictions[query_indices, :])
+        workload.set_predicted_analytical_latencies(
+            self._predictions[query_indices, :], query_indices
+        )

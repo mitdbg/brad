@@ -80,6 +80,11 @@ class Workload:
         self._predicted_aurora_pages_accessed: Optional[npt.NDArray] = None
         self._predicted_athena_bytes_accessed: Optional[npt.NDArray] = None
 
+        # Used for debug purposes. Stores the "query index" for each query in
+        # the data structures above. This is used to recover the predicted run
+        # times for plotting or analysis purposes later on.
+        self._query_index_mapping: List[int] = []
+
         ###
         ### Legacy properties below.
         ###
@@ -141,9 +146,10 @@ class Workload:
     ###
 
     def set_predicted_analytical_latencies(
-        self, predicted_latency: npt.NDArray
+        self, predicted_latency: npt.NDArray, query_indices: List[int]
     ) -> None:
         self._predicted_analytical_latencies = predicted_latency
+        self._query_index_mapping = query_indices
 
     def get_predicted_analytical_latency(self, query_idx: int, engine: Engine) -> float:
         assert self._predicted_analytical_latencies is not None

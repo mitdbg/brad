@@ -288,8 +288,11 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         final_top_k.sort(reverse=True)
 
         # For later interactive inspection in Python.
-        BlueprintPickleDebugLogger.log_candidates_if_requested(
+        BlueprintPickleDebugLogger.log_object_if_requested(
             self._config, "final_query_based_blueprints", final_top_k
+        )
+        BlueprintPickleDebugLogger.log_object_if_requested(
+            self._config, "scoring_context", ctx
         )
 
         # Log the final top k for debugging purposes, if needed.
