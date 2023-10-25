@@ -11,7 +11,7 @@ import os
 import pytz
 import multiprocessing as mp
 from datetime import datetime, timedelta
-from typing import List, Tuple, Optional
+from typing import Optional
 
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
@@ -53,9 +53,6 @@ def runner(
     ]
     lookup_theatre_id_by_name = 0.8
     txn_indexes = list(range(len(transactions)))
-    latencies: List[List[Tuple[datetime, float]]] = [
-        [] for _ in range(len(transactions))
-    ]
     commits = [0 for _ in range(len(transactions))]
     aborts = [0 for _ in range(len(transactions))]
 
@@ -67,6 +64,15 @@ def runner(
         f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
     )
 
+    # For printing out results.
+    if "COND_OUT" in os.environ:
+        # pylint: disable-next=import-error
+        import conductor.lib as cond
+
+        out_dir = cond.get_output_path()
+    else:
+        out_dir = pathlib.Path(".")
+
     # Signal that we are ready to start and wait for other clients.
     start_queue.put("")
     _ = stop_queue.get()
@@ -74,6 +80,11 @@ def runner(
     rand_backoff = None
     overall_start = time.time()
     try:
+        latency_file = open(
+            out_dir / "oltp_latency_{}.csv".format(worker_idx), "w", encoding="UTF-8"
+        )
+        print("txn_idx,timestamp,run_time_s", file=latency_file)
+
         while True:
             txn_idx = txn_prng.choices(txn_indexes, weights=transaction_weights, k=1)[0]
             txn = transactions[txn_idx]
@@ -138,7 +149,12 @@ def runner(
                 commits[txn_idx] += 1
             else:
                 aborts[txn_idx] += 1
-            latencies[txn_idx].append((now, txn_end - txn_start))
+
+            if txn_prng.random() < args.latency_sample_prob:
+                print(
+                    "{},{},{}".format(txn_idx, now, txn_end - txn_start),
+                    file=latency_file,
+                )
 
             try:
                 _ = stop_queue.get_nowait()
@@ -149,23 +165,7 @@ def runner(
     finally:
         overall_end = time.time()
         print(f"[{worker_idx}] Done running transactions.", flush=True, file=sys.stderr)
-
-        # For printing out results.
-        if "COND_OUT" in os.environ:
-            # pylint: disable-next=import-error
-            import conductor.lib as cond
-
-            out_dir = cond.get_output_path()
-        else:
-            out_dir = pathlib.Path(".")
-
-        with open(
-            out_dir / "oltp_latency_{}.csv".format(worker_idx), "w", encoding="UTF-8"
-        ) as file:
-            print("txn_idx,timestamp,run_time_s", file=file)
-            for tidx, lat_list in enumerate(latencies):
-                for timestamp, lat in lat_list:
-                    print("{},{},{}".format(tidx, timestamp, lat), file=file)
+        latency_file.close()
 
         with open(
             out_dir / "oltp_stats_{}.csv".format(worker_idx), "w", encoding="UTF-8"
@@ -231,6 +231,12 @@ def main():
         "--schema-name",
         type=str,
         help="The schema name to use, if connecting directly.",
+    )
+    parser.add_argument(
+        "--latency-sample-prob",
+        type=float,
+        default=0.01,
+        help="The probability that a transaction's latency will be recorded.",
     )
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)
