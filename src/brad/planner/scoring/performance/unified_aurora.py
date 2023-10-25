@@ -68,11 +68,26 @@ class AuroraProvisioningScore:
             pred_txn_load = overall_writer_load
             pred_txn_cpu_denorm = overall_writer_cpu_util_denorm
         else:
+            model = ctx.planner_config.aurora_txn_coefs(ctx.schema_name)
+            curr_num_cpus = aurora_num_cpus(curr_prov)
             client_txns_per_s = ctx.metrics.txn_completions_per_s
-            pred_txn_load = client_txns_per_s * ctx.planner_config.client_txn_to_load()
-            pred_txn_cpu_denorm = (
-                client_txns_per_s * ctx.planner_config.client_txn_to_cpu_denorm()
-            )
+
+            # Piecewise function; the inflection point appears due to (maybe)
+            # hyperthreading behavior.
+            #
+            # D(client_txns_per_s, curr_cpus) =
+            #   C_1 * client_txns_per_s    if C_1 * client_txns_per_s <= curr_cpus / 2
+            #   C_2 * (client_txns_per_s - curr_cpus / (2 * C_1)) + curr_cpus / 2    otherwise
+            cpu_denorm_limit = curr_num_cpus / 2
+            pred_txn_cpu_denorm = client_txns_per_s * model["C_1"]
+            if pred_txn_cpu_denorm > cpu_denorm_limit:
+                pred_txn_cpu_denorm = (
+                    model["C_2"] * (client_txns_per_s - cpu_denorm_limit / model["C_1"])
+                    + cpu_denorm_limit
+                )
+
+            # In theory, these two should be equal. Empirically, they are mostly close enough.
+            pred_txn_load = pred_txn_cpu_denorm
 
             # TODO: Possible edge cases here due to cumulative prediction error (e.g.,
             # pred_txn_load > overall_writer_load violates our model's assumptions).

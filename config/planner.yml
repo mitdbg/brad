@@ -261,6 +261,7 @@ aurora_load_factor:
 ###
 
 aurora_txns:
+  # [Deprecated]
   # N.B. These values are for the initial IMDB "bulk insert" transactions
   client_thpt_to_load: 0.06493011
   client_thpt_to_cpu_denorm: 0.04584762
@@ -268,6 +269,7 @@ aurora_txns:
   # Should be a bit more precise.
   prov_to_peak_cpu_denorm: 0.56730588
 
+  # [Deprecated]
   # N.B. These values are for the IMDB-extended transactions.
   client_thpt_to_cpu_denorm: 0.0015366357203185784
   client_thpt_to_load: 0.0037392906617191367
@@ -276,11 +278,21 @@ aurora_txns:
   prov_to_peak_cpu_denorm: 0.6800294117647058
 
   imdb_extended_20g:
+    # Used for "load translation"
+    C_1: 0.00282164
+    C_2: 0.00108688
+
+    # Used for latency.
     K: 1.0581694841384888
     b_p50: 0.0022556402254849672
     b_p95: 0.00383179122582078
 
   imdb_extended_100g:
+    # Used for "load translation"
+    C_1: 0.00282164
+    C_2: 0.00108688
+
+    # Used for latency.
     K: 1.0729172229766846
     b_p50: 0.001035563531331718
     b_p95: 0.00274773221462965
