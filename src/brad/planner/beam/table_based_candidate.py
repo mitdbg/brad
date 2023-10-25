@@ -334,6 +334,8 @@ class BlueprintCandidate(ComparableBlueprint):
 
             if (((~cur) & nxt) & (EngineBitmapValues[Engine.Aurora])) != 0:
                 # Added table to Aurora.
+                # You only pay for 1 copy of the table on Aurora, regardless of
+                # how many read replicas you have.
                 self.storage_cost += compute_single_aurora_table_cost(tbl, ctx)
 
     def try_to_make_feasible_if_needed(self, ctx: ScoringContext) -> None:
@@ -391,6 +393,9 @@ class BlueprintCandidate(ComparableBlueprint):
             ctx.next_workload.get_predicted_analytical_latency_batch(
                 self.query_locations[Engine.Aurora], Engine.Aurora
             ),
+            ctx.next_workload.get_arrival_counts_batch(
+                self.query_locations[Engine.Aurora]
+            ),
             ctx.current_blueprint.aurora_provisioning(),
             self.aurora_provisioning,
             ctx,
@@ -398,6 +403,9 @@ class BlueprintCandidate(ComparableBlueprint):
         self.redshift_score = RedshiftProvisioningScore.compute(
             ctx.next_workload.get_predicted_analytical_latency_batch(
                 self.query_locations[Engine.Redshift], Engine.Redshift
+            ),
+            ctx.next_workload.get_arrival_counts_batch(
+                self.query_locations[Engine.Aurora]
             ),
             ctx.current_blueprint.redshift_provisioning(),
             self.redshift_provisioning,

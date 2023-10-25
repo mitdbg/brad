@@ -259,6 +259,8 @@ class BlueprintCandidate(ComparableBlueprint):
 
             if (((~curr) & next_placement) & (EngineBitmapValues[Engine.Aurora])) != 0:
                 # Added table to Aurora.
+                # You only pay for 1 copy of the table on Aurora, regardless of
+                # how many read replicas you have.
                 self.storage_cost += compute_single_aurora_table_cost(name, ctx)
 
         # Adding a new query can affect the feasibility of the provisioning.
@@ -420,12 +422,18 @@ class BlueprintCandidate(ComparableBlueprint):
 
         self.aurora_score = AuroraProvisioningScore.compute(
             np.array(self.base_query_latencies[Engine.Aurora]),
+            ctx.next_workload.get_arrival_counts_batch(
+                self.query_locations[Engine.Aurora]
+            ),
             ctx.current_blueprint.aurora_provisioning(),
             self.aurora_provisioning,
             ctx,
         )
         self.redshift_score = RedshiftProvisioningScore.compute(
             np.array(self.base_query_latencies[Engine.Redshift]),
+            ctx.next_workload.get_arrival_counts_batch(
+                self.query_locations[Engine.Aurora]
+            ),
             ctx.current_blueprint.redshift_provisioning(),
             self.redshift_provisioning,
             ctx,

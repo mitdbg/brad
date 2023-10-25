@@ -51,7 +51,7 @@ class BlueprintPlanningDebugLogger:
 
 class BlueprintPickleDebugLogger:
     @staticmethod
-    def log_candidates_if_requested(
+    def log_object_if_requested(
         config: ConfigFile, file_name_prefix: str, blueprints: Any
     ) -> None:
         log_path = config.planner_log_path

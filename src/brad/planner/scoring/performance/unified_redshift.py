@@ -1,12 +1,14 @@
 import logging
 import numpy as np
 import numpy.typing as npt
-from typing import Dict
+from typing import Dict, TYPE_CHECKING
 
 from brad.config.engine import Engine
 from brad.blueprint.provisioning import Provisioning
-from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.provisioning import redshift_num_cpus
+
+if TYPE_CHECKING:
+    from brad.planner.scoring.context import ScoringContext
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +30,10 @@ class RedshiftProvisioningScore:
     def compute(
         cls,
         base_query_run_times: npt.NDArray,
+        query_arrival_counts: npt.NDArray,
         curr_prov: Provisioning,
         next_prov: Provisioning,
-        ctx: ScoringContext,
+        ctx: "ScoringContext",
     ) -> "RedshiftProvisioningScore":
         """
         Computes all of the Redshift provisioning-dependent scoring components in one
@@ -56,7 +59,7 @@ class RedshiftProvisioningScore:
 
         # 1. Adjust the analytical portion of the system load for query movement.
         if (
-            Engine.Redshift not in ctx.current_latency_weights
+            Engine.Redshift not in ctx.engine_latency_norm_factor
             or curr_prov.num_nodes() == 0
         ):
             # Special case. We cannot reweigh the queries because nothing in the
@@ -65,15 +68,15 @@ class RedshiftProvisioningScore:
         else:
             # Query movement scaling factor.
             # Captures change in queries routed to this engine.
-            base_latency = ctx.current_latency_weights[Engine.Redshift]
-            assert base_latency != 0.0
-            total_next_latency = base_query_run_times.sum()
-            query_factor = total_next_latency / base_latency
+            norm_factor = ctx.engine_latency_norm_factor[Engine.Redshift]
+            assert norm_factor != 0.0
+            total_next_latency = np.dot(base_query_run_times, query_arrival_counts)
+            query_factor = total_next_latency / norm_factor
 
         adjusted_cpu_denorm = query_factor * overall_cpu_util_denorm
 
         # 2. Scale query execution times based on load and provisioning.
-        scaled_rt = cls._scale_load_resources(
+        scaled_rt = cls.scale_load_resources(
             base_query_run_times, next_prov, adjusted_cpu_denorm, ctx
         )
 
@@ -87,11 +90,11 @@ class RedshiftProvisioningScore:
         )
 
     @staticmethod
-    def _scale_load_resources(
+    def scale_load_resources(
         base_predicted_latency: npt.NDArray,
         to_prov: Provisioning,
         overall_cpu_denorm: float,
-        ctx: ScoringContext,
+        ctx: "ScoringContext",
     ) -> npt.NDArray:
         resource_factor = _REDSHIFT_BASE_RESOURCE_VALUE / (
             redshift_num_cpus(to_prov) * to_prov.num_nodes()
@@ -127,4 +130,4 @@ class RedshiftProvisioningScore:
         dest.update(self.debug_values)
 
 
-_REDSHIFT_BASE_RESOURCE_VALUE = redshift_num_cpus(Provisioning("dc2.large", 1))
+_REDSHIFT_BASE_RESOURCE_VALUE = redshift_num_cpus(Provisioning("dc2.large", 2))

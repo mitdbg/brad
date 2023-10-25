@@ -90,7 +90,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                 self._current_blueprint.table_locations_bitmap(),
             )
         )
-        ctx.compute_engine_latency_weights()
+        ctx.compute_engine_latency_norm_factor()
 
         beam_size = self._planner_config.beam_size()
         placement_options = self._get_table_placement_options_bitmap()
@@ -274,8 +274,11 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             return
 
         # For later interactive inspection in Python.
-        BlueprintPickleDebugLogger.log_candidates_if_requested(
+        BlueprintPickleDebugLogger.log_object_if_requested(
             self._config, "final_table_based_blueprints", final_top_k
+        )
+        BlueprintPickleDebugLogger.log_object_if_requested(
+            self._config, "scoring_context", ctx
         )
 
         # Log the final top k for debugging purposes, if needed.
