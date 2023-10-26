@@ -6,7 +6,7 @@ function start_brad() {
     --config-file $config_file \
     --schema-name $schema_name \
     --planner-config-file $planner_config_file \
-    --temp-config-file config/temp_config_sample.yml \
+    --temp-config-file config/temp_config.yml \
     &
   brad_pid=$!
   popd
@@ -20,7 +20,7 @@ function start_brad_debug() {
     --config-file $config_file \
     --schema-name $schema_name \
     --planner-config-file $planner_config_file \
-    --temp-config-file config/temp_config_sample.yml \
+    --temp-config-file config/temp_config.yml \
     --debug \
     &
   brad_pid=$!
