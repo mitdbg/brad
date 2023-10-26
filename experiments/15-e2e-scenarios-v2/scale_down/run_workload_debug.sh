@@ -22,7 +22,7 @@ start_brad_debug $config_file $planner_config_file
 sleep 10
 
 start_repeating_olap_runner 2 30 5  # Implicit: --query-indexes
-start_txn_runner 2
+start_txn_runner 4
 
 echo "READY -- Sleeping for 1 hour. Hit Ctrl-C to stop."
 sleep $((60 * 60))

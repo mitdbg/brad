@@ -42,7 +42,7 @@ run_experiment(
     "ra-query-indexes": "0,1,2",
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "ra-query-frequency-file": IMDB_100GB_REGULAR_QUERY_FREQS,
-    "num-front-ends": 3,
+    "num-front-ends": 4,
   },
 )
 
@@ -56,6 +56,6 @@ run_command(
     "schema-name": "imdb_extended_100g",
     "ra-query-indexes": ",".join(map(str, list(range(25, 35)) + list(range(50, 60)))),
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "num-front-ends": 3,
+    "num-front-ends": 4,
   },
 )
