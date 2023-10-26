@@ -3,6 +3,7 @@ import logging
 from .operator import Operator
 from brad.data_sync.execution.context import ExecutionContext
 from brad.config.engine import Engine
+from brad.data_sync.s3_path import S3Path
 
 logger = logging.getLogger(__name__)
 
@@ -88,3 +89,17 @@ class LoadFromS3(Operator):
         redshift = await ctx.redshift()
         await redshift.execute(query)
         return self
+
+    async def _execute_athena(self, ctx: ExecutionContext) -> "Operator":
+        # This reduces to copying the file to the appropriate directory
+        s3_client = ctx.s3_client()
+        s3_client.copy_object(
+            CopySource={
+                "Bucket": S3Path(self._relative_s3_path).path_prefix(),
+                "Key": self._table_name,
+            },
+            Bucket=f"{ctx._config.athena_s3_data_path}{self._blueprint.schema_name()}",
+            Key=self._table_name,
+        )
+        return self
+    

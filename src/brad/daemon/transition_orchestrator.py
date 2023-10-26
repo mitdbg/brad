@@ -7,8 +7,16 @@ from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.diff.table import TableDiff
 from brad.blueprint.manager import BlueprintManager
 from brad.blueprint.provisioning import Provisioning
+from brad.blueprint.sql_gen.table import TableSqlGenerator
 from brad.blueprint.state import TransitionState
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
+from brad.data_sync.execution.context import ExecutionContext
+from brad.data_sync.operators.drop_tables import DropTables
+from brad.data_sync.operators.load_from_s3 import LoadFromS3
+from brad.data_sync.operators.unload_to_s3 import UnloadToS3
+from brad.front_end.engine_connections import EngineConnections
+from brad.provisioning.directory import Directory
 from brad.provisioning.rds import RdsProvisioningManager
 from brad.provisioning.redshift import RedshiftProvisioningManager
 
@@ -62,7 +70,7 @@ class TransitionOrchestrator:
         assert self._next_blueprint is not None
         assert self._next_version is not None
 
-        # Re-provision Aurora and Redshift as needed
+        # 1. Re-provision Aurora and Redshift as needed
         aurora_diff = self._diff.aurora_diff()
         redshift_diff = self._diff.redshift_diff()
 
@@ -81,15 +89,49 @@ class TransitionOrchestrator:
         await asyncio.gather(aurora_awaitable, redshift_awaitable)
         logger.debug("Aurora and Redshift provisioning changes complete.")
 
-        # Move tables as needed
+        # 2. Sync tables (TODO: discuss more efficient alternatives -
+        # possibly add a filter of tables to run_sync)
+        ran_sync = await self._data_sync_executor.run_sync(
+            self._blueprint_mgr.get_blueprint()
+        )
+        logger.debug(
+            f"""Completed data sync step during transition. 
+            There were {'some' if ran_sync else 'no'} new writes to sync"""
+        )
+
+        # 3. Create tables in new locations as needed
+        directory = Directory(self._config)
+        asyncio.run(directory.refresh())
+
+        cxns = EngineConnections.connect_sync(
+            self._config,
+            directory,
+            schema_name=self._curr_blueprint.schema_name(),
+            autocommit=False,
+            specific_engines=None,
+        )
+
+        sql_gen = TableSqlGenerator(self._config, self._next_blueprint)
+
+        for diff in self._diff.table_diffs():
+            for location in diff.added_locations:
+                logger.info(
+                    "Creating table '%s' on %s...",
+                    diff.table_name,
+                    location,
+                )
+                queries, db_type = sql_gen.generate_create_table_sql(
+                    diff.table_name, location
+                )
+                conn = cxns.get_connection(db_type)
+                cursor = conn.cursor_sync()
+                for q in queries:
+                    logger.debug("Running on %s: %s", str(db_type), q)
+                    cursor.execute_sync(q)
+
+        # 4. Load tables into new locations
         table_awaitables = []
         for diff in self._diff.table_diffs():
-            # This assumes that all engines in the current blueprint on which
-            # a given table is present have an *up-to-date* copy of the table.
-            # Can relax this later using the sync infrastructure.
-            #
-            # Only need to write table out if we're planning on loading it to
-            # an additional engine.
             if diff.added_locations is not None:
                 table_awaitables.append(self._enforce_table_diff_additions(diff))
         await asyncio.gather(table_awaitables)
@@ -136,11 +178,13 @@ class TransitionOrchestrator:
             self._curr_blueprint.aurora_provisioning(),
             self._next_blueprint.aurora_provisioning(),
             self._diff.aurora_diff(),
+            self._diff.table_diffs(),
         )
         redshift_awaitable = self._run_redshift_post_transition(
-            self._diff.redshift_diff(),
+            self._diff.redshift_diff(), self._diff.table_diffs()
         )
-        await asyncio.gather(aurora_awaitable, redshift_awaitable)
+        athena_awaitable = self._run_athena_post_transition(self._diff.table_diffs())
+        await asyncio.gather(aurora_awaitable, redshift_awaitable, athena_awaitable)
         logger.debug("Post-transition steps complete.")
 
         await self._blueprint_mgr.update_transition_state(TransitionState.Stable)
@@ -305,7 +349,11 @@ class TransitionOrchestrator:
         # Aurora's pre-transition work is complete!
 
     async def _run_aurora_post_transition(
-        self, old: Provisioning, new: Provisioning, diff: Optional[ProvisioningDiff]
+        self,
+        old: Provisioning,
+        new: Provisioning,
+        diff: Optional[ProvisioningDiff],
+        table_diffs: Optional[list[TableDiff]],
     ) -> None:
         if diff is None:
             # Nothing to do.
@@ -330,6 +378,19 @@ class TransitionOrchestrator:
                 )
                 await self._rds.delete_replica(replicas[delete_index].instance_id())
                 delete_index -= 1
+
+        # Drop removed tables
+        if table_diffs is None:
+            # Nothing to do.
+            return
+
+        to_drop = []
+        for table_diff in table_diffs:
+            if Engine.Aurora in table_diff.removed_locations():
+                to_drop.append(table_diff.table_name())
+        d = DropTables(to_drop, Engine.Aurora)
+        ctx = self._new_execution_context(Engine.Aurora)
+        d.execute(ctx)
 
         # Aurora's post-transition work is complete!
 
@@ -383,8 +444,7 @@ class TransitionOrchestrator:
         # Redshift's pre-transition work is complete!
 
     async def _run_redshift_post_transition(
-        self,
-        diff: Optional[ProvisioningDiff],
+        self, diff: Optional[ProvisioningDiff], table_diffs: Optional[list[TableDiff]]
     ) -> None:
         if diff is None:
             # Nothing to do.
@@ -396,17 +456,108 @@ class TransitionOrchestrator:
             )
             await self._redshift.pause_cluster(self._config.redshift_cluster_id)
 
+        # Drop removed tables
+        if table_diffs is None:
+            # Nothing to do.
+            return
+
+        to_drop = []
+        for table_diff in table_diffs:
+            if Engine.Redshift in table_diff.removed_locations():
+                to_drop.append(table_diff.table_name())
+        d = DropTables(to_drop, Engine.Redshift)
+        ctx = self._new_execution_context(Engine.Redshift)
+        d.execute(ctx)
+
+    async def _run_athena_post_transition(
+        self,
+        table_diffs: Optional[list[TableDiff]],
+    ) -> None:
+        if table_diffs is None:
+            # Nothing to do.
+            return
+
+        # Drop removed tables
+        to_drop = []
+        for table_diff in self._diff.table_diffs():
+            if Engine.Athena in table_diff.removed_locations():
+                to_drop.append(table_diff.table_name())
+        d = DropTables(to_drop, Engine.Athena)
+        ctx = self._new_execution_context(Engine.Athena)
+        d.execute(ctx)
+
     async def _enforce_table_diff_additions(self, diff: TableDiff) -> None:
-        await self._write_table_out(diff.table)
+        await self._unload_table_if_needed(diff.table)
+
         table_loading_awaitables = []
         for e in diff.added_locations:
-            table_loading_awaitables.append(self._load_table_to_engine(diff))    
+            table_loading_awaitables.append(
+                self._load_table_to_engine(diff.table_name, e)
+            )
 
-    async def _write_table_out(self, table_name: str) -> None:
-        return
-    
-    async def _add_table_to_new_engines(self, diff: TableDiff) -> None:
-        return
+    async def _unload_table_if_needed(self, table_name: str) -> None:
+        curr_locations = self._curr_blueprint.get_table_locations(table_name)
+        temp_s3_path = (
+            f"transition/{table_name}.tbl"  # FIXME: different path convention?
+        )
+
+        # The logic here assumes that all engines have the most recent version.
+
+        # If the table already exists in Athena, no reason to write it out again.
+        if Engine.Athena in curr_locations:
+            logger.debug(
+                f"""In transition: table {table_name} exists on S3, 
+                         no need to write out temporary table"""
+            )
+        elif Engine.Redshift in curr_locations:  # Faster to write out from Redshift
+            u = UnloadToS3(table_name, temp_s3_path, engine=Engine.Redshift)
+            ctx = self._new_execution_context(Engine.Redshift)
+            u.execute(ctx)
+            logger.debug(
+                f"In transition: table {table_name} written to S3 from Redshift."
+            )
+        elif Engine.Aurora in curr_locations:
+            u = UnloadToS3(table_name, temp_s3_path, engine=Engine.Aurora)
+            ctx = self._new_execution_context(Engine.Aurora)
+            u.execute(ctx)
+            logger.debug(
+                f"In transition: table {table_name} written to S3 from Aurora."
+            )
+        else:
+            logger.error(
+                f"""In transition: table {table_name} does not exist 
+                         on any engine in current blueprint."""
+            )
+
+    async def _load_table_to_engine(self, table_name: str, e: Engine) -> None:
+        temp_s3_path = f"transition/{table_name}.tbl"
+        ctx = self._new_execution_context(e)
+
+        l = LoadFromS3(table_name, temp_s3_path, e)
+        l.execute(ctx)
+        logger.debug(f"In transition: table {table_name} loaded to {e}.")
+
+    def _new_execution_context(self, e: Engine) -> ExecutionContext:
+        assert self._engines is not None
+        return ExecutionContext(
+            aurora=(
+                self._engines.get_connection(Engine.Aurora)
+                if e == Engine.Aurora
+                else None
+            ),
+            athena=(
+                self._engines.get_connection(Engine.Athena)
+                if e == Engine.Athena
+                else None
+            ),
+            redshift=(
+                self._engines.get_connection(Engine.Redshift)
+                if e == Engine.Redshift
+                else None
+            ),
+            blueprint=self._blueprint_mgr.get_blueprint(),
+            config=self._config,
+        )
 
 
 # Note that `version` is the blueprint version when the instance was created. It
