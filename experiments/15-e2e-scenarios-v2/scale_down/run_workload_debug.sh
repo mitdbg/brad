@@ -16,6 +16,8 @@ extract_named_arguments $@
 trap "cancel_experiment" INT
 trap "cancel_experiment" TERM
 
+# Useful for testing out blueprint planning without executing the transition.
+export BRAD_IGNORE_BLUEPRINT=1
 start_brad $config_file $planner_config_file
 sleep 30
 
