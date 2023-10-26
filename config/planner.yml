@@ -52,7 +52,7 @@ triggers:
 ###
 
 beam_size: 100
-max_provisioning_multiplier: 3
+max_provisioning_multiplier: 2.5
 max_feasible_cpu: 85
 
 
