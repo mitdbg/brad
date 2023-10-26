@@ -1,19 +1,6 @@
 include("../common.cond")
 
 run_experiment(
-  name="brad_100g",
-  run="./run_workload.sh",
-  options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_100g.yml",
-    "planner-config-file": "config/planner.yml",
-    # TODO: Select regular query indexes
-    "ra-query-indexes": "0,1,2",
-    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-  },
-)
-
-run_experiment(
   name="brad_20g",
   run="./run_workload.sh",
   options={
@@ -40,5 +27,31 @@ run_command(
     "ra-query-indexes": "25,50,51,75,76,27,28,6",
     "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
     "num-front-ends": 4,
+  },
+)
+
+run_experiment(
+  name="brad_100g",
+  run="./run_workload.sh",
+  options={
+    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
+    "config-file": "config/config_100g.yml",
+    "planner-config-file": "config/planner.yml",
+    # TODO: Select regular query indexes
+    "ra-query-indexes": "0,1,2",
+    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+    "ra-query-frequency-file": IMDB_100GB_REGULAR_QUERY_FREQS,
+  },
+)
+
+run_experiment(
+  name="brad_100g_debug",
+  run="./run_workload_debug.sh",
+  options={
+    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
+    "config-file": "config/config_100g.yml",
+    "planner-config-file": "config/planner.yml",
+    "ra-query-indexes": ",".join(list(range(25, 35)) + list(range(50, 60))),
+    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
   },
 )
