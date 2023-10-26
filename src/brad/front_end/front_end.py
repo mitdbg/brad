@@ -307,6 +307,8 @@ class BradFrontEnd(BradInterface):
                     connection = session.engines.get_connection(engine_to_use)
                     cursor = connection.cursor_sync()
                     start = datetime.now(tz=timezone.utc)
+                    if query_rep.is_transaction_start():
+                        session.set_txn_start_timestamp(start)
                     # Using execute_sync() is lower overhead than the async
                     # interface. For transactions, we won't necessarily need the
                     # async interface.
@@ -339,7 +341,8 @@ class BradFrontEnd(BradInterface):
             if query_rep.is_transaction_start():
                 session.set_in_transaction(in_txn=True)
 
-            if query_rep.is_transaction_end():
+            is_transaction_end = query_rep.is_transaction_end()
+            if is_transaction_end:
                 session.set_in_transaction(in_txn=False)
                 self._transaction_end_counter.bump()
 
@@ -353,10 +356,14 @@ class BradFrontEnd(BradInterface):
                     f"IsTransaction: {transactional_query}"
                 )
                 run_time_s_float = run_time_s.total_seconds()
-                if transactional_query:
-                    self._txn_latency_sketch.add(run_time_s_float)
-                else:
+                if not transactional_query:
                     self._query_latency_sketch.add(run_time_s_float)
+                elif is_transaction_end:
+                    # We want to record the duration of the entire transaction
+                    # (not just one query in the transaction).
+                    self._txn_latency_sketch.add(
+                        (end - session.txn_start_timestamp()).total_seconds()
+                    )
 
             # Extract and return the results, if any.
             try:

@@ -298,4 +298,4 @@ class AuroraProvisioningScore:
         dest.update(self.debug_values)
 
 
-_AURORA_BASE_RESOURCE_VALUE = aurora_num_cpus(Provisioning("db.r6g.xlarge", 1))
+_AURORA_BASE_RESOURCE_VALUE = aurora_num_cpus(Provisioning("db.r6g.large", 1))

@@ -130,4 +130,4 @@ class RedshiftProvisioningScore:
         dest.update(self.debug_values)
 
 
-_REDSHIFT_BASE_RESOURCE_VALUE = redshift_num_cpus(Provisioning("dc2.large", 2))
+_REDSHIFT_BASE_RESOURCE_VALUE = redshift_num_cpus(Provisioning("dc2.large", 1))

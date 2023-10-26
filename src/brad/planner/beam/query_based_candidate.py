@@ -432,7 +432,7 @@ class BlueprintCandidate(ComparableBlueprint):
         self.redshift_score = RedshiftProvisioningScore.compute(
             np.array(self.base_query_latencies[Engine.Redshift]),
             ctx.next_workload.get_arrival_counts_batch(
-                self.query_locations[Engine.Aurora]
+                self.query_locations[Engine.Redshift]
             ),
             ctx.current_blueprint.redshift_provisioning(),
             self.redshift_provisioning,
