@@ -21,8 +21,8 @@ log_workload_point "brad_start_initiated"
 sleep 30
 
 log_workload_point "clients_starting"
-start_repeating_olap_runner 1 30 5  # Implicit: --query-indexes
-start_txn_runner 2
+start_repeating_olap_runner 4 15 5  # Implicit: --query-indexes
+start_txn_runner 4
 log_workload_point "clients_started"
 
 # Wait until a re-plan and transition completes.

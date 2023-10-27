@@ -39,10 +39,9 @@ run_experiment(
     "planner-config-file": "config/planner.yml",
     "schema-name": "imdb_extended_100g",
     # TODO: Select regular query indexes
-    "ra-query-indexes": "0,1,2",
+    "ra-query-indexes": ",".join(map(str, list(range(25, 35)) + list(range(75, 80)))),
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "ra-query-frequency-file": IMDB_100GB_REGULAR_QUERY_FREQS,
-    "num-front-ends": 4,
+    "num-front-ends": 8,
   },
 )
 
@@ -54,8 +53,8 @@ run_command(
     "config-file": "config/config_large_100.yml",
     "planner-config-file": "config/planner.yml",
     "schema-name": "imdb_extended_100g",
-    "ra-query-indexes": ",".join(map(str, list(range(25, 35)) + list(range(50, 60)))),
+    "ra-query-indexes": ",".join(map(str, list(range(25, 35)) + list(range(75, 80)))),
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "num-front-ends": 4,
+    "num-front-ends": 8,
   },
 )

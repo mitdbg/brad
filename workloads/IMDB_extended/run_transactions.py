@@ -115,8 +115,8 @@ def runner(
                     if rand_backoff is None:
                         rand_backoff = RandomizedExponentialBackoff(
                             max_retries=100,
-                            base_delay_s=2.0,
-                            max_delay_s=timedelta(minutes=10).total_seconds(),
+                            base_delay_s=0.1,
+                            max_delay_s=timedelta(minutes=1).total_seconds(),
                         )
 
                     # Delay retrying in the case of a transient error (this
