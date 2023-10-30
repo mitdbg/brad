@@ -48,6 +48,10 @@ triggers:
     ceiling_s: 30.0
     sustained_epochs: 3
 
+  txn_latency_ceiling:
+    ceiling_s: 0.030
+    sustained_epochs: 3
+
 ###
 ### Beam planning constants.
 ###
@@ -311,9 +315,9 @@ aurora_txns:
     C_2: 0.00108688
 
     # Used for latency.
-    K: 1.0581694841384888
-    b_p50: 0.0022556402254849672
-    b_p90: 0.00383179122582078  # TODO: Update
+    K: 1.0194002389907837
+    b_p50: 0.005365931428968906
+    b_p90: 0.005891922861337662  # TODO: Update
 
   imdb_extended_100g:
     # Used for "load translation"
@@ -321,9 +325,9 @@ aurora_txns:
     C_2: 0.00108688
 
     # Used for latency.
-    K: 1.0729172229766846
-    b_p50: 0.001035563531331718
-    b_p90: 0.00274773221462965  # TODO: Update
+    K: 1.0811012983322144
+    b_p50: 0.0008631267119199038
+    b_p90: 0.002251814818009734
 
 
 aurora_scaling:
