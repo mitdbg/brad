@@ -82,7 +82,9 @@ async def main_impl(args) -> None:
         extract_file = f"{table.name}_test.tbl"
         full_extract_path = f"{config.s3_extract_path}{extract_file}"
 
-        num_rows = table_sizer.table_size_rows(table.name, Engine.Aurora)
+        num_rows = await table_sizer.table_size_rows(
+            table.name, Engine.Aurora, approximate_allowed=False
+        )
         extract_limit = min(num_rows, args.max_rows)
         op = UnloadToS3(table.name, extract_file, Engine.Aurora, extract_limit)
         await op.execute(ctx)

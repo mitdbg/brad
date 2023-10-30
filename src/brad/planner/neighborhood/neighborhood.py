@@ -94,7 +94,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         # the daemon process.
         logger.info("Running a replan.")
         self._log_current_metrics()
-        current_workload, next_workload = self._workload_provider.get_workloads(
+        current_workload, next_workload = await self._workload_provider.get_workloads(
             datetime.now().astimezone(pytz.utc), window_multiplier
         )
         workload_filters = [
