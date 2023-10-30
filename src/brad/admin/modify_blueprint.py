@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import logging
 from typing import Optional
@@ -23,6 +24,17 @@ from brad.routing.tree_based.forest_policy import ForestPolicy
 from brad.routing.rule_based import RuleBased
 
 logger = logging.getLogger(__name__)
+
+
+# Parse string-formatted injected table placement. 
+class ParseTableList(argparse.Action):
+    def __call__(self, parser, namespace, s, option_string=None):
+        mappings = {}
+        for mapping in s.split(";"):
+            table, engines_str = mapping.split("=")
+            engine_list = engines_str.split(",")
+            mappings[table] = [Engine.from_str(e.strip()) for e in engine_list]
+        setattr(namespace, self.dest, mappings)
 
 
 def register_admin_action(subparser) -> None:
@@ -71,7 +83,12 @@ def register_admin_action(subparser) -> None:
     parser.add_argument(
         "--place-tables-everywhere",
         action="store_true",
-        help="Updates the blueprint's table placement and places tables on all engines.",
+        help="Updates the blueprint's table placement and places tables on all engines. Overrides --place-tables.",
+    )
+    parser.add_argument(
+        "--place-tables",
+        action=ParseTableList,
+        help="Updates the blueprint's table placement and places the specified tables on the specified engines. Overridden by --place-tables-everywhere. Format argument as a string of the form: table1=engine1,engine2;table2=engine3;",
     )
     parser.add_argument(
         "--set-routing-policy",
@@ -238,7 +255,7 @@ def modify_blueprint(args) -> None:
 
     enum_blueprint = EnumeratedBlueprint(blueprint)
 
-    # 3. Modify parts of the blueprint as needed.
+    # 3. Modify engine provisioning as needed.
     if args.aurora_instance_type is not None or args.aurora_num_nodes is not None:
         aurora_prov = blueprint.aurora_provisioning()
         aurora_prov = aurora_prov.mutable_clone()
@@ -257,12 +274,20 @@ def modify_blueprint(args) -> None:
             redshift_prov.set_num_nodes(args.redshift_num_nodes)
         enum_blueprint.set_redshift_provisioning(redshift_prov)
 
-    if args.place_tables_everywhere:
+    # 4. Modify table placement as needed.
+    new_placement = blueprint.table_locations().copy()
+    for table, engines in args.place_tables.items():
+        new_placement[table] = engines
+    enum_blueprint.set_table_locations(new_placement)
+
+
+    if args.place_tables_everywhere: # Overrides manual placement above.
         new_placement = {}
         for tbl in blueprint.table_locations().keys():
             new_placement[tbl] = Engine.from_bitmap(Engine.bitmap_all())
         enum_blueprint.set_table_locations(new_placement)
 
+    # 5. Modify routing policy as needed.
     if args.set_routing_policy is not None:
         if args.set_routing_policy == "always_redshift":
             definite_policy: AbstractRoutingPolicy = AlwaysOneRouter(Engine.Redshift)
@@ -280,8 +305,8 @@ def modify_blueprint(args) -> None:
             )
         full_policy = FullRoutingPolicy([], definite_policy)
         enum_blueprint.set_routing_policy(full_policy)
-
-    # 3. Write the changes back.
+    
+    # 6. Write the changes back.
     modified_blueprint = enum_blueprint.to_blueprint()
     if blueprint == modified_blueprint:
         logger.info("No changes made to the blueprint.")
