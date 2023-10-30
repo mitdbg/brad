@@ -158,17 +158,19 @@ class WorkloadBuilder:
                 self._transactional_queries.append(q.strip())
         return self
 
-    def table_sizes_from_engines(
+    async def table_sizes_from_engines(
         self, blueprint: Blueprint, table_sizer: TableSizer
     ) -> "WorkloadBuilder":
-        preferred_sources = [Engine.Redshift, Engine.Aurora, Engine.Athena]
+        # For more accurate predictions, we should retrieve the size of the
+        # table that will actualy be exported/imported.
+        preferred_sources = [Engine.Redshift, Engine.Athena, Engine.Aurora]
         self._table_sizes.clear()
         for table, locations in blueprint.tables_with_locations():
             for source in preferred_sources:
                 if source not in locations:
                     continue
-                self._table_sizes[table.name] = table_sizer.table_size_rows(
-                    table.name, source
+                self._table_sizes[table.name] = await table_sizer.table_size_rows(
+                    table.name, source, approximate_allowed=True
                 )
                 break
             assert table.name in self._table_sizes

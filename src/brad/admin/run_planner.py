@@ -119,7 +119,7 @@ def parse_metrics(kv_str: str) -> Dict[str, float]:
     return metrics
 
 
-def run_planner(args) -> None:
+async def run_planner_impl(args) -> None:
     """
     This admin action is used to manually test the blueprint planner
     independently of the rest of BRAD.
@@ -153,17 +153,20 @@ def run_planner(args) -> None:
         )
         workload_dir = pathlib.Path(args.workload_dir)
         table_sizer = TableSizer(engines, config)
-        builder = WorkloadBuilder()
-        workload = (
-            builder.add_analytical_queries_and_counts_from_file(
+        builder = (
+            WorkloadBuilder()
+            .add_analytical_queries_and_counts_from_file(
                 args.query_bank_file,
                 args.query_counts_file,
             )
             .add_transactional_queries_from_file(workload_dir / "oltp.sql")
             .for_period(timedelta(hours=1))
-            .table_sizes_from_engines(blueprint_mgr.get_blueprint(), table_sizer)
-            .build()
         )
+        workload = (
+            await builder.table_sizes_from_engines(
+                blueprint_mgr.get_blueprint(), table_sizer
+            )
+        ).build()
 
     elif args.workload_source == "workload_dir":
         assert args.analytical_rate_per_s is not None
@@ -173,17 +176,20 @@ def run_planner(args) -> None:
         )
         table_sizer = TableSizer(engines, config)
         workload_dir = pathlib.Path(args.workload_dir)
-        builder = WorkloadBuilder()
-        workload = (
-            builder.add_analytical_queries_from_file(workload_dir / "olap.sql")
+        builder = (
+            WorkloadBuilder()
+            .add_analytical_queries_from_file(workload_dir / "olap.sql")
             .add_transactional_queries_from_file(workload_dir / "oltp.sql")
             .uniform_per_analytical_query_rate(
                 args.analytical_rate_per_s, period=timedelta(seconds=1)
             )
             .for_period(timedelta(hours=1))
-            .table_sizes_from_engines(blueprint_mgr.get_blueprint(), table_sizer)
-            .build()
         )
+        workload = (
+            await builder.table_sizes_from_engines(
+                blueprint_mgr.get_blueprint(), table_sizer
+            )
+        ).build()
 
     # 5. Load the pre-computed predictions.
     prediction_dir = pathlib.Path(args.predictions_dir)
@@ -276,6 +282,10 @@ def run_planner(args) -> None:
         workload.serialize_for_debugging(
             pathlib.Path(args.workload_dir) / _PICKLE_FILE_NAME
         )
+
+
+def run_planner(args) -> None:
+    asyncio.run(run_planner_impl(args))
 
 
 _PICKLE_FILE_NAME = "workload.pickle"

@@ -20,7 +20,7 @@ class WorkloadProvider:
     workload (for blueprint planning purposes).
     """
 
-    def get_workloads(
+    async def get_workloads(
         self,
         window_end: datetime,
         window_multiplier: int = 1,
@@ -51,7 +51,7 @@ class FixedWorkloadProvider(WorkloadProvider):
         self._workload_curr = workload
         self._workload_next = workload.clone()
 
-    def get_workloads(
+    async def get_workloads(
         self,
         window_end: datetime,
         window_multiplier: int = 1,
@@ -78,7 +78,7 @@ class LoggedWorkloadProvider(WorkloadProvider):
         self._blueprint_mgr = blueprint_mgr
         self._schema_name = schema_name
 
-    def get_workloads(
+    async def get_workloads(
         self,
         window_end: datetime,
         window_multiplier: int = 1,
@@ -114,7 +114,7 @@ class LoggedWorkloadProvider(WorkloadProvider):
             # TODO: These calls should be async. But since we run them on the
             # daemon, it's probably fine.
             builder.add_queries_from_s3_logs(self._config, window_start, window_end)
-            builder.table_sizes_from_engines(
+            await builder.table_sizes_from_engines(
                 self._blueprint_mgr.get_blueprint(), table_sizer
             )
             workload = builder.build(

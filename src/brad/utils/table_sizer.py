@@ -47,19 +47,41 @@ class TableSizer:
                 "Unknown location {} for table {}".format(str(location), table_name)
             )
 
-    def table_size_rows(self, table_name: str, location: Engine) -> int:
-        query = "SELECT COUNT(*) FROM {}".format(table_name)
+    async def table_size_rows(
+        self, table_name: str, location: Engine, approximate_allowed: bool = False
+    ) -> int:
         if location == Engine.Aurora:
             conn = self._engines.get_connection(Engine.Aurora)
         elif location == Engine.Redshift:
             conn = self._engines.get_connection(Engine.Redshift)
         elif location == Engine.Athena:
             conn = self._engines.get_connection(Engine.Athena)
+
+        if approximate_allowed and location == Engine.Aurora:
+            # Special case since SELECT COUNT(*) on Aurora is generally slow.
+            query = f"SELECT reltuples FROM pg_class WHERE relname = '{source_table_name(table_name)}'"
+            cursor = conn.cursor_sync()
+            await cursor.execute(query)
+            row = cursor.fetchone_sync()
+            assert row is not None
+            result = int(row[0])
+            if result < 0:
+                logger.warning(
+                    "Extracted a negative table size for %s from %s: %d. Falling back to slower scan.",
+                    table_name,
+                    location,
+                    result,
+                )
+            else:
+                return result
+
+        query = f"SELECT COUNT(*) FROM {table_name}"
         cursor = conn.cursor_sync()
-        cursor.execute_sync(query)
+        await cursor.execute(query)
         row = cursor.fetchone_sync()
         assert row is not None
-        return int(row[0])
+        result = int(row[0])
+        return result
 
     def aurora_row_size_bytes(self, table_name: str) -> int:
         """

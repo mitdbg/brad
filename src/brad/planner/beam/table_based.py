@@ -53,7 +53,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         # 1. Fetch metrics and the next workload and then apply predictions.
         metrics, metrics_timestamp = self._metrics_provider.get_metrics()
-        current_workload, next_workload = self._workload_provider.get_workloads(
+        current_workload, next_workload = await self._workload_provider.get_workloads(
             metrics_timestamp, window_multiplier, desired_period=timedelta(hours=1)
         )
         self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
