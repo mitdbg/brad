@@ -42,6 +42,8 @@ class ScoringContext:
         # across blueprints.
         self.engine_latency_norm_factor: Dict[Engine, float] = {}
 
+        self.already_logged_txn_interference_warning = False
+
     async def simulate_current_workload_routing(self, router: Router) -> None:
         self.current_query_locations[Engine.Aurora].clear()
         self.current_query_locations[Engine.Redshift].clear()

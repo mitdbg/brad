@@ -97,23 +97,28 @@ class AuroraProvisioningScore:
             # TODO: Possible edge cases here due to cumulative prediction error (e.g.,
             # pred_txn_load > overall_writer_load violates our model's assumptions).
             # We need a robust way to handle these potential errors.
-            if pred_txn_load > overall_writer_load:
-                logger.warning(
-                    "Predicted transactional load higher than the overall writer load. "
-                    "Overall load: %.2f, Client txn thpt: %.2f, Predicted txn load: %.2f",
-                    overall_writer_load,
-                    client_txns_per_s,
-                    pred_txn_load,
-                )
-            if pred_txn_cpu_denorm > overall_writer_cpu_util_denorm:
-                logger.warning(
-                    "Predicted transactional CPU denormalized utilization higher than the overall "
-                    "CPU use. Overall use: %.2f, Client txn thpt: %.2f, Predicted CPU "
-                    "use: %.2f",
-                    overall_writer_cpu_util_denorm,
-                    client_txns_per_s,
-                    pred_txn_cpu_denorm,
-                )
+            if not ctx.already_logged_txn_interference_warning:
+                if pred_txn_load > overall_writer_load:
+                    logger.warning(
+                        "Predicted transactional load higher than the overall "
+                        "writer load. Overall load: %.2f, Client txn thpt: %.2f, "
+                        "Predicted txn load: %.2f",
+                        overall_writer_load,
+                        client_txns_per_s,
+                        pred_txn_load,
+                    )
+                    ctx.already_logged_txn_interference_warning = True
+
+                if pred_txn_cpu_denorm > overall_writer_cpu_util_denorm:
+                    logger.warning(
+                        "Predicted transactional CPU denormalized utilization "
+                        "higher than the overall CPU use. Overall use: %.2f, "
+                        "Client txn thpt: %.2f, Predicted CPU use: %.2f",
+                        overall_writer_cpu_util_denorm,
+                        client_txns_per_s,
+                        pred_txn_cpu_denorm,
+                    )
+                    ctx.already_logged_txn_interference_warning = True
 
         # 2. Adjust the analytical portion of the system load for query movement
         #    (compute `query_factor``).
@@ -142,9 +147,12 @@ class AuroraProvisioningScore:
             )
 
         else:
-            total_analytics_load = max(0, overall_writer_load - pred_txn_load)
+            # Analytics load should never be zero - so we impute a small value
+            # to work around mispredictions.
+            eps = 1e-3 if len(base_query_run_times) > 0 else 0.0
+            total_analytics_load = max(eps, overall_writer_load - pred_txn_load)
             total_analytics_cpu_denorm = max(
-                0, overall_writer_cpu_util_denorm - pred_txn_cpu_denorm
+                eps, overall_writer_cpu_util_denorm - pred_txn_cpu_denorm
             )
 
         total_analytics_load *= query_factor
@@ -298,4 +306,4 @@ class AuroraProvisioningScore:
         dest.update(self.debug_values)
 
 
-_AURORA_BASE_RESOURCE_VALUE = aurora_num_cpus(Provisioning("db.r6g.large", 1))
+_AURORA_BASE_RESOURCE_VALUE = aurora_num_cpus(Provisioning("db.r6g.xlarge", 1))

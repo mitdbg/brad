@@ -6,7 +6,7 @@ function start_brad() {
     --config-file $config_file \
     --schema-name $schema_name \
     --planner-config-file $planner_config_file \
-    --temp-config-file config/temp_config_sample.yml \
+    --temp-config-file config/temp_config.yml \
     &
   brad_pid=$!
   popd
@@ -20,7 +20,7 @@ function start_brad_debug() {
     --config-file $config_file \
     --schema-name $schema_name \
     --planner-config-file $planner_config_file \
-    --temp-config-file config/temp_config_sample.yml \
+    --temp-config-file config/temp_config.yml \
     --debug \
     &
   brad_pid=$!
@@ -89,19 +89,25 @@ function start_repeating_olap_runner() {
   local ra_gap_s=$2
   local ra_gap_std_s=$3
 
+  local args=(
+    --num-clients $ra_clients
+    --num-front-ends $num_front_ends
+    --query-indexes $ra_query_indexes
+    --query-bank-file $ra_query_bank_file
+    --avg-gap-s $ra_gap_s
+    --avg-gap-std-s $ra_gap_std_s
+  )
+
+  if [[ ! -z $ra_query_frequency_path ]]; then
+    args+=(--query-frequency-path $ra_query_frequency_path)
+  fi
+
   >&2 echo "[Repeating Analytics] Running with $ra_clients..."
   results_dir=$COND_OUT/ra_${ra_clients}
   mkdir -p $results_dir
 
   log_workload_point "rana_${ra_clients}"
-  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py \
-    --num-clients $ra_clients \
-    --avg-gap-s $ra_gap_s \
-    --avg-gap-std-s $ra_gap_std_s \
-    --num-front-ends $num_front_ends \
-    --query-indexes $ra_query_indexes \
-    --query-bank-file $ra_query_bank_file \
-    &
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py "${args[@]}" &
   rana_pid=$!
 }
 
@@ -171,6 +177,10 @@ function extract_named_arguments() {
 
     if [[ $phys_arg =~ --ra-gap-std-s=.+ ]]; then
       ra_gap_std_s=${phys_arg:15}
+    fi
+
+    if [[ $phys_arg =~ --ra-query-frequency-path=.+ ]]; then
+      ra_query_frequency_path=${phys_arg:26}
     fi
 
     if [[ $phys_arg =~ --num-front-ends=.+ ]]; then

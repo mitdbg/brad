@@ -16,11 +16,13 @@ extract_named_arguments $@
 trap "cancel_experiment" INT
 trap "cancel_experiment" TERM
 
-start_brad $config_file $planner_config_file
-sleep 30
+# Useful for testing out blueprint planning without executing the transition.
+export BRAD_IGNORE_BLUEPRINT=1
+start_brad_debug $config_file $planner_config_file
+sleep 10
 
-start_repeating_olap_runner 1 30 5  # Implicit: --query-indexes
-start_txn_runner 2
+start_repeating_olap_runner 8 15 5  # Implicit: --query-indexes
+start_txn_runner 8
 
 echo "READY -- Sleeping for 1 hour. Hit Ctrl-C to stop."
 sleep $((60 * 60))

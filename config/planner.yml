@@ -23,8 +23,8 @@ query_dist_change_frac: 0.1
 
 triggers:
   enabled: true
-  check_period_s: 60  # Triggers are checked every X seconds.
-  check_period_offset_s: 20
+  check_period_s: 90  # Triggers are checked every X seconds.
+  check_period_offset_s: 360  # Wait 6 mins before starting.
 
   elapsed_time:
     disabled: true
@@ -41,7 +41,8 @@ triggers:
     sustained_epochs: 3
 
   variable_costs:
-    threshold: 0.5
+    disabled: true
+    threshold: 1.0
 
   query_latency_ceiling:
     ceiling_s: 30.0
@@ -52,7 +53,7 @@ triggers:
 ###
 
 beam_size: 100
-max_provisioning_multiplier: 3
+max_provisioning_multiplier: 2.5
 max_feasible_cpu: 85
 
 

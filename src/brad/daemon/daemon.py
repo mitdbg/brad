@@ -58,6 +58,7 @@ logger = logging.getLogger(__name__)
 
 # Temporarily used.
 PERSIST_BLUEPRINT_VAR = "BRAD_PERSIST_BLUEPRINT"
+IGNORE_ALL_BLUEPRINTS_VAR = "BRAD_IGNORE_BLUEPRINT"
 
 
 class BradDaemon:
@@ -342,6 +343,11 @@ class BradDaemon:
         """
         Informs the server about a new blueprint.
         """
+
+        if IGNORE_ALL_BLUEPRINTS_VAR in os.environ:
+            logger.info("Skipping all blueprints. Chosen blueprint: %s", blueprint)
+            return
+
         if self._system_event_logger is not None:
             self._system_event_logger.log(SystemEvent.NewBlueprintProposed)
 

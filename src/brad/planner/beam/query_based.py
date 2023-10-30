@@ -129,8 +129,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
         # 5. Run beam search to formulate the table placements.
         for j, query_idx in enumerate(query_indices[1:]):
-            if j % 100 == 0:
-                logger.debug("Processing index %d of %d", j, len(query_indices[1:]))
+            logger.debug("Processing index %d of %d", j, len(query_indices[1:]))
 
             next_top_k: List[BlueprintCandidate] = []
             query = analytical_queries[query_idx]
