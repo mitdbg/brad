@@ -22,8 +22,8 @@ class TempConfig:
     def txn_latency_p50_ceiling_s(self) -> float:
         return float(self._raw["txn_latency_p50_ceiling_s"])
 
-    def txn_latency_p95_ceiling_s(self) -> float:
-        return float(self._raw["txn_latency_p95_ceiling_s"])
+    def txn_latency_p90_ceiling_s(self) -> float:
+        return float(self._raw["txn_latency_p90_ceiling_s"])
 
     def std_dataset_path(self) -> Optional[pathlib.Path]:
         if "std_dataset_path" not in self._raw:

@@ -248,14 +248,14 @@ class AuroraProvisioningScore:
         to_prov: Provisioning,
         ctx: "ScoringContext",
     ) -> npt.NDArray:
-        observed_lats = np.array([ctx.metrics.txn_lat_s_p50, ctx.metrics.txn_lat_s_p95])
+        observed_lats = np.array([ctx.metrics.txn_lat_s_p50, ctx.metrics.txn_lat_s_p90])
 
         # Q(u) = a / (K - u) + b ; u is CPU utilization in [0, 1]
         # --> Q(u') = (K - u) / (K - u') (Q(u) - b) + b
 
         model = ctx.planner_config.aurora_txn_coefs(ctx.schema_name)
         K = model["K"]
-        b = np.array([model["b_p50"], model["b_p95"]])
+        b = np.array([model["b_p50"], model["b_p90"]])
 
         curr_num_cpus = aurora_num_cpus(curr_prov)
         next_num_cpus = aurora_num_cpus(to_prov)
@@ -301,7 +301,7 @@ class AuroraProvisioningScore:
         dest["aurora_pred_txn_peak_cpu_denorm"] = self.pred_txn_peak_cpu_denorm
         (
             dest["aurora_pred_txn_lat_s_p50"],
-            dest["aurora_pred_txn_lat_s_p95"],
+            dest["aurora_pred_txn_lat_s_p90"],
         ) = self.scaled_txn_lats
         dest.update(self.debug_values)
 

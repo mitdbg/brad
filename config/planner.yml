@@ -313,7 +313,7 @@ aurora_txns:
     # Used for latency.
     K: 1.0581694841384888
     b_p50: 0.0022556402254849672
-    b_p95: 0.00383179122582078
+    b_p90: 0.00383179122582078  # TODO: Update
 
   imdb_extended_100g:
     # Used for "load translation"
@@ -323,7 +323,7 @@ aurora_txns:
     # Used for latency.
     K: 1.0729172229766846
     b_p50: 0.001035563531331718
-    b_p95: 0.00274773221462965
+    b_p90: 0.00274773221462965  # TODO: Update
 
 
 aurora_scaling:
