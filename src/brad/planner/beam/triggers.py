@@ -10,6 +10,7 @@ from brad.planner.triggers.redshift_cpu_utilization import RedshiftCpuUtilizatio
 from brad.planner.triggers.elapsed_time import ElapsedTimeTrigger
 from brad.planner.triggers.query_latency_ceiling import QueryLatencyCeiling
 from brad.planner.triggers.trigger import Trigger
+from brad.planner.triggers.txn_latency_ceiling import TransactionLatencyCeiling
 from brad.planner.triggers.variable_costs import VariableCosts
 
 
@@ -58,6 +59,16 @@ def get_beam_triggers(
     if "disabled" not in latency_ceiling:
         trigger_list.append(
             QueryLatencyCeiling(
+                monitor,
+                latency_ceiling["ceiling_s"],
+                latency_ceiling["sustained_epochs"],
+            )
+        )
+
+    txn_latency_ceiling = trigger_config["txn_latency_ceiling"]
+    if "disabled" not in txn_latency_ceiling:
+        trigger_list.append(
+            TransactionLatencyCeiling(
                 monitor,
                 latency_ceiling["ceiling_s"],
                 latency_ceiling["sustained_epochs"],
