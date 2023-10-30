@@ -59,6 +59,7 @@ class ScoringContext:
                 maybe_eng = query.primary_execution_location()
                 if maybe_eng is not None:
                     self.current_query_locations[maybe_eng].append(qidx)
+                    continue
 
             # Fall back to the router if the historical routing location is not
             # available.
