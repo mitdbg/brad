@@ -10,3 +10,9 @@ pip install -r requirements.txt
 mkdir imdb && cd imdb && wget -c http://homepages.cwi.nl/~boncz/job/imdb.tgz && tar -xvzf imdb.tgz
 python workloads/IMDB/prepend_imdb_headers.py --csv_dir /path/to/imdb
 ```
+
+## Execute repeating analytical queries
+```angular2html
+cd workloads/IMDB_extended/
+
+```
