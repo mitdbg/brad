@@ -21,8 +21,16 @@ export BRAD_IGNORE_BLUEPRINT=1
 start_brad_debug $config_file $planner_config_file
 sleep 10
 
-start_repeating_olap_runner 8 15 5  # Implicit: --query-indexes
-start_txn_runner 8
+rana_pid=$(start_repeating_olap_runner 8 15 5 $ra_query_indexes)
+txn_pid=$(start_txn_runner 8)
+rana_special_pid=$(start_repeating_olap_runner 1 70 5 "60,61,71,75")
+
+function inner_cancel_experiment() {
+  cancel_experiment $rana_pid $txn_pid
+}
+
+trap "inner_cancel_experiment" INT
+trap "inner_cancel_experiment" TERM
 
 echo "READY -- Sleeping for 1 hour. Hit Ctrl-C to stop."
 sleep $((60 * 60))

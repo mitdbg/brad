@@ -13,17 +13,22 @@ source ../common.sh
 # --query-indexes
 extract_named_arguments $@
 
-trap "cancel_experiment" INT
-trap "cancel_experiment" TERM
-
 start_brad $config_file $planner_config_file
 log_workload_point "brad_start_initiated"
 sleep 30
 
 log_workload_point "clients_starting"
-start_repeating_olap_runner 4 15 5  # Implicit: --query-indexes
-start_txn_runner 4
+rana_pid=$(start_repeating_olap_runner 4 15 5 $ra_query_indexes)
+txn_pid=$(start_txn_runner 4)
+rana_special_pid=$(start_repeating_olap_runner 1 70 5 "60,61,71,75")
 log_workload_point "clients_started"
+
+function inner_cancel_experiment() {
+  cancel_experiment $rana_pid $txn_pid
+}
+
+trap "inner_cancel_experiment" INT
+trap "inner_cancel_experiment" TERM
 
 # Wait until a re-plan and transition completes.
 # Expected:
@@ -51,5 +56,5 @@ log_workload_point "experiment_workload_done"
 
 # Shut down everything now.
 >&2 echo "Experiment done. Shutting down runners..."
-graceful_shutdown
+graceful_shutdown $rana_pid $txn_pid
 log_workload_point "shutdown_complete"
