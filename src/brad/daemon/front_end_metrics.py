@@ -14,6 +14,7 @@ from brad.config.metrics import FrontEndMetric
 from brad.daemon.messages import MetricsReport
 from brad.daemon.metrics_logger import MetricsLogger
 from brad.utils.streaming_metric import StreamingMetric, StreamingNumericMetric
+from brad.utils import log_verbose
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,7 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
                                 # make a copy.
                                 merged = copy.deepcopy(sketch)
 
-                        logger.debug(
+                        log_verbose(
                             "[%s] [%d] Matched %d sketches with range %s -- %s",
                             metric_key,
                             fidx,
