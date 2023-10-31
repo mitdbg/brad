@@ -18,16 +18,18 @@ trap "cancel_experiment" TERM
 
 # Useful for testing out blueprint planning without executing the transition.
 export BRAD_IGNORE_BLUEPRINT=1
+# Should be removed eventually and we should rely on the blueprint.
+export BRAD_INITIAL_ROUTE_REDSHIFT_ONLY=1
 start_brad_debug $config_file $planner_config_file
 sleep 10
 
-start_repeating_olap_runner 8 15 5 $ra_query_indexes
+start_repeating_olap_runner 8 15 5 $ra_query_indexes "ra_8"
 rana_pid=$runner_pid
 
 start_txn_runner 8
 txn_pid=$runner_pid
 
-start_repeating_olap_runner 1 70 5 "60,61,71,75"
+start_repeating_olap_runner 1 70 5 "60,61,71,75" "ra_1_special"
 rana2_pid=$runner_pid
 
 function inner_cancel_experiment() {

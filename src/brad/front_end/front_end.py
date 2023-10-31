@@ -3,6 +3,7 @@ import json
 import logging
 import random
 import time
+import os
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
@@ -52,6 +53,8 @@ from brad.workload_logging.epoch_file_handler import EpochFileHandler
 logger = logging.getLogger(__name__)
 
 LINESEP = "\n".encode()
+
+INITIAL_ROUTE_REDSHIFT_ONLY_VAR = "BRAD_INITIAL_ROUTE_REDSHIFT_ONLY"
 
 
 class BradFrontEnd(BradInterface):
@@ -144,7 +147,7 @@ class BradFrontEnd(BradInterface):
         self._estimator: Optional[Estimator] = None
 
         # Number of transactions that completed.
-        self._transaction_end_counter = Counter()
+        self._transaction_end_counter = Counter()  # pylint: disable=global-statement
         self._reset_latency_sketches()
         self._brad_metrics_reporting_task: Optional[asyncio.Task[None]] = None
 
@@ -160,6 +163,10 @@ class BradFrontEnd(BradInterface):
 
         # Used to re-establish engine connections.
         self._reestablish_connections_task: Optional[asyncio.Task[None]] = None
+
+        # This is temporary for experiment purposes. In the future, this will be
+        # part of the blueprint.
+        self._route_redshift_only = INITIAL_ROUTE_REDSHIFT_ONLY_VAR in os.environ
 
     async def serve_forever(self):
         await self._run_setup()
@@ -289,6 +296,8 @@ class BradFrontEnd(BradInterface):
             )
             if transactional_query:
                 engine_to_use = Engine.Aurora
+            elif self._route_redshift_only:
+                engine_to_use = Engine.Redshift
             else:
                 engine_to_use = await self._router.engine_for(query_rep)
 
@@ -493,6 +502,7 @@ class BradFrontEnd(BradInterface):
                 )
                 # This refreshes any cached state that depends on the old blueprint.
                 await self._run_blueprint_update(message.version)
+                self._route_redshift_only = False
                 # Tell the daemon that we have updated.
                 self._output_queue.put(
                     NewBlueprintAck(self._fe_index, message.version), block=False

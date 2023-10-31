@@ -92,6 +92,7 @@ function start_repeating_olap_runner() {
   local ra_gap_s=$2
   local ra_gap_std_s=$3
   local query_indexes=$4
+  local results_name=$5
 
   local args=(
     --num-clients $ra_clients
@@ -107,10 +108,10 @@ function start_repeating_olap_runner() {
   fi
 
   >&2 echo "[Repeating Analytics] Running with $ra_clients..."
-  results_dir=$COND_OUT/ra_${ra_clients}
+  results_dir=$COND_OUT/$results_name
   mkdir -p $results_dir
 
-  log_workload_point "rana_${ra_clients}"
+  log_workload_point $results_name
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py "${args[@]}" &
 
   # This is a special return value variable that we use.
