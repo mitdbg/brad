@@ -8,10 +8,10 @@ planning_window:
   hours: 0
   minutes: 5
 
-# Each second in the previous workload is treated as 10 seconds (so a 5 min
-# planning window is treated as 50 mins). This is to make scenario run times
+# Each second in the previous workload is treated as 12 seconds (so a 5 min
+# planning window is treated as 60 mins). This is to make scenario run times
 # more managable.
-reinterpret_second_as: 10
+reinterpret_second_as: 12
 
 # The query distribution must change by at least this much for a new blueprint
 # to be accepted.
@@ -31,12 +31,12 @@ triggers:
     multiplier: 60  # Multiplier over `planning_window`.
 
   redshift_cpu:
-    lo: 10
-    hi: 90
+    lo: 15
+    hi: 85
     sustained_epochs: 3
 
   aurora_cpu:
-    lo: 10
+    lo: 15
     hi: 85
     sustained_epochs: 3
 

@@ -1,3 +1,4 @@
+import asyncio
 import heapq
 import itertools
 import json
@@ -130,8 +131,13 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         # 5. Run beam search to formulate the rest of the table placements.
         for j, cluster in enumerate(clusters[1:]):
-            if j % 100 == 0:
-                logger.debug("Processing index %d of %d", j, len(clusters[1:]))
+            if j % 5 == 0:
+                # This is a long-running process. We should yield every so often
+                # to allow other tasks to run on the daemon (e.g., processing
+                # metrics messages).
+                await asyncio.sleep(0)
+
+            logger.debug("Processing index %d of %d", j, len(clusters[1:]))
 
             next_top_k: List[BlueprintCandidate] = []
             tables, queries, _ = cluster

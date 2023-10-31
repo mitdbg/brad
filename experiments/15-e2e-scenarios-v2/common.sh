@@ -28,16 +28,19 @@ function start_brad_debug() {
 }
 
 function cancel_experiment() {
-  kill -INT $txn_pid
-  kill -INT $rana_pid
+  for pid_var in "$@"; do
+    kill -INT $pid_var
+  done
   kill -INT $brad_pid
 }
 
 function graceful_shutdown() {
-  kill -INT $txn_pid
-  kill -INT $rana_pid
-  wait $txn_pid
-  wait $rana_pid
+  for pid_var in "$@"; do
+    kill -INT $pid_var
+  done
+  for pid_var in "$@"; do
+    wait $pid_var
+  done
 
   kill -INT $brad_pid
   wait $brad_pid
@@ -88,11 +91,13 @@ function start_repeating_olap_runner() {
   local ra_clients=$1
   local ra_gap_s=$2
   local ra_gap_std_s=$3
+  local query_indexes=$4
+  local results_name=$5
 
   local args=(
     --num-clients $ra_clients
     --num-front-ends $num_front_ends
-    --query-indexes $ra_query_indexes
+    --query-indexes $query_indexes
     --query-bank-file $ra_query_bank_file
     --avg-gap-s $ra_gap_s
     --avg-gap-std-s $ra_gap_std_s
@@ -103,12 +108,14 @@ function start_repeating_olap_runner() {
   fi
 
   >&2 echo "[Repeating Analytics] Running with $ra_clients..."
-  results_dir=$COND_OUT/ra_${ra_clients}
+  results_dir=$COND_OUT/$results_name
   mkdir -p $results_dir
 
-  log_workload_point "rana_${ra_clients}"
+  log_workload_point $results_name
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py "${args[@]}" &
-  rana_pid=$!
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
 }
 
 function run_repeating_olap_warmup() {
@@ -141,7 +148,9 @@ function start_txn_runner() {
     --num-clients $t_clients \
     --num-front-ends $num_front_ends \
     &
-  txn_pid=$!
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
 }
 
 function extract_named_arguments() {

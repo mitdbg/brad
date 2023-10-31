@@ -30,6 +30,13 @@ run_command(
   },
 )
 
+aurora_acceptable = [58, 61, 62, 64, 69]
+aurora_good = [25, 26, 27, 28, 29, 31, 32, 33, 37, 43, 46, 47, 49, 83, 90]
+
+# 16 queries that should be acceptable on Aurora. We have 4 that should run on
+# Redshift/Athena.
+aurora_alt = [99, 56, 32, 92, 91, 49, 30, 83, 94, 38, 87, 86, 76, 37, 31, 46]
+
 run_experiment(
   name="brad_100g",
   run="./run_workload.sh",
@@ -39,7 +46,7 @@ run_experiment(
     "planner-config-file": "config/planner.yml",
     "schema-name": "imdb_extended_100g",
     # TODO: Select regular query indexes
-    "ra-query-indexes": ",".join(map(str, list(range(25, 35)) + list(range(75, 80)))),
+    "ra-query-indexes": ",".join(map(str, aurora_alt)),
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "num-front-ends": 8,
   },
@@ -53,7 +60,7 @@ run_command(
     "config-file": "config/config_large_100.yml",
     "planner-config-file": "config/planner.yml",
     "schema-name": "imdb_extended_100g",
-    "ra-query-indexes": ",".join(map(str, list(range(25, 35)) + list(range(75, 80)))),
+    "ra-query-indexes": ",".join(map(str, aurora_alt)),
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "num-front-ends": 8,
   },
