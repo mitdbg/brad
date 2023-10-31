@@ -137,6 +137,7 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
                                 merged = copy.deepcopy(sketch)
 
                         log_verbose(
+                            logger,
                             "[%s] [%d] Matched %d sketches with range %s -- %s",
                             metric_key,
                             fidx,
