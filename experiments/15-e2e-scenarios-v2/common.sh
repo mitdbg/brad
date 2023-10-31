@@ -112,7 +112,9 @@ function start_repeating_olap_runner() {
 
   log_workload_point "rana_${ra_clients}"
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py "${args[@]}" &
-  echo $!
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
 }
 
 function run_repeating_olap_warmup() {
@@ -145,7 +147,9 @@ function start_txn_runner() {
     --num-clients $t_clients \
     --num-front-ends $num_front_ends \
     &
-  echo $!
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
 }
 
 function extract_named_arguments() {
