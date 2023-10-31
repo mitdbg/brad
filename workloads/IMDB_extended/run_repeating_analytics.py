@@ -300,7 +300,6 @@ def simulation_runner(
 
                 qidx = query_order.pop()
             logger.debug("Executing qidx: %d", qidx)
-            query = query_bank[qidx]
             # using the average of the best two engines as approximation of brad runtime
             runtime = (
                 np.sum(all_query_runtime[qidx]) - np.min(all_query_runtime[qidx])
@@ -611,8 +610,8 @@ def main():
     for i in range(args.num_clients):
         start_queue[i].get()
 
-    global EXECUTE_START_TIME
-    EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
+    # global EXECUTE_START_TIME
+    # EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
 
     if num_client_trace is not None:
         assert args.time_scale_factor is not None, "need to set args.time_scale_factor"
