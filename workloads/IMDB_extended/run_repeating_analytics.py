@@ -608,8 +608,10 @@ def main():
     for i in range(args.num_clients):
         start_queue[i].get()
 
-    # global EXECUTE_START_TIME
-    # EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
+    global EXECUTE_START_TIME  # pylint: disable=global-statement
+    EXECUTE_START_TIME = datetime.now().astimezone(
+        pytz.utc
+    )  # pylint: disable=global-statement
 
     if num_client_trace is not None:
         assert args.time_scale_factor is not None, "need to set args.time_scale_factor"
