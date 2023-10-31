@@ -111,8 +111,9 @@ def runner(
                 runner_idx,
                 queries,
             )
-            query_order = queries.copy()
-            prng.shuffle(query_order)
+            query_order_main = queries.copy()
+            prng.shuffle(query_order_main)
+            query_order = query_order_main.copy()
 
             # Signal that we're ready to start and wait for the controller.
             start_queue.put_nowait("")
@@ -139,8 +140,7 @@ def runner(
                     qidx = prng.choices(queries, list(query_frequency))[0]
                 else:
                     if len(query_order) == 0:
-                        query_order = queries.copy()
-                        prng.shuffle(query_order)
+                        query_order = query_order_main.copy()
 
                     qidx = query_order.pop()
                 logger.debug("Executing qidx: %d", qidx)
