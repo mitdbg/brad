@@ -153,11 +153,12 @@ def runner(
                         time_unsimulated = get_time_of_the_day_unsimulated(
                             now, args.time_scale_factor
                         )
+                        time_unsimulated_str = time_in_minute_to_datetime_str(
+                            time_unsimulated
+                        )
                     else:
-                        time_unsimulated = None
-                    time_unsimulated_str = time_in_minute_to_datetime_str(
-                        time_unsimulated
-                    )
+                        time_unsimulated_str = "xxx"
+
                     start = time.time()
                     _, engine = database.execute_sync_with_engine(query)
                     end = time.time()
@@ -168,7 +169,7 @@ def runner(
                             time_unsimulated_str,
                             qidx,
                             end - start,
-                            ENGINE_NAMES[engine],
+                            engine.value,
                         ),
                         file=file,
                         flush=True,
@@ -313,9 +314,9 @@ def simulation_runner(
                 time_unsimulated = get_time_of_the_day_unsimulated(
                     now, args.time_scale_factor
                 )
+                time_unsimulated_str = time_in_minute_to_datetime_str(time_unsimulated)
             else:
-                time_unsimulated = None
-            time_unsimulated_str = time_in_minute_to_datetime_str(time_unsimulated)
+                time_unsimulated_str = "xxx"
             print(
                 "{},{},{},{},{},{}".format(
                     now,
@@ -619,6 +620,7 @@ def main():
         stop_queue[0].put("")
         num_running_client = 1
 
+        finished_one_day = True
         curr_day_start_time = datetime.now().astimezone(pytz.utc)
         for time_of_day in num_client_trace:
             if time_of_day == 0:
@@ -629,11 +631,13 @@ def main():
             curr_time_in_s = (now - curr_day_start_time).total_seconds()
             total_exec_time_in_s = (now - EXECUTE_START_TIME).total_seconds()
             if args.run_for_s <= total_exec_time_in_s:
+                finished_one_day = False
                 break
             if args.run_for_s - total_exec_time_in_s <= (time_in_s - curr_time_in_s):
                 wait_time = args.run_for_s - total_exec_time_in_s
                 if wait_time > 0:
                     time.sleep(wait_time)
+                finished_one_day = False
                 break
             time.sleep(time_in_s - curr_time_in_s)
             num_client_required = min(num_client_trace[time_of_day], args.num_clients)
@@ -656,10 +660,15 @@ def main():
                     num_running_client -= 1
         now = datetime.now().astimezone(pytz.utc)
         total_exec_time_in_s = (now - EXECUTE_START_TIME).total_seconds()
-        print(
-            f"Finished executing one day of workload in {total_exec_time_in_s}s, will ignore the rest of "
-            f"pre-set execution time {args.run_for_s}s"
-        )
+        if finished_one_day:
+            print(
+                f"Finished executing one day of workload in {total_exec_time_in_s}s, will ignore the rest of "
+                f"pre-set execution time {args.run_for_s}s"
+            )
+        else:
+            print(
+                f"Executed ended but unable to finish executing the trace of a full day within {args.run_for_s}s"
+            )
 
     else:
         print("Telling all {} clients to start.".format(args.num_clients), flush=True)
