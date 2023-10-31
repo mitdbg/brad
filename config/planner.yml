@@ -31,12 +31,12 @@ triggers:
     multiplier: 60  # Multiplier over `planning_window`.
 
   redshift_cpu:
-    lo: 10
-    hi: 90
+    lo: 15
+    hi: 85
     sustained_epochs: 3
 
   aurora_cpu:
-    lo: 10
+    lo: 15
     hi: 85
     sustained_epochs: 3
 
