@@ -90,8 +90,8 @@ def best_cost_under_perf_ceilings(
 ) -> BlueprintComparator:
     def is_better_than(left: ComparableBlueprint, right: ComparableBlueprint) -> bool:
         # Check transactional latency ceilings first.
-        left_txn_p90 = left.get_predicted_transactional_latencies()[0]
-        right_txn_p90 = right.get_predicted_transactional_latencies()[0]
+        left_txn_p90 = left.get_predicted_transactional_latencies()[1]
+        right_txn_p90 = right.get_predicted_transactional_latencies()[1]
 
         # If one of these candidates have NaN predictions, we need to
         # consider other factors. NaN indicates that a prediction is not
