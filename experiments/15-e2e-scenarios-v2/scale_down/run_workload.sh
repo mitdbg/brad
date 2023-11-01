@@ -26,7 +26,7 @@ rana_pid=$runner_pid
 start_txn_runner 8
 txn_pid=$runner_pid
 
-start_repeating_olap_runner 1 70 5 "60,61,71,75" "ra_1_special"
+start_repeating_olap_runner 1 70 5 "61,71,75" "ra_1_special"
 rana2_pid=$runner_pid
 log_workload_point "clients_started"
 
