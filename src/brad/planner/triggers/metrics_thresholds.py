@@ -19,6 +19,7 @@ class MetricsThresholds:
         rel = metric_values[-self._sustained_epochs :]
         if len(rel) < self._sustained_epochs:
             # Not enough data.
+            logger.debug("Not enough data for trigger based on %s.", log_desc)
             return False
 
         if (rel < self._lo).all():

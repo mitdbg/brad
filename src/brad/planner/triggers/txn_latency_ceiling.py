@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from typing import Optional
 
 from brad.config.metrics import FrontEndMetric
@@ -14,9 +15,10 @@ class TransactionLatencyCeiling(Trigger):
         monitor: Monitor,
         latency_ceiling_s: float,
         sustained_epochs: int,
+        epoch_length: timedelta,
         lookahead_epochs: Optional[int] = None,
     ) -> None:
-        super().__init__()
+        super().__init__(epoch_length)
         self._monitor = monitor
         self._latency_ceiling_s = latency_ceiling_s
         self._sustained_epochs = sustained_epochs
@@ -27,7 +29,8 @@ class TransactionLatencyCeiling(Trigger):
             k=self._sustained_epochs,
             metric_ids=[FrontEndMetric.TxnLatencySecondP90.value],
         )
-        rel = past[FrontEndMetric.TxnLatencySecondP90.value]
+        rel_past = past[past.index > self._cutoff]
+        rel = rel_past[FrontEndMetric.TxnLatencySecondP90.value]
         if len(rel) >= self._sustained_epochs and (rel > self._latency_ceiling_s).all():
             p90_lat_s = rel.iloc[-1]
             logger.info(
@@ -38,6 +41,9 @@ class TransactionLatencyCeiling(Trigger):
             return True
 
         if self._lookahead_epochs is None:
+            return False
+
+        if not self._passed_n_epochs_since_cutoff(self._sustained_epochs):
             return False
 
         future = self._monitor.front_end_metrics().read_k_upcoming(

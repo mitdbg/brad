@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from typing import Optional
 
 from .metrics_thresholds import MetricsThresholds
@@ -14,12 +15,14 @@ class AuroraCpuUtilization(Trigger):
         monitor: Monitor,
         lo: float,
         hi: float,
+        epoch_length: timedelta,
         sustained_epochs: int = 1,
         lookahead_epochs: Optional[int] = None,
     ) -> None:
-        super().__init__()
+        super().__init__(epoch_length)
         self._monitor = monitor
         self._impl = MetricsThresholds(lo, hi, sustained_epochs)
+        self._epoch_length = epoch_length
         self._sustained_epochs = sustained_epochs
         self._lookahead_epochs = lookahead_epochs
 
@@ -39,8 +42,9 @@ class AuroraCpuUtilization(Trigger):
         past = self._monitor.aurora_writer_metrics().read_k_most_recent(
             k=self._sustained_epochs, metric_ids=[_UTILIZATION_METRIC]
         )
+        relevant = past[past.index > self._cutoff]
         if self._impl.exceeds_thresholds(
-            past[_UTILIZATION_METRIC], "Aurora writer CPU utilization"
+            relevant[_UTILIZATION_METRIC], "Aurora writer CPU utilization"
         ):
             return True
 
@@ -48,12 +52,18 @@ class AuroraCpuUtilization(Trigger):
             past = reader_metrics.read_k_most_recent(
                 k=self._sustained_epochs, metric_ids=[_UTILIZATION_METRIC]
             )
+            relevant = past[past.index > self._cutoff]
             if self._impl.exceeds_thresholds(
-                past[_UTILIZATION_METRIC], f"Aurora reader {idx} CPU utilization"
+                relevant[_UTILIZATION_METRIC], f"Aurora reader {idx} CPU utilization"
             ):
                 return True
 
         if self._lookahead_epochs is None:
+            return False
+
+        if not self._passed_n_epochs_since_cutoff(self._sustained_epochs):
+            # We do not trigger based on a forecast if `sustained_epochs` has
+            # not passed since the last cutoff.
             return False
 
         future = self._monitor.aurora_writer_metrics().read_k_upcoming(

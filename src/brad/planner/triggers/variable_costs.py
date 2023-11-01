@@ -33,6 +33,7 @@ class VariableCosts(Trigger):
         data_access_provider: DataAccessProvider,
         router_provider: RouterProvider,
         threshold_frac: float,
+        epoch_length: timedelta,
     ) -> None:
         """
         This will trigger a replan if the current variable costs (currently,
@@ -42,7 +43,7 @@ class VariableCosts(Trigger):
         For example, if `threshold_frac` is 0.2, then replanning is triggered if
         the estimated cost is +/- 20% of the previously estimated cost.
         """
-        super().__init__()
+        super().__init__(epoch_length)
         self._config = config
         self._planner_config = planner_config
         self._monitor = monitor

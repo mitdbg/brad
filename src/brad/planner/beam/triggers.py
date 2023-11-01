@@ -31,16 +31,27 @@ def get_beam_triggers(
     et_config = trigger_config["elapsed_time"]
     if "disabled" not in et_config:
         trigger_list.append(
-            ElapsedTimeTrigger(planning_window * et_config["multiplier"])
+            ElapsedTimeTrigger(
+                planning_window * et_config["multiplier"],
+                epoch_length=config.epoch_length,
+            )
         )
 
     aurora_cpu = trigger_config["aurora_cpu"]
     if "disabled" not in aurora_cpu:
-        trigger_list.append(AuroraCpuUtilization(monitor, **aurora_cpu))
+        trigger_list.append(
+            AuroraCpuUtilization(
+                monitor, epoch_length=config.epoch_length, **aurora_cpu
+            )
+        )
 
     redshift_cpu = trigger_config["redshift_cpu"]
     if "disabled" not in redshift_cpu:
-        trigger_list.append(RedshiftCpuUtilization(monitor, **redshift_cpu))
+        trigger_list.append(
+            RedshiftCpuUtilization(
+                monitor, epoch_length=config.epoch_length, **redshift_cpu
+            )
+        )
 
     var_costs = trigger_config["variable_costs"]
     if "disabled" not in var_costs:
@@ -52,6 +63,7 @@ def get_beam_triggers(
                 data_access_provider,
                 router_provider,
                 var_costs["threshold"],
+                config.epoch_length,
             )
         )
 
@@ -62,6 +74,7 @@ def get_beam_triggers(
                 monitor,
                 latency_ceiling["ceiling_s"],
                 latency_ceiling["sustained_epochs"],
+                config.epoch_length,
             )
         )
 
@@ -72,6 +85,7 @@ def get_beam_triggers(
                 monitor,
                 latency_ceiling["ceiling_s"],
                 latency_ceiling["sustained_epochs"],
+                config.epoch_length,
             )
         )
 

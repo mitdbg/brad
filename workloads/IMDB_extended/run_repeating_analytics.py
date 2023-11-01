@@ -98,7 +98,7 @@ def runner(
             encoding="UTF-8",
         ) as file:
             print(
-                "timestamp,time_since_execution,time_of_day,query_idx,run_time,engine",
+                "timestamp,time_since_execution_s,time_of_day,query_idx,run_time_s,engine",
                 file=file,
                 flush=True,
             )

@@ -58,6 +58,9 @@ class AuroraProvisioningScore:
 
         current_aurora_has_replicas = curr_prov.num_nodes() > 1
         next_aurora_has_replicas = next_prov.num_nodes() > 1
+        no_analytics_queries_executed = (
+            len(ctx.current_query_locations[Engine.Aurora]) == 0
+        )
 
         overall_writer_load = ctx.metrics.aurora_writer_load_minute_avg
         overall_writer_cpu_util_pct = ctx.metrics.aurora_writer_cpu_avg
@@ -67,9 +70,10 @@ class AuroraProvisioningScore:
         )
 
         # 1. Compute the transaction portion of load.
-        if current_aurora_has_replicas:
-            # We schedule all analytics on the read replica(s). So the metric
-            # values on the writer are due to the transactional workload.
+        if current_aurora_has_replicas or no_analytics_queries_executed:
+            # We schedule all analytics on the read replica(s) or no queries
+            # were routed to Aurora. So the metric values on the writer are due
+            # to the transactional workload.
             pred_txn_load = overall_writer_load
             pred_txn_cpu_denorm = overall_writer_cpu_util_denorm
         else:
@@ -145,6 +149,12 @@ class AuroraProvisioningScore:
                 * aurora_num_cpus(curr_prov)
                 * curr_num_read_replicas
             )
+
+        elif no_analytics_queries_executed:
+            # This is a special case: no queries executed on Aurora and there
+            # was no read replica.
+            total_analytics_load = 0.0
+            total_analytics_cpu_denorm = 0.0
 
         else:
             # Analytics load should never be zero - so we impute a small value
@@ -225,6 +235,14 @@ class AuroraProvisioningScore:
         overall_load: float,
         ctx: "ScoringContext",
     ) -> npt.NDArray:
+        # Special case:
+        if (
+            overall_load == 0.0
+            and aurora_num_cpus(to_prov) == _AURORA_BASE_RESOURCE_VALUE
+        ):
+            # No changes.
+            return base_predicted_latency
+
         # This method is used to compute the predicted query latencies.
         resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(to_prov)
         basis = np.array(
