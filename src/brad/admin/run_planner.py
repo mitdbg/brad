@@ -2,7 +2,7 @@ import asyncio
 import logging
 import pathlib
 import pytz
-from typing import Dict
+from typing import Dict, Optional
 from datetime import timedelta, datetime
 
 from brad.asset_manager import AssetManager
@@ -21,6 +21,7 @@ from brad.planner.scoring.data_access.precomputed_values import (
 from brad.planner.scoring.performance.precomputed_predictions import (
     PrecomputedPredictions,
 )
+from brad.planner.triggers.trigger import Trigger
 from brad.planner.metrics import (
     MetricsFromMonitor,
     FixedMetricsProvider,
@@ -248,7 +249,9 @@ async def run_planner_impl(args) -> None:
     )
     asyncio.run(monitor.fetch_latest())
 
-    async def on_new_blueprint(blueprint: Blueprint, score: Score):
+    async def on_new_blueprint(
+        blueprint: Blueprint, score: Score, _trigger: Optional[Trigger]
+    ):
         logger.info("Selected new blueprint")
         logger.info("%s", blueprint)
 

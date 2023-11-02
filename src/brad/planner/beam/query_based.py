@@ -3,7 +3,7 @@ import heapq
 import json
 import logging
 from datetime import timedelta
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.abstract import BlueprintPlanner
@@ -43,7 +43,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
     def get_triggers(self) -> Iterable[Trigger]:
         return self._triggers
 
-    async def _run_replan_impl(self, window_multiplier: int = 1) -> None:
+    async def _run_replan_impl(
+        self, trigger: Optional[Trigger], window_multiplier: int = 1
+    ) -> None:
         logger.info("Running a replan...")
 
         # 1. Fetch the next workload and apply predictions.
@@ -339,4 +341,4 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             "Metrics used during planning: %s", json.dumps(metrics._asdict(), indent=2)
         )
 
-        await self._notify_new_blueprint(best_blueprint, best_blueprint_score)
+        await self._notify_new_blueprint(best_blueprint, best_blueprint_score, trigger)
