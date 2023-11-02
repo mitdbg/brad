@@ -534,7 +534,9 @@ class BradDaemon:
             if self._system_event_logger is not None:
                 self._system_event_logger.log(SystemEvent.ManuallyTriggeredReplan)
             try:
-                await self._planner.run_replan(window_multiplier)
+                await self._planner.run_replan(
+                    trigger=None, window_multiplier=window_multiplier
+                )
                 return [("Planner completed. See the daemon's logs for more details.",)]
             except Exception as ex:
                 logger.exception("Encountered exception when running the planner.")

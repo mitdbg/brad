@@ -98,7 +98,7 @@ class BlueprintPlanner:
                                 SystemEvent.TriggeredReplan,
                                 "trigger={}".format(t.name()),
                             )
-                        await self.run_replan()
+                        await self.run_replan(trigger=t)
                         break
             else:
                 logger.debug(
@@ -106,7 +106,9 @@ class BlueprintPlanner:
                 )
             await asyncio.sleep(check_period)
 
-    async def run_replan(self, window_multiplier: int = 1) -> None:
+    async def run_replan(
+        self, trigger: Optional[Trigger], window_multiplier: int = 1
+    ) -> None:
         """
         Triggers a "forced" replan. Used for debugging.
 
@@ -114,6 +116,8 @@ class BlueprintPlanner:
         """
         try:
             self._replan_in_progress = True
+            for t in self.get_triggers():
+                t.on_replan(trigger)
             await self._run_replan_impl(window_multiplier)
         finally:
             self._replan_in_progress = False

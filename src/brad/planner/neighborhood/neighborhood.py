@@ -79,7 +79,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 await asyncio.sleep(3)
                 logger.debug("Planner is checking if a replan is needed...")
                 if self._check_if_metrics_warrant_replanning():
-                    await self.run_replan()
+                    await self.run_replan(trigger=None)
         finally:
             if self._metrics_out is not None:
                 self._metrics_out.close()

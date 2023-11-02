@@ -276,7 +276,7 @@ async def run_planner_impl(args) -> None:
     event_loop = asyncio.new_event_loop()
     event_loop.set_debug(enabled=args.debug)
     asyncio.set_event_loop(event_loop)
-    asyncio.run(planner.run_replan())
+    asyncio.run(planner.run_replan(trigger=None))
 
     if args.save_pickle:
         workload.serialize_for_debugging(
