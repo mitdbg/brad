@@ -20,7 +20,7 @@ log_workload_point "brad_start_initiated"
 sleep 30
 
 log_workload_point "clients_starting"
-start_repeating_olap_runner 5 15 5 $ra_query_indexes "ra_8"
+start_repeating_olap_runner 6 15 5 $ra_query_indexes "ra_8"
 rana_pid=$runner_pid
 
 start_txn_runner 3
@@ -43,7 +43,7 @@ trap "inner_cancel_experiment" TERM
 # - Turn off Redshift
 # Detection time is ~5 minutes
 # Transition time is ~7 minutes
-total_second_phase_time_s="$((60 * 60))"
+total_second_phase_time_s="$((45 * 60))"
 wait_start="$(date -u +%s)"
 
 poll_file_for_event $COND_OUT/brad_daemon_events.csv "post_transition_completed" 30
