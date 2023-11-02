@@ -20,7 +20,7 @@ log_workload_point "brad_start_initiated"
 sleep 30
 
 log_workload_point "clients_starting"
-start_repeating_olap_runner 4 15 5 $ra_query_indexes "ra_8"
+start_repeating_olap_runner 5 15 5 $ra_query_indexes "ra_8"
 rana_pid=$runner_pid
 
 start_txn_runner 4

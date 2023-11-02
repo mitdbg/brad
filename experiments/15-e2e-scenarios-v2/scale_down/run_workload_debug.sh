@@ -23,7 +23,7 @@ export BRAD_INITIAL_ROUTE_REDSHIFT_ONLY=1
 start_brad_debug $config_file $planner_config_file
 sleep 10
 
-start_repeating_olap_runner 4 15 5 $ra_query_indexes "ra_8"
+start_repeating_olap_runner 5 15 5 $ra_query_indexes "ra_8"
 rana_pid=$runner_pid
 
 start_txn_runner 4
