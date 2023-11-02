@@ -1,0 +1,25 @@
+s3_bucket: brad-personal-data
+bucket_region: us-east-1
+redshift:
+  host: fillme
+  user: fillme
+  password: fillme
+  database: fillme
+  port: fillme
+  iam: fillme
+aurora: 
+  host: fillme
+  user: fillme
+  password: fillme
+  database: fillme
+  port: fillme
+  access_key: fillme
+  secret_key: fillme
+tidb:
+  host: fillme
+  user: fillme
+  password: fillme
+  port: fillme
+  public_key: fillme
+  private_key: fillme
+

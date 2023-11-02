@@ -12,7 +12,7 @@ from workloads.cross_db_benchmark.benchmark_tools.redshift.database_connection i
 from workloads.cross_db_benchmark.benchmark_tools.athena.database_connection import (
     AthenaDatabaseConnection,
 )
-from workloads.cross_db_benchmark.benchmark_tools.tidb.database_connection import (
+from workloads.cross_db_benchmark.benchmark_tools.baseline.tidb import (
     TiDB,
 )
 

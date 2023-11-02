@@ -1,5 +1,5 @@
 alias python=python3.11
-duration=1800
+duration=60
 txnengine="aurora"
 analyticsengine="redshift"
 # echo "Running txns with $1 clients"

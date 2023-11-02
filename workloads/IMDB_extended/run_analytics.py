@@ -73,17 +73,17 @@ def runner(
         # Signal that we're ready to start and wait for the controller.
         start_queue.put_nowait("")
         _ = stop_queue.get()
-
+        random.shuffle(queries)
+        qidx_offset = 0
         while True:
             if args.avg_gap_s is not None:
                 wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
                 if wait_for_s < 0.0:
                     wait_for_s = 0.0
                 time.sleep(wait_for_s)
-
-            qidx_offset = prng.randint(0, len(queries) - 1)
-            qidx = queries[qidx_offset]
+            qidx = queries[qidx_offset % len(queries)]
             query = query_bank[qidx]
+            qidx_offset += 1
 
             try:
                 engine = None
