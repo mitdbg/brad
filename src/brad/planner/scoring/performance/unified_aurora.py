@@ -179,7 +179,7 @@ class AuroraProvisioningScore:
                 # We need to use a non-zero load. We use a constant factor to
                 # prime the system.
                 total_analytics_load = (
-                    0.25
+                    ctx.planner_config.aurora_initialize_load_fraction()
                     * aurora_num_cpus(ctx.current_blueprint.aurora_provisioning())
                     * ctx.current_blueprint.aurora_provisioning().num_nodes()
                 )

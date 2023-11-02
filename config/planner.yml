@@ -348,3 +348,5 @@ redshift_scaling:
 
 use_io_optimized_aurora: true
 use_recorded_routing_if_available: true
+
+aurora_initialize_load_fraction: 0.25
