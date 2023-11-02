@@ -405,7 +405,7 @@ def create_query_dataloader(
             query_collator,
             db_statistics=val_database_statistics,
             feature_statistics=feature_statistics,
-            plan_featurization_name=query_featurization_name,
+            query_featurization_name=query_featurization_name,
         )
         dataloader_args = dict(
             batch_size=batch_size,
