@@ -43,7 +43,7 @@ trap "inner_cancel_experiment" TERM
 # - Turn off Redshift
 # Detection time is ~5 minutes
 # Transition time is ~7 minutes
-total_second_phase_time_s="$((30 * 60))"
+total_second_phase_time_s="$((60 * 60))"
 wait_start="$(date -u +%s)"
 
 poll_file_for_event $COND_OUT/brad_daemon_events.csv "post_transition_completed" 30
