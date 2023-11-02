@@ -9,6 +9,7 @@ from brad.planner.triggers.aurora_cpu_utilization import AuroraCpuUtilization
 from brad.planner.triggers.redshift_cpu_utilization import RedshiftCpuUtilization
 from brad.planner.triggers.elapsed_time import ElapsedTimeTrigger
 from brad.planner.triggers.query_latency_ceiling import QueryLatencyCeiling
+from brad.planner.triggers.recent_change import RecentChange
 from brad.planner.triggers.trigger import Trigger
 from brad.planner.triggers.txn_latency_ceiling import TransactionLatencyCeiling
 from brad.planner.triggers.variable_costs import VariableCosts
@@ -88,5 +89,9 @@ def get_beam_triggers(
                 config.epoch_length,
             )
         )
+
+    recent_change = trigger_config["recent_change"]
+    if "disabled" not in recent_change:
+        trigger_list.append(RecentChange(planner_config, config.epoch_length))
 
     return trigger_list

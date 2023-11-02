@@ -79,7 +79,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 await asyncio.sleep(3)
                 logger.debug("Planner is checking if a replan is needed...")
                 if self._check_if_metrics_warrant_replanning():
-                    await self.run_replan()
+                    await self.run_replan(trigger=None)
         finally:
             if self._metrics_out is not None:
                 self._metrics_out.close()
@@ -88,7 +88,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         # TODO: Add triggers if needed.
         return []
 
-    async def _run_replan_impl(self, window_multiplier: int = 1) -> None:
+    async def _run_replan_impl(
+        self, trigger: Optional[Trigger], window_multiplier: int = 1
+    ) -> None:
         # This will be long-running and will block the event loop. For our
         # current needs, this is fine since the planner is the main component in
         # the daemon process.
@@ -182,7 +184,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             selected_score = Score()
             self._last_suggested_blueprint = selected_blueprint
             self._last_suggested_blueprint_score = selected_score
-            await self._notify_new_blueprint(selected_blueprint, selected_score)
+            await self._notify_new_blueprint(
+                selected_blueprint, selected_score, trigger
+            )
 
         finally:
             engines.close_sync()

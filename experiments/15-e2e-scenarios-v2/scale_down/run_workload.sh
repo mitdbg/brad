@@ -20,10 +20,10 @@ log_workload_point "brad_start_initiated"
 sleep 30
 
 log_workload_point "clients_starting"
-start_repeating_olap_runner 8 15 5 $ra_query_indexes "ra_8"
+start_repeating_olap_runner 6 15 5 $ra_query_indexes "ra_8"
 rana_pid=$runner_pid
 
-start_txn_runner 4
+start_txn_runner 3
 txn_pid=$runner_pid
 
 start_repeating_olap_runner 1 70 5 "61,71,75" "ra_1_special"
@@ -46,7 +46,7 @@ trap "inner_cancel_experiment" TERM
 total_second_phase_time_s="$((60 * 60))"
 wait_start="$(date -u +%s)"
 
-poll_file_for_event $COND_OUT/brad_daemon_events.csv "post_transition_completed" 45
+poll_file_for_event $COND_OUT/brad_daemon_events.csv "post_transition_completed" 30
 log_workload_point "after_replan"
 
 wait_end="$(date -u +%s)"

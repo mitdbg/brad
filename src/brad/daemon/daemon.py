@@ -47,6 +47,8 @@ from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyS
 from brad.planner.scoring.performance.precomputed_predictions import (
     PrecomputedPredictions,
 )
+from brad.planner.triggers.trigger import Trigger
+from brad.planner.triggers.recent_change import RecentChange
 from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import LoggedWorkloadProvider
@@ -339,7 +341,9 @@ class BradDaemon:
                     str(message),
                 )
 
-    async def _handle_new_blueprint(self, blueprint: Blueprint, score: Score) -> None:
+    async def _handle_new_blueprint(
+        self, blueprint: Blueprint, score: Score, trigger: Optional[Trigger]
+    ) -> None:
         """
         Informs the server about a new blueprint.
         """
@@ -351,7 +355,7 @@ class BradDaemon:
         if self._system_event_logger is not None:
             self._system_event_logger.log(SystemEvent.NewBlueprintProposed)
 
-        if self._should_skip_blueprint(blueprint, score):
+        if self._should_skip_blueprint(blueprint, score, trigger):
             if self._system_event_logger is not None:
                 self._system_event_logger.log(SystemEvent.NewBlueprintSkipped)
             return
@@ -383,7 +387,9 @@ class BradDaemon:
             )
             self._transition_task = asyncio.create_task(self._run_transition_part_one())
 
-    def _should_skip_blueprint(self, blueprint: Blueprint, score: Score) -> bool:
+    def _should_skip_blueprint(
+        self, blueprint: Blueprint, score: Score, trigger: Optional[Trigger]
+    ) -> bool:
         """
         This is called whenever the planner chooses a new blueprint. The purpose
         is to avoid transitioning to blueprints with few changes.
@@ -407,13 +413,32 @@ class BradDaemon:
             logger.info("Planner selected an identical blueprint - skipping.")
             return True
 
-        if diff.aurora_diff() is not None or diff.redshift_diff() is not None:
-            return False
-
         current_score = self._blueprint_mgr.get_active_score()
         if current_score is None:
             # Do not skip - we are currently missing the score of the active
             # blueprint, so there is nothing to compare to.
+            return False
+
+        if trigger is not None and isinstance(trigger, RecentChange):
+            # TODO(geoffxy): This should eventually be removed. The right
+            # solution is doing a comparison during blueprint planning.  Added
+            # temporarily on November 2, 2023.
+            current_cost = (
+                current_score.provisioning_cost
+                + current_score.workload_scan_cost
+                + current_score.storage_cost
+            )
+            next_cost = (
+                score.provisioning_cost + score.workload_scan_cost + score.storage_cost
+            )
+
+            if next_cost > current_cost:
+                logger.info(
+                    "Skipping a RecentChange triggered blueprint because a higher-cost blueprint was selected."
+                )
+                return True
+
+        if diff.aurora_diff() is not None or diff.redshift_diff() is not None:
             return False
 
         current_dist = current_score.normalized_query_count_distribution()
@@ -534,7 +559,9 @@ class BradDaemon:
             if self._system_event_logger is not None:
                 self._system_event_logger.log(SystemEvent.ManuallyTriggeredReplan)
             try:
-                await self._planner.run_replan(window_multiplier)
+                await self._planner.run_replan(
+                    trigger=None, window_multiplier=window_multiplier
+                )
                 return [("Planner completed. See the daemon's logs for more details.",)]
             except Exception as ex:
                 logger.exception("Encountered exception when running the planner.")
@@ -550,9 +577,16 @@ class BradDaemon:
         transitioning_to_version = tm.next_version
 
         if self._system_event_logger is not None:
+            next_blueprint = tm.next_blueprint
+            assert next_blueprint is not None
+            next_aurora = str(next_blueprint.aurora_provisioning())
+            next_redshift = str(next_blueprint.redshift_provisioning())
+
             self._system_event_logger.log(
                 SystemEvent.PreTransitionStarted,
-                "version={}".format(transitioning_to_version),
+                f"version={transitioning_to_version},"
+                f"aurora={next_aurora},"
+                f"redshift={next_redshift}",
             )
 
         def update_monitor_sources():

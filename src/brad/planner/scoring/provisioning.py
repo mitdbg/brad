@@ -115,7 +115,7 @@ def compute_aurora_transition_time_s(
         return 0.0
 
     # We transition one instance at a time to minimize disruption.
-    num_nodes_to_create = new.num_nodes() - old.num_nodes()
+    num_nodes_to_create = max(new.num_nodes() - old.num_nodes(), 0)
 
     if new.instance_type() != old.instance_type():
         # We modify "overlapping" nodes. For the primary instance, we actually

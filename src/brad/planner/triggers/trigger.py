@@ -32,6 +32,13 @@ class Trigger:
         """
         return self.__class__.__name__
 
+    def on_replan(self, trigger: Optional["Trigger"]) -> None:
+        """
+        Called when a replan occurs (for stateful triggers). The trigger that
+        fired the replan will be passed in; it will be None if the replan was
+        triggered manually.
+        """
+
     def _reset_cutoff(self) -> None:
         self._cutoff = datetime.now(tz=pytz.utc)
 

@@ -230,3 +230,6 @@ class PlannerConfig:
             return default
         else:
             return self._raw[key]
+
+    def aurora_initialize_load_fraction(self) -> float:
+        return self._raw["aurora_initialize_load_fraction"]

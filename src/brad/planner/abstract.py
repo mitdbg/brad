@@ -19,7 +19,9 @@ from brad.planner.workload.provider import WorkloadProvider
 
 logger = logging.getLogger(__name__)
 
-NewBlueprintCallback = Callable[[Blueprint, Score], Coroutine[None, None, None]]
+NewBlueprintCallback = Callable[
+    [Blueprint, Score, Optional[Trigger]], Coroutine[None, None, None]
+]
 
 
 class BlueprintPlanner:
@@ -98,7 +100,7 @@ class BlueprintPlanner:
                                 SystemEvent.TriggeredReplan,
                                 "trigger={}".format(t.name()),
                             )
-                        await self.run_replan()
+                        await self.run_replan(trigger=t)
                         break
             else:
                 logger.debug(
@@ -106,7 +108,9 @@ class BlueprintPlanner:
                 )
             await asyncio.sleep(check_period)
 
-    async def run_replan(self, window_multiplier: int = 1) -> None:
+    async def run_replan(
+        self, trigger: Optional[Trigger], window_multiplier: int = 1
+    ) -> None:
         """
         Triggers a "forced" replan. Used for debugging.
 
@@ -114,11 +118,15 @@ class BlueprintPlanner:
         """
         try:
             self._replan_in_progress = True
-            await self._run_replan_impl(window_multiplier)
+            for t in self.get_triggers():
+                t.on_replan(trigger)
+            await self._run_replan_impl(trigger, window_multiplier)
         finally:
             self._replan_in_progress = False
 
-    async def _run_replan_impl(self, window_multiplier: int = 1) -> None:
+    async def _run_replan_impl(
+        self, trigger: Optional[Trigger], window_multiplier: int = 1
+    ) -> None:
         """
         Implementers should override this method to define the blueprint
         optimization algorithm.
@@ -166,12 +174,14 @@ class BlueprintPlanner:
         """
         self._callbacks.append(callback)
 
-    async def _notify_new_blueprint(self, blueprint: Blueprint, score: Score) -> None:
+    async def _notify_new_blueprint(
+        self, blueprint: Blueprint, score: Score, trigger: Optional[Trigger]
+    ) -> None:
         """
         Concrete planners should call this method to notify subscribers about
         the next blueprint.
         """
         tasks = []
         for callback in self._callbacks:
-            tasks.append(asyncio.create_task(callback(blueprint, score)))
+            tasks.append(asyncio.create_task(callback(blueprint, score, trigger)))
         await asyncio.gather(*tasks)
