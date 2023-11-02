@@ -33,6 +33,7 @@ class RecentChange(Trigger):
 
         if now >= self._last_provisioning_change + window:
             self._last_provisioning_change = None
+            logger.info("Triggering replan because of a recent provisioning change.")
             return True
         else:
             return False
