@@ -165,8 +165,8 @@ class AuroraProvisioningScore:
                 eps, overall_writer_cpu_util_denorm - pred_txn_cpu_denorm
             )
 
-        total_analytics_load *= query_factor
-        total_analytics_cpu_denorm *= query_factor
+        # total_analytics_load *= query_factor
+        # total_analytics_cpu_denorm *= query_factor
 
         # 4. Compute the workload-affected metrics.
         # Basically, if there are no replicas, both the analytical and
@@ -174,6 +174,15 @@ class AuroraProvisioningScore:
         if next_aurora_has_replicas:
             next_num_read_replicas = next_prov.num_nodes() - 1
             assert next_num_read_replicas > 0
+
+            if no_analytics_queries_executed and len(base_query_run_times) > 0:
+                # We need to use a non-zero load. We use a constant factor to
+                # prime the system.
+                total_analytics_load = 0.25 * aurora_num_cpus(
+                    ctx.current_blueprint.aurora_provisioning()
+                )
+                total_analytics_cpu_denorm = total_analytics_load
+
             # Divide by the number of read replicas: we assume the load can
             # be equally divided amongst the replicas.
             analytics_affected_per_machine_load = (
