@@ -552,9 +552,16 @@ class BradDaemon:
         transitioning_to_version = tm.next_version
 
         if self._system_event_logger is not None:
+            next_blueprint = tm.next_blueprint
+            assert next_blueprint is not None
+            next_aurora = str(next_blueprint.aurora_provisioning())
+            next_redshift = str(next_blueprint.redshift_provisioning())
+
             self._system_event_logger.log(
                 SystemEvent.PreTransitionStarted,
-                "version={}".format(transitioning_to_version),
+                f"version={transitioning_to_version},"
+                f"aurora={next_aurora},"
+                f"redshift={next_redshift}",
             )
 
         def update_monitor_sources():
