@@ -52,8 +52,7 @@ triggers:
     ceiling_s: 0.030
     sustained_epochs: 3
 
-  recent_change:
-    disabled: true
+  recent_change: {}
 
 ###
 ### Beam planning constants.
