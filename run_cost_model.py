@@ -37,7 +37,13 @@ class StoreDictKeyPair(argparse.Action):
 
 
 def parse_queries_wrapper(
-    database, source, source_aurora, target, cap_queries, db_name, is_brad
+    database: DatabaseSystem,
+    source: str,
+    source_aurora: str,
+    target: str,
+    cap_queries: int,
+    db_name: str,
+    is_brad: bool,
 ):
     raw_plans = load_json(source)
     if source_aurora is None or not os.path.exists(source_aurora):
@@ -163,6 +169,7 @@ if __name__ == "__main__":
     parser.add_argument("--lower_bound_runtime", type=int, default=None)
     parser.add_argument("--gather_feature_statistics", action="store_true")
     parser.add_argument("--skip_train", action="store_true")
+    parser.add_argument("--eval_on_test", action="store_true")
     parser.add_argument("--save_best", action="store_true")
     parser.add_argument("--train_model", action="store_true")
     parser.add_argument("--is_query", action="store_true")
@@ -396,6 +403,7 @@ if __name__ == "__main__":
                 skip_train=args.skip_train,
                 loss_class_name=args.loss_class_name,
                 save_best=args.save_best,
+                eval_on_test=args.eval_on_test,
             )
         else:
             model = train_readout_hyperparams(
@@ -420,6 +428,7 @@ if __name__ == "__main__":
                 skip_train=args.skip_train,
                 loss_class_name=args.loss_class_name,
                 save_best=args.save_best,
+                eval_on_test=args.eval_on_test,
             )
 
     if args.infer_brad:
