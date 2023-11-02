@@ -178,8 +178,10 @@ class AuroraProvisioningScore:
             if no_analytics_queries_executed and len(base_query_run_times) > 0:
                 # We need to use a non-zero load. We use a constant factor to
                 # prime the system.
-                total_analytics_load = 0.25 * aurora_num_cpus(
-                    ctx.current_blueprint.aurora_provisioning()
+                total_analytics_load = (
+                    0.25
+                    * aurora_num_cpus(ctx.current_blueprint.aurora_provisioning())
+                    * ctx.current_blueprint.aurora_provisioning().num_nodes()
                 )
                 total_analytics_cpu_denorm = total_analytics_load
 
