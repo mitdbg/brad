@@ -1,3 +1,4 @@
+import asyncio
 import heapq
 import json
 import logging
@@ -10,7 +11,10 @@ from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.query_based_candidate import BlueprintCandidate
 from brad.planner.beam.triggers import get_beam_triggers
 from brad.planner.router_provider import RouterProvider
-from brad.planner.debug_logger import BlueprintPlanningDebugLogger
+from brad.planner.debug_logger import (
+    BlueprintPlanningDebugLogger,
+    BlueprintPickleDebugLogger,
+)
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
@@ -45,7 +49,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         # 1. Fetch the next workload and apply predictions.
         metrics, metrics_timestamp = self._metrics_provider.get_metrics()
         logger.debug("Using metrics: %s", str(metrics))
-        current_workload, next_workload = self._workload_provider.get_workloads(
+        current_workload, next_workload = await self._workload_provider.get_workloads(
             metrics_timestamp, window_multiplier, desired_period=timedelta(hours=1)
         )
         self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
@@ -85,7 +89,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 self._current_blueprint.table_locations_bitmap()
             )
         )
-        ctx.compute_engine_latency_weights()
+        ctx.compute_engine_latency_norm_factor()
 
         beam_size = self._planner_config.beam_size()
         engines = [Engine.Aurora, Engine.Redshift, Engine.Athena]
@@ -126,8 +130,13 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
         # 5. Run beam search to formulate the table placements.
         for j, query_idx in enumerate(query_indices[1:]):
-            if j % 100 == 0:
-                logger.debug("Processing index %d of %d", j, len(query_indices[1:]))
+            if j % 5 == 0:
+                # This is a long-running process. We should yield every so often
+                # to allow other tasks to run on the daemon (e.g., processing
+                # metrics messages).
+                await asyncio.sleep(0)
+
+            logger.debug("Processing index %d of %d", j, len(query_indices[1:]))
 
             next_top_k: List[BlueprintCandidate] = []
             query = analytical_queries[query_idx]
@@ -167,11 +176,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                             next_candidate.find_best_provisioning(ctx)
 
                         if not (next_candidate.is_better_than(next_top_k[0])):
-                            # We eliminate `next_candidate`. Even after
-                            # looking for the best provisioning, it has a
-                            # worse score compared to `next_top_k[0]` (the
-                            # worst scoring blueprint candidate in the
-                            # top-k).
+                            # We eliminate `next_candidate`. Even after looking
+                            # for the best provisioning, it has a worse score
+                            # compared to `next_top_k[0]` (the worst scoring
+                            # blueprint candidate in the top-k).
                             continue
 
                         while (
@@ -284,6 +292,14 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         # The best blueprint will be ordered first (we have a negated
         # `__lt__` method to work with `heapq` to create a max heap).
         final_top_k.sort(reverse=True)
+
+        # For later interactive inspection in Python.
+        BlueprintPickleDebugLogger.log_object_if_requested(
+            self._config, "final_query_based_blueprints", final_top_k
+        )
+        BlueprintPickleDebugLogger.log_object_if_requested(
+            self._config, "scoring_context", ctx
+        )
 
         # Log the final top k for debugging purposes, if needed.
         final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(

@@ -3,9 +3,11 @@ import json
 import logging
 import random
 import time
+import os
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
+from ddsketch import DDSketch
 
 import grpc
 import pyodbc
@@ -51,6 +53,8 @@ from brad.workload_logging.epoch_file_handler import EpochFileHandler
 logger = logging.getLogger(__name__)
 
 LINESEP = "\n".encode()
+
+INITIAL_ROUTE_REDSHIFT_ONLY_VAR = "BRAD_INITIAL_ROUTE_REDSHIFT_ONLY"
 
 
 class BradFrontEnd(BradInterface):
@@ -143,7 +147,8 @@ class BradFrontEnd(BradInterface):
         self._estimator: Optional[Estimator] = None
 
         # Number of transactions that completed.
-        self._transaction_end_counter = Counter()
+        self._transaction_end_counter = Counter()  # pylint: disable=global-statement
+        self._reset_latency_sketches()
         self._brad_metrics_reporting_task: Optional[asyncio.Task[None]] = None
 
         # Used to manage `BRAD_` requests that need to be sent to the daemon for
@@ -158,6 +163,10 @@ class BradFrontEnd(BradInterface):
 
         # Used to re-establish engine connections.
         self._reestablish_connections_task: Optional[asyncio.Task[None]] = None
+
+        # This is temporary for experiment purposes. In the future, this will be
+        # part of the blueprint.
+        self._route_redshift_only = INITIAL_ROUTE_REDSHIFT_ONLY_VAR in os.environ
 
     async def serve_forever(self):
         await self._run_setup()
@@ -287,6 +296,8 @@ class BradFrontEnd(BradInterface):
             )
             if transactional_query:
                 engine_to_use = Engine.Aurora
+            elif self._route_redshift_only:
+                engine_to_use = Engine.Redshift
             else:
                 engine_to_use = await self._router.engine_for(query_rep)
 
@@ -300,11 +311,22 @@ class BradFrontEnd(BradInterface):
             debug_info["executor"] = engine_to_use
 
             # 3. Actually execute the query.
-            connection = session.engines.get_connection(engine_to_use)
-            cursor = await connection.cursor()
             try:
-                start = datetime.now(tz=timezone.utc)
-                await cursor.execute(query_rep.raw_query)
+                if transactional_query:
+                    connection = session.engines.get_connection(engine_to_use)
+                    cursor = connection.cursor_sync()
+                    start = datetime.now(tz=timezone.utc)
+                    if query_rep.is_transaction_start():
+                        session.set_txn_start_timestamp(start)
+                    # Using execute_sync() is lower overhead than the async
+                    # interface. For transactions, we won't necessarily need the
+                    # async interface.
+                    cursor.execute_sync(query_rep.raw_query)
+                else:
+                    connection = session.engines.get_reader_connection(engine_to_use)
+                    cursor = connection.cursor_sync()
+                    start = datetime.now(tz=timezone.utc)
+                    await cursor.execute(query_rep.raw_query)
                 end = datetime.now(tz=timezone.utc)
             except (
                 pyodbc.ProgrammingError,
@@ -328,7 +350,8 @@ class BradFrontEnd(BradInterface):
             if query_rep.is_transaction_start():
                 session.set_in_transaction(in_txn=True)
 
-            if query_rep.is_transaction_end():
+            is_transaction_end = query_rep.is_transaction_end()
+            if is_transaction_end:
                 session.set_in_transaction(in_txn=False)
                 self._transaction_end_counter.bump()
 
@@ -336,9 +359,20 @@ class BradFrontEnd(BradInterface):
             run_time_s = end - start
             if not transactional_query or (random.random() < self._config.txn_log_prob):
                 self._qlogger.info(
-                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {run_time_s}s IsTransaction: {transactional_query}"
+                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} "
+                    f"Engine: {engine_to_use.value} "
+                    f"Duration (s): {run_time_s.total_seconds()} "
+                    f"IsTransaction: {transactional_query}"
                 )
-            self._query_run_times.add_value(run_time_s.total_seconds())
+                run_time_s_float = run_time_s.total_seconds()
+                if not transactional_query:
+                    self._query_latency_sketch.add(run_time_s_float)
+                elif is_transaction_end:
+                    # We want to record the duration of the entire transaction
+                    # (not just one query in the transaction).
+                    self._txn_latency_sketch.add(
+                        (end - session.txn_start_timestamp()).total_seconds()
+                    )
 
             # Extract and return the results, if any.
             try:
@@ -468,6 +502,7 @@ class BradFrontEnd(BradInterface):
                 )
                 # This refreshes any cached state that depends on the old blueprint.
                 await self._run_blueprint_update(message.version)
+                self._route_redshift_only = False
                 # Tell the daemon that we have updated.
                 self._output_queue.put(
                     NewBlueprintAck(self._fe_index, message.version), block=False
@@ -480,30 +515,52 @@ class BradFrontEnd(BradInterface):
                 logger.info("Received message from the daemon: %s", message)
 
     async def _report_metrics_to_daemon(self) -> None:
-        period_start = time.time()
-        while True:
-            txn_value = self._transaction_end_counter.value()
-            period_end = time.time()
-            self._transaction_end_counter.reset()
-            elapsed_time_s = period_end - period_start
-
-            # If the input queue is full, we just drop this message.
-            sampled_thpt = txn_value / elapsed_time_s
-            rt_summary = self._query_run_times.get_summary(k=1)
-            self._query_run_times.clear()  # Only keep the unreported samples.
-            metrics_report = MetricsReport(self._fe_index, sampled_thpt, rt_summary)
-            logger.debug(
-                "Sending metrics report: txn_completions_per_s: %.2f, max_query_run_time_s: %.2f",
-                sampled_thpt,
-                max(rt_summary.top_k) if len(rt_summary.top_k) > 0 else 0.0,
-            )
-            self._output_queue.put_nowait(metrics_report)
-
+        try:
             period_start = time.time()
 
-            # NOTE: Once we add multiple front end servers, we should stagger
-            # the sleep period.
-            await asyncio.sleep(self._config.front_end_metrics_reporting_period_seconds)
+            # We want to stagger the reports across the front ends to avoid
+            # overwhelming the daemon.
+            await asyncio.sleep(0.1 * self._fe_index)
+
+            while True:
+                # Ideally we adjust for delays here too.
+                await asyncio.sleep(
+                    self._config.front_end_metrics_reporting_period_seconds
+                )
+
+                txn_value = self._transaction_end_counter.value()
+                period_end = time.time()
+                self._transaction_end_counter.reset()
+                elapsed_time_s = period_end - period_start
+
+                # If the input queue is full, we just drop this message.
+                sampled_thpt = txn_value / elapsed_time_s
+                metrics_report = MetricsReport.from_data(
+                    self._fe_index,
+                    sampled_thpt,
+                    self._txn_latency_sketch,
+                    self._query_latency_sketch,
+                )
+                logger.debug(
+                    "Sending metrics report: txn_completions_per_s: %.2f", sampled_thpt
+                )
+                self._output_queue.put_nowait(metrics_report)
+
+                txn_p90 = self._txn_latency_sketch.get_quantile_value(0.9)
+                if txn_p90 is not None:
+                    logger.debug("Transaction latency p90 (s): %.4f", txn_p90)
+
+                query_p90 = self._query_latency_sketch.get_quantile_value(0.9)
+                if query_p90 is not None:
+                    logger.debug("Query latency p90 (s): %.4f", query_p90)
+
+                period_start = time.time()
+                self._reset_latency_sketches()
+
+        except Exception as ex:
+            if not isinstance(ex, asyncio.CancelledError):
+                # This should be a fatal error.
+                logger.exception("Unexpected error in the metrics reporting task.")
 
     def _clean_query_str(self, raw_sql: str) -> str:
         sql = raw_sql.strip()
@@ -593,6 +650,11 @@ class BradFrontEnd(BradInterface):
                 "Refreshing the blueprint before attempting to re-establish connections again."
             )
             await self._blueprint_mgr.load()
+
+    def _reset_latency_sketches(self) -> None:
+        sketch_rel_accuracy = 0.01
+        self._query_latency_sketch = DDSketch(relative_accuracy=sketch_rel_accuracy)
+        self._txn_latency_sketch = DDSketch(relative_accuracy=sketch_rel_accuracy)
 
 
 async def _orchestrate_shutdown() -> None:

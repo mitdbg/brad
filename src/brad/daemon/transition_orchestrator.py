@@ -217,22 +217,49 @@ class TransitionOrchestrator:
 
             replicas_to_modify = min(new.num_nodes() - 1, old.num_nodes() - 1)
 
-            # Modify replicas one-by-one. Note that this logic causes the reader
-            # to go down if there is only one read replica.
-            for idx, replica in enumerate(
-                self._blueprint_mgr.get_directory().aurora_readers()
-            ):
-                if idx >= replicas_to_modify:
-                    break
+            if replicas_to_modify == 1 and old.num_nodes() - 1 == 1:
+                # Special case: The current blueprint only has one read replica
+                # and we need to modify it to transition to the next blueprint.
+                existing_readers = self._blueprint_mgr.get_directory().aurora_readers()
+                assert len(existing_readers) == 1
+                existing_replica_id = existing_readers[0].instance_id()
 
-                logger.debug(
-                    "Changing instance %s to %s",
-                    replica.instance_id(),
-                    new.instance_type(),
+                new_replica_id = _AURORA_REPLICA_FORMAT.format(
+                    cluster_id=self._config.aurora_cluster_id,
+                    version=str(next_version).zfill(5),
+                    index=str(0).zfill(2),
                 )
-                await self._rds.change_instance_type(
-                    replica.instance_id(), new, wait_until_available=True
+                logger.debug("Creating replica %s", new_replica_id)
+                await self._rds.create_replica(
+                    self._config.aurora_cluster_id,
+                    new_replica_id,
+                    new,
+                    wait_until_available=True,
                 )
+
+                logger.debug("Deleting the old replica: %s", existing_replica_id)
+                await self._rds.delete_replica(existing_replica_id)
+                await self._blueprint_mgr.refresh_directory()
+                if on_instance_identity_change is not None:
+                    on_instance_identity_change()
+
+            else:
+                # Modify replicas one-by-one. At most one reader replica is down
+                # at any time - but we consider this acceptable.
+                for idx, replica in enumerate(
+                    self._blueprint_mgr.get_directory().aurora_readers()
+                ):
+                    if idx >= replicas_to_modify:
+                        break
+
+                    logger.debug(
+                        "Changing instance %s to %s",
+                        replica.instance_id(),
+                        new.instance_type(),
+                    )
+                    await self._rds.change_instance_type(
+                        replica.instance_id(), new, wait_until_available=True
+                    )
 
         new_replica_count = max(new.num_nodes() - 1, 0)
         old_replica_count = max(old.num_nodes() - 1, 0)
@@ -245,6 +272,11 @@ class TransitionOrchestrator:
                     index=str(next_index).zfill(2),
                 )
                 logger.debug("Creating replica %s", new_replica_id)
+                # Ideally we wait for the replicas to finish creation in
+                # parallel. Because of how we make the boto3 client async,
+                # there's a possibility of having multiple API calls in flight
+                # at the same time, which boto3 does not support. To be safe, we
+                # just run these replica creations sequentially.
                 await self._rds.create_replica(
                     self._config.aurora_cluster_id,
                     new_replica_id,

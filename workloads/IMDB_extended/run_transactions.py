@@ -1,6 +1,6 @@
+import asyncio
 import argparse
 import pathlib
-import pyodbc
 import queue
 import random
 import signal
@@ -11,11 +11,15 @@ import os
 import pytz
 import yaml
 import multiprocessing as mp
-from datetime import datetime
-from typing import List, Tuple
+from datetime import datetime, timedelta
+from typing import Optional
 
-from brad.grpc_client import BradGrpcClient, BradClientError
-from workload_utils.database import Database, PyodbcDatabase, BradDatabase
+from brad.config.engine import Engine
+from brad.config.file import ConfigFile
+from brad.grpc_client import BradClientError
+from brad.provisioning.directory import Directory
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
+from workload_utils.connect import connect_to_db
 from workload_utils.transaction_worker import TransactionWorker
 from workload_utils.baseline import make_tidb_conn, make_postgres_compatible_conn
 
@@ -23,6 +27,7 @@ from workload_utils.baseline import make_tidb_conn, make_postgres_compatible_con
 def runner(
     args,
     worker_idx: int,
+    directory: Optional[Directory],
     start_queue: mp.Queue,
     stop_queue: mp.Queue,
 ) -> None:
@@ -54,36 +59,38 @@ def runner(
     ]
     lookup_theatre_id_by_name = 0.8
     txn_indexes = list(range(len(transactions)))
-    latencies: List[List[Tuple[datetime, float]]] = [
-        [] for _ in range(len(transactions))
-    ]
     commits = [0 for _ in range(len(transactions))]
     aborts = [0 for _ in range(len(transactions))]
 
-    # Connect.
-    if args.cstr_var is not None:
-        db: Database = PyodbcDatabase(pyodbc.connect(os.environ[args.cstr_var]))
-    elif args.tidb:
-        db: Database = PyodbcDatabase(make_tidb_conn())
-    elif args.aurora:
-        db: Database = PyodbcDatabase(make_postgres_compatible_conn("aurora"))
-    else:
-        port_offset = worker_idx % args.num_front_ends
-        brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
-        brad.connect()
-        db = BradDatabase(brad)
-
-    # Set the isolation level.
+    # Connect and set the isolation level.
+    db = connect_to_db(
+        args, worker_idx, direct_engine=Engine.Aurora, directory=directory
+    )
     db.execute_sync(
         f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
     )
+
+    # For printing out results.
+    if "COND_OUT" in os.environ:
+        # pylint: disable-next=import-error
+        import conductor.lib as cond
+
+        out_dir = cond.get_output_path()
+    else:
+        out_dir = pathlib.Path(".")
 
     # Signal that we are ready to start and wait for other clients.
     start_queue.put("")
     _ = stop_queue.get()
 
+    rand_backoff = None
     overall_start = time.time()
     try:
+        latency_file = open(
+            out_dir / "oltp_latency_{}.csv".format(worker_idx), "w", encoding="UTF-8"
+        )
+        print("txn_idx,timestamp,run_time_s", file=latency_file)
+
         while True:
             txn_idx = txn_prng.choices(txn_indexes, weights=transaction_weights, k=1)[0]
             txn = transactions[txn_idx]
@@ -99,6 +106,9 @@ def runner(
                     )
                 else:
                     succeeded = txn(db)
+
+                rand_backoff = None
+
             except BradClientError as ex:
                 succeeded = False
                 if ex.is_transient():
@@ -107,6 +117,21 @@ def runner(
                         flush=True,
                         file=sys.stderr,
                     )
+
+                    if rand_backoff is None:
+                        rand_backoff = RandomizedExponentialBackoff(
+                            max_retries=100,
+                            base_delay_s=0.1,
+                            max_delay_s=timedelta(minutes=1).total_seconds(),
+                        )
+
+                    # Delay retrying in the case of a transient error (this
+                    # happens during blueprint transitions).
+                    wait_s = rand_backoff.wait_time_s()
+                    if wait_s is None:
+                        print("Aborting benchmark. Too many transient errors.")
+                        break
+                    time.sleep(wait_s)
 
                 else:
                     print(
@@ -130,7 +155,12 @@ def runner(
                 commits[txn_idx] += 1
             else:
                 aborts[txn_idx] += 1
-            latencies[txn_idx].append((now, txn_end - txn_start))
+
+            if txn_prng.random() < args.latency_sample_prob:
+                print(
+                    "{},{},{}".format(txn_idx, now, txn_end - txn_start),
+                    file=latency_file,
+                )
 
             try:
                 _ = stop_queue.get_nowait()
@@ -141,24 +171,7 @@ def runner(
     finally:
         overall_end = time.time()
         print(f"[{worker_idx}] Done running transactions.", flush=True, file=sys.stderr)
-
-        # For printing out results.
-        if "COND_OUT" in os.environ:
-            # pylint: disable-next=import-error
-            import conductor.lib as cond
-
-            out_dir = cond.get_output_path()
-        else:
-            out_dir = pathlib.Path(f"./{args.output_dir}")
-            os.makedirs(f"{out_dir}", exist_ok=True)
-
-        with open(
-            out_dir / "oltp_latency_{}.csv".format(worker_idx), "w", encoding="UTF-8"
-        ) as file:
-            print("txn_idx,timestamp,run_time_s", file=file)
-            for tidx, lat_list in enumerate(latencies):
-                for timestamp, lat in lat_list:
-                    print("{},{},{}".format(tidx, timestamp, lat), file=file)
+        latency_file.close()
 
         with open(
             out_dir / "oltp_stats_{}.csv".format(worker_idx), "w", encoding="UTF-8"
@@ -199,16 +212,10 @@ def main():
         help="Environment variable that holds a ODBC connection string. Set to connect directly (i.e., not through BRAD)",
     )
     parser.add_argument(
-        "--tidb",
-        default=False,
-        action="store_true",
-        help="Environment variable that whether to run a TIDB benchmark through ODBC or not",
-    )
-    parser.add_argument(
-        "--aurora",
-        default=False,
-        action="store_true",
-        help="Environment variable that whether to run a TIDB benchmark through ODBC or not",
+        "--baseline",
+        default="",
+        type=str,
+        help="Whether to use tidb, aurora or redshift",
     )
     parser.add_argument(
         "--output-dir",
@@ -228,6 +235,27 @@ def main():
         default="REPEATABLE READ",
         help="The isolation level to use when running the transactions.",
     )
+    parser.add_argument(
+        "--brad-direct",
+        action="store_true",
+        help="Set to connect directly to Aurora via BRAD's config.",
+    )
+    parser.add_argument(
+        "--config-file",
+        type=str,
+        help="The BRAD config file (if --brad-direct is used).",
+    )
+    parser.add_argument(
+        "--schema-name",
+        type=str,
+        help="The schema name to use, if connecting directly.",
+    )
+    parser.add_argument(
+        "--latency-sample-prob",
+        type=float,
+        default=0.01,
+        help="The probability that a transaction's latency will be recorded.",
+    )
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)
     parser.add_argument("--num-front-ends", type=int, default=1)
@@ -237,9 +265,20 @@ def main():
     start_queue = mgr.Queue()
     stop_queue = mgr.Queue()
 
+    if args.brad_direct:
+        assert args.config_file is not None
+        assert args.schema_name is not None
+        config = ConfigFile.load(args.config_file)
+        directory = Directory(config)
+        asyncio.run(directory.refresh())
+    else:
+        directory = None
+
     clients = []
     for idx in range(args.num_clients):
-        p = mp.Process(target=runner, args=(args, idx, start_queue, stop_queue))
+        p = mp.Process(
+            target=runner, args=(args, idx, directory, start_queue, stop_queue)
+        )
         p.start()
         clients.append(p)
 

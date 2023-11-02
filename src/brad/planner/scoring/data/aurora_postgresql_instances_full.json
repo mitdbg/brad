@@ -5,7 +5,8 @@
     "memory_mib": 4096,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 0.082
+    "usd_per_hour": 0.082,
+    "io_opt_usd_per_hour": 0.107
   },
   {
     "instance_type": "db.t4g.medium",
@@ -13,7 +14,8 @@
     "memory_mib": 4096,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 0.073
+    "usd_per_hour": 0.073,
+    "io_opt_usd_per_hour": 0.095
   },
   {
     "instance_type": "db.t3.large",
@@ -21,7 +23,8 @@
     "memory_mib": 8192,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 0.164
+    "usd_per_hour": 0.164,
+    "io_opt_usd_per_hour": 1.213
   },
   {
     "instance_type": "db.t4g.large",
@@ -29,7 +32,8 @@
     "memory_mib": 8192,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 0.146
+    "usd_per_hour": 0.146,
+    "io_opt_usd_per_hour": 0.19
   },
   {
     "instance_type": "db.r5.large",
@@ -37,7 +41,8 @@
     "memory_mib": 16384,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 0.29
+    "usd_per_hour": 0.29,
+    "io_opt_usd_per_hour": 0.377
   },
   {
     "instance_type": "db.r6g.large",
@@ -45,7 +50,8 @@
     "memory_mib": 16384,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 0.26
+    "usd_per_hour": 0.26,
+    "io_opt_usd_per_hour": 0.338
   },
   {
     "instance_type": "db.r6i.large",
@@ -53,7 +59,8 @@
     "memory_mib": 16384,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 0.29
+    "usd_per_hour": 0.29,
+    "io_opt_usd_per_hour": 0.377
   },
   {
     "instance_type": "db.x2g.large",
@@ -61,7 +68,8 @@
     "memory_mib": 32768,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 0.377
+    "usd_per_hour": 0.377,
+    "io_opt_usd_per_hour": 0.49
   },
   {
     "instance_type": "db.r5.xlarge",
@@ -69,7 +77,8 @@
     "memory_mib": 32768,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 0.58
+    "usd_per_hour": 0.58,
+    "io_opt_usd_per_hour": 0.754
   },
   {
     "instance_type": "db.r6g.xlarge",
@@ -77,7 +86,8 @@
     "memory_mib": 32768,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 0.519
+    "usd_per_hour": 0.519,
+    "io_opt_usd_per_hour": 0.675
   },
   {
     "instance_type": "db.r6i.xlarge",
@@ -85,7 +95,8 @@
     "memory_mib": 32768,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 0.58
+    "usd_per_hour": 0.58,
+    "io_opt_usd_per_hour": 0.754
   },
   {
     "instance_type": "db.x2g.xlarge",
@@ -93,7 +104,8 @@
     "memory_mib": 65536,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 0.754
+    "usd_per_hour": 0.754,
+    "io_opt_usd_per_hour": 0.98
   },
   {
     "instance_type": "db.r5.2xlarge",
@@ -101,7 +113,8 @@
     "memory_mib": 65536,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 1.16
+    "usd_per_hour": 1.16,
+    "io_opt_usd_per_hour": 1.508
   },
   {
     "instance_type": "db.r6g.2xlarge",
@@ -109,7 +122,8 @@
     "memory_mib": 65536,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 1.038
+    "usd_per_hour": 1.038,
+    "io_opt_usd_per_hour": 1.349
   },
   {
     "instance_type": "db.r6i.2xlarge",
@@ -117,7 +131,8 @@
     "memory_mib": 65536,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 1.16
+    "usd_per_hour": 1.16,
+    "io_opt_usd_per_hour": 1.508
   },
   {
     "instance_type": "db.x2g.2xlarge",
@@ -125,7 +140,8 @@
     "memory_mib": 131072,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 1.508
+    "usd_per_hour": 1.508,
+    "io_opt_usd_per_hour": 1.96
   },
   {
     "instance_type": "db.r5.4xlarge",
@@ -133,7 +149,8 @@
     "memory_mib": 131072,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 2.32
+    "usd_per_hour": 2.32,
+    "io_opt_usd_per_hour": 3.016
   },
   {
     "instance_type": "db.r6g.4xlarge",
@@ -141,7 +158,8 @@
     "memory_mib": 131072,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 2.076
+    "usd_per_hour": 2.076,
+    "io_opt_usd_per_hour": 2.699
   },
   {
     "instance_type": "db.r6i.4xlarge",
@@ -149,7 +167,8 @@
     "memory_mib": 131072,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 2.32
+    "usd_per_hour": 2.32,
+    "io_opt_usd_per_hour": 3.016
   },
   {
     "instance_type": "db.x2g.4xlarge",
@@ -157,7 +176,8 @@
     "memory_mib": 262144,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 3.016
+    "usd_per_hour": 3.016,
+    "io_opt_usd_per_hour": 3.921
   },
   {
     "instance_type": "db.r5.8xlarge",
@@ -165,7 +185,8 @@
     "memory_mib": 262144,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 4.64
+    "usd_per_hour": 4.64,
+    "io_opt_usd_per_hour": 6.032
   },
   {
     "instance_type": "db.r6g.8xlarge",
@@ -173,7 +194,8 @@
     "memory_mib": 262144,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 4.153
+    "usd_per_hour": 4.153,
+    "io_opt_usd_per_hour": 5.399
   },
   {
     "instance_type": "db.r6i.8xlarge",
@@ -181,7 +203,8 @@
     "memory_mib": 262144,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 4.64
+    "usd_per_hour": 4.64,
+    "io_opt_usd_per_hour": 6.032
   },
   {
     "instance_type": "db.x2g.8xlarge",
@@ -189,7 +212,8 @@
     "memory_mib": 524288,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 6.032
+    "usd_per_hour": 6.032,
+    "io_opt_usd_per_hour": 7.842
   },
   {
     "instance_type": "db.r5.12xlarge",
@@ -197,7 +221,8 @@
     "memory_mib": 393216,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 6.96
+    "usd_per_hour": 6.96,
+    "io_opt_usd_per_hour": 9.048
   },
   {
     "instance_type": "db.r6g.12xlarge",
@@ -205,7 +230,8 @@
     "memory_mib": 393216,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 6.229
+    "usd_per_hour": 6.229,
+    "io_opt_usd_per_hour": 8.098
   },
   {
     "instance_type": "db.r6i.12xlarge",
@@ -213,7 +239,8 @@
     "memory_mib": 393216,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 6.96
+    "usd_per_hour": 6.96,
+    "io_opt_usd_per_hour": 9.048
   },
   {
     "instance_type": "db.x2g.12xlarge",
@@ -221,7 +248,8 @@
     "memory_mib": 786432,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 9.048
+    "usd_per_hour": 9.048,
+    "io_opt_usd_per_hour": 11.762
   },
   {
     "instance_type": "db.r5.16xlarge",
@@ -229,7 +257,8 @@
     "memory_mib": 524288,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 9.28
+    "usd_per_hour": 9.28,
+    "io_opt_usd_per_hour": 12.064
   },
   {
     "instance_type": "db.r6g.16xlarge",
@@ -237,7 +266,8 @@
     "memory_mib": 524288,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 8.306
+    "usd_per_hour": 8.306,
+    "io_opt_usd_per_hour": 10.798
   },
   {
     "instance_type": "db.r6i.16xlarge",
@@ -245,7 +275,8 @@
     "memory_mib": 524288,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 9.28
+    "usd_per_hour": 9.28,
+    "io_opt_usd_per_hour": 12.064
   },
   {
     "instance_type": "db.x2g.16xlarge",
@@ -253,7 +284,8 @@
     "memory_mib": 1048576,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 12.064
+    "usd_per_hour": 12.064,
+    "io_opt_usd_per_hour": 15.683
   },
   {
     "instance_type": "db.r5.24xlarge",
@@ -261,7 +293,8 @@
     "memory_mib": 786432,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 13.92
+    "usd_per_hour": 13.92,
+    "io_opt_usd_per_hour": 18.096
   },
   {
     "instance_type": "db.r6i.24xlarge",
@@ -269,7 +302,8 @@
     "memory_mib": 786432,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 13.92
+    "usd_per_hour": 13.92,
+    "io_opt_usd_per_hour": 18.096
   },
   {
     "instance_type": "db.r6i.32xlarge",
@@ -277,6 +311,7 @@
     "memory_mib": 1048576,
     "min_nodes": 1,
     "max_nodes": 15,
-    "usd_per_hour": 18.56
+    "usd_per_hour": 18.56,
+    "io_opt_usd_per_hour": 24.128
   }
 ]

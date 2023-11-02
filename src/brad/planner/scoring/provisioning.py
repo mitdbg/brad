@@ -9,12 +9,14 @@ import brad.planner.scoring.data as score_data
 from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.provisioning import Provisioning
 from brad.config.planner import PlannerConfig
+from brad.planner.scoring.context import ScoringContext
 from brad.planner.workload.query import Query
 from brad.provisioning.redshift import RedshiftProvisioningManager
 
 
 ProvisioningResources = namedtuple(
-    "ProvisioningResources", ["instance_type", "usd_per_hour", "vcpus", "mem_mib"]
+    "ProvisioningResources",
+    ["instance_type", "usd_per_hour", "vcpus", "mem_mib", "io_opt_usd_per_hour"],
 )
 
 
@@ -28,6 +30,7 @@ def _load_instance_specs(file_name: str) -> Dict[str, ProvisioningResources]:
             config["usd_per_hour"],
             config["vcpus"],
             config["memory_mib"],
+            config["io_opt_usd_per_hour"] if "io_opt_usd_per_hour" in config else None,
         )
         for config in raw_json
     }
@@ -37,11 +40,15 @@ AuroraSpecs = _load_instance_specs("aurora_postgresql_instances.json")
 RedshiftSpecs = _load_instance_specs("redshift_instances.json")
 
 
-def compute_aurora_hourly_operational_cost(provisioning: Provisioning) -> float:
-    return (
-        AuroraSpecs[provisioning.instance_type()].usd_per_hour
-        * provisioning.num_nodes()
-    )
+def compute_aurora_hourly_operational_cost(
+    provisioning: Provisioning, ctx: ScoringContext
+) -> float:
+    prov = AuroraSpecs[provisioning.instance_type()]
+    if ctx.planner_config.use_io_optimized_aurora():
+        hourly_cost = prov.io_opt_usd_per_hour
+    else:
+        hourly_cost = prov.usd_per_hour
+    return hourly_cost * provisioning.num_nodes()
 
 
 def compute_redshift_hourly_operational_cost(provisioning: Provisioning) -> float:
@@ -56,9 +63,11 @@ def compute_aurora_accessed_pages(
     accessed_pages_per_query: Iterable[int],
 ) -> int:
     total_pages = 0
+    arrival_counts = 0.0
     for query, accessed_pages in zip(queries, accessed_pages_per_query):
-        total_pages += query.arrival_count() * accessed_pages
-    return total_pages
+        total_pages += accessed_pages
+        arrival_counts += query.arrival_count()
+    return max(int(total_pages * arrival_counts), 1)
 
 
 def compute_aurora_scan_cost(
@@ -79,11 +88,11 @@ def compute_athena_scanned_bytes(
     # N.B. There is a minimum charge of 10 MB per query.
     min_bytes_per_query = planner_config.athena_min_mb_per_query() * 1000 * 1000
     total_accessed_bytes = 0
+    arrival_counts = 0.0
     for query, accessed_bytes in zip(queries, accessed_bytes_per_query):
-        total_accessed_bytes += query.arrival_count() * max(
-            accessed_bytes, min_bytes_per_query
-        )
-    return total_accessed_bytes
+        total_accessed_bytes += max(accessed_bytes, min_bytes_per_query)
+        arrival_counts += query.arrival_count()
+    return max(int(total_accessed_bytes * arrival_counts), 1)
 
 
 def compute_athena_scan_cost(

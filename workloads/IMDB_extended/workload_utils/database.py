@@ -5,6 +5,7 @@ import sys
 from typing import Tuple, Optional
 from brad.config.engine import Engine
 from brad.grpc_client import BradGrpcClient, RowList
+from brad.connection.connection import Connection
 
 
 class Database:
@@ -65,9 +66,6 @@ class PyodbcDatabase(Database):
         # Open a new cursor
         self._cursor = self._conn.cursor()
 
-    def execute_sync_with_engine(self, query: str) -> RowList:
-        res = self.execute_sync(query)
-        return (res, self._engine)
 
     def execute_sync_with_engine(self, query: str) -> Tuple[RowList, Optional[Engine]]:
         return self.execute_sync(query), self._engine
@@ -108,3 +106,29 @@ class BradDatabase(Database):
 
     def close_sync(self) -> None:
         self._brad.close()
+
+
+class DirectConnection(Database):
+    def __init__(self, connection: Connection) -> None:
+        self._conn = connection
+        self._cursor = connection.cursor_sync()
+
+    def execute_sync(self, query: str) -> RowList:
+        self._cursor.execute_sync(query)
+        try:
+            return self._cursor.fetchall_sync()
+        except pyodbc.ProgrammingError:
+            # Happens when we call `fetchall()` after running a DML statement.
+            return []
+
+    def execute_sync_with_engine(self, query: str) -> Tuple[RowList, Optional[Engine]]:
+        return self.execute_sync(query), None
+
+    def commit_sync(self) -> None:
+        self._cursor.commit_sync()
+
+    def rollback_sync(self) -> None:
+        self._cursor.rollback_sync()
+
+    def close_sync(self) -> None:
+        self._conn.close_sync()

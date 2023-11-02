@@ -469,7 +469,7 @@ def main():
 
     table_cols, table_indexed_cols = load_schema(args.schema_file)
 
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
     directory = Directory(config)
     asyncio.run(directory.refresh())
     conn = ConnectionFactory.connect_to_sync(

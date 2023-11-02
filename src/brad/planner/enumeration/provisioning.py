@@ -71,9 +71,6 @@ class ProvisioningEnumerator:
             for num_nodes in range(
                 int(specs["min_nodes"]), int(specs["max_nodes"]) + 1
             ):
-                if instance_type.startswith("db.") and num_nodes > 1:
-                    continue
-
                 candidate.set_num_nodes(num_nodes)
 
                 if (

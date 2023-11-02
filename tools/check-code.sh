@@ -51,7 +51,10 @@ fi
 if [ -z $mode ] || [ $mode == $check_types ]; then
   echo_blue "Type Check (mypy)"
   echo_blue "================="
-  MYPYPATH=src mypy -p brad -p tests -p tools -p workloads.IMDB_extended
+  MYPYPATH=src mypy -p brad \
+    -p tests \
+    -p tools \
+    -p workloads.IMDB_extended
   mypy_exit=$?
   echo ""
 fi

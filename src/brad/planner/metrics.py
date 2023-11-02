@@ -17,10 +17,15 @@ Metrics = namedtuple(
     "Metrics",
     [
         "redshift_cpu_avg",
-        "aurora_cpu_avg",
-        "buffer_hit_pct_avg",
-        "aurora_load_minute_avg",
+        "aurora_writer_cpu_avg",
+        "aurora_reader_cpu_avg",
+        "aurora_writer_buffer_hit_pct_avg",
+        "aurora_reader_buffer_hit_pct_avg",
+        "aurora_writer_load_minute_avg",
+        "aurora_reader_load_minute_avg",
         "txn_completions_per_s",
+        "txn_lat_s_p50",
+        "txn_lat_s_p90",
     ],
 )
 
@@ -61,9 +66,10 @@ class MetricsFromMonitor(MetricsProvider):
         blueprint = self._blueprint_mgr.get_blueprint()
         aurora_on = blueprint.aurora_provisioning().num_nodes() > 0
         redshift_on = blueprint.redshift_provisioning().num_nodes() > 0
+        aurora_has_readers = blueprint.aurora_provisioning().num_nodes() > 1
 
         redshift_source = self._monitor.redshift_metrics()
-        aurora_source = self._monitor.aurora_metrics(reader_index=None)
+        aurora_writer_source = self._monitor.aurora_writer_metrics()
         front_end_source = self._monitor.front_end_metrics()
 
         # The `max()` of `real_time_delay()` indicates the number of previous
@@ -73,13 +79,15 @@ class MetricsFromMonitor(MetricsProvider):
         max_available_after_epochs = (
             max(
                 redshift_source.real_time_delay(),
-                aurora_source.real_time_delay(),
+                aurora_writer_source.real_time_delay(),
                 front_end_source.real_time_delay(),
             )
             + 1
         )
 
         # TODO: Need to support forecasted metrics.
+        # TODO: We should extract all metric values over the planning window and
+        # provide them to the downstream consumer (e.g., the planner).
         redshift = (
             redshift_source.read_k_most_recent(
                 k=max_available_after_epochs, metric_ids=_REDSHIFT_METRICS
@@ -87,21 +95,35 @@ class MetricsFromMonitor(MetricsProvider):
             if redshift_on
             else pd.DataFrame([], columns=_REDSHIFT_METRICS)
         )
-        aurora = (
-            aurora_source.read_k_most_recent(
+        aurora_writer = (
+            aurora_writer_source.read_k_most_recent(
                 k=max_available_after_epochs + 1, metric_ids=_AURORA_METRICS
             )
             if aurora_on
             else pd.DataFrame([], columns=_AURORA_METRICS)
         )
+        if aurora_has_readers:
+            reader_metrics = []
+            for aurora_reader_source in self._monitor.aurora_reader_metrics():
+                reader_metrics.append(
+                    aurora_reader_source.read_k_most_recent(
+                        k=max_available_after_epochs + 1, metric_ids=_AURORA_METRICS
+                    )
+                )
+            combined = pd.concat(reader_metrics)
+            # We take the mean across all read replicas (assume load is equally
+            # split across replicas).
+            aurora_reader = combined.groupby(combined.index).mean()
+        else:
+            aurora_reader = pd.DataFrame([], columns=_AURORA_METRICS)
         front_end = front_end_source.read_k_most_recent(
             k=max_available_after_epochs, metric_ids=_FRONT_END_METRICS
         )
 
-        if redshift.empty and aurora.empty and front_end.empty:
+        if redshift.empty and aurora_writer.empty and front_end.empty:
             logger.warning("All metrics are empty.")
             now = datetime.now().astimezone(pytz.utc)
-            return (Metrics(1.0, 1.0, 100.0, 1.0, 1.0), now)
+            return (Metrics(1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0), now)
 
         assert not front_end.empty, "Front end metrics are empty."
 
@@ -111,12 +133,16 @@ class MetricsFromMonitor(MetricsProvider):
         # planning process.
         if redshift.empty:
             redshift = self._fill_empty_metrics(redshift, front_end)
-        if aurora.empty:
-            aurora = self._fill_empty_metrics(aurora, front_end)
+        if aurora_writer.empty:
+            aurora_writer = self._fill_empty_metrics(aurora_writer, front_end)
+        if aurora_reader.empty:
+            aurora_reader = self._fill_empty_metrics(aurora_reader, front_end)
 
         # Align timestamps across the metrics.
-        common_timestamps = front_end.index.intersection(aurora.index).intersection(
-            redshift.index
+        common_timestamps = (
+            front_end.index.intersection(aurora_writer.index)
+            .intersection(redshift.index)
+            .intersection(aurora_reader.index)
         )
         if len(common_timestamps) == 0:
             most_recent_common = front_end.index.max()
@@ -140,43 +166,67 @@ class MetricsFromMonitor(MetricsProvider):
             default_value=0.0,
             name="txn_per_s",
         )
-
-        aurora_rel = aurora.loc[aurora.index <= most_recent_common]
-        aurora_cpu = self._extract_most_recent_possibly_missing(
-            aurora_rel[_AURORA_METRICS[0]], default_value=0.0, name="aurora_cpu"
+        txn_lat_s_p50 = self._extract_most_recent_possibly_missing(
+            front_end.loc[
+                front_end.index <= most_recent_common,
+                FrontEndMetric.TxnLatencySecondP50.value,
+            ],
+            default_value=0.0,
+            name="txn_lat_s_p50",
+        )
+        txn_lat_s_p90 = self._extract_most_recent_possibly_missing(
+            front_end.loc[
+                front_end.index <= most_recent_common,
+                FrontEndMetric.TxnLatencySecondP90.value,
+            ],
+            default_value=0.0,
+            name="txn_lat_s_p90",
         )
 
-        if len(aurora_rel) < 2:
-            logger.warning("Not enough Aurora metric entries to compute current load.")
-            load_minute = self._extract_most_recent_possibly_missing(
-                aurora_rel[_AURORA_METRICS[1]], default_value=0.0, name="load_minute"
-            )
-        else:
-            # Load averages are exponentially averaged. We do the following to
-            # recover the load value for the last minute.
-            exp_1 = math.exp(-1)
-            exp_1_rest = 1 - exp_1
-            load_last = aurora_rel[_AURORA_METRICS[1]].iloc[-1]
-            load_2nd_last = aurora_rel[_AURORA_METRICS[1]].iloc[-2]
-            load_minute = (load_last - exp_1 * load_2nd_last) / exp_1_rest
-            logger.debug(
-                "Aurora load renormalization: %.4f, %.4f, %.4f",
-                load_2nd_last,
-                load_last,
-                load_minute,
-            )
+        aurora_writer_rel = aurora_writer.loc[aurora_writer.index <= most_recent_common]
+        aurora_reader_rel = aurora_reader.loc[aurora_reader.index <= most_recent_common]
 
-        hit_rate_pct = self._extract_most_recent_possibly_missing(
-            aurora_rel[_AURORA_METRICS[2]], default_value=0.0, name="hit_rate_pct"
+        aurora_writer_cpu = self._extract_most_recent_possibly_missing(
+            aurora_writer_rel[_AURORA_METRICS[0]],
+            default_value=0.0,
+            name="aurora_writer_cpu",
+        )
+        aurora_reader_cpu = self._extract_most_recent_possibly_missing(
+            aurora_reader_rel[_AURORA_METRICS[0]],
+            default_value=0.0,
+            name="aurora_reader_cpu",
+        )
+
+        aurora_writer_load_minute = self._recover_load_value(
+            aurora_writer_rel, "aurora_writer_load_minute"
+        )
+        aurora_reader_load_minute = self._recover_load_value(
+            aurora_reader_rel, "aurora_reader_load_minute"
+        )
+
+        aurora_writer_hit_rate_pct = self._extract_most_recent_possibly_missing(
+            aurora_writer_rel[_AURORA_METRICS[2]],
+            default_value=0.0,
+            name="aurora_writer_hit_rate_pct",
+        )
+        aurora_reader_hit_rate_pct = self._extract_most_recent_possibly_missing(
+            aurora_reader_rel[_AURORA_METRICS[2]],
+            default_value=0.0,
+            name="aurora_reader_hit_rate_pct",
         )
 
         return (
             Metrics(
-                redshift_cpu,
-                aurora_cpu,
-                buffer_hit_pct_avg=hit_rate_pct,
-                aurora_load_minute_avg=load_minute,
+                redshift_cpu_avg=redshift_cpu,
+                aurora_writer_cpu_avg=aurora_writer_cpu,
+                aurora_reader_cpu_avg=aurora_reader_cpu,
+                aurora_writer_buffer_hit_pct_avg=aurora_writer_hit_rate_pct,
+                aurora_reader_buffer_hit_pct_avg=aurora_reader_hit_rate_pct,
+                aurora_writer_load_minute_avg=aurora_writer_load_minute,
+                aurora_reader_load_minute_avg=aurora_reader_load_minute,
                 txn_completions_per_s=txn_per_s,
+                txn_lat_s_p50=txn_lat_s_p50,
+                txn_lat_s_p90=txn_lat_s_p90,
             ),
             most_recent_common.to_pydatetime(),
         )
@@ -203,6 +253,31 @@ class MetricsFromMonitor(MetricsProvider):
         else:
             return series.iloc[-1]
 
+    def _recover_load_value(self, aurora_rel: pd.DataFrame, metric_name: str) -> float:
+        if len(aurora_rel) < 2:
+            logger.warning("Not enough Aurora metric entries to compute current load.")
+            load_minute = self._extract_most_recent_possibly_missing(
+                aurora_rel[_AURORA_METRICS[1]],
+                default_value=0.0,
+                name=metric_name,
+            )
+        else:
+            # Load averages are exponentially averaged. We do the following to
+            # recover the load value for the last minute.
+            exp_1 = math.exp(-1)
+            exp_1_rest = 1 - exp_1
+            load_last = aurora_rel[_AURORA_METRICS[1]].iloc[-1]
+            load_2nd_last = aurora_rel[_AURORA_METRICS[1]].iloc[-2]
+            load_minute = (load_last - exp_1 * load_2nd_last) / exp_1_rest
+            load_minute = max(0.0, load_minute)  # To avoid negative loads.
+            logger.debug(
+                "Aurora load renormalization: %.4f, %.4f, %.4f",
+                load_2nd_last,
+                load_last,
+                load_minute,
+            )
+        return load_minute
+
 
 _AURORA_METRICS = [
     "os.cpuUtilization.total.avg",
@@ -216,4 +291,6 @@ _REDSHIFT_METRICS = [
 
 _FRONT_END_METRICS = [
     FrontEndMetric.TxnEndPerSecond.value,
+    FrontEndMetric.TxnLatencySecondP50.value,
+    FrontEndMetric.TxnLatencySecondP90.value,
 ]

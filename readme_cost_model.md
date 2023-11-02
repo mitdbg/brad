@@ -106,9 +106,9 @@ python run_cost_model.py \
 ```
 
 
-Argment dataset if needed (highly recommended for aurora):
+Augment dataset if needed (highly recommended for aurora):
 ```angular2html
-python run_cost_model.py --argment_dataset --workload_runs ../data/imdb/parsed_queries/aurora_IMDB_10k_10_6_parsed_queries.json --target ../data/imdb/parsed_queries/
+python run_cost_model.py --augment_dataset --workload_runs ../data/imdb/parsed_queries/aurora_IMDB_10k_10_6_parsed_queries.json --target ../data/imdb/parsed_queries/
 ```
 
 

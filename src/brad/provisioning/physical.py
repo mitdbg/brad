@@ -58,7 +58,7 @@ class PhysicalProvisioning:
     # Can override certain metrics by providing Dict[metric_id -> value]
     def should_trigger_replan(self, overrides=None) -> bool:
         redshift = self._monitor.redshift_metrics().read_k_most_recent(1)
-        aurora = self._monitor.aurora_metrics(reader_index=None).read_k_most_recent(1)
+        aurora = self._monitor.aurora_writer_metrics().read_k_most_recent(1)
         print("TRIGGER REPLAN")
         print("REDSHIFT")
         print(redshift)
@@ -89,11 +89,11 @@ class PhysicalProvisioning:
     # Update physical provisioning.
     def update_blueprint(self, new_blueprint: Blueprint):
         aurora_instance_type = new_blueprint.aurora_provisioning().instance_type()
-        aurora_paused = new_blueprint.aurora_provisioning().is_paused()
         aurora_instance_count = new_blueprint.aurora_provisioning().num_nodes()
+        aurora_paused = aurora_instance_count == 0
         redshift_instance_type = new_blueprint.redshift_provisioning().instance_type()
         redshift_instance_count = new_blueprint.redshift_provisioning().num_nodes()
-        redshift_paused = new_blueprint.redshift_provisioning().is_paused()
+        redshift_paused = redshift_instance_count == 0
         print("Rescaling Aurora...")
         self._rds_provisioning.rescale(
             immediate=True,

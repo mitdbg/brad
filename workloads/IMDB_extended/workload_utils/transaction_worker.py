@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 from typing import List, Tuple, Any
 
 from brad.grpc_client import RowList, BradClientError
-from .database import Database
-from .dataset_config import (
+from workload_utils.database import Database
+from workload_utils.dataset_config import (
     MIN_MOVIE_ID,
     THEATRES_PER_SF,
     MIN_THEATRE_ID,
@@ -192,7 +192,7 @@ class TransactionWorker:
             )
             if len(showing_options) == 0:
                 # No options. We still consider this as a "success" and return true.
-                db.execute_sync("COMMIT")
+                db.commit_sync()
                 return True
 
             # 3. Choose a showing.

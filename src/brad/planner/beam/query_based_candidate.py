@@ -27,6 +27,7 @@ from brad.planner.scoring.provisioning import (
 from brad.planner.scoring.score import Score
 from brad.planner.scoring.table_placement import (
     compute_single_athena_table_cost,
+    compute_single_aurora_table_cost,
     compute_single_table_movement_time_and_cost,
 )
 from brad.planner.workload.query import Query
@@ -171,16 +172,10 @@ class BlueprintCandidate(ComparableBlueprint):
         values["provisioning_trans_time_s"] = self.provisioning_trans_time_s
 
         if self.aurora_score is not None:
-            values["aurora_load"] = self.aurora_score.overall_system_load
-            values["aurora_cpu_denorm"] = self.aurora_score.overall_cpu_denorm
-            values[
-                "pred_txn_peak_cpu_denorm"
-            ] = self.aurora_score.pred_txn_peak_cpu_denorm
-            values.update(self.aurora_score.debug_values)
+            self.aurora_score.add_debug_values(values)
 
         if self.redshift_score is not None:
-            values["redshift_cpu_denorm"] = self.redshift_score.overall_cpu_denorm
-            values.update(self.redshift_score.debug_values)
+            self.redshift_score.add_debug_values(values)
 
         return values
 
@@ -226,11 +221,22 @@ class BlueprintCandidate(ComparableBlueprint):
 
         self.workload_scan_cost = compute_athena_scan_cost(
             self.athena_scanned_bytes, ctx.planner_config
-        ) + compute_aurora_scan_cost(
-            self.aurora_accessed_pages,
-            buffer_pool_hit_rate=ctx.metrics.buffer_hit_pct_avg / 100,
-            planner_config=ctx.planner_config,
         )
+
+        if not ctx.planner_config.use_io_optimized_aurora():
+            has_read_replicas = (
+                ctx.current_blueprint.aurora_provisioning().num_nodes() > 1
+            )
+            if has_read_replicas:
+                hit_rate = ctx.metrics.aurora_reader_buffer_hit_pct_avg / 100.0
+            else:
+                hit_rate = ctx.metrics.aurora_writer_buffer_hit_pct_avg / 100.0
+
+            self.workload_scan_cost += compute_aurora_scan_cost(
+                self.aurora_accessed_pages,
+                buffer_pool_hit_rate=hit_rate,
+                planner_config=ctx.planner_config,
+            )
 
         # Table movement costs that this query imposes.
         for name, next_placement in table_diffs:
@@ -245,11 +251,17 @@ class BlueprintCandidate(ComparableBlueprint):
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
 
-            # If we added a table to Athena, we need to take into account its
-            # storage costs.
+            # If we added a table to Athena or Aurora, we need to take into
+            # account its storage costs.
             if (((~curr) & next_placement) & (EngineBitmapValues[Engine.Athena])) != 0:
                 # We added the table to Athena.
                 self.storage_cost += compute_single_athena_table_cost(name, ctx)
+
+            if (((~curr) & next_placement) & (EngineBitmapValues[Engine.Aurora])) != 0:
+                # Added table to Aurora.
+                # You only pay for 1 copy of the table on Aurora, regardless of
+                # how many read replicas you have.
+                self.storage_cost += compute_single_aurora_table_cost(name, ctx)
 
         # Adding a new query can affect the feasibility of the provisioning.
         self.feasibility = BlueprintFeasibility.Unchecked
@@ -318,11 +330,22 @@ class BlueprintCandidate(ComparableBlueprint):
 
         self.workload_scan_cost = compute_athena_scan_cost(
             self.athena_scanned_bytes, ctx.planner_config
-        ) + compute_aurora_scan_cost(
-            self.aurora_accessed_pages,
-            buffer_pool_hit_rate=ctx.metrics.buffer_hit_pct_avg / 100,
-            planner_config=ctx.planner_config,
         )
+
+        if not ctx.planner_config.use_io_optimized_aurora():
+            has_read_replicas = (
+                ctx.current_blueprint.aurora_provisioning().num_nodes() > 1
+            )
+            if has_read_replicas:
+                hit_rate = ctx.metrics.aurora_reader_buffer_hit_pct_avg / 100.0
+            else:
+                hit_rate = ctx.metrics.aurora_writer_buffer_hit_pct_avg / 100.0
+
+            self.workload_scan_cost += compute_aurora_scan_cost(
+                self.aurora_accessed_pages,
+                buffer_pool_hit_rate=hit_rate,
+                planner_config=ctx.planner_config,
+            )
 
     def add_transactional_tables(self, ctx: ScoringContext) -> None:
         referenced_tables = set()
@@ -372,7 +395,7 @@ class BlueprintCandidate(ComparableBlueprint):
     def recompute_provisioning_dependent_scoring(self, ctx: ScoringContext) -> None:
         self._memoized.clear()
         aurora_prov_cost = compute_aurora_hourly_operational_cost(
-            self.aurora_provisioning
+            self.aurora_provisioning, ctx
         )
         redshift_prov_cost = compute_redshift_hourly_operational_cost(
             self.redshift_provisioning
@@ -399,12 +422,18 @@ class BlueprintCandidate(ComparableBlueprint):
 
         self.aurora_score = AuroraProvisioningScore.compute(
             np.array(self.base_query_latencies[Engine.Aurora]),
+            ctx.next_workload.get_arrival_counts_batch(
+                self.query_locations[Engine.Aurora]
+            ),
             ctx.current_blueprint.aurora_provisioning(),
             self.aurora_provisioning,
             ctx,
         )
         self.redshift_score = RedshiftProvisioningScore.compute(
             np.array(self.base_query_latencies[Engine.Redshift]),
+            ctx.next_workload.get_arrival_counts_batch(
+                self.query_locations[Engine.Redshift]
+            ),
             ctx.current_blueprint.redshift_provisioning(),
             self.redshift_provisioning,
             ctx,
@@ -534,23 +563,8 @@ class BlueprintCandidate(ComparableBlueprint):
             # Already ran.
             return
 
-        if self.aurora_score is not None:
-            # TODO: Check whether there are transactions or not.
-            if (
-                self.aurora_score.overall_cpu_denorm
-                >= self.aurora_score.pred_txn_peak_cpu_denorm
-            ):
-                # logger.debug(
-                #     "Txn not feasible. %s, pred denorm %.2f, peak denorm %.2f",
-                #     self.aurora_provisioning,
-                #     self.aurora_score.overall_cpu_denorm,
-                #     self.aurora_score.pred_txn_peak_cpu_denorm,
-                # )
-                self.feasibility = BlueprintFeasibility.Infeasible
-            return
-
-        # Might need to validate Redshift load values here.
-
+        # We used to check for transactional load here. Now it's scored as part
+        # of performance.
         self.feasibility = BlueprintFeasibility.Feasible
 
     def update_aurora_provisioning(self, prov: Provisioning) -> None:
@@ -624,6 +638,10 @@ class BlueprintCandidate(ComparableBlueprint):
         relevant.append(np.array(self.base_query_latencies[Engine.Athena]))
         return np.concatenate(relevant)
 
+    def get_predicted_transactional_latencies(self) -> npt.NDArray:
+        assert self.aurora_score is not None
+        return self.aurora_score.scaled_txn_lats
+
     def get_operational_monetary_cost(self) -> float:
         return self.storage_cost + self.provisioning_cost + self.workload_scan_cost
 
@@ -641,3 +659,14 @@ class BlueprintCandidate(ComparableBlueprint):
             return self._memoized[key]
         except KeyError:
             return None
+
+    def __getstate__(self) -> Dict[Any, Any]:
+        # This is used for debug logging purposes.
+        copied = self.__dict__.copy()
+        # This is not serializable, nor do we need it to be (for debug purposes).
+        copied["_comparator"] = None
+        return copied
+
+    def __setstate__(self, d: Dict[Any, Any]) -> None:
+        self.__dict__ = d
+        logger.info("Note: Deserializing table-based blueprint candidate.")

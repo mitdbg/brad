@@ -85,6 +85,7 @@ def make_postgres_compatible_conn(engine="redshift"):
     return conn
 
 
+# TODO: Implement loading from S3. This currenlty loads from local disk.
 class TiDBLoader:
     def __init__(self):
         self.conn: mysql.connector.MySQLConnection = make_tidb_conn()

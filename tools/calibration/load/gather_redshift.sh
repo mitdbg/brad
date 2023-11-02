@@ -1,24 +1,20 @@
 #! /bin/bash
 
-# Need to run this collection across 4 instances in parallel to complete in a
-# reasonable amount of time.
 if [ -z $4 ]; then
-  >&2 echo "Usage: $0 <instance> <config_path> <group_num> <cluster_identifier>"
+  >&2 echo "Usage: $0 <instance> <config_path> <schema name> <cluster id>"
   >&2 echo "The config path should be relative to the redshift/ subdirectory."
   exit 1
 fi
 
-export BRAD_SCHEMA="imdb"
-export BRAD_CONFIG=$2
-
 instance=$1
-group=$3
+export BRAD_CONFIG=$2
+export BRAD_SCHEMA=$3
 cluster_identifier=$4
 
 function run_warm_up() {
   >&2 echo "Running warm up..."
   pushd redshift
-  python3 -m brad.calibration.measure_load --run-warmup --engine redshift --query-file ../query_bank.sql
+  python3 -m brad.calibration.measure_load --run-warmup --engine redshift --query-file ../../../../workloads/IMDB_100GB/scaling_20/queries.sql
   popd
 }
 
@@ -51,17 +47,17 @@ function sync_redshift_resize() {
   done
 }
 
->&2 echo "$instance 1x ($group of 2)"
-sync_redshift_resize $instance 1
-run_warm_up
-cond run "//redshift:${instance}-1-${group}-of-2"
-
->&2 echo "$instance 2x ($group of 2)"
+>&2 echo "$instance 2x"
 sync_redshift_resize $instance 2
 run_warm_up
-cond run "//redshift:${instance}-2-${group}-of-2"
+cond run "//redshift:${instance}-2-${BRAD_SCHEMA}"
 
->&2 echo "$instance 4x ($group of 2)"
+>&2 echo "$instance 4x"
 sync_redshift_resize $instance 4
 run_warm_up
-cond run "//redshift:${instance}-4-${group}-of-2"
+cond run "//redshift:${instance}-4-${BRAD_SCHEMA}"
+
+>&2 echo "$instance 8x"
+sync_redshift_resize $instance 8
+run_warm_up
+cond run "//redshift:${instance}-8-${BRAD_SCHEMA}"

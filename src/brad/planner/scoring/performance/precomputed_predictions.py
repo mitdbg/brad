@@ -18,6 +18,45 @@ class PrecomputedPredictions(AnalyticsLatencyScorer):
     """
 
     @classmethod
+    def load_from_standard_dataset(
+        cls, dataset_path: str | pathlib.Path
+    ) -> "PrecomputedPredictions":
+        if isinstance(dataset_path, pathlib.Path):
+            dsp = dataset_path
+        else:
+            dsp = pathlib.Path(dataset_path)
+
+        with open(dsp / "queries.sql", "r", encoding="UTF-8") as query_file:
+            raw_queries = [line.strip() for line in query_file]
+
+        queries_map = {}
+        for idx, query in enumerate(raw_queries):
+            if query.endswith(";"):
+                queries_map[query[:-1]] = idx
+            else:
+                queries_map[query] = idx
+
+        rt_preds = np.load(dsp / "pred-run_time_s-athena-aurora-redshift.npy")
+
+        # Sanity check.
+        assert rt_preds.shape[0] == len(raw_queries)
+
+        preds = [np.array([]), np.array([]), np.array([])]
+        preds[Workload.EngineLatencyIndex[Engine.Aurora]] = rt_preds[:, 1]
+        preds[Workload.EngineLatencyIndex[Engine.Redshift]] = rt_preds[:, 2]
+        preds[Workload.EngineLatencyIndex[Engine.Athena]] = rt_preds[:, 0]
+
+        predictions = np.stack(preds, axis=-1)
+
+        # Replace any `inf` / `nan` values in the predictions with this value.
+        # This prevents a degenerate case in performance estimation.
+        timeout_value_s = 210.0
+        predictions[np.isinf(predictions)] = timeout_value_s
+        predictions[np.isnan(predictions)] = timeout_value_s
+
+        return cls(queries_map, predictions)
+
+    @classmethod
     def load(
         cls,
         workload_file_path: str | pathlib.Path,
@@ -78,4 +117,6 @@ class PrecomputedPredictions(AnalyticsLatencyScorer):
 
         if has_unmatched:
             raise RuntimeError("Workload contains unmatched queries.")
-        workload.set_predicted_analytical_latencies(self._predictions[query_indices, :])
+        workload.set_predicted_analytical_latencies(
+            self._predictions[query_indices, :], query_indices
+        )

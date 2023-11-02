@@ -1,7 +1,7 @@
 import random
 import logging
 
-from .database import Database
+from workload_utils.database import Database
 
 logger = logging.getLogger(__name__)
 

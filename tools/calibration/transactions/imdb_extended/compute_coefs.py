@@ -85,7 +85,7 @@ def load_data(prefix):
         if not exp.is_dir() or exp.name.startswith("."):
             continue
         parts = exp.name.split("-")
-        num_clients = int(parts[1])
+        num_clients = int(parts[2])
 
         metrics_df = extract_metrics(exp / "pi_metrics.csv")
         metrics = process_metrics(metrics_df)
@@ -148,7 +148,7 @@ def combine_data(
     all_stats = []
     data_path = pathlib.Path(data_path_str)
     for inst in instances:
-        metrics, lats, stats = load_data(data_path / inst)
+        metrics, lats, stats = load_data(data_path / (inst + "-imdb_extended_20g"))
         comb = pd.merge(lats, metrics, on=["num_clients"])
         comb.insert(0, "instance", inst)
         comb.insert(1, "num_cpus", cpu_count[inst])

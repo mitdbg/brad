@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from .operator import Operator
 from brad.data_sync.execution.context import ExecutionContext
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 _AURORA_UNLOAD_TEMPLATE = """
     SELECT * FROM aws_s3.query_export_to_s3(
-        'SELECT * FROM {table_name}',
+        '{query}',
         aws_commons.create_s3_uri(
             '{s3_bucket}',
             '{s3_path}',
@@ -34,7 +35,13 @@ class UnloadToS3(Operator):
     Dumps data from a table onto S3.
     """
 
-    def __init__(self, table_name: str, relative_s3_path: str, engine: Engine) -> None:
+    def __init__(
+        self,
+        table_name: str,
+        relative_s3_path: str,
+        engine: Engine,
+        limit: Optional[int] = None,
+    ) -> None:
         """
         NOTE: All S3 paths are relative to the extract path, specified in the
         configuration.
@@ -43,6 +50,7 @@ class UnloadToS3(Operator):
         self._table_name = table_name
         self._engine = engine
         self._relative_s3_path = relative_s3_path
+        self._limit = limit
 
     def __repr__(self) -> str:
         return "".join(
@@ -67,8 +75,12 @@ class UnloadToS3(Operator):
             raise RuntimeError("Unsupported engine {}".format(self._engine))
 
     async def _execute_aurora(self, ctx: ExecutionContext) -> "Operator":
+        inner_query = f"SELECT * FROM {self._table_name}"
+        if self._limit is not None:
+            inner_query += f" LIMIT {self._limit}"
+
         query = _AURORA_UNLOAD_TEMPLATE.format(
-            table_name=self._table_name,
+            query=inner_query,
             s3_bucket=ctx.s3_bucket(),
             s3_region=ctx.s3_region(),
             s3_path="{}{}".format(ctx.s3_path(), self._relative_s3_path),

@@ -1,19 +1,13 @@
 class Provisioning:
-    def __init__(
-        self, instance_type: str, num_nodes: int, is_paused: bool = False
-    ) -> None:
+    def __init__(self, instance_type: str, num_nodes: int) -> None:
         self._instance_type = instance_type
         self._num_nodes = num_nodes
-        self._is_paused = is_paused
 
     def instance_type(self) -> str:
         return self._instance_type
 
     def num_nodes(self) -> int:
         return self._num_nodes
-
-    def is_paused(self) -> bool:
-        return self._is_paused
 
     def clone(self) -> "Provisioning":
         return Provisioning(self._instance_type, self._num_nodes)
@@ -27,8 +21,6 @@ class Provisioning:
                 self._instance_type,
                 "(",
                 str(self._num_nodes),
-                ", ",
-                str(self._is_paused),
                 ")",
             ]
         )

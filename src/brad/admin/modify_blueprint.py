@@ -186,7 +186,7 @@ async def run_transition(
 # This method is called by `brad.exec.admin.main`.
 def modify_blueprint(args):
     # 1. Load the config.
-    config = ConfigFile(args.config_file)
+    config = ConfigFile.load(args.config_file)
 
     # 2. Load the existing blueprint.
     assets = AssetManager(config)
@@ -255,6 +255,10 @@ def modify_blueprint(args):
 
     # 3. Write the changes back.
     modified_blueprint = enum_blueprint.to_blueprint()
+    if blueprint == modified_blueprint:
+        logger.info("No changes made to the blueprint.")
+        return
+
     if args.force:
         # TODO: If we have an external way to compute the score, we should do it here.
         blueprint_mgr.force_new_blueprint_sync(modified_blueprint, score=None)

@@ -41,6 +41,7 @@ INSTALL_REQUIRES = [
     "mysql-connector-python",
     "tabulate",
     "PyAthena",
+    "ddsketch",
 ]
 
 DEV_REQUIRES = [

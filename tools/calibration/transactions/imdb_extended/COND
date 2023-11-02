@@ -1,12 +1,19 @@
 RUN_FOR_S = 2 * 60 + 30  # 2 minutes 30 seconds
 NUM_CLIENTS = {
+  "t4g_medium": [1, 2, 4, 8, 16, 32],
   "r6g_large": [1, 2, 4, 8, 16, 32],
   "r6g_xlarge": [1, 2, 4, 8, 16, 32, 64],
   "r6g_2xlarge": [1, 2, 4, 8, 16, 32, 64, 128],
   "r6g_4xlarge": [1, 2, 4, 8, 16, 32, 64, 128, 256],
 }
 
-INSTANCES = ["r6g_large", "r6g_xlarge", "r6g_2xlarge", "r6g_4xlarge"]
+INSTANCES = ["t4g_medium", "r6g_large", "r6g_xlarge", "r6g_2xlarge", "r6g_4xlarge"]
+
+SCHEMA_SCALE_FACTORS = {
+  "imdb_extended": 1,
+  "imdb_extended_20g": 6,
+  "imdb_extended_100g": 33,
+}
 
 combine(
   name="all",
@@ -29,5 +36,33 @@ for instance in INSTANCES:
         },
       )
       for clients in NUM_CLIENTS[instance]
+    ],
+  )
+
+  for name, sf in SCHEMA_SCALE_FACTORS.items():
+    run_experiment_group(
+      name=f"{instance}-{name}",
+      run="./run_instance.sh",
+      experiments=[
+        ExperimentInstance(
+          name=f"{instance}-{name}-{clients}",
+          options={
+            "run-for-s": RUN_FOR_S,
+            "num-clients": clients,
+            "scale-factor": sf,
+            "schema-name": name,
+          },
+        )
+        for clients in NUM_CLIENTS[instance]
+      ],
+    )
+
+
+for name in SCHEMA_SCALE_FACTORS.keys():
+  combine(
+    name=name,
+    deps=[
+      f":{instance}-{name}"
+      for instance in INSTANCES
     ],
   )

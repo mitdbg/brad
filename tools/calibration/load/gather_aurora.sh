@@ -1,22 +1,21 @@
 #! /bin/bash
 
-if [ -z $2 ]; then
-  >&2 echo "Usage: $0 <config_path> <aurora instance id>"
+if [ -z $3 ]; then
+  >&2 echo "Usage: $0 <config_path> <aurora instance id> <schema name>"
   >&2 echo "The config path should be relative to the aurora/ subdirectory."
   exit 1
 fi
 
-# N.B. Both "imdb" and "imdb_extended" should be fine.
-export BRAD_SCHEMA="imdb"
 export BRAD_CONFIG=$1
 export BRAD_AURORA_INSTANCE_ID=$2
+export BRAD_SCHEMA=$3
 
 db_instance=$2
 
 function run_warm_up() {
   >&2 echo "Running warm up..."
   pushd aurora
-  python3 -m brad.calibration.measure_load --run-warmup --engine aurora --query-file ../query_bank.sql
+  python3 -m brad.calibration.measure_load --run-warmup --engine aurora --query-file ../../../../workloads/IMDB_100GB/scaling_20/queries.sql
   popd
 }
 
@@ -41,18 +40,18 @@ function modify_instance_sync() {
 modify_instance_sync $db_instance "db.r6g.2xlarge"
 >&2 echo "Warming up..."
 run_warm_up
-cond run //aurora/:r6g_2xlarge
+cond run //aurora/:r6g_2xlarge-$BRAD_SCHEMA
 
 # db.r6g.xlarge
 >&2 echo "r6g.xlarge"
 modify_instance_sync $db_instance "db.r6g.xlarge"
 >&2 echo "Warming up..."
 run_warm_up
-cond run //aurora/:r6g_xlarge
+cond run //aurora/:r6g_xlarge-$BRAD_SCHEMA
 
 # db.r6g.large
 >&2 echo "r6g.large"
 modify_instance_sync $db_instance "db.r6g.large"
 >&2 echo "Warming up..."
 run_warm_up
-cond run //aurora/:r6g_large
+cond run //aurora/:r6g_large-$BRAD_SCHEMA

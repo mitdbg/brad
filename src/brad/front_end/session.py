@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import pytz
+from datetime import datetime
 from typing import Dict, Tuple, Optional
 
 from brad.config.engine import Engine
@@ -23,6 +25,7 @@ class Session:
         self._engines = engines
         self._in_txn = False
         self._closed = False
+        self._txn_start_timestamp = datetime.now(tz=pytz.utc)
 
     @property
     def identifier(self) -> SessionId:
@@ -42,6 +45,12 @@ class Session:
 
     def set_in_transaction(self, in_txn: bool) -> None:
         self._in_txn = in_txn
+
+    def set_txn_start_timestamp(self, timestamp: datetime) -> None:
+        self._txn_start_timestamp = timestamp
+
+    def txn_start_timestamp(self) -> datetime:
+        return self._txn_start_timestamp
 
     async def close(self):
         self._closed = True
@@ -81,6 +90,7 @@ class SessionManager:
             self._blueprint_mgr.get_directory(),
             self._schema_name,
             specific_engines=engines,
+            connect_to_aurora_read_replicas=True,
         )
         session = Session(session_id, connections)
         self._sessions[session_id] = session

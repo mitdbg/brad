@@ -1,5 +1,9 @@
 import logging
 from datetime import timedelta, datetime
+from typing import Optional
+
+from brad.blueprint import Blueprint
+from brad.planner.scoring.score import Score
 
 from .trigger import Trigger
 
@@ -7,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 class ElapsedTimeTrigger(Trigger):
-    def __init__(self, period: timedelta) -> None:
-        super().__init__()
+    def __init__(self, period: timedelta, epoch_length: timedelta) -> None:
+        super().__init__(epoch_length)
         self._period = period
         self._reset_trigger_next()
 
@@ -22,5 +26,9 @@ class ElapsedTimeTrigger(Trigger):
             return True
         return False
 
+    def update_blueprint(self, blueprint: Blueprint, score: Optional[Score]) -> None:
+        super().update_blueprint(blueprint, score)
+        self._reset_trigger_next()
+
     def _reset_trigger_next(self) -> None:
-        self._trigger_next = datetime.now() + self._period
+        self._trigger_next = self._cutoff + self._period

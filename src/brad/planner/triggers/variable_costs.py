@@ -1,8 +1,9 @@
 import logging
 import math
 import pytz
+import pandas as pd
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Tuple
 
 from .trigger import Trigger
 from brad.config.engine import Engine
@@ -32,6 +33,7 @@ class VariableCosts(Trigger):
         data_access_provider: DataAccessProvider,
         router_provider: RouterProvider,
         threshold_frac: float,
+        epoch_length: timedelta,
     ) -> None:
         """
         This will trigger a replan if the current variable costs (currently,
@@ -41,7 +43,7 @@ class VariableCosts(Trigger):
         For example, if `threshold_frac` is 0.2, then replanning is triggered if
         the estimated cost is +/- 20% of the previously estimated cost.
         """
-        super().__init__()
+        super().__init__(epoch_length)
         self._config = config
         self._planner_config = planner_config
         self._monitor = monitor
@@ -58,7 +60,13 @@ class VariableCosts(Trigger):
             )
             return False
 
-        current_hourly_cost = await self._estimate_current_scan_hourly_cost()
+        aurora_cost, athena_cost = await self._estimate_current_scan_hourly_cost()
+
+        if self._planner_config.use_io_optimized_aurora():
+            current_hourly_cost = athena_cost
+        else:
+            current_hourly_cost = athena_cost + aurora_cost
+
         if current_hourly_cost <= 1e-5:
             # Treated as 0.
             logger.debug(
@@ -83,9 +91,9 @@ class VariableCosts(Trigger):
 
         return False
 
-    async def _estimate_current_scan_hourly_cost(self) -> float:
+    async def _estimate_current_scan_hourly_cost(self) -> Tuple[float, float]:
         if self._current_blueprint is None:
-            return 0.0
+            return 0.0, 0.0
 
         # Extract the queries seen in the last window.
         window_end = datetime.now()
@@ -99,10 +107,13 @@ class VariableCosts(Trigger):
         workload = (
             WorkloadBuilder()
             .add_queries_from_s3_logs(self._config, window_start, window_end)
-            .build(rescale_to_period=timedelta(hours=1))
+            .build(
+                rescale_to_period=timedelta(hours=1),
+                reinterpret_second_as=self._planner_config.reinterpret_second_as(),
+            )
         )
         if len(workload.analytical_queries()) == 0:
-            return 0.0
+            return 0.0, 0.0
         self._data_access_provider.apply_access_statistics(workload)
 
         # Compute the scan cost of this last window of queries.
@@ -115,7 +126,12 @@ class VariableCosts(Trigger):
         )
 
         for idx, q in enumerate(workload.analytical_queries()):
-            engine = await router.engine_for(q)
+            maybe_engine = q.primary_execution_location()
+            if maybe_engine is None:
+                engine = await router.engine_for(q)
+            else:
+                engine = maybe_engine
+
             if engine == Engine.Aurora:
                 aurora_query_indices.append(idx)
                 aurora_queries.append(q)
@@ -123,6 +139,7 @@ class VariableCosts(Trigger):
                 athena_query_indices.append(idx)
                 athena_queries.append(q)
 
+        # NOTE: Ideally we use the actual values.
         aurora_accessed_pages = compute_aurora_accessed_pages(
             aurora_queries,
             workload.get_predicted_aurora_pages_accessed_batch(aurora_query_indices),
@@ -134,14 +151,28 @@ class VariableCosts(Trigger):
         )
 
         # We use the hit rate to estimate Aurora scan costs.
+        # Note that if we are using I/O optimized Aurora, there is no
+        # incremental scan cost.
         lookback_epochs = math.ceil(
             self._planner_config.planning_window() / self._config.epoch_length
         )
-        # TODO: If there are read replicas, we should use the hit rate from them instead.
-        metrics = self._monitor.aurora_metrics(reader_index=None).read_k_most_recent(
-            k=lookback_epochs, metric_ids=[_HIT_RATE_METRIC]
-        )
-        hit_rate_avg = metrics[_HIT_RATE_METRIC].mean() / 100.0
+        aurora_reader_metrics = self._monitor.aurora_reader_metrics()
+        if len(aurora_reader_metrics) > 0:
+            reader_hit_rates = []
+            for reader_metrics in aurora_reader_metrics:
+                reader_hit_rates.append(
+                    reader_metrics.read_k_most_recent(
+                        k=lookback_epochs, metric_ids=[_HIT_RATE_METRIC]
+                    )
+                )
+            all_metrics = pd.concat(reader_hit_rates)
+            hit_rate_avg = all_metrics[_HIT_RATE_METRIC].mean() / 100.0
+        else:
+            aurora_writer_metrics = self._monitor.aurora_writer_metrics()
+            metrics = aurora_writer_metrics.read_k_most_recent(
+                k=lookback_epochs, metric_ids=[_HIT_RATE_METRIC]
+            )
+            hit_rate_avg = metrics[_HIT_RATE_METRIC].mean() / 100.0
 
         aurora_scan_cost = compute_aurora_scan_cost(
             aurora_accessed_pages, hit_rate_avg, self._planner_config
@@ -150,7 +181,7 @@ class VariableCosts(Trigger):
             athena_scanned_bytes, self._planner_config
         )
 
-        return aurora_scan_cost + athena_scan_cost
+        return aurora_scan_cost, athena_scan_cost
 
 
 _HIT_RATE_METRIC = "BufferCacheHitRatio_Average"

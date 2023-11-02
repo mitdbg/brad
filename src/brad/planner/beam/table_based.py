@@ -1,3 +1,4 @@
+import asyncio
 import heapq
 import itertools
 import json
@@ -11,7 +12,10 @@ from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.triggers import get_beam_triggers
 from brad.planner.router_provider import RouterProvider
 from brad.planner.beam.table_based_candidate import BlueprintCandidate
-from brad.planner.debug_logger import BlueprintPlanningDebugLogger
+from brad.planner.debug_logger import (
+    BlueprintPlanningDebugLogger,
+    BlueprintPickleDebugLogger,
+)
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
@@ -50,7 +54,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         # 1. Fetch metrics and the next workload and then apply predictions.
         metrics, metrics_timestamp = self._metrics_provider.get_metrics()
-        current_workload, next_workload = self._workload_provider.get_workloads(
+        current_workload, next_workload = await self._workload_provider.get_workloads(
             metrics_timestamp, window_multiplier, desired_period=timedelta(hours=1)
         )
         self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
@@ -87,7 +91,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                 self._current_blueprint.table_locations_bitmap(),
             )
         )
-        ctx.compute_engine_latency_weights()
+        ctx.compute_engine_latency_norm_factor()
 
         beam_size = self._planner_config.beam_size()
         placement_options = self._get_table_placement_options_bitmap()
@@ -127,8 +131,13 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         # 5. Run beam search to formulate the rest of the table placements.
         for j, cluster in enumerate(clusters[1:]):
-            if j % 100 == 0:
-                logger.debug("Processing index %d of %d", j, len(clusters[1:]))
+            if j % 5 == 0:
+                # This is a long-running process. We should yield every so often
+                # to allow other tasks to run on the daemon (e.g., processing
+                # metrics messages).
+                await asyncio.sleep(0)
+
+            logger.debug("Processing index %d of %d", j, len(clusters[1:]))
 
             next_top_k: List[BlueprintCandidate] = []
             tables, queries, _ = cluster
@@ -269,6 +278,14 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                 "The table-based beam planner failed to find any feasible blueprints."
             )
             return
+
+        # For later interactive inspection in Python.
+        BlueprintPickleDebugLogger.log_object_if_requested(
+            self._config, "final_table_based_blueprints", final_top_k
+        )
+        BlueprintPickleDebugLogger.log_object_if_requested(
+            self._config, "scoring_context", ctx
+        )
 
         # Log the final top k for debugging purposes, if needed.
         final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(

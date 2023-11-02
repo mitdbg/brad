@@ -3,7 +3,7 @@ import os
 import pathlib
 import re
 import yaml
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from datetime import timedelta
 
 from brad.config.engine import Engine
@@ -13,10 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 class ConfigFile:
-    def __init__(self, path: str):
-        self._raw_path = path
-        with open(path, "r", encoding="UTF-8") as file:
-            self._raw = yaml.load(file, Loader=yaml.Loader)
+    @classmethod
+    def load(cls, file_path: str) -> "ConfigFile":
+        with open(file_path, "r", encoding="UTF-8") as file:
+            raw = yaml.load(file, Loader=yaml.Loader)
+        return cls(raw)
+
+    def __init__(self, raw_parsed: Dict[str, Any]):
+        self._raw = raw_parsed
 
     def get_cluster_ids(self) -> Dict[Engine, str]:
         return {
@@ -24,10 +28,6 @@ class ConfigFile:
             Engine.Redshift: self.redshift_cluster_id,
             Engine.Athena: "brad-db0",  # TODO(Amadou): I don't want to break existing configs. Coordinate with Geoff on this.
         }
-
-    @property
-    def raw_path(self) -> str:
-        return self._raw_path
 
     @property
     def daemon_log_path(self) -> Optional[pathlib.Path]:

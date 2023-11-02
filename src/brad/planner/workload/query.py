@@ -1,5 +1,6 @@
 import logging
-from typing import Dict
+from collections import Counter
+from typing import Dict, List, Tuple, Optional
 
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
@@ -21,16 +22,42 @@ class Query(QueryRep):
     Objects of this class are logically immutable.
     """
 
-    def __init__(self, sql_query: str, arrival_count: int = 1):
+    def __init__(
+        self,
+        sql_query: str,
+        arrival_count: float = 1.0,
+        past_executions: Optional[List[Tuple[Engine, float]]] = None,
+    ):
         super().__init__(sql_query)
         self._arrival_count = arrival_count
+        self._past_executions = past_executions
+        # `arrival_count` might be scaled for a fixed period. This multiplier
+        # represents the scaling factor used; it should be applied to
+        # `past_executions` when reweighing a query distribution.
+        self._past_executions_multiplier = 1.0
 
         # Legacy statistics.
         self._data_accessed_mb: Dict[Engine, int] = {}
         self._tuples_accessed: Dict[Engine, int] = {}
 
-    def arrival_count(self) -> int:
+    def past_executions(self) -> Optional[List[Tuple[Engine, float]]]:
+        """
+        Retrieve any information about past executions of this query.
+        """
+        return self._past_executions
+
+    def arrival_count(self) -> float:
+        """
+        Note that this value may be fractional due to time period adjustments in
+        the workload.
+        """
         return self._arrival_count
+
+    def set_arrival_count(self, arrival_count: float) -> None:
+        self._arrival_count = arrival_count
+
+    def set_past_executions_multiplier(self, multiplier: float) -> None:
+        self._past_executions_multiplier = multiplier
 
     # The methods below are legacy code.
 
@@ -96,3 +123,11 @@ class Query(QueryRep):
 
         # MB, so we divide by 1000 twice.
         self._data_accessed_mb[for_engine] = total_storage_bytes // 1000 // 1000
+
+    def primary_execution_location(self) -> Optional[Engine]:
+        if self._past_executions is None or len(self._past_executions) == 0:
+            return None
+
+        counter = Counter([execution[0] for execution in self._past_executions])
+        most_common, _ = counter.most_common(1)[0]
+        return most_common
