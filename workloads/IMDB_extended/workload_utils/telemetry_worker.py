@@ -1,7 +1,7 @@
 import random
 import logging
 
-from database import Database
+from workload_utils.database import Database
 
 logger = logging.getLogger(__name__)
 
@@ -10,12 +10,6 @@ class TelemetryWorker:
     def __init__(self, worker_id: int, seed: int) -> None:
         self.worker_id = worker_id
         self.prng = random.Random(seed)
-
-        # to generate queries
-        self.max_dist = 1000
-        self.max_close_cinemas = 80
-        self.min_cap = 10
-        self.max_cap = 1000
 
     def random_timerange(self):
         year = 2023
@@ -92,8 +86,3 @@ class TelemetryWorker:
 
         except:  # pylint: disable=bare-except
             return False
-
-
-if __name__ == "__main__":
-    tw = TelemetryWorker(1, 20)
-    print(tw.query1(None))
