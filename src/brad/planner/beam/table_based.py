@@ -6,6 +6,7 @@ import logging
 from datetime import timedelta
 from typing import Iterable, List, Tuple, Dict, Optional
 
+from brad.blueprint.blueprint import Blueprint
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.abstract import BlueprintPlanner
 from brad.planner.beam.feasibility import BlueprintFeasibility
@@ -18,6 +19,7 @@ from brad.planner.debug_logger import (
 )
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
+from brad.planner.scoring.score import Score
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
 from brad.planner.triggers.trigger import Trigger
 from brad.planner.workload import Workload
@@ -50,9 +52,9 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         return False
 
     async def _run_replan_impl(
-        self, trigger: Optional[Trigger], window_multiplier: int = 1
-    ) -> None:
-        logger.info("Running a replan...")
+        self, window_multiplier: int = 1
+    ) -> Optional[Tuple[Blueprint, Score]]:
+        logger.info("Running a table-based beam replan...")
 
         # 1. Fetch metrics and the next workload and then apply predictions.
         metrics, metrics_timestamp = self._metrics_provider.get_metrics()
@@ -72,7 +74,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         assert len(clusters) > 0
         if len(clusters) == 0:
             logger.info("No queries in the workload. Cannot replan.")
-            return
+            return None
 
         if len(next_workload.analytical_queries()) < 20:
             logger.info("[Table-Based Planner] Query arrival counts")
@@ -127,9 +129,10 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         if len(current_top_k) == 0:
             logger.error(
-                "Table-based beam blueprint planning failed. Could not generate an initial set of feasible blueprints."
+                "Table-based beam blueprint planning failed. "
+                "Could not generate an initial set of feasible blueprints."
             )
-            return
+            return None
 
         # 5. Run beam search to formulate the rest of the table placements.
         for j, cluster in enumerate(clusters[1:]):
@@ -279,7 +282,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             logger.error(
                 "The table-based beam planner failed to find any feasible blueprints."
             )
-            return
+            return None
 
         # For later interactive inspection in Python.
         BlueprintPickleDebugLogger.log_object_if_requested(
@@ -309,25 +312,20 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             best_candidate.table_placements[tbl] |= EngineBitmapValues[Engine.Athena]
             best_candidate.storage_cost += compute_single_athena_table_cost(tbl, ctx)
 
-        # 8. Output the new blueprint.
-        best_blueprint = best_candidate.to_blueprint()
-        best_blueprint_score = best_candidate.to_score()
-        self._last_suggested_blueprint = best_blueprint
-        self._last_suggested_blueprint_score = best_blueprint_score
-
         logger.info("Selected blueprint:")
-        logger.info("%s", best_blueprint)
-
+        logger.info("%s", best_candidate)
         debug_values = best_candidate.to_debug_values()
         logger.info(
-            "Selected blueprint details: %s",
-            json.dumps(debug_values, indent=2, default=str),
+            "Selected blueprint details: %s", json.dumps(debug_values, indent=2)
         )
         logger.info(
             "Metrics used during planning: %s", json.dumps(metrics._asdict(), indent=2)
         )
 
-        await self._notify_new_blueprint(best_blueprint, best_blueprint_score, trigger)
+        # 8. Output the new blueprint.
+        best_blueprint = best_candidate.to_blueprint()
+        best_blueprint_score = best_candidate.to_score()
+        return best_blueprint, best_blueprint_score
 
     def _preprocess_workload_queries(
         self, workload: Workload

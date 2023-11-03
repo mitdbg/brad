@@ -3,10 +3,12 @@ import heapq
 import json
 import logging
 from datetime import timedelta
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Tuple, Optional
 
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.abstract import BlueprintPlanner
+from brad.blueprint.blueprint import Blueprint
+from brad.planner.scoring.score import Score
 from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.query_based_candidate import BlueprintCandidate
 from brad.planner.beam.triggers import get_beam_triggers
@@ -44,13 +46,12 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         return self._triggers
 
     async def _run_replan_impl(
-        self, trigger: Optional[Trigger], window_multiplier: int = 1
-    ) -> None:
-        logger.info("Running a replan...")
+        self, window_multiplier: int = 1
+    ) -> Optional[Tuple[Blueprint, Score]]:
+        logger.info("Running a query-based beam replan...")
 
         # 1. Fetch the next workload and apply predictions.
         metrics, metrics_timestamp = self._metrics_provider.get_metrics()
-        logger.debug("Using metrics: %s", str(metrics))
         current_workload, next_workload = await self._workload_provider.get_workloads(
             metrics_timestamp, window_multiplier, desired_period=timedelta(hours=1)
         )
@@ -70,7 +71,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         # workload.
         if len(query_indices) == 0:
             logger.info("No queries in the workload. Cannot replan.")
-            return
+            return None
 
         if len(next_workload.analytical_queries()) < 20:
             logger.info("[Query-Based Planner] Query arrival counts")
@@ -126,9 +127,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
         if len(current_top_k) == 0:
             logger.error(
-                "Query-based beam blueprint planning failed. Could not generate an initial set of feasible blueprints."
+                "Query-based beam blueprint planning failed. "
+                "Could not generate an initial set of feasible blueprints."
             )
-            return
+            return None
 
         # 5. Run beam search to formulate the table placements.
         for j, query_idx in enumerate(query_indices[1:]):
@@ -238,9 +240,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
         if len(rerouted_top_k) == 0:
             logger.error(
-                "The query-based beam planner failed to find any feasible placements after re-routing the queries."
+                "The query-based beam planner failed to find any "
+                "feasible placements after re-routing the queries."
             )
-            return
+            return None
 
         # 8. Run a final greedy search over provisionings in the top-k set.
         final_top_k: List[BlueprintCandidate] = []
@@ -289,7 +292,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             logger.error(
                 "The query-based beam planner failed to find any feasible blueprints."
             )
-            return
+            return None
 
         # The best blueprint will be ordered first (we have a negated
         # `__lt__` method to work with `heapq` to create a max heap).
@@ -324,15 +327,8 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             # We added the table to Athena.
             best_candidate.storage_cost += compute_single_athena_table_cost(tbl, ctx)
 
-        # 9. Output the new blueprint.
-        best_blueprint = best_candidate.to_blueprint()
-        best_blueprint_score = best_candidate.to_score()
-        self._last_suggested_blueprint = best_blueprint
-        self._last_suggested_blueprint_score = best_blueprint_score
-
         logger.info("Selected blueprint:")
-        logger.info("%s", best_blueprint)
-
+        logger.info("%s", best_candidate)
         debug_values = best_candidate.to_debug_values()
         logger.info(
             "Selected blueprint details: %s", json.dumps(debug_values, indent=2)
@@ -341,4 +337,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             "Metrics used during planning: %s", json.dumps(metrics._asdict(), indent=2)
         )
 
-        await self._notify_new_blueprint(best_blueprint, best_blueprint_score, trigger)
+        # 9. Output the new blueprint.
+        best_blueprint = best_candidate.to_blueprint()
+        best_blueprint_score = best_candidate.to_score()
+        return best_blueprint, best_blueprint_score

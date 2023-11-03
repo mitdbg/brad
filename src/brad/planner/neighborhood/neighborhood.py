@@ -3,9 +3,10 @@ import logging
 import pytz
 import pandas as pd
 from io import TextIOWrapper
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 from datetime import datetime
 
+from brad.blueprint.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
 from brad.planner.abstract import BlueprintPlanner
@@ -89,8 +90,8 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         return []
 
     async def _run_replan_impl(
-        self, trigger: Optional[Trigger], window_multiplier: int = 1
-    ) -> None:
+        self, window_multiplier: int = 1
+    ) -> Optional[Tuple[Blueprint, Score]]:
         # This will be long-running and will block the event loop. For our
         # current needs, this is fine since the planner is the main component in
         # the daemon process.
@@ -182,11 +183,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             selected_blueprint = self._impl.on_enumeration_complete(scoring_ctx)
             # TODO: Populate the score if needed.
             selected_score = Score()
-            self._last_suggested_blueprint = selected_blueprint
-            self._last_suggested_blueprint_score = selected_score
-            await self._notify_new_blueprint(
-                selected_blueprint, selected_score, trigger
-            )
+            return selected_blueprint, selected_score
 
         finally:
             engines.close_sync()

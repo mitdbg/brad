@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Coroutine, Callable, List, Optional, Iterable
+from typing import Coroutine, Callable, List, Optional, Iterable, Tuple
 
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
@@ -112,7 +112,7 @@ class BlueprintPlanner:
         self, trigger: Optional[Trigger], window_multiplier: int = 1
     ) -> None:
         """
-        Triggers a "forced" replan. Used for debugging.
+        Initiates a replan. Call this directly to "force" a replan.
 
         Use `window_multiplier` to expand the window used for planning.
         """
@@ -120,13 +120,22 @@ class BlueprintPlanner:
             self._replan_in_progress = True
             for t in self.get_triggers():
                 t.on_replan(trigger)
-            await self._run_replan_impl(trigger, window_multiplier)
+
+            result = await self._run_replan_impl(window_multiplier)
+            if result is None:
+                return
+            blueprint, score = result
+            self._last_suggested_blueprint = blueprint
+            self._last_suggested_blueprint_score = score
+
+            await self._notify_new_blueprint(blueprint, score, trigger)
+
         finally:
             self._replan_in_progress = False
 
     async def _run_replan_impl(
-        self, trigger: Optional[Trigger], window_multiplier: int = 1
-    ) -> None:
+        self, window_multiplier: int = 1
+    ) -> Optional[Tuple[Blueprint, Score]]:
         """
         Implementers should override this method to define the blueprint
         optimization algorithm.
