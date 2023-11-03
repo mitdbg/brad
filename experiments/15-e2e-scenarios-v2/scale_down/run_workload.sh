@@ -20,18 +20,18 @@ log_workload_point "brad_start_initiated"
 sleep 30
 
 log_workload_point "clients_starting"
-start_repeating_olap_runner 6 15 5 $ra_query_indexes "ra_8"
+start_repeating_olap_runner 8 15 5 $ra_query_indexes "ra_8"
 rana_pid=$runner_pid
 
-start_txn_runner 3
+start_txn_runner 4
 txn_pid=$runner_pid
 
-start_repeating_olap_runner 1 70 5 "61,71,75" "ra_1_special"
-rana2_pid=$runner_pid
+# start_repeating_olap_runner 1 70 5 "61,71,75" "ra_1_special"
+# rana2_pid=$runner_pid
 log_workload_point "clients_started"
 
 function inner_cancel_experiment() {
-  cancel_experiment $rana_pid $txn_pid $rana2_pid
+  cancel_experiment $rana_pid $txn_pid
 }
 
 trap "inner_cancel_experiment" INT
@@ -63,5 +63,5 @@ log_workload_point "experiment_workload_done"
 
 # Shut down everything now.
 >&2 echo "Experiment done. Shutting down runners..."
-graceful_shutdown $rana_pid $txn_pid $rana2_pid
+graceful_shutdown $rana_pid $txn_pid
 log_workload_point "shutdown_complete"
