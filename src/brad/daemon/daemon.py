@@ -584,8 +584,8 @@ class BradDaemon:
 
             self._system_event_logger.log(
                 SystemEvent.PreTransitionStarted,
-                f"version={transitioning_to_version},"
-                f"aurora={next_aurora},"
+                f"version={transitioning_to_version};"
+                f"aurora={next_aurora};"
                 f"redshift={next_redshift}",
             )
 
