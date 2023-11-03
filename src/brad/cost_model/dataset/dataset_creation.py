@@ -240,6 +240,7 @@ def create_plan_dataloader(
     plan_collator = plan_collator_dict[database]
     train_collate_fn = functools.partial(
         plan_collator,
+        database=database,
         db_statistics=database_statistics,
         feature_statistics=feature_statistics,
         plan_featurization_name=plan_featurization_name,
@@ -272,6 +273,7 @@ def create_plan_dataloader(
             # test dataset
             test_collate_fn = functools.partial(
                 plan_collator,
+                database=database,
                 db_statistics=test_database_statistics,
                 feature_statistics=feature_statistics,
                 plan_featurization_name=plan_featurization_name,
@@ -290,6 +292,7 @@ def create_plan_dataloader(
         )
         val_collate_fn = functools.partial(
             plan_collator,
+            database=database,
             db_statistics=val_database_statistics,
             feature_statistics=feature_statistics,
             plan_featurization_name=plan_featurization_name,
@@ -403,6 +406,7 @@ def create_query_dataloader(
         )
         val_collate_fn = functools.partial(
             query_collator,
+            database=database,
             db_statistics=val_database_statistics,
             feature_statistics=feature_statistics,
             query_featurization_name=query_featurization_name,

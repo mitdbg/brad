@@ -35,6 +35,8 @@ def parse_queries_redshift(
     target_path=None,
     is_brad=False,
     include_no_joins=False,
+    exclude_runtime_first_run=True,
+    only_runtime_first_run=False,
 ):
     assert len(run_stats.query_list) == len(aurora_run_stats.query_list)
     db_conn = None
@@ -125,7 +127,12 @@ def parse_queries_redshift(
         elif hasattr(q, "runtimes") and len(q.runtimes) > 1:
             # We ran for more than one repetition.
             # Always discard the first run to exclude compilation overhead (Redshift).
-            runtime = statistics.mean(q.runtimes[1:]) * 1000
+            if only_runtime_first_run:
+                runtime = q.runtimes[0] * 1000
+            elif exclude_runtime_first_run:
+                runtime = statistics.mean(q.runtimes[1:]) * 1000
+            else:
+                runtime = statistics.mean(q.runtimes) * 1000
         else:
             runtime = q.runtime * 1000
 

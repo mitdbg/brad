@@ -67,6 +67,8 @@ def parse_queries_wrapper(
         target_path=target,
         is_brad=is_brad,
         include_no_joins=args.include_no_joins,
+        exclude_runtime_first_run=args.exclude_runtime_first_run,
+        only_runtime_first_run=args.only_runtime_first_run,
     )
     with open(target, "w") as outfile:
         json.dump(parsed_runs, outfile, default=dumper)
@@ -146,6 +148,8 @@ if __name__ == "__main__":
     parser.add_argument("--augment_dataset_dist", type=str)
     parser.add_argument("--is_brad", action="store_true")
     parser.add_argument("--include_no_joins", action="store_true")
+    parser.add_argument("--exclude_runtime_first_run", action="store_true")
+    parser.add_argument("--only_runtime_first_run", action="store_true")
 
     # Training cost model command
     parser.add_argument("--workload_runs", default=None, nargs="+")
