@@ -2,13 +2,15 @@ import asyncio
 import heapq
 import json
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import List, Tuple, Optional
 
-from brad.config.engine import Engine, EngineBitmapValues
-from brad.planner.abstract import BlueprintPlanner
 from brad.blueprint.blueprint import Blueprint
-from brad.planner.scoring.score import Score
+from brad.config.engine import Engine, EngineBitmapValues
+from brad.config.file import ConfigFile
+from brad.config.planner import PlannerConfig
+from brad.planner.abstract import BlueprintPlanner
+from brad.planner.compare.provider import BlueprintComparatorProvider
 from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.query_based_candidate import BlueprintCandidate
 from brad.planner.debug_logger import (
@@ -16,14 +18,36 @@ from brad.planner.debug_logger import (
     BlueprintPickleDebugLogger,
 )
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
+from brad.planner.estimator import EstimatorProvider
+from brad.planner.metrics import Metrics, FixedMetricsProvider
+from brad.planner.providers import BlueprintProviders
+from brad.planner.recorded_run import RecordedPlanningRun
+from brad.planner.router_provider import RouterProvider
 from brad.planner.scoring.context import ScoringContext
+from brad.planner.scoring.data_access.provider import NoopDataAccessProvider
+from brad.planner.scoring.performance.analytics_latency import (
+    NoopAnalyticsLatencyScorer,
+)
+from brad.planner.scoring.score import Score
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
+from brad.planner.triggers.provider import EmptyTriggerProvider
+from brad.planner.workload import Workload
+from brad.planner.workload.provider import WorkloadProvider
 
 
 logger = logging.getLogger(__name__)
 
 
 class QueryBasedBeamPlanner(BlueprintPlanner):
+    def __init__(
+        self,
+        *args,
+        disable_external_logging: bool = False,
+        **kwargs,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self._disable_external_logging = disable_external_logging
+
     async def _run_replan_impl(
         self, window_multiplier: int = 1
     ) -> Optional[Tuple[Blueprint, Score]]:
@@ -45,6 +69,27 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         )
         self._providers.data_access_provider.apply_access_statistics(next_workload)
         self._providers.data_access_provider.apply_access_statistics(current_workload)
+
+        # If requested, we record this planning pass for later debugging.
+        if (
+            not self._disable_external_logging
+            and BlueprintPickleDebugLogger.is_log_requested(self._config)
+        ):
+            planning_run = RecordedQueryBasedPlanningRun(
+                self._config,
+                self._planner_config,
+                self._schema_name,
+                self._current_blueprint,
+                self._current_blueprint_score,
+                current_workload,
+                next_workload,
+                metrics,
+                metrics_timestamp,
+                self._providers.comparator_provider,
+            )
+            BlueprintPickleDebugLogger.log_object_if_requested(
+                self._config, "query_beam_run", planning_run
+            )
 
         # 2. Compute query gains and reorder queries by their gain in descending
         # order.
@@ -189,13 +234,14 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
             current_top_k = next_top_k
 
-        # Log the placement top k for debugging purposes, if needed.
-        placement_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
-            self._config, "query_beam_placement_topk"
-        )
-        if placement_top_k_logger is not None:
-            for candidate in current_top_k:
-                placement_top_k_logger.log_debug_values(candidate.to_debug_values())
+        if not self._disable_external_logging:
+            # Log the placement top k for debugging purposes, if needed.
+            placement_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
+                self._config, "query_beam_placement_topk"
+            )
+            if placement_top_k_logger is not None:
+                for candidate in current_top_k:
+                    placement_top_k_logger.log_debug_values(candidate.to_debug_values())
 
         # 8. We generated the placements by placing queries using run time
         #    predictions. Now we re-route the queries using the fixed placements
@@ -286,21 +332,21 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         # `__lt__` method to work with `heapq` to create a max heap).
         final_top_k.sort(reverse=True)
 
-        # For later interactive inspection in Python.
-        BlueprintPickleDebugLogger.log_object_if_requested(
-            self._config, "final_query_based_blueprints", final_top_k
-        )
-        BlueprintPickleDebugLogger.log_object_if_requested(
-            self._config, "scoring_context", ctx
-        )
-
-        # Log the final top k for debugging purposes, if needed.
-        final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
-            self._config, "query_beam_final_topk"
-        )
-        if final_top_k_logger is not None:
-            for candidate in final_top_k:
-                final_top_k_logger.log_debug_values(candidate.to_debug_values())
+        if not self._disable_external_logging:
+            # For later interactive inspection in Python.
+            BlueprintPickleDebugLogger.log_object_if_requested(
+                self._config, "final_query_based_blueprints", final_top_k
+            )
+            BlueprintPickleDebugLogger.log_object_if_requested(
+                self._config, "scoring_context", ctx
+            )
+            # Log the final top k for debugging purposes, if needed.
+            final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
+                self._config, "query_beam_final_topk"
+            )
+            if final_top_k_logger is not None:
+                for candidate in final_top_k:
+                    final_top_k_logger.log_debug_values(candidate.to_debug_values())
 
         best_candidate = final_top_k[0]
 
@@ -329,3 +375,66 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         best_blueprint = best_candidate.to_blueprint()
         best_blueprint_score = best_candidate.to_score()
         return best_blueprint, best_blueprint_score
+
+
+class RecordedQueryBasedPlanningRun(RecordedPlanningRun, WorkloadProvider):
+    def __init__(
+        self,
+        config: ConfigFile,
+        planner_config: PlannerConfig,
+        schema_name: str,
+        current_blueprint: Blueprint,
+        current_blueprint_score: Optional[Score],
+        current_workload: Workload,
+        next_workload: Workload,
+        metrics: Metrics,
+        metrics_timestamp: datetime,
+        comparator_provider: BlueprintComparatorProvider,
+    ) -> None:
+        self._config = config
+        self._planner_config = planner_config
+        self._schema_name = schema_name
+        self._current_blueprint = current_blueprint
+        self._current_blueprint_score = current_blueprint_score
+        self._current_workload = current_workload
+        self._next_workload = next_workload
+        self._metrics = metrics
+        self._metrics_timestamp = metrics_timestamp
+        self._comparator_provider = comparator_provider
+
+    def create_planner(self, estimator_provider: EstimatorProvider) -> BlueprintPlanner:
+        providers = BlueprintProviders(
+            workload_provider=self,
+            analytics_latency_scorer=NoopAnalyticsLatencyScorer(),
+            comparator_provider=self._comparator_provider,
+            metrics_provider=FixedMetricsProvider(
+                self._metrics, self._metrics_timestamp
+            ),
+            data_access_provider=NoopDataAccessProvider(),
+            estimator_provider=estimator_provider,
+            trigger_provider=EmptyTriggerProvider(),
+            router_provider=RouterProvider(
+                self._schema_name, self._config, estimator_provider
+            ),
+        )
+        return QueryBasedBeamPlanner(
+            self._config,
+            self._planner_config,
+            self._schema_name,
+            self._current_blueprint,
+            self._current_blueprint_score,
+            providers,
+            # N.B. Purposefully set to `None`.
+            system_event_logger=None,
+            disable_external_logging=True,
+        )
+
+    # Provider methods follow.
+
+    async def get_workloads(
+        self,
+        window_end: datetime,
+        window_multiplier: int = 1,
+        desired_period: Optional[timedelta] = None,
+    ) -> Tuple[Workload, Workload]:
+        return self._current_workload, self._next_workload
