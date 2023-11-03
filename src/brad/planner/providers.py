@@ -5,6 +5,7 @@ from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
 from brad.planner.triggers.provider import TriggerProvider
 from brad.planner.workload.provider import WorkloadProvider
+from brad.planner.router_provider import RouterProvider
 
 
 class BlueprintProviders:
@@ -22,6 +23,7 @@ class BlueprintProviders:
         data_access_provider: DataAccessProvider,
         estimator_provider: EstimatorProvider,
         trigger_provider: TriggerProvider,
+        router_provider: RouterProvider,
     ) -> None:
         self.workload_provider = workload_provider
         self.analytics_latency_scorer = analytics_latency_scorer
@@ -30,3 +32,4 @@ class BlueprintProviders:
         self.data_access_provider = data_access_provider
         self.estimator_provider = estimator_provider
         self.trigger_provider = trigger_provider
+        self.router_provider = router_provider

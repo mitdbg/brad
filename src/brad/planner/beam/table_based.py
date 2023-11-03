@@ -4,14 +4,12 @@ import itertools
 import json
 import logging
 from datetime import timedelta
-from typing import Iterable, List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional
 
 from brad.blueprint.blueprint import Blueprint
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.abstract import BlueprintPlanner
 from brad.planner.beam.feasibility import BlueprintFeasibility
-from brad.planner.beam.triggers import get_beam_triggers
-from brad.planner.router_provider import RouterProvider
 from brad.planner.beam.table_based_candidate import BlueprintCandidate
 from brad.planner.debug_logger import (
     BlueprintPlanningDebugLogger,
@@ -21,50 +19,33 @@ from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.score import Score
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
-from brad.planner.triggers.trigger import Trigger
 from brad.planner.workload import Workload
 
 logger = logging.getLogger(__name__)
 
 
 class TableBasedBeamPlanner(BlueprintPlanner):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._router_provider = RouterProvider(
-            self._schema_name, self._config, self._estimator_provider
-        )
-        self._triggers = get_beam_triggers(
-            self._config,
-            self._planner_config,
-            self._monitor,
-            self._data_access_provider,
-            self._router_provider,
-        )
-        for t in self._triggers:
-            t.update_blueprint(self._current_blueprint, self._current_blueprint_score)
-
-    def get_triggers(self) -> Iterable[Trigger]:
-        return self._triggers
-
-    def _check_if_metrics_warrant_replanning(self) -> bool:
-        # See if the metrics indicate that we should trigger the planning
-        # process.
-        return False
-
     async def _run_replan_impl(
         self, window_multiplier: int = 1
     ) -> Optional[Tuple[Blueprint, Score]]:
         logger.info("Running a table-based beam replan...")
 
         # 1. Fetch metrics and the next workload and then apply predictions.
-        metrics, metrics_timestamp = self._metrics_provider.get_metrics()
-        current_workload, next_workload = await self._workload_provider.get_workloads(
+        metrics, metrics_timestamp = self._providers.metrics_provider.get_metrics()
+        (
+            current_workload,
+            next_workload,
+        ) = await self._providers.workload_provider.get_workloads(
             metrics_timestamp, window_multiplier, desired_period=timedelta(hours=1)
         )
-        self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
-        self._analytics_latency_scorer.apply_predicted_latencies(current_workload)
-        self._data_access_provider.apply_access_statistics(next_workload)
-        self._data_access_provider.apply_access_statistics(current_workload)
+        self._providers.analytics_latency_scorer.apply_predicted_latencies(
+            next_workload
+        )
+        self._providers.analytics_latency_scorer.apply_predicted_latencies(
+            current_workload
+        )
+        self._providers.data_access_provider.apply_access_statistics(next_workload)
+        self._providers.data_access_provider.apply_access_statistics(current_workload)
 
         # 2. Cluster queries by tables and sort by gains (sum).
         clusters = self._preprocess_workload_queries(next_workload)
@@ -91,7 +72,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             self._planner_config,
         )
         await ctx.simulate_current_workload_routing(
-            await self._router_provider.get_router(
+            await self._providers.router_provider.get_router(
                 self._current_blueprint.table_locations_bitmap(),
             )
         )
@@ -115,7 +96,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             tables, queries, _ = first_cluster
             placement_changed = candidate.add_placement(placement_bitmap, tables, ctx)
             await candidate.add_query_cluster(
-                self._router_provider,
+                self._providers.router_provider,
                 queries,
                 reroute_prev=placement_changed,
                 ctx=ctx,
@@ -169,7 +150,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                         continue
 
                     await next_candidate.add_query_cluster(
-                        self._router_provider,
+                        self._providers.router_provider,
                         queries,
                         reroute_prev=placement_changed,
                         ctx=ctx,

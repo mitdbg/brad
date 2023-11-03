@@ -3,7 +3,7 @@ import heapq
 import json
 import logging
 from datetime import timedelta
-from typing import Iterable, List, Tuple, Optional
+from typing import List, Tuple, Optional
 
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.abstract import BlueprintPlanner
@@ -11,8 +11,6 @@ from brad.blueprint.blueprint import Blueprint
 from brad.planner.scoring.score import Score
 from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.query_based_candidate import BlueprintCandidate
-from brad.planner.beam.triggers import get_beam_triggers
-from brad.planner.router_provider import RouterProvider
 from brad.planner.debug_logger import (
     BlueprintPlanningDebugLogger,
     BlueprintPickleDebugLogger,
@@ -20,45 +18,33 @@ from brad.planner.debug_logger import (
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.table_placement import compute_single_athena_table_cost
-from brad.planner.triggers.trigger import Trigger
 
 
 logger = logging.getLogger(__name__)
 
 
 class QueryBasedBeamPlanner(BlueprintPlanner):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._router_provider = RouterProvider(
-            self._schema_name, self._config, self._estimator_provider
-        )
-        self._triggers = get_beam_triggers(
-            self._config,
-            self._planner_config,
-            self._monitor,
-            self._data_access_provider,
-            self._router_provider,
-        )
-        for t in self._triggers:
-            t.update_blueprint(self._current_blueprint, self._current_blueprint_score)
-
-    def get_triggers(self) -> Iterable[Trigger]:
-        return self._triggers
-
     async def _run_replan_impl(
         self, window_multiplier: int = 1
     ) -> Optional[Tuple[Blueprint, Score]]:
         logger.info("Running a query-based beam replan...")
 
         # 1. Fetch the next workload and apply predictions.
-        metrics, metrics_timestamp = self._metrics_provider.get_metrics()
-        current_workload, next_workload = await self._workload_provider.get_workloads(
+        metrics, metrics_timestamp = self._providers.metrics_provider.get_metrics()
+        (
+            current_workload,
+            next_workload,
+        ) = await self._providers.workload_provider.get_workloads(
             metrics_timestamp, window_multiplier, desired_period=timedelta(hours=1)
         )
-        self._analytics_latency_scorer.apply_predicted_latencies(next_workload)
-        self._analytics_latency_scorer.apply_predicted_latencies(current_workload)
-        self._data_access_provider.apply_access_statistics(next_workload)
-        self._data_access_provider.apply_access_statistics(current_workload)
+        self._providers.analytics_latency_scorer.apply_predicted_latencies(
+            next_workload
+        )
+        self._providers.analytics_latency_scorer.apply_predicted_latencies(
+            current_workload
+        )
+        self._providers.data_access_provider.apply_access_statistics(next_workload)
+        self._providers.data_access_provider.apply_access_statistics(current_workload)
 
         # 2. Compute query gains and reorder queries by their gain in descending
         # order.
@@ -88,7 +74,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             self._planner_config,
         )
         await ctx.simulate_current_workload_routing(
-            await self._router_provider.get_router(
+            await self._providers.router_provider.get_router(
                 self._current_blueprint.table_locations_bitmap()
             )
         )
@@ -219,7 +205,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         for candidate in current_top_k:
             query_indices = candidate.get_all_query_indices()
             candidate.reset_routing()
-            router = await self._router_provider.get_router(candidate.table_placements)
+            router = await self._providers.router_provider.get_router(
+                candidate.table_placements
+            )
             for qidx in query_indices:
                 query = analytical_queries[qidx]
                 routing_engine = await router.engine_for(query)

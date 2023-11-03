@@ -13,7 +13,7 @@ class BlueprintComparatorProvider:
         raise NotImplementedError
 
 
-class PerformanceCeilingComparator:
+class PerformanceCeilingComparatorProvider(BlueprintComparatorProvider):
     def __init__(
         self, max_query_latency_s: float, max_txn_p90_latency_s: float
     ) -> None:

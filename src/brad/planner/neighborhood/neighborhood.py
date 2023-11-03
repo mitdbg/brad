@@ -3,7 +3,7 @@ import logging
 import pytz
 import pandas as pd
 from io import TextIOWrapper
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 
 from brad.blueprint.blueprint import Blueprint
@@ -26,7 +26,6 @@ from brad.planner.neighborhood.sampled_neighborhood import (
 )
 from brad.planner.scoring.score import Score
 from brad.planner.strategy import PlanningStrategy
-from brad.planner.triggers.trigger import Trigger
 from brad.planner.workload import Workload
 from brad.provisioning.directory import Directory
 from brad.routing.rule_based import RuleBased
@@ -85,10 +84,6 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             if self._metrics_out is not None:
                 self._metrics_out.close()
 
-    def get_triggers(self) -> Iterable[Trigger]:
-        # TODO: Add triggers if needed.
-        return []
-
     async def _run_replan_impl(
         self, window_multiplier: int = 1
     ) -> Optional[Tuple[Blueprint, Score]]:
@@ -97,7 +92,10 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         # the daemon process.
         logger.info("Running a replan.")
         self._log_current_metrics()
-        current_workload, next_workload = await self._workload_provider.get_workloads(
+        (
+            current_workload,
+            next_workload,
+        ) = await self._providers.workload_provider.get_workloads(
             datetime.now().astimezone(pytz.utc), window_multiplier
         )
         workload_filters = [

@@ -6,16 +6,10 @@ from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.config.system_event import SystemEvent
-from brad.daemon.monitor import Monitor
 from brad.daemon.system_event_logger import SystemEventLogger
-from brad.planner.compare.function import BlueprintComparator
-from brad.planner.estimator import EstimatorProvider
-from brad.planner.metrics import MetricsProvider
-from brad.planner.scoring.data_access.provider import DataAccessProvider
-from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
+from brad.planner.providers import BlueprintProviders
 from brad.planner.scoring.score import Score
 from brad.planner.triggers.trigger import Trigger
-from brad.planner.workload.provider import WorkloadProvider
 
 logger = logging.getLogger(__name__)
 
@@ -33,40 +27,34 @@ class BlueprintPlanner:
 
     def __init__(
         self,
+        config: ConfigFile,
         planner_config: PlannerConfig,
+        schema_name: str,
         current_blueprint: Blueprint,
         current_blueprint_score: Optional[Score],
-        monitor: Monitor,
-        config: ConfigFile,
-        schema_name: str,
-        workload_provider: WorkloadProvider,
-        analytics_latency_scorer: AnalyticsLatencyScorer,
-        comparator: BlueprintComparator,
-        metrics_provider: MetricsProvider,
-        data_access_provider: DataAccessProvider,
-        estimator_provider: EstimatorProvider,
+        providers: BlueprintProviders,
         system_event_logger: Optional[SystemEventLogger],
     ) -> None:
+        self._config = config
         self._planner_config = planner_config
+        self._schema_name = schema_name
         self._current_blueprint = current_blueprint
         self._current_blueprint_score = current_blueprint_score
         self._last_suggested_blueprint: Optional[Blueprint] = None
         self._last_suggested_blueprint_score: Optional[Score] = None
-        self._monitor = monitor
-        self._config = config
-        self._schema_name = schema_name
 
-        self._workload_provider = workload_provider
-        self._analytics_latency_scorer = analytics_latency_scorer
-        self._comparator = comparator
-        self._metrics_provider = metrics_provider
-        self._data_access_provider = data_access_provider
-        self._estimator_provider = estimator_provider
+        self._providers = providers
         self._system_event_logger = system_event_logger
 
         self._callbacks: List[NewBlueprintCallback] = []
         self._replan_in_progress = False
         self._disable_triggers = False
+
+        self._triggers = self._providers.trigger_provider.get_triggers()
+        for t in self._triggers:
+            t.update_blueprint(self._current_blueprint, self._current_blueprint_score)
+
+        self._comparator = self._providers.comparator_provider.get_comparator()
 
     async def run_forever(self) -> None:
         """
@@ -144,10 +132,9 @@ class BlueprintPlanner:
 
     def get_triggers(self) -> Iterable[Trigger]:
         """
-        Implementers should return the triggers used to trigger blueprint
-        replanning.
+        The triggers used to trigger blueprint replanning.
         """
-        raise NotImplementedError
+        return self._triggers
 
     def set_disable_triggers(self, disable: bool) -> None:
         """
