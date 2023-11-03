@@ -34,10 +34,12 @@ from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.front_end.start_front_end import start_front_end
 from brad.planner.abstract import BlueprintPlanner
-from brad.planner.compare.cost import best_cost_under_perf_ceilings
+from brad.planner.compare.provider import PerformanceCeilingComparatorProvider
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import MetricsFromMonitor
+from brad.planner.providers import BlueprintProviders
+from brad.planner.router_provider import RouterProvider
 from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.data_access.precomputed_values import (
@@ -47,8 +49,9 @@ from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyS
 from brad.planner.scoring.performance.precomputed_predictions import (
     PrecomputedPredictions,
 )
-from brad.planner.triggers.trigger import Trigger
+from brad.planner.triggers.provider import ConfigDefinedTriggers
 from brad.planner.triggers.recent_change import RecentChange
+from brad.planner.triggers.trigger import Trigger
 from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import LoggedWorkloadProvider
@@ -179,9 +182,9 @@ class BradDaemon:
                     aurora_accessed_pages_path=self._temp_config.aurora_data_access_path(),
                     athena_accessed_bytes_path=self._temp_config.athena_data_access_path(),
                 )
-            comparator = best_cost_under_perf_ceilings(
-                max_query_latency_s=self._temp_config.latency_ceiling_s(),
-                max_txn_p90_latency_s=self._temp_config.txn_latency_p90_ceiling_s(),
+            comparator_provider = PerformanceCeilingComparatorProvider(
+                self._temp_config.latency_ceiling_s(),
+                self._temp_config.txn_latency_p90_ceiling_s(),
             )
         else:
             logger.warning(
@@ -189,17 +192,12 @@ class BradDaemon:
             )
             latency_scorer = _NoopAnalyticsScorer()
             data_access_provider = _NoopDataAccessProvider()
-            comparator = best_cost_under_perf_ceilings(
-                max_query_latency_s=10, max_txn_p90_latency_s=0.030
-            )
+            comparator_provider = PerformanceCeilingComparatorProvider(30.0, 0.030)
 
-        self._planner = BlueprintPlannerFactory.create(
-            planner_config=self._planner_config,
-            current_blueprint=self._blueprint_mgr.get_blueprint(),
-            current_blueprint_score=self._blueprint_mgr.get_active_score(),
-            monitor=self._monitor,
-            config=self._config,
-            schema_name=self._schema_name,
+        router_provider = RouterProvider(
+            self._schema_name, self._config, self._estimator_provider
+        )
+        providers = BlueprintProviders(
             workload_provider=LoggedWorkloadProvider(
                 self._config,
                 self._planner_config,
@@ -207,10 +205,26 @@ class BradDaemon:
                 self._schema_name,
             ),
             analytics_latency_scorer=latency_scorer,
-            comparator=comparator,
+            comparator_provider=comparator_provider,
             metrics_provider=MetricsFromMonitor(self._monitor, self._blueprint_mgr),
             data_access_provider=data_access_provider,
             estimator_provider=self._estimator_provider,
+            trigger_provider=ConfigDefinedTriggers(
+                self._config,
+                self._planner_config,
+                self._monitor,
+                data_access_provider,
+                router_provider,
+            ),
+            router_provider=router_provider,
+        )
+        self._planner = BlueprintPlannerFactory.create(
+            config=self._config,
+            planner_config=self._planner_config,
+            schema_name=self._schema_name,
+            current_blueprint=self._blueprint_mgr.get_blueprint(),
+            current_blueprint_score=self._blueprint_mgr.get_active_score(),
+            providers=providers,
             system_event_logger=self._system_event_logger,
         )
         self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
