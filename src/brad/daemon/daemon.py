@@ -182,10 +182,10 @@ class BradDaemon:
                     aurora_accessed_pages_path=self._temp_config.aurora_data_access_path(),
                     athena_accessed_bytes_path=self._temp_config.athena_data_access_path(),
                 )
-                comparator_provider = PerformanceCeilingComparatorProvider(
-                    self._temp_config.latency_ceiling_s(),
-                    self._temp_config.txn_latency_p90_ceiling_s(),
-                )
+            comparator_provider = PerformanceCeilingComparatorProvider(
+                self._temp_config.latency_ceiling_s(),
+                self._temp_config.txn_latency_p90_ceiling_s(),
+            )
         else:
             logger.warning(
                 "TempConfig not provided. The planner will not be able to run correctly."

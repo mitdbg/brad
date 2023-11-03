@@ -361,8 +361,12 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             # We added the table to Athena.
             best_candidate.storage_cost += compute_single_athena_table_cost(tbl, ctx)
 
+        # 9. Output the new blueprint.
+        best_blueprint = best_candidate.to_blueprint()
+        best_blueprint_score = best_candidate.to_score()
+
         logger.info("Selected blueprint:")
-        logger.info("%s", best_candidate)
+        logger.info("%s", best_blueprint)
         debug_values = best_candidate.to_debug_values()
         logger.info(
             "Selected blueprint details: %s", json.dumps(debug_values, indent=2)
@@ -371,9 +375,6 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             "Metrics used during planning: %s", json.dumps(metrics._asdict(), indent=2)
         )
 
-        # 9. Output the new blueprint.
-        best_blueprint = best_candidate.to_blueprint()
-        best_blueprint_score = best_candidate.to_score()
         return best_blueprint, best_blueprint_score
 
 
