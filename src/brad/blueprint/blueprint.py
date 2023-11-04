@@ -1,11 +1,9 @@
-from typing import Callable, Dict, List, Set, Optional, Tuple, Any
+from typing import Dict, List, Set, Optional, Tuple, Any
 
 from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.table import Table
 from brad.config.engine import Engine
-from brad.routing.router import Router
-
-RouterProvider = Callable[[], Router]
+from brad.routing.abstract_policy import FullRoutingPolicy
 
 
 class Blueprint:
@@ -16,14 +14,14 @@ class Blueprint:
         table_locations: Dict[str, List[Engine]],
         aurora_provisioning: Provisioning,
         redshift_provisioning: Provisioning,
-        router_provider: Optional[RouterProvider],
+        full_routing_policy: FullRoutingPolicy,
     ):
         self._schema_name = schema_name
         self._table_schemas = table_schemas
         self._table_locations = table_locations
         self._aurora_provisioning = aurora_provisioning
         self._redshift_provisioning = redshift_provisioning
-        self._router_provider = router_provider
+        self._full_routing_policy = full_routing_policy
 
         # Derived properties used for the class' methods.
         self._tables_by_name = {tbl.name: tbl for tbl in self._table_schemas}
@@ -57,11 +55,8 @@ class Blueprint:
     def redshift_provisioning(self) -> Provisioning:
         return self._redshift_provisioning
 
-    def get_router(self) -> Optional[Router]:
-        return self._router_provider() if self._router_provider is not None else None
-
-    def router_provider(self) -> Optional[RouterProvider]:
-        return self._router_provider
+    def get_routing_policy(self) -> FullRoutingPolicy:
+        return self._full_routing_policy
 
     def base_table_names(self) -> Set[str]:
         return self._base_table_names

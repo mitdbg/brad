@@ -21,7 +21,7 @@ class EnumeratedBlueprint(Blueprint):
             base_blueprint.table_locations(),
             base_blueprint.aurora_provisioning(),
             base_blueprint.redshift_provisioning(),
-            base_blueprint.router_provider(),
+            base_blueprint.get_routing_policy(),
         )
         self._current_locations = base_blueprint.table_locations()
         self._current_aurora_provisioning = base_blueprint.aurora_provisioning()
@@ -57,7 +57,7 @@ class EnumeratedBlueprint(Blueprint):
             },
             aurora_provisioning=self._current_aurora_provisioning.clone(),
             redshift_provisioning=self._current_redshift_provisioning.clone(),
-            router_provider=self.router_provider(),
+            full_routing_policy=self.get_routing_policy(),
         )
 
     # Overridden getters.
