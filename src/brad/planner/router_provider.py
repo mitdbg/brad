@@ -3,10 +3,11 @@ from typing import Dict, Optional
 from brad.asset_manager import AssetManager
 from brad.config.file import ConfigFile
 from brad.planner.estimator import EstimatorProvider
+from brad.routing.abstract_policy import AbstractRoutingPolicy
 from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
 from brad.routing.rule_based import RuleBased
-from brad.routing.tree_based.forest_router import ForestRouter
+from brad.routing.tree_based.forest_policy import ForestPolicy
 from brad.routing.tree_based.model_wrap import ModelWrap
 
 
@@ -38,19 +39,17 @@ class RouterProvider:
             or self._routing_policy == RoutingPolicy.ForestTableSelectivity
         ):
             if self._model is None:
-                self._model = ForestRouter.static_load_model_sync(
+                self._model = ForestPolicy.static_load_model_sync(
                     self._schema_name,
                     self._routing_policy,
                     self._assets,
                 )
-            router = ForestRouter.for_planner(
-                self._routing_policy, self._schema_name, self._model, table_bitmap
+            definite_policy: AbstractRoutingPolicy = ForestPolicy.from_loaded_model(
+                self._routing_policy, self._model
             )
-            await router.run_setup(self._estimator_provider.get_estimator())
-            return router
 
         elif self._routing_policy == RoutingPolicy.RuleBased:
-            return RuleBased(table_placement_bitmap=table_bitmap)
+            definite_policy = RuleBased(table_placement_bitmap=table_bitmap)
 
         else:
             raise RuntimeError(
@@ -58,6 +57,11 @@ class RouterProvider:
                     self._routing_policy.value
                 )
             )
+
+        # This is temporary and will be removed.
+        router = Router.create_from_definite_policy(definite_policy, table_bitmap)
+        await router.run_setup(self._estimator_provider.get_estimator())
+        return router
 
     def clear_cached(self) -> None:
         self._model = None

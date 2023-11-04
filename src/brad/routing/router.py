@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Dict, Tuple, Optional, TYPE_CHECKING
 
 from brad.data_stats.estimator import Estimator
@@ -8,6 +9,8 @@ from brad.routing.abstract_policy import AbstractRoutingPolicy, FullRoutingPolic
 
 if TYPE_CHECKING:
     from brad.blueprint import Blueprint
+
+logger = logging.getLogger(__name__)
 
 
 class Router:
@@ -38,6 +41,13 @@ class Router:
         self._full_policy = full_policy
         self._table_placement_bitmap = table_placement_bitmap
         self._use_future_blueprint_policies = use_future_blueprint_policies
+
+    def log_policy(self) -> None:
+        logger.info("Routing policy:")
+        logger.info("  Indefinite policies:")
+        for p in self._full_policy.indefinite_policies:
+            logger.info("    - %s", p.name())
+        logger.info("  Definite policy: %s")
 
     async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
         """

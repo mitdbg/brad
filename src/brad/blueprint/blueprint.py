@@ -1,4 +1,4 @@
-from typing import Dict, List, Set, Optional, Tuple, Any
+from typing import Dict, List, Set, Tuple, Any
 
 from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.table import Table

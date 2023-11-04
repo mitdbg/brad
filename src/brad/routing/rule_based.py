@@ -9,7 +9,7 @@ from brad.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.blueprint.manager import BlueprintManager
 from brad.daemon.monitor import Monitor
-from brad.routing.router import Router
+from brad.routing.abstract_policy import AbstractRoutingPolicy
 from brad.query_rep import QueryRep
 from brad.front_end.session import SessionManager
 
@@ -54,7 +54,7 @@ class RuleBasedParams(object):
         self.redshift_parameters_lower_limit = redshift_parameters_lower_limit
 
 
-class RuleBased(Router):
+class RuleBased(AbstractRoutingPolicy):
     def __init__(
         self,
         # One of `blueprint_mgr` and `blueprint` must not be `None`.
@@ -84,6 +84,9 @@ class RuleBased(Router):
         # non-determinism will be used for offline training data exploration (not implemented)
         self._deterministic = deterministic
         self._params = RuleBasedParams()
+
+    def name(self) -> str:
+        return "RuleBased"
 
     def update_blueprint(self, blueprint: Blueprint) -> None:
         self._blueprint = blueprint
@@ -207,25 +210,8 @@ class RuleBased(Router):
             return True
         return not_overloaded
 
-    def engine_for_sync(self, query: QueryRep) -> Engine:
-        if self._table_placement_bitmap is None:
-            if self._blueprint is not None:
-                blueprint = self._blueprint
-            else:
-                assert self._blueprint_mgr is not None
-                blueprint = self._blueprint_mgr.get_blueprint()
-            self._table_placement_bitmap = blueprint.table_locations_bitmap()
-
-        valid_locations, only_location = self._run_location_routing(
-            query, self._table_placement_bitmap
-        )
-        if only_location is not None:
-            return only_location
-
-        locations = Engine.from_bitmap(valid_locations)
-        assert len(locations) > 1
-        ideal_location_rank: List[Engine] = []
-        touched_tables = query.tables()
+    def engine_for_sync(self, query_rep: QueryRep) -> List[Engine]:
+        touched_tables = query_rep.tables()
         if (
             len(touched_tables)
             < self._params.ideal_location_lower_limit["redshift_num_table"]
@@ -239,7 +225,7 @@ class RuleBased(Router):
             if self._catalog:
                 n_rows = []
                 n_cols = []
-                for table_name in query.tables():
+                for table_name in query_rep.tables():
                     if table_name in self._catalog:
                         n_rows.append(self._catalog[table_name]["nrow"])
                         n_cols.append(self._catalog[table_name]["ncol"])
@@ -269,7 +255,7 @@ class RuleBased(Router):
             ideal_location_rank = [Engine.Redshift, Engine.Athena, Engine.Aurora]
             if self._catalog:
                 n_rows = []
-                for table_name in query.tables():
+                for table_name in query_rep.tables():
                     if table_name in self._catalog:
                         n_rows.append(self._catalog[table_name]["nrow"])
                 if (
@@ -287,11 +273,8 @@ class RuleBased(Router):
             ideal_location_rank = [Engine.Athena, Engine.Redshift, Engine.Aurora]
 
         if self._monitor is None:
-            for loc in ideal_location_rank:
-                if loc in locations:
-                    return loc
-            # This should be unreachable since len(locations) > 0.
-            assert False
+            return ideal_location_rank
+
         else:
             # Todo(Ziniu): this can be stored in this class to reduce latency
             raw_aurora_metrics = (
@@ -304,21 +287,14 @@ class RuleBased(Router):
                 logger.warning(
                     "Routing without system metrics when we expect to have metrics."
                 )
-                return ideal_location_rank[0]
+                return ideal_location_rank
 
             aurora_metrics = raw_aurora_metrics.iloc[0].to_dict()
             redshift_metrics = raw_redshift_metrics.iloc[0].to_dict()
             for loc in ideal_location_rank:
-                if loc in locations and self.check_engine_state(
-                    loc, aurora_metrics, redshift_metrics
-                ):
-                    return loc
+                if self.check_engine_state(loc, aurora_metrics, redshift_metrics):
+                    return [loc, *[il for il in ideal_location_rank if il != loc]]
 
             # In the case of all system are overloaded (time to trigger replan),
             # we assign it to the optimal one. But Athena should not be overloaded at any time
-            for loc in ideal_location_rank:
-                if loc in locations:
-                    return loc
-
-            # Should be unreachable since len(locations) > 0.
-            assert False
+            return ideal_location_rank

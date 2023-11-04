@@ -13,6 +13,9 @@ class RoundRobin(AbstractRoutingPolicy):
     def __init__(self):
         self._ordering = [Engine.Athena, Engine.Aurora, Engine.Redshift]
 
+    def name(self) -> str:
+        return "RoundRobin"
+
     def engine_for_sync(self, _query: QueryRep) -> List[Engine]:
         tmp = self._ordering[0]
         self._ordering[0] = self._ordering[1]
