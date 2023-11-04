@@ -57,7 +57,7 @@ class ScalingScorer(Scorer):
     def _simulate_next_workload(self, ctx: ScoringContext) -> None:
         # NOTE: The routing policy should be included in the blueprint. We
         # currently hardcode it here for engineering convenience.
-        router = RuleBased(blueprint=ctx.next_blueprint)
+        router = RuleBased()
 
         # See where each analytical query gets routed.
         for q in ctx.next_workload.analytical_queries():

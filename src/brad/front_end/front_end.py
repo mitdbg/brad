@@ -214,7 +214,7 @@ class BradFrontEnd(BradInterface):
             elif self._routing_policy_override == RoutingPolicy.RuleBased:
                 # TODO: If we need metrics, re-create the monitor here. It's
                 # easier to not have it created.
-                definite_policy = RuleBased(blueprint=blueprint, monitor=None)
+                definite_policy = RuleBased()
             elif (
                 self._routing_policy_override == RoutingPolicy.ForestTablePresence
                 or self._routing_policy_override == RoutingPolicy.ForestTableSelectivity

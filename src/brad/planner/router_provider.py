@@ -49,7 +49,7 @@ class RouterProvider:
             )
 
         elif self._routing_policy == RoutingPolicy.RuleBased:
-            definite_policy = RuleBased(table_placement_bitmap=table_bitmap)
+            definite_policy = RuleBased()
 
         else:
             raise RuntimeError(

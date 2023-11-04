@@ -1,13 +1,12 @@
 import os.path
 import json
 import logging
-from typing import List, Optional, Mapping, MutableMapping, Any, Dict
+from typing import List, Optional, Mapping, MutableMapping, Any
 from importlib.resources import files, as_file
 
 import brad.routing
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
-from brad.blueprint.manager import BlueprintManager
 from brad.daemon.monitor import Monitor
 from brad.routing.abstract_policy import AbstractRoutingPolicy
 from brad.query_rep import QueryRep
@@ -57,18 +56,9 @@ class RuleBasedParams(object):
 class RuleBased(AbstractRoutingPolicy):
     def __init__(
         self,
-        # One of `blueprint_mgr` and `blueprint` must not be `None`.
-        blueprint_mgr: Optional[BlueprintManager] = None,
-        blueprint: Optional[Blueprint] = None,
-        table_placement_bitmap: Optional[Dict[str, int]] = None,
         monitor: Optional[Monitor] = None,
         catalog: Optional[MutableMapping[str, MutableMapping[str, Any]]] = None,
-        use_decision_tree: bool = False,
-        deterministic: bool = True,
     ):
-        self._blueprint_mgr = blueprint_mgr
-        self._blueprint = blueprint
-        self._table_placement_bitmap = table_placement_bitmap
         self._monitor = monitor
         # catalog contains all tables' number of rows and columns
         self._catalog = catalog
@@ -78,21 +68,14 @@ class RuleBased(AbstractRoutingPolicy):
                 if os.path.exists(file):
                     with open(file, "r", encoding="utf8") as f:
                         self._catalog = json.load(f)
-        # use decision tree instead of rules
-        self._use_decision_tree = use_decision_tree
-        # deterministic routing guarantees the same decision for the same query and should be used online
-        # non-determinism will be used for offline training data exploration (not implemented)
-        self._deterministic = deterministic
         self._params = RuleBasedParams()
 
     def name(self) -> str:
         return "RuleBased"
 
-    def update_blueprint(self, blueprint: Blueprint) -> None:
-        self._blueprint = blueprint
-        self._table_placement_bitmap = blueprint.table_locations_bitmap()
-
-    async def recollect_catalog(self, sessions: SessionManager) -> None:
+    async def recollect_catalog(
+        self, sessions: SessionManager, blueprint: Blueprint
+    ) -> None:
         # recollect catalog stats; happens every maintenance window
         if self._catalog is None:
             self._catalog = dict()
@@ -104,12 +87,6 @@ class RuleBased(AbstractRoutingPolicy):
         # Since only Aurora handles txn, we only need connection to Aurora
         connection = session.engines.get_connection(Engine.Aurora)
         cursor = await connection.cursor()
-
-        if self._blueprint is not None:
-            blueprint = self._blueprint
-        else:
-            assert self._blueprint_mgr is not None
-            blueprint = self._blueprint_mgr.get_blueprint()
 
         indexes_sql = (
             "SELECT tablename, indexname, indexdef FROM pg_indexes WHERE schemaname = 'public' "

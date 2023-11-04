@@ -194,7 +194,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
     def _estimate_current_data_accessed(
         self, engines: EngineConnections, current_workload: Workload
     ) -> Dict[Engine, int]:
-        current_router = RuleBased(blueprint=self._current_blueprint)
+        current_router = RuleBased()
 
         total_accessed_mb: Dict[Engine, int] = {}
         total_accessed_mb[Engine.Aurora] = 0
