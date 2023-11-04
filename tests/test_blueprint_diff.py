@@ -5,6 +5,8 @@ from brad.blueprint.table import Table
 from brad.blueprint.user import UserProvidedBlueprint
 from brad.config.engine import Engine
 from brad.planner.data import bootstrap_blueprint
+from brad.routing.abstract_policy import FullRoutingPolicy
+from brad.routing.always_one import AlwaysOneRouter
 
 
 def test_no_diff():
@@ -72,7 +74,7 @@ def test_provisioning_change():
         initial.table_locations(),
         initial.aurora_provisioning(),
         Provisioning(instance_type="dc2.large", num_nodes=4),
-        router_provider=None,
+        full_routing_policy=FullRoutingPolicy([], AlwaysOneRouter(Engine.Aurora)),
     )
     diff = BlueprintDiff.of(initial, changed)
     assert diff is not None

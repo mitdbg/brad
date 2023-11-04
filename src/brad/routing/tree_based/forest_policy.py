@@ -46,11 +46,11 @@ class ForestPolicy(AbstractRoutingPolicy):
     async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
         self._estimator = estimator
 
-    async def engine_for(self, query: QueryRep) -> List[Engine]:
-        return await self._model.engine_for(query, self._estimator)
+    async def engine_for(self, query_rep: QueryRep) -> List[Engine]:
+        return await self._model.engine_for(query_rep, self._estimator)
 
-    def engine_for_sync(self, query: QueryRep) -> List[Engine]:
-        return asyncio.run(self.engine_for(query))
+    def engine_for_sync(self, query_rep: QueryRep) -> List[Engine]:
+        return asyncio.run(self.engine_for(query_rep))
 
     # The methods below are used to save/load `ModelWrap` from S3. We
     # historically separated out the model's implementation details because the

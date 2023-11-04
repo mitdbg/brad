@@ -204,7 +204,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         # Compute the total amount of data accessed on each engine in the
         # current workload (used to weigh the workload assigned to each engine).
         for q in current_workload.analytical_queries():
-            current_engine = current_router.engine_for_sync(q)
+            current_engines = current_router.engine_for_sync(q)
+            assert len(current_engines) > 0
+            current_engine = current_engines[0]
             q.populate_data_accessed_mb(
                 current_engine, engines, self._current_blueprint
             )
