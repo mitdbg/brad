@@ -65,8 +65,7 @@ class Router:
         """
         self._table_placement_bitmap = blueprint.table_locations_bitmap()
         if self._use_future_blueprint_policies:
-            # TODO: Deserialize from the blueprint.
-            pass
+            self._full_policy = blueprint.get_routing_policy()
 
     async def engine_for(self, query: QueryRep) -> Engine:
         """
