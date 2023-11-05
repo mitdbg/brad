@@ -33,6 +33,7 @@ from brad.planner.scoring.table_placement import compute_single_athena_table_cos
 from brad.planner.triggers.provider import EmptyTriggerProvider
 from brad.planner.workload import Workload
 from brad.planner.workload.provider import WorkloadProvider
+from brad.routing.router import Router
 
 
 logger = logging.getLogger(__name__)
@@ -118,11 +119,11 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             metrics,
             self._planner_config,
         )
-        await ctx.simulate_current_workload_routing(
-            await self._providers.router_provider.get_router(
-                self._current_blueprint.table_locations_bitmap()
-            )
+        current_workload_router = Router.create_from_blueprint(self._current_blueprint)
+        await current_workload_router.run_setup(
+            self._providers.estimator_provider.get_estimator()
         )
+        await ctx.simulate_current_workload_routing(current_workload_router)
         ctx.compute_engine_latency_norm_factor()
 
         beam_size = self._planner_config.beam_size()
@@ -251,9 +252,14 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         for candidate in current_top_k:
             query_indices = candidate.get_all_query_indices()
             candidate.reset_routing()
-            router = await self._providers.router_provider.get_router(
-                candidate.table_placements
+            # We will also select a routing policy here instead of re-routing.
+            # This is the legacy approach.
+            router = Router(
+                self._current_blueprint.get_routing_policy(),
+                candidate.table_placements,
+                use_future_blueprint_policies=True,
             )
+            await router.run_setup(self._providers.estimator_provider.get_estimator())
             for qidx in query_indices:
                 query = analytical_queries[qidx]
                 routing_engine = await router.engine_for(query)

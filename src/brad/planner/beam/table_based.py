@@ -34,6 +34,7 @@ from brad.planner.scoring.table_placement import compute_single_athena_table_cos
 from brad.planner.triggers.provider import EmptyTriggerProvider
 from brad.planner.workload import Workload
 from brad.planner.workload.provider import WorkloadProvider
+from brad.routing.router import Router
 
 logger = logging.getLogger(__name__)
 
@@ -114,11 +115,11 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             metrics,
             self._planner_config,
         )
-        await ctx.simulate_current_workload_routing(
-            await self._providers.router_provider.get_router(
-                self._current_blueprint.table_locations_bitmap(),
-            )
+        planning_router = Router.create_from_blueprint(self._current_blueprint)
+        await planning_router.run_setup(
+            self._providers.estimator_provider.get_estimator()
         )
+        await ctx.simulate_current_workload_routing(planning_router)
         ctx.compute_engine_latency_norm_factor()
 
         beam_size = self._planner_config.beam_size()
@@ -138,8 +139,9 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             candidate.add_transactional_tables(ctx)
             tables, queries, _ = first_cluster
             placement_changed = candidate.add_placement(placement_bitmap, tables, ctx)
+            planning_router.update_placement(candidate.table_placements)
             await candidate.add_query_cluster(
-                self._providers.router_provider,
+                planning_router,
                 queries,
                 reroute_prev=placement_changed,
                 ctx=ctx,
@@ -192,8 +194,9 @@ class TableBasedBeamPlanner(BlueprintPlanner):
                         # table placement that includes this query cluster.
                         continue
 
+                    planning_router.update_placement(next_candidate.table_placements)
                     await next_candidate.add_query_cluster(
-                        self._providers.router_provider,
+                        planning_router,
                         queries,
                         reroute_prev=placement_changed,
                         ctx=ctx,
