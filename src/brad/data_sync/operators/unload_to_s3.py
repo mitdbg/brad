@@ -1,4 +1,3 @@
-import boto3
 import logging
 from typing import Optional
 
@@ -126,7 +125,7 @@ class UnloadToS3(Operator):
 
         athena_output_prefix = ctx.athena_s3_output_path()[
             (len("s3://") + len(ctx.s3_bucket()) + 1) :
-        ] # Remove the bucket name from the path
+        ]  # Remove the bucket name from the path
 
         objects = ctx.s3_client().list_objects_v2(
             Bucket=ctx.s3_bucket(),
@@ -148,7 +147,9 @@ class UnloadToS3(Operator):
                 Key=f"{ctx.s3_path()}transition/{self._table_name}/{self._table_name}.tbl",
             )
 
-            logger.debug(f"Extracted table to {ctx.s3_path()}transition/{self._table_name}/{self._table_name}.tbl")
+            logger.debug(
+                f"Extracted table to {ctx.s3_path()}transition/{self._table_name}/{self._table_name}.tbl"
+            )
         else:
             logger.error(
                 f"Could not extract table {self._table_name} from Athena to S3."

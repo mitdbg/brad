@@ -40,6 +40,7 @@ class TransitionOrchestrator:
         self._redshift = RedshiftProvisioningManager(config)
         self._waiting_for_front_ends = 0
         self._data_sync_executor = DataSyncExecutor(self._config, self._blueprint_mgr)
+        self._cxns: Optional[EngineConnections] = None
 
         self._refresh_transition_metadata()
 
@@ -431,6 +432,7 @@ class TransitionOrchestrator:
             dt = DropTables(tables_to_drop, Engine.Aurora)
             await dt.execute(ctx)
 
+            assert self._cxns is not None
             self._cxns.get_connection(Engine.Aurora).cursor_sync().commit_sync()
 
         # Aurora's post-transition work is complete!
@@ -504,15 +506,16 @@ class TransitionOrchestrator:
             d = DropTables(to_drop, Engine.Redshift)
             ctx = self._new_execution_context()
             await d.execute(ctx)
+            assert self._cxns is not None
             self._cxns.get_connection(Engine.Redshift).cursor_sync().commit_sync()
 
     async def _run_athena_post_transition(
         self,
         table_diffs: Optional[list[TableDiff]],
     ) -> None:
-        if table_diffs is not None:
-            # Drop removed tables
-            to_drop = []
+        # Drop removed tables
+        to_drop = []
+        if table_diffs is not None and self._diff is not None:
             for table_diff in self._diff.table_diffs():
                 if Engine.Athena in table_diff.removed_locations():
                     to_drop.append(table_diff.table_name())
@@ -546,6 +549,7 @@ class TransitionOrchestrator:
         await d.execute(ctx)
 
     async def _unload_table(self, table_name: str, s3_path: str) -> None:
+        assert self._curr_blueprint is not None
         curr_locations = self._curr_blueprint.get_table_locations(table_name)
 
         # TODO: The logic here assumes that all engines have the most recent version.
@@ -604,18 +608,17 @@ class TransitionOrchestrator:
                     e,
                     delimiter=",",
                     header_rows=1,
-                    aurora_columns=comma_separated_column_names(
-                        columns
-                    ),
+                    aurora_columns=comma_separated_column_names(columns),
                 )
                 await l.execute(ctx)
 
             # TODO: do we need to manually set the values in the bookkeeping column?
-
+            assert self._cxns is not None
             self._cxns.get_connection(Engine.Aurora).cursor_sync().commit_sync()
         elif e == Engine.Redshift:
             l = LoadFromS3(table_name, s3_path_prefix, e, delimiter=",", header_rows=1)
             await l.execute(ctx)
+            assert self._cxns is not None
             self._cxns.get_connection(Engine.Redshift).cursor_sync().commit_sync()
         elif e == Engine.Athena:
             l = LoadFromS3(table_name, s3_path_prefix, e, delimiter=",", header_rows=1)

@@ -26,7 +26,7 @@ from brad.routing.rule_based import RuleBased
 logger = logging.getLogger(__name__)
 
 
-# Parse string-formatted injected table placement. 
+# Parse string-formatted injected table placement.
 class ParseTableList(argparse.Action):
     def __call__(self, parser, namespace, s, option_string=None):
         mappings = {}
@@ -280,8 +280,7 @@ def modify_blueprint(args) -> None:
         new_placement[table] = engines
     enum_blueprint.set_table_locations(new_placement)
 
-
-    if args.place_tables_everywhere: # Overrides manual placement above.
+    if args.place_tables_everywhere:  # Overrides manual placement above.
         new_placement = {}
         for tbl in blueprint.table_locations().keys():
             new_placement[tbl] = Engine.from_bitmap(Engine.bitmap_all())
@@ -305,7 +304,7 @@ def modify_blueprint(args) -> None:
             )
         full_policy = FullRoutingPolicy([], definite_policy)
         enum_blueprint.set_routing_policy(full_policy)
-    
+
     # 6. Write the changes back.
     modified_blueprint = enum_blueprint.to_blueprint()
     if blueprint == modified_blueprint:

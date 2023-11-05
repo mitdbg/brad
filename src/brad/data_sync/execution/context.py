@@ -81,7 +81,7 @@ class ExecutionContext:
 
     def s3_client(self):
         return self._s3_client
-    
+
     def athena_s3_output_path(self) -> str:
         return self._athena_s3_output_path
 

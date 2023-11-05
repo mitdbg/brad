@@ -3,7 +3,6 @@ import logging
 from .operator import Operator
 from brad.data_sync.execution.context import ExecutionContext
 from brad.config.engine import Engine
-from brad.data_sync.s3_path import S3Path
 from brad.blueprint.sql_gen.table import comma_separated_column_names_and_types
 
 logger = logging.getLogger(__name__)
@@ -44,7 +43,15 @@ class LoadFromS3(Operator):
     Loads data (stored on S3) into a table on an engine.
     """
 
-    def __init__(self, table_name: str, relative_s3_path: str, engine: Engine, delimiter: str = '|', header_rows: int = 0, aurora_columns: str = "") -> None:
+    def __init__(
+        self,
+        table_name: str,
+        relative_s3_path: str,
+        engine: Engine,
+        delimiter: str = "|",
+        header_rows: int = 0,
+        aurora_columns: str = "",
+    ) -> None:
         """
         NOTE: All S3 paths are relative to the extract path, specified in the
         configuration.
@@ -88,7 +95,7 @@ class LoadFromS3(Operator):
             s3_region=ctx.s3_region(),
             s3_path="{}{}".format(ctx.s3_path(), self._relative_s3_path),
             delimiter=self._delimiter,
-            header_str = ", HEADER" if self._header_rows > 0 else "",
+            header_str=", HEADER" if self._header_rows > 0 else "",
         )
         logger.debug("Running on Aurora: %s", query)
         aurora = await ctx.aurora()
@@ -111,14 +118,16 @@ class LoadFromS3(Operator):
 
     async def _execute_athena(self, ctx: ExecutionContext) -> "Operator":
         # TODO: this duplicates code from `brad.admin.bulk_load._load_athena()`
-        # Consider refactoring, possibly by having bulk load call into functionlaity from here. 
+        # Consider refactoring, possibly by having bulk load call into functionlaity from here.
 
         table = ctx.blueprint().get_table(self._table_name)
 
         # 1. We need to create a loading table.
         query = _ATHENA_CREATE_LOAD_TABLE.format(
             load_table_name="{}_brad_loading".format(self._table_name),
-            columns=comma_separated_column_names_and_types(table.columns, Engine.Athena),
+            columns=comma_separated_column_names_and_types(
+                table.columns, Engine.Athena
+            ),
             s3_bucket=ctx.s3_bucket(),
             s3_path="{}{}".format(ctx.s3_path(), self._relative_s3_path),
             delimiter=self._delimiter,
@@ -129,8 +138,10 @@ class LoadFromS3(Operator):
         await athena.execute(query)
 
         # 2. Actually run the load.
-        query = "INSERT INTO {table_name} SELECT * FROM {table_name}_brad_loading".format(
-            table_name=self._table_name
+        query = (
+            "INSERT INTO {table_name} SELECT * FROM {table_name}_brad_loading".format(
+                table_name=self._table_name
+            )
         )
         logger.debug("Running on Athena %s", query)
         await athena.execute(query)
