@@ -194,7 +194,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
     def _estimate_current_data_accessed(
         self, engines: EngineConnections, current_workload: Workload
     ) -> Dict[Engine, int]:
-        current_router = RuleBased(blueprint=self._current_blueprint)
+        current_router = RuleBased()
 
         total_accessed_mb: Dict[Engine, int] = {}
         total_accessed_mb[Engine.Aurora] = 0
@@ -204,7 +204,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         # Compute the total amount of data accessed on each engine in the
         # current workload (used to weigh the workload assigned to each engine).
         for q in current_workload.analytical_queries():
-            current_engine = current_router.engine_for_sync(q)
+            current_engines = current_router.engine_for_sync(q)
+            assert len(current_engines) > 0
+            current_engine = current_engines[0]
             q.populate_data_accessed_mb(
                 current_engine, engines, self._current_blueprint
             )

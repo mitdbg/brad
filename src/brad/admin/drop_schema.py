@@ -8,7 +8,7 @@ from brad.config.file import ConfigFile
 from brad.front_end.engine_connections import EngineConnections
 from brad.provisioning.directory import Directory
 from brad.routing.policy import RoutingPolicy
-from brad.routing.tree_based.forest_router import ForestRouter
+from brad.routing.tree_based.forest_policy import ForestPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +56,10 @@ def drop_schema(args):
 
     # 4. Drop any serialized routers.
     assets = AssetManager(config)
-    ForestRouter.static_drop_model_sync(
+    ForestPolicy.static_drop_model_sync(
         args.schema_name, RoutingPolicy.ForestTableSelectivity, assets
     )
-    ForestRouter.static_drop_model_sync(
+    ForestPolicy.static_drop_model_sync(
         args.schema_name, RoutingPolicy.ForestTablePresence, assets
     )
 

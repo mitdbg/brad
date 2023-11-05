@@ -2,6 +2,11 @@ import enum
 
 
 class RoutingPolicy(str, enum.Enum):
+    """
+    This is used to override the policy specified by the blueprint (usually for
+    testing purposes).
+    """
+
     Default = "default"
     AlwaysAthena = "always_athena"
     AlwaysAurora = "always_aurora"
@@ -27,4 +32,4 @@ class RoutingPolicy(str, enum.Enum):
         elif candidate == RoutingPolicy.ForestTableSelectivity.value:
             return RoutingPolicy.ForestTableSelectivity
         else:
-            raise ValueError("Unrecognized DB type {}".format(candidate))
+            raise ValueError("Unrecognized policy {}".format(candidate))

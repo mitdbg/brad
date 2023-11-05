@@ -117,7 +117,7 @@ class BlueprintCandidate(ComparableBlueprint):
             self.get_table_placement(),
             self.aurora_provisioning.clone(),
             self.redshift_provisioning.clone(),
-            self._source_blueprint.router_provider(),
+            self._source_blueprint.get_routing_policy(),  # TODO: Use chosen policy.
         )
 
     def to_score(self) -> Score:

@@ -4,6 +4,8 @@ from brad.config.engine import Engine
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.enumeration.table_locations import TableLocationEnumerator
 from brad.planner.enumeration.neighborhood import NeighborhoodBlueprintEnumerator
+from brad.routing.abstract_policy import FullRoutingPolicy
+from brad.routing.always_one import AlwaysOneRouter
 
 
 def test_provisioning_enumerate_aurora():
@@ -65,7 +67,7 @@ def test_blueprint_enumerate():
         {"table1": [Engine.Aurora], "table2": [Engine.Redshift]},
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
-        router_provider=None,
+        full_routing_policy=FullRoutingPolicy([], AlwaysOneRouter(Engine.Aurora)),
     )
 
     # Simple sanity check only.

@@ -7,10 +7,10 @@ def test_always_route_aurora():
     router = AlwaysOneRouter(db)
 
     pred_db = router.engine_for_sync("SELECT 1")
-    assert pred_db == db
+    assert pred_db == [db]
 
     pred_db = router.engine_for_sync("SELECT * FROM my_table")
-    assert pred_db == db
+    assert pred_db == [db]
 
 
 def test_always_route_athena():
@@ -18,10 +18,10 @@ def test_always_route_athena():
     router = AlwaysOneRouter(db)
 
     pred_db = router.engine_for_sync("SELECT 1")
-    assert pred_db == db
+    assert pred_db == [db]
 
     pred_db = router.engine_for_sync("SELECT * FROM my_table")
-    assert pred_db == db
+    assert pred_db == [db]
 
 
 def test_always_route_redshift():
@@ -29,7 +29,7 @@ def test_always_route_redshift():
     router = AlwaysOneRouter(db)
 
     pred_db = router.engine_for_sync("SELECT 1")
-    assert pred_db == db
+    assert pred_db == [db]
 
     pred_db = router.engine_for_sync("SELECT * FROM my_table")
-    assert pred_db == db
+    assert pred_db == [db]
