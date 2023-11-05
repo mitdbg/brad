@@ -82,6 +82,7 @@ class Blueprint:
             and self.table_locations() == other.table_locations()
             and self.aurora_provisioning() == other.aurora_provisioning()
             and self.redshift_provisioning() == other.redshift_provisioning()
+            # TODO: Do we want to check for routing policy equality?
         )
 
     def _compute_base_tables(self) -> Set[str]:
@@ -113,15 +114,33 @@ class Blueprint:
 
     def __repr__(self) -> str:
         # Useful for debugging purposes.
-        aurora = "Aurora: " + str(self.aurora_provisioning())
-        redshift = "Redshift: " + str(self.redshift_provisioning())
+        aurora = "Aurora:    " + str(self.aurora_provisioning())
+        redshift = "Redshift:  " + str(self.redshift_provisioning())
         tables = "\n  ".join(
             map(
                 lambda name_loc: "".join([name_loc[0], ": ", str(name_loc[1])]),
                 self.table_locations().items(),
             )
         )
-        return "\n  ".join(["Blueprint:", tables, aurora, redshift])
+        routing_policy = self.get_routing_policy()
+        indefinite_policies = (
+            f"Indefinite routing policies:  {len(routing_policy.indefinite_policies)}"
+        )
+        definite_policy = (
+            f"Definite routing policy:      {routing_policy.definite_policy.name()}"
+        )
+        return "\n  ".join(
+            [
+                "Blueprint:",
+                tables,
+                "",
+                aurora,
+                redshift,
+                "",
+                indefinite_policies,
+                definite_policy,
+            ]
+        )
 
     def as_dict(self) -> Dict[str, Any]:
         """
