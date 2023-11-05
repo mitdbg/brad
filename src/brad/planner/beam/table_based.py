@@ -23,7 +23,6 @@ from brad.planner.estimator import EstimatorProvider
 from brad.planner.metrics import Metrics, FixedMetricsProvider
 from brad.planner.providers import BlueprintProviders
 from brad.planner.recorded_run import RecordedPlanningRun
-from brad.planner.router_provider import RouterProvider
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.data_access.provider import NoopDataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import (
@@ -443,9 +442,6 @@ class RecordedTableBasedPlanningRun(RecordedPlanningRun, WorkloadProvider):
             data_access_provider=NoopDataAccessProvider(),
             estimator_provider=estimator_provider,
             trigger_provider=EmptyTriggerProvider(),
-            router_provider=RouterProvider(
-                self._schema_name, self._config, estimator_provider
-            ),
         )
         return TableBasedBeamPlanner(
             self._config,

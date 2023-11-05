@@ -15,7 +15,6 @@ from brad.planner.compare.provider import PerformanceCeilingComparatorProvider
 from brad.planner.estimator import EstimatorProvider, FixedEstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.providers import BlueprintProviders
-from brad.planner.router_provider import RouterProvider
 from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.precomputed_values import (
     PrecomputedDataAccessProvider,
@@ -243,7 +242,6 @@ async def run_planner_impl(args) -> None:
         data_access_provider=data_access_provider,
         estimator_provider=estimator_provider,
         trigger_provider=EmptyTriggerProvider(),
-        router_provider=RouterProvider(args.schema_name, config, estimator_provider),
     )
     planner = BlueprintPlannerFactory.create(
         config=config,
