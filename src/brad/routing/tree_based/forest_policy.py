@@ -43,6 +43,11 @@ class ForestPolicy(AbstractRoutingPolicy):
     def name(self) -> str:
         return f"ForestPolicy({self._policy.name})"
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ForestPolicy):
+            return False
+        return self._policy == other._policy and self._model == other.model
+
     async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
         self._estimator = estimator
 

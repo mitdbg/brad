@@ -22,3 +22,6 @@ class RoundRobin(AbstractRoutingPolicy):
         self._ordering[1] = self._ordering[2]
         self._ordering[2] = tmp
         return self._ordering
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, RoundRobin)

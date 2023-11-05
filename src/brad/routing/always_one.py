@@ -21,3 +21,6 @@ class AlwaysOneRouter(AbstractRoutingPolicy):
 
     def engine_for_sync(self, _query: QueryRep) -> List[Engine]:
         return self._always_route_to
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, AlwaysOneRouter) and self._engine == other._engine

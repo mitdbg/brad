@@ -82,7 +82,7 @@ class Blueprint:
             and self.table_locations() == other.table_locations()
             and self.aurora_provisioning() == other.aurora_provisioning()
             and self.redshift_provisioning() == other.redshift_provisioning()
-            # TODO: Do we want to check for routing policy equality?
+            and self.get_routing_policy() == other.get_routing_policy()
         )
 
     def _compute_base_tables(self) -> Set[str]:
@@ -133,10 +133,10 @@ class Blueprint:
             [
                 "Blueprint:",
                 tables,
-                "",
+                "---",
                 aurora,
                 redshift,
-                "",
+                "---",
                 indefinite_policies,
                 definite_policy,
             ]

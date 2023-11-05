@@ -73,6 +73,9 @@ class RuleBased(AbstractRoutingPolicy):
     def name(self) -> str:
         return "RuleBased"
 
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, RuleBased)
+
     async def recollect_catalog(
         self, sessions: SessionManager, blueprint: Blueprint
     ) -> None:

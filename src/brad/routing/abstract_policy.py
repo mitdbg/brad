@@ -72,3 +72,10 @@ class FullRoutingPolicy:
         for policy in self.indefinite_policies:
             await policy.run_setup(estimator)
         await self.definite_policy.run_setup(estimator)
+
+    def __eq__(self, other: object):
+        if not isinstance(other, FullRoutingPolicy):
+            return False
+        return (self.indefinite_policies == other.indefinite_policies) and (
+            self.definite_policy == other.definite_policy
+        )
