@@ -39,7 +39,6 @@ from brad.planner.estimator import EstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import MetricsFromMonitor
 from brad.planner.providers import BlueprintProviders
-from brad.planner.router_provider import RouterProvider
 from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.data_access.precomputed_values import (
@@ -194,9 +193,6 @@ class BradDaemon:
             data_access_provider = _NoopDataAccessProvider()
             comparator_provider = PerformanceCeilingComparatorProvider(30.0, 0.030)
 
-        router_provider = RouterProvider(
-            self._schema_name, self._config, self._estimator_provider
-        )
         providers = BlueprintProviders(
             workload_provider=LoggedWorkloadProvider(
                 self._config,
@@ -214,9 +210,8 @@ class BradDaemon:
                 self._planner_config,
                 self._monitor,
                 data_access_provider,
-                router_provider,
+                self._estimator_provider,
             ),
-            router_provider=router_provider,
         )
         self._planner = BlueprintPlannerFactory.create(
             config=self._config,

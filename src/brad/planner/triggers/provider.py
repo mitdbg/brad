@@ -3,7 +3,7 @@ from typing import List
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
-from brad.planner.router_provider import RouterProvider
+from brad.planner.estimator import EstimatorProvider
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.triggers.aurora_cpu_utilization import AuroraCpuUtilization
 from brad.planner.triggers.redshift_cpu_utilization import RedshiftCpuUtilization
@@ -36,13 +36,13 @@ class ConfigDefinedTriggers(TriggerProvider):
         planner_config: PlannerConfig,
         monitor: Monitor,
         data_access_provider: DataAccessProvider,
-        router_provider: RouterProvider,
+        estimator_provider: EstimatorProvider,
     ) -> None:
         self._config = config
         self._planner_config = planner_config
         self._monitor = monitor
         self._data_access_provider = data_access_provider
-        self._router_provider = router_provider
+        self._estimator_provider = estimator_provider
 
     def get_triggers(self) -> List[Trigger]:
         trigger_config = self._planner_config.trigger_configs()
@@ -87,7 +87,7 @@ class ConfigDefinedTriggers(TriggerProvider):
                     self._planner_config,
                     self._monitor,
                     self._data_access_provider,
-                    self._router_provider,
+                    self._estimator_provider,
                     var_costs["threshold"],
                     self._config.epoch_length,
                 )

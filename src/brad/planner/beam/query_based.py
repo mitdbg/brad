@@ -22,7 +22,6 @@ from brad.planner.estimator import EstimatorProvider
 from brad.planner.metrics import Metrics, FixedMetricsProvider
 from brad.planner.providers import BlueprintProviders
 from brad.planner.recorded_run import RecordedPlanningRun
-from brad.planner.router_provider import RouterProvider
 from brad.planner.scoring.context import ScoringContext
 from brad.planner.scoring.data_access.provider import NoopDataAccessProvider
 from brad.planner.scoring.performance.analytics_latency import (
@@ -33,6 +32,7 @@ from brad.planner.scoring.table_placement import compute_single_athena_table_cos
 from brad.planner.triggers.provider import EmptyTriggerProvider
 from brad.planner.workload import Workload
 from brad.planner.workload.provider import WorkloadProvider
+from brad.routing.router import Router
 
 
 logger = logging.getLogger(__name__)
@@ -118,11 +118,11 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             metrics,
             self._planner_config,
         )
-        await ctx.simulate_current_workload_routing(
-            await self._providers.router_provider.get_router(
-                self._current_blueprint.table_locations_bitmap()
-            )
+        planning_router = Router.create_from_blueprint(self._current_blueprint)
+        await planning_router.run_setup(
+            self._providers.estimator_provider.get_estimator()
         )
+        await ctx.simulate_current_workload_routing(planning_router)
         ctx.compute_engine_latency_norm_factor()
 
         beam_size = self._planner_config.beam_size()
@@ -251,12 +251,12 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         for candidate in current_top_k:
             query_indices = candidate.get_all_query_indices()
             candidate.reset_routing()
-            router = await self._providers.router_provider.get_router(
-                candidate.table_placements
-            )
+            # We will also select a routing policy here instead of re-routing.
+            # This is the legacy approach.
+            planning_router.update_placement(candidate.table_placements)
             for qidx in query_indices:
                 query = analytical_queries[qidx]
-                routing_engine = await router.engine_for(query)
+                routing_engine = await planning_router.engine_for(query)
                 candidate.add_query_last_step(
                     qidx,
                     query,
@@ -414,9 +414,6 @@ class RecordedQueryBasedPlanningRun(RecordedPlanningRun, WorkloadProvider):
             data_access_provider=NoopDataAccessProvider(),
             estimator_provider=estimator_provider,
             trigger_provider=EmptyTriggerProvider(),
-            router_provider=RouterProvider(
-                self._schema_name, self._config, estimator_provider
-            ),
         )
         return QueryBasedBeamPlanner(
             self._config,

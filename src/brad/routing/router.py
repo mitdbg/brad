@@ -67,6 +67,13 @@ class Router:
         if self._use_future_blueprint_policies:
             self._full_policy = blueprint.get_routing_policy()
 
+    def update_placement(self, table_placement_bitmap: Dict[str, int]) -> None:
+        """
+        This is only meant to be used by the planner. Updates to the router's
+        state should otherwise always be done using `update_blueprint()`.
+        """
+        self._table_placement_bitmap = table_placement_bitmap
+
     async def engine_for(self, query: QueryRep) -> Engine:
         """
         Selects an engine for the provided SQL query.
