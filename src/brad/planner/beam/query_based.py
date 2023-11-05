@@ -118,11 +118,11 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             metrics,
             self._planner_config,
         )
-        current_workload_router = Router.create_from_blueprint(self._current_blueprint)
-        await current_workload_router.run_setup(
+        planning_router = Router.create_from_blueprint(self._current_blueprint)
+        await planning_router.run_setup(
             self._providers.estimator_provider.get_estimator()
         )
-        await ctx.simulate_current_workload_routing(current_workload_router)
+        await ctx.simulate_current_workload_routing(planning_router)
         ctx.compute_engine_latency_norm_factor()
 
         beam_size = self._planner_config.beam_size()
@@ -253,15 +253,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             candidate.reset_routing()
             # We will also select a routing policy here instead of re-routing.
             # This is the legacy approach.
-            router = Router(
-                self._current_blueprint.get_routing_policy(),
-                candidate.table_placements,
-                use_future_blueprint_policies=True,
-            )
-            await router.run_setup(self._providers.estimator_provider.get_estimator())
+            planning_router.update_placement(candidate.table_placements)
             for qidx in query_indices:
                 query = analytical_queries[qidx]
-                routing_engine = await router.engine_for(query)
+                routing_engine = await planning_router.engine_for(query)
                 candidate.add_query_last_step(
                     qidx,
                     query,
