@@ -37,6 +37,14 @@ class QueryRep:
         self._is_data_modification: Optional[bool] = None
         self._tables: Optional[List[str]] = None
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, QueryRep):
+            return False
+        return self._raw_sql_query == other._raw_sql_query
+
+    def __hash__(self) -> int:
+        return hash(self._raw_sql_query)
+
     @property
     def raw_query(self) -> str:
         return self._raw_sql_query
