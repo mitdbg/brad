@@ -197,6 +197,7 @@ def main():
         default=1,
         help="The number of transactional clients.",
     )
+    parser.add_argument("--client-offset", type=int, default=0)
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed for reproducibility."
     )

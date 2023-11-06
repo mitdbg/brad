@@ -138,16 +138,24 @@ function run_repeating_olap_warmup() {
 
 function start_txn_runner() {
   t_clients=$1
+  client_offset=$2
 
   >&2 echo "[Transactions] Running with $t_clients..."
   results_dir=$COND_OUT/t_${t_clients}
   mkdir -p $results_dir
 
+  local args=(
+    --num-clients $t_clients
+    --num-front-ends $num_front_ends
+  )
+
+  if [[ ! -z $client_offset ]]; then
+    args+=(--client-offset $client_offset)
+  fi
+
   log_workload_point "txn_${t_clients}"
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions.py \
-    --num-clients $t_clients \
-    --num-front-ends $num_front_ends \
-    &
+    "${args[@]}" &
 
   # This is a special return value variable that we use.
   runner_pid=$!

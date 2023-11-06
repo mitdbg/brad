@@ -48,7 +48,7 @@ def connect_to_db(
         db = PyodbcDatabase(pyodbc.connect(os.environ[args.cstr_var], autocommit=True))
 
     else:
-        port_offset = worker_index % args.num_front_ends
+        port_offset = (worker_index + args.client_offset) % args.num_front_ends
         brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
         brad.connect()
         db = BradDatabase(brad)

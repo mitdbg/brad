@@ -471,6 +471,7 @@ def main():
         help="Path to the distribution of number of clients for each period of a day",
     )
     parser.add_argument("--num-clients", type=int, default=1)
+    parser.add_argument("--client-offset", type=int, default=0)
     parser.add_argument("--avg-gap-s", type=float)
     parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
     parser.add_argument(
