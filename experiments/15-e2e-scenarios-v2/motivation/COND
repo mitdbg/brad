@@ -50,7 +50,7 @@ run_command(
   name="set_up_router_before",
   run="python3 set_up_router.py",
   options={
-    "config-file": "config/config_large_100.yml",
+    "config-file": "../../../config/config_large_100.yml",
     "schema-name": "imdb_extended_100g",
     "query-bank-file": "queries.sql",
     "redshift-queries": ",".join(map(str, range(0, 20))),
@@ -61,10 +61,12 @@ run_command(
   name="set_up_router_after",
   run="python3 set_up_router.py",
   options={
-    "config-file": "config/config_large_100.yml",
+    "config-file": "../../../config/config_large_100.yml",
     "schema-name": "imdb_extended_100g",
     "query-bank-file": "queries.sql",
     "aurora-queries": ",".join(map(str, range(0, 15))),
     "athena-queries": ",".join(map(str, range(15, 20))),
   },
+  # Prevents this task from running before `:brad_100g_before` completes.
+  deps=[":brad_100g_before"]
 )

@@ -35,7 +35,6 @@ async def run_transition(
 
 
 def main():
-    set_up_logging(debug_mode=args.debug)
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config-file",
@@ -60,6 +59,7 @@ def main():
         "--redshift-queries", type=str, help="Comma separated list of indices."
     )
     args = parser.parse_args()
+    set_up_logging()
 
     # 1. Load the config.
     config = ConfigFile.load(args.config_file)
@@ -81,17 +81,18 @@ def main():
 
     # 4. Create the fixed routing policy.
     query_map = {}
-    for qidx_str in args.athena_queries.split(","):
-        qidx = int(qidx_str.strip())
-        query_map[queries[qidx]] = Engine.Athena
-
-    for qidx_str in args.redshift_queries.split(","):
-        qidx = int(qidx_str.strip())
-        query_map[queries[qidx]] = Engine.Redshift
-
-    for qidx_str in args.aurora_queries.split(","):
-        qidx = int(qidx_str.strip())
-        query_map[queries[qidx]] = Engine.Aurora
+    if args.athena_queries is not None:
+        for qidx_str in args.athena_queries.split(","):
+            qidx = int(qidx_str.strip())
+            query_map[queries[qidx]] = Engine.Athena
+    if args.redshift_queries is not None:
+        for qidx_str in args.redshift_queries.split(","):
+            qidx = int(qidx_str.strip())
+            query_map[queries[qidx]] = Engine.Redshift
+    if args.aurora_queries is not None:
+        for qidx_str in args.aurora_queries.split(","):
+            qidx = int(qidx_str.strip())
+            query_map[queries[qidx]] = Engine.Aurora
     clp = CachedLocationPolicy(query_map)
 
     # 5. Replace the policy.
