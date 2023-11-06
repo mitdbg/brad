@@ -10,8 +10,16 @@ aurora_good = [1243, 1277, 1485, 2117, 3988, 4152, 4625]
 # Total cost (running once): 0.07977253171000001
 athena_good = [179, 238, 382, 768, 933]
 
+combine(
+  name="all",
+  deps=[
+    ":brad_100g_before",
+    ":brad_100g_after",
+  ],
+)
+
 run_experiment(
-  name="brad_100g",
+  name="brad_100g_before",
   run="./run_workload.sh",
   options={
     "config-file": "config/config_large_100.yml",
@@ -21,6 +29,21 @@ run_experiment(
     "ra-query-indexes": ",".join(map(str, range(0, 20))),
     "num-front-ends": 2,
   },
+  deps=[":set_up_router_before"],
+)
+
+run_experiment(
+  name="brad_100g_after",
+  run="./run_workload.sh",
+  options={
+    "config-file": "config/config_large_100.yml",
+    "planner-config-file": "config/planner.yml",
+    "schema-name": "imdb_extended_100g",
+    "ra-query-bank-file": "queries.sql",
+    "ra-query-indexes": ",".join(map(str, range(0, 20))),
+    "num-front-ends": 2,
+  },
+  deps=[":set_up_router_after"],
 )
 
 run_command(
