@@ -76,7 +76,14 @@ def register_admin_action(subparser) -> None:
     parser.add_argument(
         "--set-routing-policy",
         type=str,
-        help="Sets the serialized routing policy to a preconfigured default: {always_redshift, df_selectivity, rule_based}",
+        help="Sets the serialized routing policy to a preconfigured default: "
+        "{always_redshift, df_selectivity, rule_based}",
+    )
+    parser.add_argument(
+        "--keep-indefinite-policies",
+        action="store_true",
+        help="If set, will retain the currently-serialized indefinite policies. "
+        "This only takes effect when --set-routing-policy is also used.",
     )
     parser.add_argument(
         "--add-indexes",
@@ -278,7 +285,13 @@ def modify_blueprint(args) -> None:
             raise RuntimeError(
                 f"Unknown routing policy preset: {args.set_routing_policy}"
             )
-        full_policy = FullRoutingPolicy([], definite_policy)
+
+        current_full_policy = enum_blueprint.get_routing_policy()
+        if args.keep_indefinite_policies:
+            indefinite_policies = current_full_policy.indefinite_policies
+        else:
+            indefinite_policies = []
+        full_policy = FullRoutingPolicy(indefinite_policies, definite_policy)
         enum_blueprint.set_routing_policy(full_policy)
 
     # 3. Write the changes back.

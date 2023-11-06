@@ -40,6 +40,9 @@ class Query(QueryRep):
         self._data_accessed_mb: Dict[Engine, int] = {}
         self._tuples_accessed: Dict[Engine, int] = {}
 
+    def copy_as_query_rep(self) -> QueryRep:
+        return QueryRep(self.raw_query)
+
     def past_executions(self) -> Optional[List[Tuple[Engine, float]]]:
         """
         Retrieve any information about past executions of this query.
