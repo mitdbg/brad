@@ -22,7 +22,7 @@ start_repeating_olap_runner 1 3 0 $ra_query_indexes "ra_1"
 rana_pid=$runner_pid
 
 # 1 Transaction runner
-start_txn_runner 1
+start_txn_runner 1 1
 txn_pid=$runner_pid
 
 log_workload_point "clients_started"
