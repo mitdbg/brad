@@ -156,6 +156,10 @@ class ConfigFile:
     def txn_log_prob(self) -> float:
         return float(self._raw["txn_log_prob"])
 
+    @property
+    def disable_table_movement(self) -> bool:
+        return self._raw["disable_table_movement"]
+
     def get_connection_details(self, engine: Engine) -> Dict[str, str]:
         """
         Returns the raw configuration details provided for an engine.

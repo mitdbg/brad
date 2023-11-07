@@ -35,6 +35,10 @@ class ExecutionContext:
         self._s3_region = self._config.s3_extract_region
         self._s3_path = self._config.s3_extract_path
 
+        # The "location" in S3 where Athena stores intermediate results.
+        # Needed when exporting data from Athena to S3.
+        self._athena_s3_output_path = self._config.athena_s3_output_path
+
         # Table bounds (pre-computed) for extraction.
         self._table_bounds: Dict[str, "TableSyncBounds"] = {}
 
@@ -77,6 +81,9 @@ class ExecutionContext:
 
     def s3_client(self):
         return self._s3_client
+
+    def athena_s3_output_path(self) -> str:
+        return self._athena_s3_output_path
 
     def config(self) -> ConfigFile:
         return self._config
