@@ -398,28 +398,7 @@ class TransitionOrchestrator:
         diff: Optional[ProvisioningDiff],
         table_diffs: Optional[list[TableDiff]],
     ) -> None:
-        if diff is not None:
-            if new.num_nodes() == 0:
-                # Special case (shutting down the cluster).
-                await self._rds.pause_cluster(self._config.aurora_cluster_id)
-                return
-
-            old_replica_count = max(old.num_nodes() - 1, 0)
-            new_replica_count = max(new.num_nodes() - 1, 0)
-
-            if old_replica_count > 0 and new_replica_count < old_replica_count:
-                await self._blueprint_mgr.refresh_directory()
-                replicas = self._blueprint_mgr.get_directory().aurora_readers()
-                delete_index = old_replica_count - 1
-                while delete_index >= new_replica_count:
-                    logger.debug(
-                        "Deleting Aurora replica %s...",
-                        replicas[delete_index].instance_id(),
-                    )
-                    await self._rds.delete_replica(replicas[delete_index].instance_id())
-                    delete_index -= 1
-
-        # Drop removed tables
+        # Drop removed tables.
         if table_diffs is not None and len(table_diffs) > 0:
             views_to_drop = []
             triggers_to_drop = []
@@ -444,6 +423,28 @@ class TransitionOrchestrator:
 
             assert self._cxns is not None
             self._cxns.get_connection(Engine.Aurora).cursor_sync().commit_sync()
+
+        # Change the provisioning.
+        if diff is not None:
+            if new.num_nodes() == 0:
+                # Special case (shutting down the cluster).
+                await self._rds.pause_cluster(self._config.aurora_cluster_id)
+                return
+
+            old_replica_count = max(old.num_nodes() - 1, 0)
+            new_replica_count = max(new.num_nodes() - 1, 0)
+
+            if old_replica_count > 0 and new_replica_count < old_replica_count:
+                await self._blueprint_mgr.refresh_directory()
+                replicas = self._blueprint_mgr.get_directory().aurora_readers()
+                delete_index = old_replica_count - 1
+                while delete_index >= new_replica_count:
+                    logger.debug(
+                        "Deleting Aurora replica %s...",
+                        replicas[delete_index].instance_id(),
+                    )
+                    await self._rds.delete_replica(replicas[delete_index].instance_id())
+                    delete_index -= 1
 
         # Aurora's post-transition work is complete!
 
@@ -499,13 +500,6 @@ class TransitionOrchestrator:
     async def _run_redshift_post_transition(
         self, diff: Optional[ProvisioningDiff], table_diffs: Optional[list[TableDiff]]
     ) -> None:
-        if diff is not None:
-            if diff.new_num_nodes() == 0:
-                logger.debug(
-                    "Pausing Redshift cluster %s", self._config.redshift_cluster_id
-                )
-                await self._redshift.pause_cluster(self._config.redshift_cluster_id)
-
         # Drop removed tables
         if table_diffs is not None:
             to_drop = []
@@ -518,6 +512,14 @@ class TransitionOrchestrator:
             await d.execute(ctx)
             assert self._cxns is not None
             self._cxns.get_connection(Engine.Redshift).cursor_sync().commit_sync()
+
+        # Pause the cluster if we are transitioning to 0 nodes.
+        if diff is not None:
+            if diff.new_num_nodes() == 0:
+                logger.debug(
+                    "Pausing Redshift cluster %s", self._config.redshift_cluster_id
+                )
+                await self._redshift.pause_cluster(self._config.redshift_cluster_id)
 
     async def _run_athena_post_transition(
         self,
