@@ -100,6 +100,11 @@ class TransitionOrchestrator:
         await asyncio.gather(aurora_awaitable, redshift_awaitable)
         logger.debug("Aurora and Redshift provisioning changes complete.")
 
+        if self._config.disable_table_movement:
+            logger.debug("Table movement during transitions is disabled.")
+            await self._run_prepare_then_transition_cleanup()
+            return
+
         # 2. Sync tables (TODO: discuss more efficient alternatives -
         # possibly add a filter of tables to run_sync)
         await self._data_sync_executor.establish_connections()
@@ -165,6 +170,11 @@ class TransitionOrchestrator:
         await self._cxns.close()
         self._cxns = None
 
+        await self._run_prepare_then_transition_cleanup()
+
+    async def _run_prepare_then_transition_cleanup(
+        self,
+    ) -> None:
         logger.debug("Pre-transition steps complete.")
 
         await self._blueprint_mgr.update_transition_state(
@@ -404,7 +414,11 @@ class TransitionOrchestrator:
         table_diffs: Optional[list[TableDiff]],
     ) -> None:
         # Drop removed tables.
-        if table_diffs is not None and len(table_diffs) > 0:
+        if (
+            table_diffs is not None
+            and len(table_diffs) > 0
+            and self._config.disable_table_movement is False
+        ):
             views_to_drop = []
             triggers_to_drop = []
             tables_to_drop = []
@@ -506,7 +520,7 @@ class TransitionOrchestrator:
         self, diff: Optional[ProvisioningDiff], table_diffs: Optional[list[TableDiff]]
     ) -> None:
         # Drop removed tables
-        if table_diffs is not None:
+        if table_diffs is not None and self._config.disable_table_movement is False:
             to_drop = []
             for table_diff in table_diffs:
                 if Engine.Redshift in table_diff.removed_locations():
@@ -532,8 +546,8 @@ class TransitionOrchestrator:
     ) -> None:
         # Drop removed tables
         to_drop = []
-        if table_diffs is not None and self._diff is not None:
-            for table_diff in self._diff.table_diffs():
+        if table_diffs is not None and self._config.disable_table_movement is False:
+            for table_diff in table_diffs:
                 if Engine.Athena in table_diff.removed_locations():
                     to_drop.append(table_diff.table_name())
             d = DropTables(to_drop, Engine.Athena)
