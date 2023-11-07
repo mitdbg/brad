@@ -55,6 +55,8 @@ _ATHENA_CREATE_LOAD_TABLE = """
     {options2}
 """
 
+# TODO: Possibly use LoadFromS3 operators here.
+
 
 def register_admin_action(subparser) -> None:
     parser = subparser.add_parser("bulk_load", help="Bulk load table(s) on BRAD.")

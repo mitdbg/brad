@@ -104,11 +104,13 @@ class LoadFromS3(Operator):
 
         # Reset the next sequence values for SERIAL/BIGSERIAL types after loading
         # (Aurora does not automatically update it).
-        table = ctx.blueprint.get_table(self._table_name)
+        table = ctx.blueprint().get_table(self._table_name)
         for column in table.columns:
             if column.data_type != "SERIAL" and column.data_type != "BIGSERIAL":
                 continue
-            query = "SELECT MAX({}) FROM {}".format(column.name, source_table_name(table))
+            query = "SELECT MAX({}) FROM {}".format(
+                column.name, source_table_name(table)
+            )
             logger.debug("Running on Aurora: %s", query)
             await aurora.execute(query)
             row = await aurora.fetchone()
