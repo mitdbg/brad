@@ -110,12 +110,18 @@ class TransitionOrchestrator:
         # 3. Create tables in new locations as needed
         directory = self._blueprint_mgr.get_directory()
 
+        active_engines = {Engine.Aurora, Engine.Redshift, Engine.Athena}
+        if self._curr_blueprint.aurora_provisioning().num_nodes() == 0:
+            active_engines.remove(Engine.Aurora)
+        if self._curr_blueprint.redshift_provisioning().num_nodes() == 0:
+            active_engines.remove(Engine.Redshift)
+
         self._cxns = EngineConnections.connect_sync(
             self._config,
             directory,
             schema_name=self._curr_blueprint.schema_name(),
             autocommit=False,
-            specific_engines=None,
+            specific_engines=active_engines,
         )
 
         sql_gen = TableSqlGenerator(self._config, self._next_blueprint)
@@ -192,12 +198,19 @@ class TransitionOrchestrator:
         assert self._next_blueprint is not None
 
         directory = self._blueprint_mgr.get_directory()
+
+        active_engines = {Engine.Aurora, Engine.Redshift, Engine.Athena}
+        if self._curr_blueprint.aurora_provisioning().num_nodes() == 0:
+            active_engines.remove(Engine.Aurora)
+        if self._curr_blueprint.redshift_provisioning().num_nodes() == 0:
+            active_engines.remove(Engine.Redshift)
+
         self._cxns = EngineConnections.connect_sync(
             self._config,
             directory,
             schema_name=self._curr_blueprint.schema_name(),
             autocommit=False,
-            specific_engines=None,
+            specific_engines=active_engines,
         )
 
         aurora_awaitable = self._run_aurora_post_transition(
