@@ -14,3 +14,8 @@ class DataAccessProvider:
         accessed bytes in Athena).
         """
         raise NotImplementedError
+
+
+class NoopDataAccessProvider(DataAccessProvider):
+    def apply_access_statistics(self, workload: Workload) -> None:
+        pass

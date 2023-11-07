@@ -10,7 +10,7 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
-from brad.planner.router_provider import RouterProvider
+from brad.planner.estimator import EstimatorProvider
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.query import Query
@@ -20,6 +20,7 @@ from brad.planner.scoring.provisioning import (
     compute_aurora_accessed_pages,
     compute_athena_scanned_bytes,
 )
+from brad.routing.router import Router
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class VariableCosts(Trigger):
         planner_config: PlannerConfig,
         monitor: Monitor,
         data_access_provider: DataAccessProvider,
-        router_provider: RouterProvider,
+        estimator_provider: EstimatorProvider,
         threshold_frac: float,
         epoch_length: timedelta,
     ) -> None:
@@ -48,7 +49,7 @@ class VariableCosts(Trigger):
         self._planner_config = planner_config
         self._monitor = monitor
         self._data_access_provider = data_access_provider
-        self._router_provider = router_provider
+        self._estimator_provider = estimator_provider
         self._change_ratio = 1.0 + threshold_frac
 
     async def should_replan(self) -> bool:
@@ -121,9 +122,8 @@ class VariableCosts(Trigger):
         aurora_queries: List[Query] = []
         athena_query_indices: List[int] = []
         athena_queries: List[Query] = []
-        router = await self._router_provider.get_router(
-            self._current_blueprint.table_locations_bitmap()
-        )
+        router = Router.create_from_blueprint(self._current_blueprint)
+        await router.run_setup(self._estimator_provider.get_estimator())
 
         for idx, q in enumerate(workload.analytical_queries()):
             maybe_engine = q.primary_execution_location()

@@ -8,7 +8,6 @@ from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning, MutableProvisioning
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.beam.feasibility import BlueprintFeasibility
-from brad.planner.router_provider import RouterProvider
 from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
@@ -111,7 +110,7 @@ class BlueprintCandidate(ComparableBlueprint):
             self.get_table_placement(),
             self.aurora_provisioning.clone(),
             self.redshift_provisioning.clone(),
-            self._source_blueprint.router_provider(),
+            self._source_blueprint.get_routing_policy(),  # TODO: Use chosen policy.
         )
 
     def to_score(self) -> Score:
@@ -202,13 +201,11 @@ class BlueprintCandidate(ComparableBlueprint):
 
     async def add_query_cluster(
         self,
-        router_provider: RouterProvider,
+        router: Router,
         query_cluster: List[int],
         reroute_prev: bool,
         ctx: ScoringContext,
     ) -> None:
-        router: Router = await router_provider.get_router(self.table_placements)
-
         if reroute_prev:
             self.query_locations[Engine.Aurora].clear()
             self.query_locations[Engine.Redshift].clear()

@@ -13,6 +13,8 @@ from brad.planner.neighborhood.filters.single_engine_execution import (
 from brad.planner.neighborhood.filters.table_on_engine import TableOnEngine
 from brad.planner.workload import Workload
 from brad.planner.workload.query import Query
+from brad.routing.abstract_policy import FullRoutingPolicy
+from brad.routing.always_one import AlwaysOneRouter
 
 
 def workload_from_queries(query_list: List[str]) -> Workload:
@@ -42,7 +44,7 @@ def test_aurora_transactions():
         },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
-        router_provider=None,
+        full_routing_policy=FullRoutingPolicy([], AlwaysOneRouter(Engine.Aurora)),
     )
     bp2 = Blueprint(
         "schema",
@@ -56,7 +58,7 @@ def test_aurora_transactions():
         },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
-        router_provider=None,
+        full_routing_policy=FullRoutingPolicy([], AlwaysOneRouter(Engine.Aurora)),
     )
 
     bp_filter1 = AuroraTransactions(workload1)
@@ -90,7 +92,7 @@ def test_single_engine_execution():
         },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
-        router_provider=None,
+        full_routing_policy=FullRoutingPolicy([], AlwaysOneRouter(Engine.Aurora)),
     )
     bp2 = Blueprint(
         "schema",
@@ -106,7 +108,7 @@ def test_single_engine_execution():
         },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
-        router_provider=None,
+        full_routing_policy=FullRoutingPolicy([], AlwaysOneRouter(Engine.Aurora)),
     )
 
     bp_filter1 = SingleEngineExecution(workload1)
@@ -136,7 +138,7 @@ def test_table_on_engine():
         },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
-        router_provider=None,
+        full_routing_policy=FullRoutingPolicy([], AlwaysOneRouter(Engine.Aurora)),
     )
     bp2 = Blueprint(
         "schema",
@@ -152,7 +154,7 @@ def test_table_on_engine():
         },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 0),
-        router_provider=None,
+        full_routing_policy=FullRoutingPolicy([], AlwaysOneRouter(Engine.Aurora)),
     )
     bp3 = Blueprint(
         "schema",
@@ -168,7 +170,7 @@ def test_table_on_engine():
         },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 0),
-        router_provider=None,
+        full_routing_policy=FullRoutingPolicy([], AlwaysOneRouter(Engine.Aurora)),
     )
 
     assert bp_filter.is_valid(bp1)
@@ -192,7 +194,7 @@ def test_no_data_loss():
         },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
-        router_provider=None,
+        full_routing_policy=FullRoutingPolicy([], AlwaysOneRouter(Engine.Aurora)),
     )
     bp2 = Blueprint(
         "schema",
@@ -208,7 +210,7 @@ def test_no_data_loss():
         },
         aurora_provisioning=Provisioning("db.r6g.large", 1),
         redshift_provisioning=Provisioning("dc2.large", 1),
-        router_provider=None,
+        full_routing_policy=FullRoutingPolicy([], AlwaysOneRouter(Engine.Aurora)),
     )
 
     assert not ndl_filter.is_valid(bp1)

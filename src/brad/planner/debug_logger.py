@@ -51,8 +51,12 @@ class BlueprintPlanningDebugLogger:
 
 class BlueprintPickleDebugLogger:
     @staticmethod
+    def is_log_requested(config: ConfigFile) -> bool:
+        return config.planner_log_path is not None
+
+    @staticmethod
     def log_object_if_requested(
-        config: ConfigFile, file_name_prefix: str, blueprints: Any
+        config: ConfigFile, file_name_prefix: str, py_object: Any
     ) -> None:
         log_path = config.planner_log_path
         if log_path is None:
@@ -60,7 +64,7 @@ class BlueprintPickleDebugLogger:
 
         out_file_name = f"{file_name_prefix}_{_get_timestamp_str()}.pkl"
         with open(log_path / out_file_name, "wb") as file:
-            pickle.dump(blueprints, file)
+            pickle.dump(py_object, file)
 
 
 def _get_timestamp_str() -> str:

@@ -38,7 +38,7 @@ from brad.routing.router import Router
 logger = logging.getLogger(__name__)
 
 
-class QueryBasedBeamPlanner(BlueprintPlanner):
+class QueryBasedLegacyBeamPlanner(BlueprintPlanner):
     def __init__(
         self,
         *args,
@@ -75,7 +75,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             not self._disable_external_logging
             and BlueprintPickleDebugLogger.is_log_requested(self._config)
         ):
-            planning_run = RecordedQueryBasedPlanningRun(
+            planning_run = RecordedQueryBasedLegacyPlanningRun(
                 self._config,
                 self._planner_config,
                 self._schema_name,
@@ -243,13 +243,49 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                 for candidate in current_top_k:
                     placement_top_k_logger.log_debug_values(candidate.to_debug_values())
 
-        # 6. Run a final greedy search over provisionings in the top-k set.
+        # 8. We generated the placements by placing queries using run time
+        #    predictions. Now we re-route the queries using the fixed placements
+        #    but with the actual routing policy that we will use at runtime.
+        rerouted_top_k: List[BlueprintCandidate] = []
+
+        for candidate in current_top_k:
+            query_indices = candidate.get_all_query_indices()
+            candidate.reset_routing()
+            # We will also select a routing policy here instead of re-routing.
+            # This is the legacy approach.
+            planning_router.update_placement(candidate.table_placements)
+            for qidx in query_indices:
+                query = analytical_queries[qidx]
+                routing_engine = await planning_router.engine_for(query)
+                candidate.add_query_last_step(
+                    qidx,
+                    query,
+                    routing_engine,
+                    next_workload.get_predicted_analytical_latency(
+                        qidx, routing_engine
+                    ),
+                    ctx,
+                )
+
+            if not candidate.is_structurally_feasible():
+                continue
+
+            rerouted_top_k.append(candidate)
+
+        if len(rerouted_top_k) == 0:
+            logger.error(
+                "The query-based beam planner failed to find any "
+                "feasible placements after re-routing the queries."
+            )
+            return None
+
+        # 8. Run a final greedy search over provisionings in the top-k set.
         final_top_k: List[BlueprintCandidate] = []
 
         aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
         redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
 
-        for candidate in current_top_k:
+        for candidate in rerouted_top_k:
             aurora_it = aurora_enumerator.enumerate_nearby(
                 ctx.current_blueprint.aurora_provisioning(),
                 aurora_enumerator.scaling_to_distance(
@@ -326,7 +362,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             best_candidate.storage_cost += compute_single_athena_table_cost(tbl, ctx)
 
         # 9. Output the new blueprint.
-        best_blueprint = best_candidate.to_blueprint(ctx, use_legacy_behavior=False)
+        best_blueprint = best_candidate.to_blueprint(ctx, use_legacy_behavior=True)
         best_blueprint_score = best_candidate.to_score()
 
         logger.info("Selected blueprint:")
@@ -342,7 +378,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         return best_blueprint, best_blueprint_score
 
 
-class RecordedQueryBasedPlanningRun(RecordedPlanningRun, WorkloadProvider):
+class RecordedQueryBasedLegacyPlanningRun(RecordedPlanningRun, WorkloadProvider):
     def __init__(
         self,
         config: ConfigFile,
@@ -379,7 +415,7 @@ class RecordedQueryBasedPlanningRun(RecordedPlanningRun, WorkloadProvider):
             estimator_provider=estimator_provider,
             trigger_provider=EmptyTriggerProvider(),
         )
-        return QueryBasedBeamPlanner(
+        return QueryBasedLegacyBeamPlanner(
             self._config,
             self._planner_config,
             self._schema_name,

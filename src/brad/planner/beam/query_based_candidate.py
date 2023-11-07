@@ -31,6 +31,8 @@ from brad.planner.scoring.table_placement import (
     compute_single_table_movement_time_and_cost,
 )
 from brad.planner.workload.query import Query
+from brad.routing.abstract_policy import FullRoutingPolicy
+from brad.routing.cached import CachedLocationPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +111,21 @@ class BlueprintCandidate(ComparableBlueprint):
         # Used during comparisons.
         self._memoized: Dict[str, Any] = {}
 
-    def to_blueprint(self) -> Blueprint:
+    def to_blueprint(self, ctx: ScoringContext, use_legacy_behavior: bool) -> Blueprint:
+        if use_legacy_behavior:
+            routing_policy = self._source_blueprint.get_routing_policy()
+        else:
+            # We should cache the routing locations chosen by the planner.
+            cached_policy = CachedLocationPolicy.from_planner(
+                ctx.next_workload, self.query_locations
+            )
+            current_policy = self._source_blueprint.get_routing_policy()
+            routing_policy = FullRoutingPolicy(
+                indefinite_policies=[cached_policy],
+                # We re-use the same definite policy.
+                definite_policy=current_policy.definite_policy,
+            )
+
         # We use the source blueprint for table schema information.
         return Blueprint(
             self._source_blueprint.schema_name(),
@@ -117,7 +133,7 @@ class BlueprintCandidate(ComparableBlueprint):
             self.get_table_placement(),
             self.aurora_provisioning.clone(),
             self.redshift_provisioning.clone(),
-            self._source_blueprint.router_provider(),
+            routing_policy,
         )
 
     def to_score(self) -> Score:

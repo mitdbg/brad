@@ -16,6 +16,11 @@ from brad.config.file import ConfigFile
 from brad.daemon.transition_orchestrator import TransitionOrchestrator
 from brad.front_end.engine_connections import EngineConnections
 from brad.planner.enumeration.blueprint import EnumeratedBlueprint
+from brad.routing.abstract_policy import AbstractRoutingPolicy, FullRoutingPolicy
+from brad.routing.always_one import AlwaysOneRouter
+from brad.routing.policy import RoutingPolicy
+from brad.routing.tree_based.forest_policy import ForestPolicy
+from brad.routing.rule_based import RuleBased
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +72,18 @@ def register_admin_action(subparser) -> None:
         "--place-tables-everywhere",
         action="store_true",
         help="Updates the blueprint's table placement and places tables on all engines.",
+    )
+    parser.add_argument(
+        "--set-routing-policy",
+        type=str,
+        help="Sets the serialized routing policy to a preconfigured default: "
+        "{always_redshift, df_selectivity, rule_based}",
+    )
+    parser.add_argument(
+        "--keep-indefinite-policies",
+        action="store_true",
+        help="If set, will retain the currently-serialized indefinite policies. "
+        "This only takes effect when --set-routing-policy is also used.",
     )
     parser.add_argument(
         "--add-indexes",
@@ -184,7 +201,7 @@ async def run_transition(
 
 
 # This method is called by `brad.exec.admin.main`.
-def modify_blueprint(args):
+def modify_blueprint(args) -> None:
     # 1. Load the config.
     config = ConfigFile.load(args.config_file)
 
@@ -252,6 +269,30 @@ def modify_blueprint(args):
         for tbl in blueprint.table_locations().keys():
             new_placement[tbl] = Engine.from_bitmap(Engine.bitmap_all())
         enum_blueprint.set_table_locations(new_placement)
+
+    if args.set_routing_policy is not None:
+        if args.set_routing_policy == "always_redshift":
+            definite_policy: AbstractRoutingPolicy = AlwaysOneRouter(Engine.Redshift)
+        elif args.set_routing_policy == "df_selectivity":
+            definite_policy = asyncio.run(
+                ForestPolicy.from_assets(
+                    args.schema_name, RoutingPolicy.ForestTableSelectivity, assets
+                )
+            )
+        elif args.set_routing_policy == "rule_based":
+            definite_policy = RuleBased()
+        else:
+            raise RuntimeError(
+                f"Unknown routing policy preset: {args.set_routing_policy}"
+            )
+
+        current_full_policy = enum_blueprint.get_routing_policy()
+        if args.keep_indefinite_policies:
+            indefinite_policies = current_full_policy.indefinite_policies
+        else:
+            indefinite_policies = []
+        full_policy = FullRoutingPolicy(indefinite_policies, definite_policy)
+        enum_blueprint.set_routing_policy(full_policy)
 
     # 3. Write the changes back.
     modified_blueprint = enum_blueprint.to_blueprint()

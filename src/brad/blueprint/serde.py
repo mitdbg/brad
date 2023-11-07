@@ -1,11 +1,17 @@
+import pickle
+import logging
 from typing import Tuple, List, Dict
 
 from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.table import Column, Table
 from brad.config.engine import Engine
+from brad.routing.abstract_policy import FullRoutingPolicy
+from brad.routing.round_robin import RoundRobin
 
 import brad.proto_gen.blueprint_pb2 as b
+
+logger = logging.getLogger(__name__)
 
 # We define the data blueprint serialization/deserialization functions
 # separately from the blueprint classes to avoid mixing protobuf code (an
@@ -24,7 +30,7 @@ def deserialize_blueprint(raw_data: bytes) -> Blueprint:
         table_locations=dict(map(_table_locations_from_proto, proto.tables)),
         aurora_provisioning=_provisioning_from_proto(proto.aurora),
         redshift_provisioning=_provisioning_from_proto(proto.redshift),
-        router_provider=None,
+        full_routing_policy=_policy_from_proto(proto.policy),
     )
 
 
@@ -34,7 +40,7 @@ def serialize_blueprint(blueprint: Blueprint) -> bytes:
         tables=map(_tables_with_locations_to_proto, blueprint.tables_with_locations()),
         aurora=_provisioning_to_proto(blueprint.aurora_provisioning()),
         redshift=_provisioning_to_proto(blueprint.redshift_provisioning()),
-        policy=None,
+        policy=_policy_to_proto(blueprint.get_routing_policy()),
     )
     return proto.SerializeToString()
 
@@ -88,6 +94,13 @@ def _indexed_columns_to_proto(indexed_columns: Tuple[Column, ...]) -> b.Index:
     return b.Index(column_name=map(lambda col: col.name, indexed_columns))
 
 
+def _policy_to_proto(full_routing_policy: FullRoutingPolicy) -> b.RoutingPolicy:
+    # We just use Python pickle serialization. In the future, this should be
+    # something more robust.
+    bytes_str = pickle.dumps(full_routing_policy)
+    return b.RoutingPolicy(policy=bytes_str)
+
+
 # Deserialization
 
 
@@ -139,3 +152,18 @@ def _indexed_columns_from_proto(
     for col_name in indexed_columns.column_name:
         col_list.append(col_map[col_name])
     return tuple(col_list)
+
+
+def _policy_from_proto(policy: b.RoutingPolicy) -> FullRoutingPolicy:
+    if len(policy.policy) == 0:
+        logger.warning(
+            "Did not find a routing policy in the serialized blueprint. "
+            "This likely means you are running with an older blueprint. "
+            "Falling back to round robin routing. If you want to use a "
+            "different policy, use `brad admin modify_blueprint` to set "
+            "a policy."
+        )
+        return FullRoutingPolicy(indefinite_policies=[], definite_policy=RoundRobin())
+    # We just use Python pickle serialization. In the future, this should be
+    # something more robust.
+    return pickle.loads(policy.policy)
