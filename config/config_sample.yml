@@ -79,7 +79,7 @@ routing_policy: default
 
 # Whether to disable table movement for testing purposes (i.e. keep all tables on 
 # all engines.)
-disable_table_movement: false
+disable_table_movement: true
 
 athena:
   odbc_driver: Athena
