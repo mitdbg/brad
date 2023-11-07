@@ -108,8 +108,7 @@ class TransitionOrchestrator:
         )
 
         # 3. Create tables in new locations as needed
-        directory = Directory(self._config)
-        await directory.refresh()
+        directory = self._blueprint_mgr.get_directory()
 
         self._cxns = EngineConnections.connect_sync(
             self._config,
@@ -192,8 +191,7 @@ class TransitionOrchestrator:
         assert self._curr_blueprint is not None
         assert self._next_blueprint is not None
 
-        directory = Directory(self._config)
-        await directory.refresh()
+        directory = self._blueprint_mgr.get_directory()
         self._cxns = EngineConnections.connect_sync(
             self._config,
             directory,
