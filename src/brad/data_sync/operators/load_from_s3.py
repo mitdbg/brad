@@ -4,6 +4,7 @@ from .operator import Operator
 from brad.data_sync.execution.context import ExecutionContext
 from brad.config.engine import Engine
 from brad.blueprint.sql_gen.table import comma_separated_column_names_and_types
+from brad.config.strings import source_table_name
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,26 @@ class LoadFromS3(Operator):
         logger.debug("Running on Aurora: %s", query)
         aurora = await ctx.aurora()
         await aurora.execute(query)
+
+        # Reset the next sequence values for SERIAL/BIGSERIAL types after loading
+        # (Aurora does not automatically update it).
+        table = ctx.blueprint.get_table(self._table_name)
+        for column in table.columns:
+            if column.data_type != "SERIAL" and column.data_type != "BIGSERIAL":
+                continue
+            query = "SELECT MAX({}) FROM {}".format(column.name, source_table_name(table))
+            logger.debug("Running on Aurora: %s", query)
+            await aurora.execute(query)
+            row = await aurora.fetchone()
+            if row is None:
+                continue
+            max_serial_val = row[0]
+            query = "ALTER SEQUENCE {}_{}_seq RESTART WITH {}".format(
+                source_table_name(table), column.name, str(max_serial_val + 1)
+            )
+            logger.debug("Running on Aurora: %s", query)
+            await aurora.execute(query)
+
         return self
 
     async def _execute_redshift(self, ctx: ExecutionContext) -> "Operator":
