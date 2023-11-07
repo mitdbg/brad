@@ -21,7 +21,6 @@ from brad.data_sync.operators.drop_views import DropViews
 from brad.data_sync.operators.load_from_s3 import LoadFromS3
 from brad.data_sync.operators.unload_to_s3 import UnloadToS3
 from brad.front_end.engine_connections import EngineConnections
-from brad.provisioning.directory import Directory
 from brad.provisioning.rds import RdsProvisioningManager
 from brad.provisioning.redshift import RedshiftProvisioningManager
 
