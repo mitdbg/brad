@@ -11,7 +11,12 @@ from brad.blueprint.sql_gen.table import TableSqlGenerator, comma_separated_colu
 from brad.blueprint.state import TransitionState
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
-from brad.config.strings import source_table_name, shadow_table_name
+from brad.config.strings import (
+    source_table_name,
+    shadow_table_name,
+    AURORA_SEQ_COLUMN,
+    AURORA_EXTRACT_PROGRESS_TABLE_NAME,
+)
 from brad.data_sync.execution.context import ExecutionContext
 from brad.data_sync.operators.drop_aurora_triggers import DropAuroraTriggers
 from brad.data_sync.execution.executor import DataSyncExecutor
@@ -605,6 +610,7 @@ class TransitionOrchestrator:
         # - The athena query wants the directory name without the file name.
 
         if e == Engine.Aurora:
+            # Load table to aurora from S3
             response = ctx.s3_client().list_objects_v2(
                 Bucket=ctx.s3_bucket(), Prefix=ctx.s3_path() + s3_path_prefix
             )
@@ -623,10 +629,28 @@ class TransitionOrchestrator:
                     aurora_columns=comma_separated_column_names(columns),
                 )
                 await l.execute(ctx)
-
-            # TODO: do we need to manually set the values in the bookkeeping column?
             assert self._cxns is not None
             self._cxns.get_connection(Engine.Aurora).cursor_sync().commit_sync()
+
+            # Ensure that extract table is set up correctly for later syncs.
+            assert self._curr_blueprint is not None
+            table = self._curr_blueprint.get_table(table_name)
+            q = "SELECT MAX({}) FROM {}".format(
+                AURORA_SEQ_COLUMN, source_table_name(table)
+            )
+            logger.debug("Running on Aurora %s", q)
+            cursor = ctx.aurora().cursor()
+            await cursor.execute(q)
+            row = await cursor.fetchone()
+            max_seq = row[0]
+            if max_seq is not None:
+                q = "UPDATE {} SET next_extract_seq = {} WHERE table_name = '{}'".format(
+                    AURORA_EXTRACT_PROGRESS_TABLE_NAME, max_seq + 1, table_name
+                )
+                logger.debug("Running on Aurora %s", q)
+                await cursor.execute(q)
+            await cursor.commit()
+
         elif e == Engine.Redshift:
             l = LoadFromS3(table_name, s3_path_prefix, e, delimiter=",", header_rows=1)
             await l.execute(ctx)
