@@ -23,20 +23,36 @@ def base_table_name_from_source(table: str) -> str:
     return table[:-suffix_len]
 
 
-def delete_trigger_function_name(table: Table) -> str:
-    return "{}_brad_delete_trigger_fn".format(table.name)
+def delete_trigger_function_name(table: str | Table) -> str:
+    if isinstance(table, Table):
+        str_name = table.name
+    else:
+        str_name = table
+    return "{}_brad_delete_trigger_fn".format(str_name)
 
 
-def delete_trigger_name(table: Table) -> str:
-    return "{}_brad_delete_trigger".format(table.name)
+def delete_trigger_name(table: str | Table) -> str:
+    if isinstance(table, Table):
+        str_name = table.name
+    else:
+        str_name = table
+    return "{}_brad_delete_trigger".format(str_name)
 
 
-def update_trigger_function_name(table: Table) -> str:
-    return "{}_brad_update_trigger_fn".format(table.name)
+def update_trigger_function_name(table: str | Table) -> str:
+    if isinstance(table, Table):
+        str_name = table.name
+    else:
+        str_name = table
+    return "{}_brad_update_trigger_fn".format(str_name)
 
 
-def update_trigger_name(table: Table) -> str:
-    return "{}_brad_update_trigger".format(table.name)
+def update_trigger_name(table: str | Table) -> str:
+    if isinstance(table, Table):
+        str_name = table.name
+    else:
+        str_name = table
+    return "{}_brad_update_trigger".format(str_name)
 
 
 def seq_index_name(table: Table, for_shadow: bool) -> str:

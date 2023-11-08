@@ -14,7 +14,8 @@ _AURORA_UNLOAD_TEMPLATE = """
             '{s3_bucket}',
             '{s3_path}',
             '{s3_region}'
-        )
+        ),
+        'format csv, delimiter $${delimiter}$$, header true'
     );
 """
 
@@ -24,9 +25,14 @@ _AURORA_UNLOAD_TEMPLATE = """
 _REDSHIFT_UNLOAD_TEMPLATE = """
     UNLOAD ('SELECT * FROM {table_name}') TO 's3://{s3_bucket}/{s3_path}'
     IAM_ROLE '{s3_iam_role}'
-    DELIMITER '|'
+    DELIMITER '{delimiter}'
     ALLOWOVERWRITE
+    HEADER
     PARALLEL OFF
+"""
+
+_ATHENA_UNLOAD_TEMPLATE = """
+    SELECT * FROM {table_name}
 """
 
 
@@ -41,6 +47,7 @@ class UnloadToS3(Operator):
         relative_s3_path: str,
         engine: Engine,
         limit: Optional[int] = None,
+        delimiter: str = "|",
     ) -> None:
         """
         NOTE: All S3 paths are relative to the extract path, specified in the
@@ -51,6 +58,7 @@ class UnloadToS3(Operator):
         self._engine = engine
         self._relative_s3_path = relative_s3_path
         self._limit = limit
+        self._delimiter = delimiter
 
     def __repr__(self) -> str:
         return "".join(
@@ -70,8 +78,9 @@ class UnloadToS3(Operator):
             return await self._execute_aurora(ctx)
         elif self._engine == Engine.Redshift:
             return await self._execute_redshift(ctx)
+        elif self._engine == Engine.Athena:
+            return await self._execute_athena(ctx)
         else:
-            # N.B. Athena is not supported.
             raise RuntimeError("Unsupported engine {}".format(self._engine))
 
     async def _execute_aurora(self, ctx: ExecutionContext) -> "Operator":
@@ -84,6 +93,7 @@ class UnloadToS3(Operator):
             s3_bucket=ctx.s3_bucket(),
             s3_region=ctx.s3_region(),
             s3_path="{}{}".format(ctx.s3_path(), self._relative_s3_path),
+            delimiter=self._delimiter,
         )
         logger.debug("Running on Aurora: %s", query)
         aurora = await ctx.aurora()
@@ -96,8 +106,53 @@ class UnloadToS3(Operator):
             s3_bucket=ctx.s3_bucket(),
             s3_path="{}{}".format(ctx.s3_path(), self._relative_s3_path),
             s3_iam_role=ctx.config().redshift_s3_iam_role,
+            delimiter=self._delimiter,
         )
         logger.debug("Running on Redshift: %s", query)
         redshift = await ctx.redshift()
         await redshift.execute(query)
+        return self
+
+    async def _execute_athena(self, ctx: ExecutionContext) -> "Operator":
+        query = _ATHENA_UNLOAD_TEMPLATE.format(table_name=self._table_name)
+        logger.debug("Running on Athena: %s", query)
+        athena = await ctx.athena()
+        await athena.execute(query)
+
+        # Query results will have been saved as a csv in the `s3_output_path`.
+        # Let's copy them, using "the most recent csv file" as our target.
+        # TODO: possibly make this less hacky.
+
+        athena_output_prefix = ctx.athena_s3_output_path()[
+            (len("s3://") + len(ctx.s3_bucket()) + 1) :
+        ]  # Remove the bucket name from the path
+
+        objects = ctx.s3_client().list_objects_v2(
+            Bucket=ctx.s3_bucket(),
+            Prefix=athena_output_prefix,
+        )
+        most_recent_csv_file = max(
+            (obj for obj in objects.get("Contents", []) if obj["Key"].endswith(".csv")),
+            key=lambda x: x["LastModified"],
+            default=None,
+        )
+
+        if most_recent_csv_file:
+            ctx.s3_client().copy_object(
+                CopySource={
+                    "Bucket": ctx.s3_bucket(),
+                    "Key": most_recent_csv_file["Key"],
+                },
+                Bucket=ctx.s3_bucket(),
+                Key=f"{ctx.s3_path()}transition/{self._table_name}/{self._table_name}.tbl",
+            )
+
+            logger.debug(
+                f"Extracted table to {ctx.s3_path()}transition/{self._table_name}/{self._table_name}.tbl"
+            )
+        else:
+            logger.error(
+                f"Could not extract table {self._table_name} from Athena to S3."
+            )
+
         return self

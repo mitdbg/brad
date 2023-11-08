@@ -95,6 +95,9 @@ class TableSyncBounds:
     ) -> Dict[str, "TableSyncBounds"]:
         cursor = await ctx.aurora()
 
+        if len(tables) == 0:
+            return {}
+
         # 1. Retrieve the starting sequence values for extraction.
         q = GET_NEXT_EXTRACT_TEMPLATE.format(
             extract_tables=", ".join(map("'{}'".format, tables))
