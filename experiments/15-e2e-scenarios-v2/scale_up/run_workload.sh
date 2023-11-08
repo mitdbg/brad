@@ -31,7 +31,7 @@ function txn_sweep() {
   local gap_minute=$2
   local keep_last=$3
 
-  for t_clients in $sweep; then
+  for t_clients in $sweep; do
     start_txn_runner $t_clients  # Implicit: --dataset-type
     txn_pid=$runner_pid
 
@@ -40,7 +40,7 @@ function txn_sweep() {
       kill -INT $txn_pid
       wait $txn_pid
     fi
-  fi
+  done
 }
 
 function inner_cancel_experiment() {

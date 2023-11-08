@@ -26,23 +26,6 @@ function step_txns() {
 # --query-indexes
 extract_named_arguments $@
 
-function txn_sweep() {
-  local sweep=$1
-  local gap_minute=$2
-  local keep_last=$3
-
-  for t_clients in $sweep; then
-    start_txn_runner $t_clients  # Implicit: --dataset-type
-    txn_pid=$runner_pid
-
-    sleep $(($gap_minute * 60))
-    if [[ ! -z $keep_last ]] && [[ $t_clients = $keep_last ]]; then
-      kill -INT $txn_pid
-      wait $txn_pid
-    fi
-  fi
-}
-
 function inner_cancel_experiment() {
   cancel_experiment $rana_pid $txn_pid
 }
@@ -134,12 +117,11 @@ function point_five() {
   wait $txn_pid
 }
 
-point_one
-# point_two
-# point_three
-# point_four
-# point_five
+echo "READY -- Running for 1 hour. Hit Ctrl-C to stop."
+point_one 60
+# point_two 60
+# point_three 60
+# point_four 60
+# point_five 60
 
-echo "READY -- Sleeping for 1 hour. Hit Ctrl-C to stop."
-sleep $((60 * 60))
 inner_cancel_experiment

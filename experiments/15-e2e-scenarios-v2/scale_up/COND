@@ -1,3 +1,5 @@
+include("../common.cond")
+
 aurora_alt = [99, 56, 32, 92, 91, 49, 30, 83, 94, 38, 87, 86, 76, 37, 31, 46]
 
 run_experiment(
