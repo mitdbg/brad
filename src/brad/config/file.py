@@ -158,7 +158,11 @@ class ConfigFile:
 
     @property
     def disable_table_movement(self) -> bool:
-        return self._raw["disable_table_movement"]
+        try:
+            return self._raw["disable_table_movement"]
+        except KeyError:
+            # Table movement disabled by default.
+            return True
 
     def get_connection_details(self, engine: Engine) -> Dict[str, str]:
         """

@@ -211,21 +211,21 @@ class TransitionOrchestrator:
         assert self._curr_blueprint is not None
         assert self._next_blueprint is not None
 
-        directory = self._blueprint_mgr.get_directory()
+        if not self._config.disable_table_movement:
+            directory = self._blueprint_mgr.get_directory()
+            active_engines = {Engine.Aurora, Engine.Redshift, Engine.Athena}
+            if self._curr_blueprint.aurora_provisioning().num_nodes() == 0:
+                active_engines.remove(Engine.Aurora)
+            if self._curr_blueprint.redshift_provisioning().num_nodes() == 0:
+                active_engines.remove(Engine.Redshift)
 
-        active_engines = {Engine.Aurora, Engine.Redshift, Engine.Athena}
-        if self._curr_blueprint.aurora_provisioning().num_nodes() == 0:
-            active_engines.remove(Engine.Aurora)
-        if self._curr_blueprint.redshift_provisioning().num_nodes() == 0:
-            active_engines.remove(Engine.Redshift)
-
-        self._cxns = EngineConnections.connect_sync(
-            self._config,
-            directory,
-            schema_name=self._curr_blueprint.schema_name(),
-            autocommit=False,
-            specific_engines=active_engines,
-        )
+            self._cxns = EngineConnections.connect_sync(
+                self._config,
+                directory,
+                schema_name=self._curr_blueprint.schema_name(),
+                autocommit=False,
+                specific_engines=active_engines,
+            )
 
         aurora_awaitable = self._run_aurora_post_transition(
             self._curr_blueprint.aurora_provisioning(),

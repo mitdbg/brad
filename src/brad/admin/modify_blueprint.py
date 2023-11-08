@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
 
 # Parse string-formatted injected table placement.
 class ParseTableList(argparse.Action):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.default = {}
+
     def __call__(self, parser, namespace, s, option_string=None):
         mappings = {}
         for mapping in s.split(";"):
