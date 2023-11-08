@@ -201,6 +201,8 @@ if __name__ == "__main__":
         args.num_epoch,
         args.starting_factor,
         args.timeout_sec,
+        args.repetitions_per_query,
         args.workload_path,
+        args.num_queries_per_template,
         args.save_path,
     )
