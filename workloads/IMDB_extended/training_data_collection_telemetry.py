@@ -1,13 +1,55 @@
 import json
 from tqdm import tqdm
+import argparse
 from workloads.IMDB_extended.gen_telemetry_workload import generate_workload
-from workloads.cross_db_benchmark.benchmark_tools.athena.database_connection import AthenaDatabaseConnection
-from workloads.cross_db_benchmark.benchmark_tools.redshift.database_connection import RedshiftDatabaseConnection
+from workloads.cross_db_benchmark.benchmark_tools.athena.database_connection import (
+    AthenaDatabaseConnection,
+)
+from workloads.cross_db_benchmark.benchmark_tools.redshift.database_connection import (
+    RedshiftDatabaseConnection,
+)
 
+
+def reset_data_athena(conn):
+    res = conn.run_query_collect_statistics(
+        "DROP TABLE movie_telemetry;", plain_run=True
+    )
+    if res["error"]:
+        assert False, "data insert failed. DB internal error"
+    create_table_sql = """CREATE TABLE
+                            movie_telemetry (ip string, timestamp string, movie_id int, event_id int)
+                            LOCATION 's3://imdb-large-data-brad/telemetry/'
+                            TBLPROPERTIES ( 'table_type' ='ICEBERG' );
+                            """
+    res = conn.run_query_collect_statistics(create_table_sql, plain_run=True)
+    if res["error"]:
+        assert False, "data insert failed. DB internal error"
+    res = conn.run_query_collect_statistics(
+        "INSERT INTO movie_telemetry SELECT * FROM temp_telemetry;", plain_run=True
+    )
+    if res["error"]:
+        assert False, "data insert failed. DB internal error"
+
+
+def reset_data_redshift(conn):
+    res = conn.run_query_collect_statistics(
+        "DROP TABLE movie_telemetry;", plain_run=True
+    )
+    if res["error"]:
+        assert False, "data insert failed. DB internal error"
+    create_table_sql = "CREATE TABLE movie_telemetry (ip character varying, timestamp TIMESTAMP, movie_id int, event_id int);"
+    res = conn.run_query_collect_statistics(create_table_sql, plain_run=True)
+    if res["error"]:
+        assert False, "data insert failed. DB internal error"
+    res = conn.run_query_collect_statistics(
+        "INSERT INTO movie_telemetry SELECT * FROM temp_telemetry;", plain_run=True
+    )
+    if res["error"]:
+        assert False, "data insert failed. DB internal error"
 
 
 def duplicate_data(conn, scale=1):
-    for i in range(scale):
+    for _ in range(scale):
         sql = "INSERT INTO movie_telemetry SELECT * FROM temp_telemetry;"
         res = conn.run_query_collect_statistics(sql, plain_run=True)
         if res["error"]:
@@ -18,7 +60,7 @@ def execute_workload_redshift(db_conn, workload, timeout_sec, repetitions_per_qu
     db_conn.set_statement_timeout(timeout_sec)
     db_conn.clear_query_result_cache()
     redshift_result = []
-    for i, sql_query in enumerate(tqdm(workload)):
+    for sql_query in tqdm(workload):
         curr_statistics = db_conn.run_query_collect_statistics(
             sql_query,
             repetitions=repetitions_per_query,
@@ -31,10 +73,10 @@ def execute_workload_redshift(db_conn, workload, timeout_sec, repetitions_per_qu
 
 def execute_workload_athena(db_conn, workload, timeout_sec, repetitions_per_query=3):
     athena_result = []
-    for i, sql_query in enumerate(tqdm(workload)):
+    for sql_query in tqdm(workload):
         curr_statistics = dict()
         curr_statistics["runtimes"] = []
-        for rep in range(repetitions_per_query):
+        for _ in range(repetitions_per_query):
             curr_out = db_conn.run_query_collect_statistics(
                 sql_query,
                 timeout_s=timeout_sec,
@@ -46,12 +88,23 @@ def execute_workload_athena(db_conn, workload, timeout_sec, repetitions_per_quer
     return athena_result
 
 
-def collect_train_data(db_name, redshift_database_kwargs, athena_database_kwargs, scale=1, num_epoch=10,
-                       starting_factor=1, timeout_sec=300, workload_path=None, save_path=None):
-    redshitf_conn = RedshiftDatabaseConnection(db_name=db_name, database_kwargs=redshift_database_kwargs)
+def collect_train_data(
+    db_name,
+    redshift_database_kwargs,
+    athena_database_kwargs,
+    scale=1,
+    num_epoch=10,
+    starting_factor=1,
+    timeout_sec=300,
+    workload_path=None,
+    save_path=None,
+):
+    redshitf_conn = RedshiftDatabaseConnection(
+        db_name=db_name, database_kwargs=redshift_database_kwargs
+    )
     athena_conn = AthenaDatabaseConnection(db_name=db_name, **athena_database_kwargs)
     if workload_path is not None:
-        with open(workload_path, 'r') as f:
+        with open(workload_path, "r", encoding="utf-8") as f:
             workload_sql = f.readlines()
     else:
         workload_sql = None
@@ -65,20 +118,81 @@ def collect_train_data(db_name, redshift_database_kwargs, athena_database_kwargs
             if starting_factor == 0:
                 starting_factor = 1
         table_stats = redshitf_conn.collect_db_statistics()
-        table_stats['column_stats'] = [s for s in table_stats['column_stats'] if s['tablename'] == 'movie_telemetry']
-        table_stats['table_stats'] = [{'relname': 'movie_telemetry', 'reltuples': 200000000 * (epoch+starting_factor),
-                                       'relcols': 4, 'relpages': 0}]
+        table_stats["column_stats"] = [
+            s
+            for s in table_stats["column_stats"]
+            if s["tablename"] == "movie_telemetry"
+        ]
+        table_stats["table_stats"] = [
+            {
+                "relname": "movie_telemetry",
+                "reltuples": 200000000 * (epoch + starting_factor),
+                "relcols": 4,
+                "relpages": 0,
+            }
+        ]
         res[f"epoch_{epoch}"]["table_stats"] = table_stats
         if workload_sql is None:
             workload_sql = generate_workload(seed=epoch)
-        redshift_result = execute_workload_redshift(redshitf_conn, workload_sql, timeout_sec)
+        redshift_result = execute_workload_redshift(
+            redshitf_conn, workload_sql, timeout_sec
+        )
         res[f"epoch_{epoch}"]["redshift_result"] = redshift_result
-        athena_result = execute_workload_athena(redshitf_conn, workload_sql, timeout_sec)
+        athena_result = execute_workload_athena(athena_conn, workload_sql, timeout_sec)
         res[f"epoch_{epoch}"]["athena_result"] = athena_result
 
         if save_path:
-            with open(save_path, "w") as outfile:
+            with open(save_path, "w", encoding="utf-8") as outfile:
                 json.dump(res, outfile)
-
     return res
 
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--db_name", default="imdb", type=str)
+
+    parser.add_argument("--host", type=str)
+    parser.add_argument("--port", default="5432", type=str)
+    parser.add_argument("--user", type=str)
+    parser.add_argument("--sslrootcert", default="SSLCERTIFICATE", type=str)
+    parser.add_argument("--password", type=str)
+
+    parser.add_argument("--aws_access_key", type=str)
+    parser.add_argument("--aws_secret_key", type=str)
+    parser.add_argument("--s3_staging_dir", type=str)
+    parser.add_argument("--aws_region", default="us-east-1", type=str)
+
+    parser.add_argument("--scale", default=1, type=int)
+    parser.add_argument("--num_epoch", default=10, type=int)
+    parser.add_argument("--starting_factor", default=1, type=int)
+    parser.add_argument("--timeout_sec", default=300, type=int)
+    parser.add_argument("--workload_path", default=None, type=str)
+    parser.add_argument("--save_path", default=None, type=str)
+
+    args = parser.parse_args()
+
+    redshift_database_kwargs = {
+        "host": args.host,
+        "port": args.port,
+        "user": args.user,
+        "password": args.password,
+        "sslrootcert": args.sslrootcert,
+    }
+    athena_database_kwargs = {
+        "aws_access_key": args.aws_access_key,
+        "aws_secret_key": args.aws_secret_key,
+        "s3_staging_dir": args.s3_staging_dir,
+        "aws_region": args.aws_region,
+    }
+
+    _ = collect_train_data(
+        args.db_name,
+        redshift_database_kwargs,
+        athena_database_kwargs,
+        args.scale,
+        args.num_epoch,
+        args.starting_factor,
+        args.timeout_sec,
+        args.workload_path,
+        args.save_path,
+    )

@@ -3,23 +3,27 @@ import numpy as np
 
 def formate_time_str(m, d):
     if m < 10:
-        m = '0' + str(m)
+        m = "0" + str(m)
     else:
         m = str(m)
     if d < 10:
-        d = '0' + str(d)
+        d = "0" + str(d)
     else:
         d = str(d)
     return f"2023-{m}-{d} 00:00:00.000"
 
 
-def generate_workload(query_templates=None, num_queries_per_template=10, seed=0, save_file=None):
+def generate_workload(
+    query_templates=None, num_queries_per_template=10, seed=0, save_file=None
+):
     np.random.seed(seed)
     if query_templates is None or len(query_templates) == 0:
-        query_templates = ["SELECT COUNT(*) FROM movie_telemetry WHERE timestamp > '{start_time}' AND timestamp < '{end_time}';",
-                           "SELECT COUNT(*) FROM movie_telemetry WHERE movie_id > {movie_start_id} AND movie_id < {movie_end_id};",
-                           "SELECT COUNT(*) FROM movie_telemetry WHERE event_id > {event_start_id} AND event_id < {event_end_id};",
-                           "SELECT COUNT(*) FROM movie_telemetry WHERE timestamp > '{start_time}' AND timestamp < '{end_time}' AND event_id > {event_start_id} AND event_id < {event_end_id} AND movie_id > {movie_start_id} AND movie_id < {movie_end_id};"]
+        query_templates = [
+            "SELECT COUNT(*) FROM movie_telemetry WHERE timestamp > '{start_time}' AND timestamp < '{end_time}';",
+            "SELECT COUNT(*) FROM movie_telemetry WHERE movie_id > {movie_start_id} AND movie_id < {movie_end_id};",
+            "SELECT COUNT(*) FROM movie_telemetry WHERE event_id > {event_start_id} AND event_id < {event_end_id};",
+            "SELECT COUNT(*) FROM movie_telemetry WHERE timestamp > '{start_time}' AND timestamp < '{end_time}' AND event_id > {event_start_id} AND event_id < {event_end_id} AND movie_id > {movie_start_id} AND movie_id < {movie_end_id};",
+        ]
 
     MIN_MOVIE_ID = 185208
     MAX_MOVIE_ID = 2440851
@@ -27,7 +31,7 @@ def generate_workload(query_templates=None, num_queries_per_template=10, seed=0,
     MAX_EVENT_ID = 20
 
     all_query_sql = []
-    for i in range(num_queries_per_template):
+    for _ in range(num_queries_per_template):
         m = np.random.choice(12, size=2) + 1
         d = np.random.choice(28, size=2) + 1
         if m[0] == m[1]:
@@ -36,7 +40,7 @@ def generate_workload(query_templates=None, num_queries_per_template=10, seed=0,
                     start_time = formate_time_str(m[0], 0)
                     end_time = formate_time_str(m[0], 1)
                 else:
-                    start_time = formate_time_str(m[0], d[0]-1)
+                    start_time = formate_time_str(m[0], d[0] - 1)
                     end_time = formate_time_str(m[0], d[0])
             else:
                 start_time = formate_time_str(m[0], np.min(d))
@@ -60,23 +64,22 @@ def generate_workload(query_templates=None, num_queries_per_template=10, seed=0,
         query_args = dict()
         for template in query_templates:
             if "'{start_time}'" in template:
-                query_args['start_time'] = start_time
+                query_args["start_time"] = start_time
             if "'{end_time}'" in template:
-                query_args['end_time'] = end_time
+                query_args["end_time"] = end_time
             if "{movie_start_id}" in template:
-                query_args['movie_start_id'] = movie_start_id
+                query_args["movie_start_id"] = movie_start_id
             if "{movie_end_id}" in template:
-                query_args['movie_end_id'] = movie_end_id
+                query_args["movie_end_id"] = movie_end_id
             if "{event_start_id}" in template:
-                query_args['event_start_id'] = event_start_id
+                query_args["event_start_id"] = event_start_id
             if "{event_end_id}" in template:
-                query_args['event_end_id'] = event_end_id
+                query_args["event_end_id"] = event_end_id
             sql = template.format(**query_args)
             all_query_sql.append(sql)
 
     if save_file:
-        with open(save_file, "w+") as f:
+        with open(save_file, "w+", encoding="utf-8") as f:
             for sql in all_query_sql:
                 f.write(sql + "\n")
     return all_query_sql
-

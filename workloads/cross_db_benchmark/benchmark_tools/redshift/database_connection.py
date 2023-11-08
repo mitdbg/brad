@@ -179,7 +179,7 @@ class RedshiftDatabaseConnection(DatabaseConnection):
         explain_only=False,
         timeout_sec=None,
         clear_cache=True,
-        plain_run=True
+        plain_run=True,
     ):
         results = None
         runtimes = None
@@ -265,7 +265,14 @@ class RedshiftDatabaseConnection(DatabaseConnection):
             cursor.execute("SET enable_result_cache_for_session = OFF;")
             connection.commit()
         cursor.execute(sql)
+        try:
+            records = cursor.fetchall()
+        except psycopg2.ProgrammingError as e:
+            records = None
+        except:
+            assert False, "internal err"
         records = cursor.fetchall()
+        connection.commit()
         self.close_conn(connection, cursor)
 
         if include_column_names:

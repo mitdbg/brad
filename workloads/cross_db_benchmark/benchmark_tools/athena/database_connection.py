@@ -11,9 +11,7 @@ def run_one(athena_connection, query, conn, explain_only=False, plain_run=False)
     try:
         t = time.perf_counter()
         if plain_run:
-            result = athena_connection.execute(
-                text(query)
-            )
+            result = athena_connection.execute(text(query))
             runtime = time.perf_counter() - t
             output = dict()
             output["result"] = []
@@ -22,7 +20,9 @@ def run_one(athena_connection, query, conn, explain_only=False, plain_run=False)
             output["runtime"] = runtime
         else:
             if explain_only:
-                result = athena_connection.execute(text("EXPLAIN (FORMAT JSON) " + query))
+                result = athena_connection.execute(
+                    text("EXPLAIN (FORMAT JSON) " + query)
+                )
             else:
                 result = athena_connection.execute(
                     text("EXPLAIN ANALYZE (FORMAT JSON) " + query)
@@ -42,7 +42,14 @@ def run_one(athena_connection, query, conn, explain_only=False, plain_run=False)
 
 
 class AthenaDatabaseConnection:
-    def __init__(self, db_name, aws_access_key="XX", aws_secret_key="XX", s3_staging_dir="XX", aws_region="us-east-1"):
+    def __init__(
+        self,
+        db_name,
+        aws_access_key="XX",
+        aws_secret_key="XX",
+        s3_staging_dir="XX",
+        aws_region="us-east-1",
+    ):
         conn_str = (
             "awsathena+rest://{aws_access_key_id}:{aws_secret_access_key}@athena.{region_name}.amazonaws.com:"
             "443/{schema_name}?s3_staging_dir={s3_staging_dir}"
@@ -58,7 +65,9 @@ class AthenaDatabaseConnection:
         self.engine = create_engine(self.conn_str)
         self.connection = None
 
-    def run_query_collect_statistics(self, sql, timeout_s=200, explain_only=False, plain_run=False):
+    def run_query_collect_statistics(
+        self, sql, timeout_s=200, explain_only=False, plain_run=False
+    ):
         self.get_connection()
         analyze_plans = None
         runtime = None
