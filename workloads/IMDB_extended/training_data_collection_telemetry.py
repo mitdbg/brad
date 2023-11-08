@@ -96,7 +96,9 @@ def collect_train_data(
     num_epoch=10,
     starting_factor=1,
     timeout_sec=300,
+    repetitions_per_query=3,
     workload_path=None,
+    num_queries_per_template=10,
     save_path=None,
 ):
     redshitf_conn = RedshiftDatabaseConnection(
@@ -133,12 +135,16 @@ def collect_train_data(
         ]
         res[f"epoch_{epoch}"]["table_stats"] = table_stats
         if workload_sql is None:
-            workload_sql = generate_workload(seed=epoch)
+            workload_sql = generate_workload(
+                seed=epoch, num_queries_per_template=num_queries_per_template
+            )
         redshift_result = execute_workload_redshift(
-            redshitf_conn, workload_sql, timeout_sec
+            redshitf_conn, workload_sql, timeout_sec, repetitions_per_query
         )
         res[f"epoch_{epoch}"]["redshift_result"] = redshift_result
-        athena_result = execute_workload_athena(athena_conn, workload_sql, timeout_sec)
+        athena_result = execute_workload_athena(
+            athena_conn, workload_sql, timeout_sec, repetitions_per_query
+        )
         res[f"epoch_{epoch}"]["athena_result"] = athena_result
 
         if save_path:
@@ -152,7 +158,7 @@ if __name__ == "__main__":
     parser.add_argument("--db_name", default="imdb", type=str)
 
     parser.add_argument("--host", type=str)
-    parser.add_argument("--port", default="5432", type=str)
+    parser.add_argument("--port", default="5439", type=str)
     parser.add_argument("--user", type=str)
     parser.add_argument("--sslrootcert", default="SSLCERTIFICATE", type=str)
     parser.add_argument("--password", type=str)
@@ -165,20 +171,22 @@ if __name__ == "__main__":
     parser.add_argument("--scale", default=1, type=int)
     parser.add_argument("--num_epoch", default=10, type=int)
     parser.add_argument("--starting_factor", default=1, type=int)
+    parser.add_argument("--repetitions_per_query", default=3, type=int)
     parser.add_argument("--timeout_sec", default=300, type=int)
     parser.add_argument("--workload_path", default=None, type=str)
+    parser.add_argument("--num_queries_per_template", default=10, type=int)
     parser.add_argument("--save_path", default=None, type=str)
 
     args = parser.parse_args()
 
-    redshift_database_kwargs = {
+    r_database_kwargs = {
         "host": args.host,
         "port": args.port,
         "user": args.user,
         "password": args.password,
         "sslrootcert": args.sslrootcert,
     }
-    athena_database_kwargs = {
+    a_database_kwargs = {
         "aws_access_key": args.aws_access_key,
         "aws_secret_key": args.aws_secret_key,
         "s3_staging_dir": args.s3_staging_dir,
@@ -187,8 +195,8 @@ if __name__ == "__main__":
 
     _ = collect_train_data(
         args.db_name,
-        redshift_database_kwargs,
-        athena_database_kwargs,
+        r_database_kwargs,
+        a_database_kwargs,
         args.scale,
         args.num_epoch,
         args.starting_factor,
