@@ -240,8 +240,9 @@ class TransitionOrchestrator:
         await asyncio.gather(aurora_awaitable, redshift_awaitable, athena_awaitable)
 
         # Close connections
-        await self._cxns.close()
-        self._cxns = None
+        if self._cxns is not None:
+            await self._cxns.close()
+            self._cxns = None
 
         logger.debug("Post-transition steps complete.")
 
