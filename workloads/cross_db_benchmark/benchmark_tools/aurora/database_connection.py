@@ -247,7 +247,7 @@ class AuroraDatabaseConnection(DatabaseConnection):
         }
 
     def run_query_collect_statistics(
-        self, sql, repetitions=1, prefix="", explain_only=False
+        self, sql, repetitions=1, prefix="", explain_only=False, plain_run=True
     ):
         analyze_plans = None
         verbose_plan = None
@@ -255,29 +255,32 @@ class AuroraDatabaseConnection(DatabaseConnection):
         data_stats = []
 
         try:
-            verbose_plan = self.get_result(f"{prefix}EXPLAIN VERBOSE {sql}")
+            if plain_run:
+                analyze_plans = self.get_result(sql)
+            else:
+                verbose_plan = self.get_result(f"{prefix}EXPLAIN VERBOSE {sql}")
 
-            analyze_plans = []
-            if not explain_only:
-                for i in range(repetitions):
-                    conn, cursor = self.get_cursor()
+                analyze_plans = []
+                if not explain_only:
+                    for i in range(repetitions):
+                        conn, cursor = self.get_cursor()
 
-                    pre_stats = self.extract_all_data_stats(cursor)
+                        pre_stats = self.extract_all_data_stats(cursor)
 
-                    statement = f"{prefix}EXPLAIN ANALYZE {sql}"
-                    curr_analyze_plan = self.get_result(statement)
+                        statement = f"{prefix}EXPLAIN ANALYZE {sql}"
+                        curr_analyze_plan = self.get_result(statement)
 
-                    # Need pre and post to do a diff. The stats are cumulative.
-                    post_stats = self.extract_all_data_stats(cursor)
+                        # Need pre and post to do a diff. The stats are cumulative.
+                        post_stats = self.extract_all_data_stats(cursor)
 
-                    analyze_plans.append(curr_analyze_plan)
-                    data_stats.append(
-                        {
-                            "pre": pre_stats,
-                            "post": post_stats,
-                        }
-                    )
-                    self.close_conn(conn, cursor)
+                        analyze_plans.append(curr_analyze_plan)
+                        data_stats.append(
+                            {
+                                "pre": pre_stats,
+                                "post": post_stats,
+                            }
+                        )
+                        self.close_conn(conn, cursor)
         # timeout
         except psycopg2.errors.QueryCanceled as e:
             timeout = True
