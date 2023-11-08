@@ -33,7 +33,8 @@ function inner_cancel_experiment() {
 trap "inner_cancel_experiment" INT
 trap "inner_cancel_experiment" TERM
 
-start_brad $config_file $planner_config_file
+export BRAD_IGNORE_BLUEPRINT=1
+start_brad_debug $config_file $planner_config_file
 log_workload_point "brad_start_initiated"
 sleep 30
 
@@ -118,8 +119,8 @@ function point_five() {
 }
 
 echo "READY -- Running for 1 hour. Hit Ctrl-C to stop."
-point_one 60
-# point_two 60
+# point_one 60
+point_two 60
 # point_three 60
 # point_four 60
 # point_five 60
