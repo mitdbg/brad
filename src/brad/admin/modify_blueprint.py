@@ -92,13 +92,21 @@ def register_admin_action(subparser) -> None:
     parser.add_argument(
         "--place-tables",
         action=ParseTableList,
-        help="Updates the blueprint's table placement and places the specified tables on the specified engines. Overridden by --place-tables-everywhere. Format argument as a string of the form: table1=engine1,engine2;table2=engine3;",
+        help="Updates the blueprint's table placement and places the specified tables "
+        "on the specified engines. Overridden by --place-tables-everywhere. Format "
+        "argument as a string of the form: table1=engine1,engine2;table2=engine3;",
     )
     parser.add_argument(
         "--set-routing-policy",
-        type=str,
+        choices=[
+            "always_redshift",
+            "always_aurora",
+            "always_athena",
+            "df_selectivity",
+            "rule_based",
+        ],
         help="Sets the serialized routing policy to a preconfigured default: "
-        "{always_redshift, df_selectivity, rule_based}",
+        "{always_redshift, always_aurora, always_athena, df_selectivity, rule_based}",
     )
     parser.add_argument(
         "--keep-indefinite-policies",
@@ -301,6 +309,10 @@ def modify_blueprint(args) -> None:
     if args.set_routing_policy is not None:
         if args.set_routing_policy == "always_redshift":
             definite_policy: AbstractRoutingPolicy = AlwaysOneRouter(Engine.Redshift)
+        elif args.set_routing_policy == "always_aurora":
+            definite_policy = AlwaysOneRouter(Engine.Aurora)
+        elif args.set_routing_policy == "always_athena":
+            definite_policy = AlwaysOneRouter(Engine.Athena)
         elif args.set_routing_policy == "df_selectivity":
             definite_policy = asyncio.run(
                 ForestPolicy.from_assets(
