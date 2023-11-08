@@ -28,6 +28,7 @@ run_experiment(
     "ra-query-bank-file": "queries.sql",
     "ra-query-indexes": ",".join(map(str, range(0, 20))),
     "num-front-ends": 2,
+    "dataset-type": "100gb",
   },
   deps=[":set_up_router_before"],
 )
@@ -42,6 +43,7 @@ run_experiment(
     "ra-query-bank-file": "queries.sql",
     "ra-query-indexes": ",".join(map(str, range(0, 20))),
     "num-front-ends": 2,
+    "dataset-type": "100gb",
   },
   deps=[":set_up_router_after"],
 )

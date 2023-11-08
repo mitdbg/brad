@@ -15,6 +15,12 @@ SCHEMA_SCALE_FACTORS = {
   "imdb_extended_100g": 33,
 }
 
+DATASET_TYPE = {
+  "imdb_extended": "original",
+  "imdb_extended_20g": "20gb",
+  "imdb_extended_100g": "100gb",
+}
+
 combine(
   name="all",
   deps=[
@@ -51,6 +57,7 @@ for instance in INSTANCES:
             "num-clients": clients,
             "scale-factor": sf,
             "schema-name": name,
+            "dataset-type": DATASET_TYPE[name],
           },
         )
         for clients in NUM_CLIENTS[instance]

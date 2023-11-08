@@ -223,5 +223,9 @@ function extract_named_arguments() {
     if [[ $phys_arg =~ --schema-name=.+ ]]; then
       schema_name=${phys_arg:14}
     fi
+
+    if [[ $dataset_type =~ --dataset-type=.+ ]]; then
+      dataset_type=${phys_arg:15}
+    fi
   done
 }

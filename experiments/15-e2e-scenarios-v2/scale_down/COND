@@ -12,6 +12,7 @@ run_experiment(
     "ra-query-indexes": "25,50,51,75,76,27,28,6",
     "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
     "num-front-ends": 4,
+    "dataset-type": "20gb",
   },
 )
 
@@ -27,6 +28,7 @@ run_command(
     "ra-query-indexes": "25,50,51,75,76,27,28,6",
     "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
     "num-front-ends": 4,
+    "dataset-type": "20gb",
   },
 )
 
@@ -49,6 +51,7 @@ run_experiment(
     "ra-query-indexes": ",".join(map(str, aurora_alt)),
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "num-front-ends": 8,
+    "dataset-type": "100gb",
   },
 )
 
@@ -63,5 +66,6 @@ run_command(
     "ra-query-indexes": ",".join(map(str, aurora_alt)),
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "num-front-ends": 8,
+    "dataset-type": "100gb",
   },
 )

@@ -38,7 +38,9 @@ def runner(
 
     signal.signal(signal.SIGINT, noop_handler)
 
-    worker = TransactionWorker(worker_idx, args.seed ^ worker_idx, args.scale_factor)
+    worker = TransactionWorker(
+        worker_idx, args.seed ^ worker_idx, args.scale_factor, args.dataset_type
+    )
 
     txn_prng = random.Random(~(args.seed ^ worker_idx))
     transactions = [
@@ -238,6 +240,13 @@ def main():
         type=float,
         default=0.01,
         help="The probability that a transaction's latency will be recorded.",
+    )
+    parser.add_argument(
+        "--dataset-type",
+        choices=["original", "20gb", "100gb"],
+        default="original",
+        help="This controls the range of reads the transaction worker performs, "
+        "depending on the dataset size.",
     )
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)
