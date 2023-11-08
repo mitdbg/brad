@@ -190,7 +190,10 @@ class RedshiftDatabaseConnection(DatabaseConnection):
             if plain_run:
                 query_start_t = time.perf_counter()
                 results = self.get_result(
-                    sql, timeout_sec=timeout_sec, clear_cache=clear_cache
+                    sql,
+                    timeout_sec=timeout_sec,
+                    clear_cache=clear_cache,
+                    fetch_output=False,
                 )
                 runtimes = time.perf_counter() - query_start_t
             else:
@@ -256,6 +259,7 @@ class RedshiftDatabaseConnection(DatabaseConnection):
         db_created=True,
         timeout_sec=None,
         clear_cache=True,
+        fetch_output=True,
     ):
         connection, cursor = self.get_cursor(db_created=db_created)
         if timeout_sec:
@@ -265,13 +269,10 @@ class RedshiftDatabaseConnection(DatabaseConnection):
             cursor.execute("SET enable_result_cache_for_session = OFF;")
             connection.commit()
         cursor.execute(sql)
-        try:
+        if fetch_output:
             records = cursor.fetchall()
-        except psycopg2.ProgrammingError as e:
+        else:
             records = None
-        except:
-            assert False, "internal err"
-        records = cursor.fetchall()
         connection.commit()
         self.close_conn(connection, cursor)
 

@@ -32,27 +32,19 @@ def reset_data_athena(conn):
 
 
 def reset_data_redshift(conn):
-    res = conn.run_query_collect_statistics(
-        "DROP TABLE movie_telemetry;", plain_run=True
-    )
-    if res["error"]:
-        assert False, "data insert failed. DB internal error"
+    _ = conn.run_query_collect_statistics("DROP TABLE movie_telemetry;", plain_run=True)
     create_table_sql = "CREATE TABLE movie_telemetry (ip character varying, timestamp TIMESTAMP, movie_id int, event_id int);"
-    res = conn.run_query_collect_statistics(create_table_sql, plain_run=True)
-    if res["error"]:
-        assert False, "data insert failed. DB internal error"
-    res = conn.run_query_collect_statistics(
+    _ = conn.run_query_collect_statistics(create_table_sql, plain_run=True)
+    _ = conn.run_query_collect_statistics(
         "INSERT INTO movie_telemetry SELECT * FROM temp_telemetry;", plain_run=True
     )
-    if res["error"]:
-        assert False, "data insert failed. DB internal error"
 
 
 def duplicate_data(conn, scale=1):
     for _ in range(scale):
         sql = "INSERT INTO movie_telemetry SELECT * FROM temp_telemetry;"
         res = conn.run_query_collect_statistics(sql, plain_run=True)
-        if res["error"]:
+        if "error" in res and res["error"]:
             assert False, "data insert failed. DB internal error"
 
 
@@ -92,6 +84,7 @@ def collect_train_data(
     db_name,
     redshift_database_kwargs,
     athena_database_kwargs,
+    re_start=False,
     scale=1,
     num_epoch=10,
     starting_factor=1,
@@ -112,6 +105,9 @@ def collect_train_data(
         workload_sql = None
 
     res = dict()
+    if re_start:
+        reset_data_redshift(redshitf_conn)
+        reset_data_athena(athena_conn)
     for epoch in range(num_epoch):
         res[f"epoch_{epoch}"] = dict()
         if epoch != 0 or starting_factor == 0:
@@ -168,6 +164,7 @@ if __name__ == "__main__":
     parser.add_argument("--s3_staging_dir", type=str)
     parser.add_argument("--aws_region", default="us-east-1", type=str)
 
+    parser.add_argument("--re_start", action="store_true")
     parser.add_argument("--scale", default=1, type=int)
     parser.add_argument("--num_epoch", default=10, type=int)
     parser.add_argument("--starting_factor", default=1, type=int)
@@ -197,6 +194,7 @@ if __name__ == "__main__":
         args.db_name,
         r_database_kwargs,
         a_database_kwargs,
+        args.re_start,
         args.scale,
         args.num_epoch,
         args.starting_factor,
