@@ -71,7 +71,7 @@ async def replay_planner_impl(args) -> None:
     planner = recorded_run.create_planner(provider)
 
     logger.info("Re-running recorded run of type: %s", str(type(recorded_run)))
-    await planner._run_replan_impl()
+    await planner._run_replan_impl()  # pylint: disable=protected-access
 
 
 # This method is called by `brad.exec.admin.main`.
