@@ -1,7 +1,7 @@
 import yaml
 import mysql.connector
 import psycopg2
-import os, json
+import os, json, sys
 import time
 from pathlib import Path
 import pandas as pd
@@ -15,7 +15,10 @@ def load_schema_json(dataset):
         "workloads/cross_db_benchmark/datasets/", dataset, "schema.json"
     )
     assert os.path.exists(schema_path), f"Could not find schema.json ({schema_path})"
-    return json.load(open(schema_path, mode='r', encoding='utf-8'), object_hook=lambda d: SimpleNamespace(**d))
+    return json.load(
+        open(schema_path, mode="r", encoding="utf-8"),
+        object_hook=lambda d: SimpleNamespace(**d),
+    )
 
 
 def load_schema_sql(dataset, sql_filename):
@@ -23,19 +26,14 @@ def load_schema_sql(dataset, sql_filename):
         "workloads/cross_db_benchmark/datasets/", dataset, "schema_sql", sql_filename
     )
     assert os.path.exists(sql_path), f"Could not find schema.sql ({sql_path})"
-    with open(sql_path, "r") as file:
+    with open(sql_path, "r", encoding="utf-8") as file:
         data = file.read().replace("\n", "")
     return data
 
 
-
-
-
-
-
 def make_tidb_conn():
     config_file = "config/baseline.yml"
-    with open(config_file, "r") as f:
+    with open(config_file, "r", encoding="utf-8") as f:
         config = yaml.load(f, Loader=yaml.Loader)
         config = config["tidb"]
         host = config["host"]
@@ -67,7 +65,7 @@ def make_tidb_conn():
 
 def make_postgres_compatible_conn(engine="redshift"):
     config_file = "config/baseline.yml"
-    with open(config_file, "r") as f:
+    with open(config_file, "r", encoding="utf-8") as f:
         config = yaml.load(f, Loader=yaml.Loader)
         config = config[engine]
         host = config["host"]
@@ -88,12 +86,29 @@ def make_postgres_compatible_conn(engine="redshift"):
 # TODO: Implement loading from S3. This currenlty loads from local disk.
 class TiDBLoader:
     def __init__(self):
-        self.conn: mysql.connector.MySQLConnection = make_tidb_conn()
+        self.conn = make_tidb_conn()
+        config_file = "config/baseline.yml"
+        with open(config_file, "r", encoding="utf-8") as f:
+            config = yaml.load(f, Loader=yaml.Loader)
+            self.s3_bucket = config["s3_bucket"]
+            self.bucket_region = config["bucket_region"]
+            config = config["tidb"]
+            self.access_key = config["access_key"]
+            self.secret_key = config["secret_key"]
         cur = self.conn.cursor()
         cur.execute("SET GLOBAL local_infile = 1;")
-        self.conn.commit()            
+        self.conn.commit()
 
-    def load_database(self, dataset, data_dir, force=False, load_from: str = ""):
+    def make_load_cmd(self, t, load_args) -> str:
+        s3_path = f"s3://{self.s3_bucket}/imdb_extended/{t}/{t}.csv?access-key={self.access_key}&secret-access-key={self.secret_key}"
+        load_args = load_args.tidb
+        load_cmd = f"LOAD DATA INFILE '{s3_path}' INTO TABLE {t} {load_args}"
+        return load_cmd
+
+
+
+
+    def load_database(self, dataset, force=False, load_from: str = ""):
         # First, check existence.
         print(f"Checking existence. Force={force}")
         exists = self.check_exists(dataset)
@@ -114,37 +129,14 @@ class TiDBLoader:
             if not start_loading:
                 continue
             start_t = time.perf_counter()
-            p = os.path.join(data_dir, f"{t}.csv")
-            table_path = Path(p).resolve()
-            tidb_path = os.path.join(data_dir, f"{t}_tidb0.csv")
-            table = pd.read_csv(
-                table_path,
-                delimiter=",",
-                quotechar='"',
-                escapechar="\\",
-                na_values="",
-                keep_default_na=False,
-                header=0,
-                low_memory=False,
-            )
-            # Need to load chunk by chunk to avoid networking errors.
-            chunksize = 1_000_000
-            print(f"Loading {t}. {len(table)} rows.")
-            for i, chunk in enumerate(range(0, len(table), chunksize)):
-                # Also need to rewrite nulls.
-                tidb_path = os.path.join(data_dir, f"{t}_tidb{i}.csv")
-                print(f"Writing {t} chunk {i}. ({chunk}/{len(table)}).")
-                table.iloc[chunk : chunk + chunksize].to_csv(
-                    tidb_path, sep="|", index=False, header=True, na_rep="\\N"
-                )
-                load_cmd = f"LOAD DATA LOCAL INFILE '{tidb_path}' INTO TABLE {t} {schema.db_load_kwargs.mysql}"
-                print(f"LOAD CMD:\n{load_cmd}")
-                self.submit_query(load_cmd, until_success=True)
-                print(f"Chunk {i} took {time.perf_counter() - start_t:.2f} secs")
+            load_cmd = self.make_load_cmd(t, schema.db_load_kwargs)
+            print(f"LOAD CMD:\n{load_cmd}")
+            self.submit_query(load_cmd, until_success=True)
             print(f"Loaded {t} in {time.perf_counter() - start_t:.2f} secs")
             print(f"Replicating {t} for HTAP")
             replica_cmd = f"ALTER TABLE {t} SET TIFLASH REPLICA 1"
             self.submit_query(replica_cmd, until_success=True)
+            sys.exit(0) # Just for testing.
 
         # print("Creating Indexes")
         # indexes_sql = load_schema_sql(dataset, "indexes.sql")
@@ -169,9 +161,6 @@ class TiDBLoader:
             if len(res) == 0:
                 return False
         return True
-
-    def get_connection(self):
-        self.conn
 
     def submit_query(self, sql: str, until_success: bool = False):
         while True:
@@ -209,9 +198,9 @@ class TiDBLoader:
 class PostgresCompatibleLoader:
     def __init__(self, engine="redshift"):
         self.engine = engine
-        self.conn: psycopg2.connection = make_postgres_compatible_conn(engine=engine)
+        self.conn = make_postgres_compatible_conn(engine=engine)
         config_file = "config/baseline.yml"
-        with open(config_file, "r") as f:
+        with open(config_file, "r", encoding="utf-8") as f:
             config = yaml.load(f, Loader=yaml.Loader)
             self.s3_bucket = config["s3_bucket"]
             self.bucket_region = config["bucket_region"]
@@ -227,29 +216,86 @@ class PostgresCompatibleLoader:
             self.conn.commit()
 
 
+    def manual_unload(self, dataset, do_unload=True, specific_table=None, start_chunk=0, end_chunk=0):
+        # Manual unload for use by TiDB.
+        schema = load_schema_json(dataset)
+        s3 = boto3.client("s3")
+        for t in schema.tables:
+            if specific_table is not None  and t != specific_table:
+                continue
+            start_t = time.perf_counter()
+            path_prefix = f"s3://{self.s3_bucket}/imdb_extended/test.{t}."
+            if do_unload:
+                unload_cmd = f"""
+                    UNLOAD ('select * from {t}')
+                    to '{path_prefix}'
+                    iam_role '{self.iam_role}'
+                    CSV DELIMITER AS '|'
+                    HEADER
+                    NULL AS  '\\N'
+                    MAXFILESIZE 1 GB
+                    PARALLEL OFF
+                """
+                self.submit_query(unload_cmd, until_success=True)
+            if start_chunk >= end_chunk:
+                continue
+            # Append csv to all path prefixes.
+            objects = s3.list_objects_v2(Bucket=self.s3_bucket, Prefix=f"imdb_extended/test.{t}.")
+            print(f"List Res: {objects}")
+            if "Contents" not in objects:
+                print(f"Unloaded {t} in {time.perf_counter() - start_t:.2f} secs")
+                continue
+            objects = objects["Contents"]
+            start_chunk_key = f"imdb_extended/test.{t}.{start_chunk:03d}"
+            end_chunk_key = f"imdb_extended/test.{t}.{end_chunk:03d}"
+            all_keys = set([obj["Key"] for obj in objects])
+            for obj in objects:
+                source_key = obj["Key"]
+                target_key = source_key + ".csv"
+                if source_key >= start_chunk_key and source_key < end_chunk_key:
+                    if source_key.endswith(".csv") or target_key in all_keys:
+                        continue
+                    # Copy to the target key.
+                    copy_source = {"Bucket": self.s3_bucket, "Key": source_key}
+                    print(f"Copying {source_key} to {target_key}")
+                    s3.copy_object(Bucket=self.s3_bucket, Key=target_key, CopySource=copy_source)
+                if source_key < start_chunk_key or source_key >= end_chunk_key:
+                    # Delete the target object.
+                    if target_key not in all_keys:
+                        continue
+                    print(f"Deleting {target_key}")
+                    s3.delete_object(Bucket=self.s3_bucket, Key=target_key)
+            print(f"Unloaded {t} in {time.perf_counter() - start_t:.2f} secs")
+
+
+
+
+
     def manually_copy_s3_data(self, dataset):
         schema = load_schema_json(dataset)
-        s3 = boto3.resource('s3')
+        s3 = boto3.resource("s3")
         # Hacky: relies on specifc ordering
         reached_title = False
         for t in schema.tables:
             if t == "title":
                 reached_title = True
             if reached_title:
-                source_dir = "imdb_20G"
+                source_dir = "imdb_100G"
             else:
-                source_dir = "imdb_extended_20g"
+                source_dir = "imdb_extended_100g"
             source_key = f"{source_dir}/{t}/{t}.csv"
             target_key = f"imdb_extended/{t}/{t}.csv"
-            copy_source = {
-                'Bucket': 'geoffxy-research',
-                'Key': source_key
-            }
+            copy_source = {"Bucket": "geoffxy-research", "Key": source_key}
             print(f"Copying {t}")
             start_t = time.perf_counter()
+            # s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
+            # print(f"Copied {t} in {time.perf_counter() - start_t:.2f} secs")
+            # For tidb
+            target_key = f"imdb_extended/test.{t}.csv"
             s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
             print(f"Copied {t} in {time.perf_counter() - start_t:.2f} secs")
-            
+
+
 
     def make_load_cmd(self, t, load_args) -> str:
         if self.engine == "redshift":
@@ -272,9 +318,11 @@ class PostgresCompatibleLoader:
                 aws_commons.create_aws_credentials('{self.access_key}', '{self.secret_key}', '')
             );
             """
-        return load_cmd 
+        return load_cmd
 
     def reset_aurora_seq_nums(self, t):
+        if self.engine != "aurora":
+            return
         q = f"SELECT MAX(id) FROM {t}"
         cur = self.conn.cursor()
         cur.execute(q)
@@ -282,15 +330,14 @@ class PostgresCompatibleLoader:
         q = f"ALTER SEQUENCE {t}_id_seq RESTART WITH {max_serial_val + 1}"
         print(f"Running: {q}")
         cur.execute(q)
-        self.conn.commit()       
-
+        self.conn.commit()
 
     def manual_reset_aurora_seq_nums(self, dataset):
         schema = load_schema_json(dataset)
         for t in schema.tables:
             self.reset_aurora_seq_nums(t)
 
-    def load_database(self, dataset, data_dir, force=False, load_from: str = ""):
+    def load_database(self, dataset, force=False, load_from: str = ""):
         # First, check existence.
         print(f"Checking existence. Force={force}")
         exists = self.check_exists(dataset)
@@ -331,10 +378,7 @@ class PostgresCompatibleLoader:
                 return False
         return True
 
-    def get_connection(self):
-        self.conn
-
-    def submit_query(self, sql: str, until_success: bool = False, error_ok: str = ""):
+    def submit_query(self, sql: str, until_success: bool = False):
         while True:
             try:
                 cur = self.conn.cursor()
@@ -344,10 +388,14 @@ class PostgresCompatibleLoader:
                 for command in commands:
                     command = command.strip()
                     if len(command) > 0:
-                        if self.engine == "redshift" and command.upper().startswith("CREATE INDEX"):
+                        if self.engine == "redshift" and command.upper().startswith(
+                            "CREATE INDEX"
+                        ):
                             print(f"Skipping index for redshift: {command}!")
                             continue
-                        if self.engine == "redshift" and command.upper().startswith("CREATE"):
+                        if self.engine == "redshift" and command.upper().startswith(
+                            "CREATE"
+                        ):
                             command = command.replace("SERIAL", "INTEGER")
                             command = command.replace("serial", "integer")
                             command = command.replace("TEXT", "VARCHAR(65535)")
@@ -376,15 +424,9 @@ class PostgresCompatibleLoader:
 
 
 if __name__ == "__main__":
-    baseline = PostgresCompatibleLoader(engine="aurora")
-    # with baseline.conn.cursor() as cur:
-    #     s3_bucket = baseline.s3_bucket
-    #     region = baseline.bucket_region
-    #     t = "theaters"
-    #     path = f"s3://{s3_bucket}/imdb_extended/{t}/{t}.csv"
-    #     cur.execute(f"SELECT aws_commons.create_s3_uri('{s3_bucket}', '{path}', '{region}');")
-    #     res = cur.fetchall()
-    #     print(f"Results: {res}")
-    import sys
-    if len(sys.argv) > 1 and sys.argv[1] == "reset":
-        baseline.manual_reset_aurora_seq_nums("imdb_extended")
+    baseline = PostgresCompatibleLoader(engine="redshift")
+    baseline.manual_unload("imdb_extended", specific_table="ticket_orders", do_unload=False, start_chunk=0, end_chunk=100)
+    # import sys
+
+    # if len(sys.argv) > 1 and sys.argv[1] == "reset":
+    #     baseline.manual_reset_aurora_seq_nums("imdb_extended")

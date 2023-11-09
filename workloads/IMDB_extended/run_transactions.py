@@ -9,7 +9,6 @@ import threading
 import time
 import os
 import pytz
-import yaml
 import multiprocessing as mp
 from datetime import datetime, timedelta
 from typing import Optional
@@ -21,7 +20,6 @@ from brad.provisioning.directory import Directory
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from workload_utils.connect import connect_to_db
 from workload_utils.transaction_worker import TransactionWorker
-from workload_utils.baseline import make_tidb_conn, make_postgres_compatible_conn
 
 
 def runner(
@@ -40,11 +38,14 @@ def runner(
 
     signal.signal(signal.SIGINT, noop_handler)
 
-    if args.aurora or args.tidb:
-        dataset_type = "20gb"
+    if args.baseline is not None and args.baseline != "":
+        # Hack.
+        dataset_type = "100gb"
     else:
         dataset_type = "original"
-    worker = TransactionWorker(worker_idx, args.seed ^ worker_idx, args.scale_factor, dataset_type=dataset_type)
+    worker = TransactionWorker(
+        worker_idx, args.seed ^ worker_idx, args.scale_factor, dataset_type=dataset_type
+    )
 
     txn_prng = random.Random(~(args.seed ^ worker_idx))
     transactions = [
@@ -77,7 +78,7 @@ def runner(
 
         out_dir = cond.get_output_path()
     else:
-        out_dir = pathlib.Path(".")
+        out_dir = pathlib.Path(f"./{args.output_dir}").resolve()
 
     # Signal that we are ready to start and wait for other clients.
     start_queue.put("")
@@ -221,7 +222,7 @@ def main():
         "--output-dir",
         type=str,
         default=".",
-        help="Environment variable that stores the output directory of tidb bench",
+        help="Environment variable that stores the output directory of the results",
     )
     parser.add_argument(
         "--scale-factor",

@@ -46,7 +46,11 @@ class PyodbcDatabase(Database):
                 cursor = self._cursor
             # Exec
             cursor.execute(query)
-            if cursor.rowcount is None or cursor.rowcount <= 0 or not(query.strip().lower().startswith("SELECT")):
+            if (
+                cursor.rowcount is None
+                or cursor.rowcount <= 0
+                or not (query.strip().lower().startswith("SELECT"))
+            ):
                 rows = []
             else:
                 print(f"Rows: {cursor.rowcount}. Q: {query}")
@@ -60,22 +64,23 @@ class PyodbcDatabase(Database):
             return []
         except mysql.connector.errors.DatabaseError as e:
             print(f"Transient error: {e}", flush=True, file=sys.stderr)
-            return None
+            return []
 
     def begin_sync(self) -> None:
         # Open a new cursor
         self._cursor = self._conn.cursor()
 
-
     def execute_sync_with_engine(self, query: str) -> Tuple[RowList, Optional[Engine]]:
         return self.execute_sync(query), self._engine
 
     def commit_sync(self) -> None:
-        self._cursor.execute("COMMIT")
+        if self._cursor is not None:
+            self._cursor.execute("COMMIT")
         self._cursor = None
 
     def rollback_sync(self) -> None:
-        self._cursor.execute("ROLLBACK")
+        if self._cursor is not None:
+            self._cursor.execute("ROLLBACK")
         self._cursor = None
 
     def close_sync(self) -> None:
@@ -123,6 +128,9 @@ class DirectConnection(Database):
 
     def execute_sync_with_engine(self, query: str) -> Tuple[RowList, Optional[Engine]]:
         return self.execute_sync(query), None
+
+    def begin_sync(self) -> None:
+        self._cursor.execute_sync("BEGIN")
 
     def commit_sync(self) -> None:
         self._cursor.commit_sync()

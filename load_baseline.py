@@ -2,7 +2,10 @@
 
 import argparse
 import sys
-from workloads.IMDB_extended.workload_utils.baseline import PostgresCompatibleLoader, TiDBLoader
+from workloads.IMDB_extended.workload_utils.baseline import (
+    PostgresCompatibleLoader,
+    TiDBLoader,
+)
 import time
 
 
@@ -20,7 +23,6 @@ def main():
     else:
         loader = PostgresCompatibleLoader(engine=args.engine)
     loader.load_database(
-        data_dir=args.data_dir,
         dataset=args.dataset,
         force=args.force_load,
         load_from=args.load_from,

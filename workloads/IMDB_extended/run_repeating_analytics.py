@@ -71,7 +71,7 @@ def runner(
 
         out_dir = cond.get_output_path()
     else:
-        out_dir = pathlib.Path(".")
+        out_dir = pathlib.Path(f"./{args.output_dir}").resolve()
 
     if args.engine is not None:
         engine = Engine.from_str(args.engine)
@@ -242,7 +242,7 @@ def simulation_runner(
 
         out_dir = cond.get_output_path()
     else:
-        out_dir = pathlib.Path(".")
+        out_dir = pathlib.Path(f"./{args.output_dir}").resolve()
 
     if query_frequency_original is not None:
         query_frequency = copy.deepcopy(query_frequency_original[queries])
@@ -359,7 +359,7 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
 
         out_dir = cond.get_output_path()
     else:
-        out_dir = pathlib.Path(".")
+        out_dir = pathlib.Path(f"./{args.output_dir}").resolve()
 
     try:
         print(
@@ -493,6 +493,12 @@ def main():
         default="",
         type=str,
         help="Whether to use tidb, aurora or redshift",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=".",
+        help="Environment variable that stores the output directory of the results",
     )
     parser.add_argument(
         "--brad-direct",

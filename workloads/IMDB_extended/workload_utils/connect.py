@@ -48,13 +48,14 @@ def connect_to_db(
     elif args.cstr_var is not None:
         db = PyodbcDatabase(pyodbc.connect(os.environ[args.cstr_var], autocommit=True))
     elif args.baseline == "tidb":
-        db: Database = PyodbcDatabase(make_tidb_conn())
+        db = PyodbcDatabase(make_tidb_conn())
     elif args.baseline in ["aurora", "redshift"]:
-        db: Database = PyodbcDatabase(make_postgres_compatible_conn(args.baseline), engine=args.baseline)
+        db = PyodbcDatabase(
+            make_postgres_compatible_conn(args.baseline), engine=args.baseline
+        )
     else:
         port_offset = worker_index % args.num_front_ends
         brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
         brad.connect()
         db = BradDatabase(brad)
-
     return db
