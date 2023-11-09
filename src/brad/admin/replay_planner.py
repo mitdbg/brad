@@ -36,6 +36,11 @@ def register_admin_action(subparser) -> None:
         required=True,
         help="Path to the file containing the recorded planning run.",
     )
+    parser.add_argument(
+        "--ignore-estimator",
+        action="store_true",
+        help="If set, do not attempt to set up the estimator.",
+    )
     parser.set_defaults(admin_action=replay_planner)
 
 
@@ -56,11 +61,11 @@ async def replay_planner_impl(args) -> None:
     blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
     await blueprint_mgr.load()
 
-    estimator = await PostgresEstimator.connect(args.schema_name, config)
-    await estimator.analyze(blueprint_mgr.get_blueprint())
-
     provider = _EstimatorProvider()
-    provider.set_estimator(estimator)
+    if not args.ignore_estimator:
+        estimator = await PostgresEstimator.connect(args.schema_name, config)
+        await estimator.analyze(blueprint_mgr.get_blueprint())
+        provider.set_estimator(estimator)
 
     recorded_run = RecordedPlanningRun.load(args.recorded_run)
     planner = recorded_run.create_planner(provider)
