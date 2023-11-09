@@ -163,14 +163,18 @@ class WorkloadBuilder:
     ) -> "WorkloadBuilder":
         # For more accurate predictions, we should retrieve the size of the
         # table that will actualy be exported/imported.
-        preferred_sources = [Engine.Redshift, Engine.Athena, Engine.Aurora]
+        preferred_sources = [Engine.Redshift, Engine.Aurora, Engine.Athena]
         self._table_sizes.clear()
-        for table, locations in blueprint.tables_with_locations():
+        num_tables = len(blueprint.tables_with_locations())
+        for idx, (table, locations) in enumerate(blueprint.tables_with_locations()):
             for source in preferred_sources:
                 if source not in locations:
                     continue
                 self._table_sizes[table.name] = await table_sizer.table_size_rows(
                     table.name, source, approximate_allowed=True
+                )
+                logger.debug(
+                    "Fetching table size %s - %d of %d", table.name, idx + 1, num_tables
                 )
                 break
             assert table.name in self._table_sizes

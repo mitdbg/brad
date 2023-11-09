@@ -73,6 +73,7 @@ class TableSizer:
                     result,
                 )
             else:
+                logger.debug("Using approximate size of %s: %d", table_name, result)
                 return result
 
         query = f"SELECT COUNT(*) FROM {table_name}"
