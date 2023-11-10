@@ -1,6 +1,9 @@
 import sqlglot
 import sqlglot.expressions as exp
-
+import yaml
+from importlib.resources import files, as_file
+import brad.routing as routing
+from brad.routing.functionality_catalog import Functionality
 from typing import List, Optional
 
 _DATA_MODIFICATION_PREFIXES = [
@@ -16,6 +19,13 @@ _DATA_MODIFICATION_PREFIXES = [
     "SET SESSION",
     "TRUNCATE",
 ]
+
+# Load geospatial keywords used to detect if geospatial query
+_GEOSPATIAL_KEYWORDS_PATH = files(routing).joinpath("geospatial_keywords.yml")
+with as_file(_GEOSPATIAL_KEYWORDS_PATH) as file:
+    with open(file, "r", encoding="utf8") as f:
+        _GEOSPATIAL_KEYWORDS = yaml.safe_load(f)
+_GEOSPATIAL_KEYWORDS = [k.upper() for k in _GEOSPATIAL_KEYWORDS]
 
 
 class QueryRep:
@@ -62,6 +72,20 @@ class QueryRep:
     def is_transaction_end(self) -> bool:
         raw_sql = self._raw_sql_query.upper()
         return raw_sql == "COMMIT" or raw_sql == "ROLLBACK"
+
+    def is_geospatial(self) -> bool:
+        query = self._raw_sql_query.upper()
+        for keyword in _GEOSPATIAL_KEYWORDS:
+            if keyword in query:
+                return True
+        return False
+
+    def get_required_functionality(self) -> int:
+        req_functionality: List[str] = []
+        if self.is_geospatial():
+            req_functionality.append(Functionality.Geospatial)
+
+        return Functionality.to_bitmap(req_functionality)
 
     def tables(self) -> List[str]:
         if self._tables is None:

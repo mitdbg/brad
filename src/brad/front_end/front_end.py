@@ -304,16 +304,10 @@ class BradFrontEnd(BradInterface):
 
             # 2. Select an engine for the query.
             query_rep = QueryRep(query)
-            transactional_query = (
-                session.in_transaction or query_rep.is_data_modification_query()
-            )
-            if transactional_query:
-                engine_to_use = Engine.Aurora
-            elif self._route_redshift_only:
-                engine_to_use = Engine.Redshift
-            else:
-                assert self._router is not None
-                engine_to_use = await self._router.engine_for(query_rep)
+            if query_rep.is_transaction_start():
+                session.set_in_transaction(True)
+            assert self._router is not None
+            engine_to_use = await self._router.engine_for(query_rep, session)
 
             log_verbose(
                 logger,
@@ -326,6 +320,9 @@ class BradFrontEnd(BradInterface):
 
             # 3. Actually execute the query.
             try:
+                transactional_query: bool = (
+                    session.in_transaction or query_rep.is_data_modification_query()
+                )
                 if transactional_query:
                     connection = session.engines.get_connection(engine_to_use)
                     cursor = connection.cursor_sync()

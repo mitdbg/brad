@@ -3,12 +3,11 @@ import logging
 import pytz
 from datetime import datetime
 from typing import Dict, Tuple, Optional
-
 from brad.config.engine import Engine
-from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.session import SessionId
 from .engine_connections import EngineConnections
+from brad.blueprint.manager import BlueprintManager
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +58,7 @@ class Session:
 
 class SessionManager:
     def __init__(
-        self, config: ConfigFile, blueprint_mgr: BlueprintManager, schema_name: str
+        self, config: ConfigFile, blueprint_mgr: "BlueprintManager", schema_name: str
     ) -> None:
         self._config = config
         self._blueprint_mgr = blueprint_mgr

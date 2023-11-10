@@ -1,7 +1,8 @@
 import asyncio
 import logging
-from typing import Dict, Tuple, Optional, TYPE_CHECKING
-
+from typing import Dict, Optional, TYPE_CHECKING
+from brad.front_end.session import Session
+from brad.routing.functionality_catalog import Functionality
 from brad.data_stats.estimator import Estimator
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.query_rep import QueryRep
@@ -41,6 +42,7 @@ class Router:
         self._full_policy = full_policy
         self._table_placement_bitmap = table_placement_bitmap
         self._use_future_blueprint_policies = use_future_blueprint_policies
+        self.functionality_catalog = Functionality()
 
     def log_policy(self) -> None:
         logger.info("Routing policy:")
@@ -74,18 +76,45 @@ class Router:
         """
         self._table_placement_bitmap = table_placement_bitmap
 
-    async def engine_for(self, query: QueryRep) -> Engine:
+    async def engine_for(
+        self, query: QueryRep, session: Optional[Session] = None
+    ) -> Engine:
         """
         Selects an engine for the provided SQL query.
         """
 
+        # Hack: To be quick, immediately return Aurora if txn.
+        # We need to change this once we have several transactional engines.
+        if session is not None and session.in_transaction:
+            return Engine.Aurora
+
         # Table placement constraints.
         assert self._table_placement_bitmap is not None
-        valid_locations, only_location = self._run_location_routing(
-            query, self._table_placement_bitmap
-        )
-        if only_location is not None:
-            return only_location
+        place_support = self._run_location_routing(query, self._table_placement_bitmap)
+
+        # Engine functionality constraints.
+        func_support = self._run_functionality_routing(query)
+
+        # Get supported engines.
+        valid_locations = place_support & func_support
+
+        # Check if no engine supports query.
+        if valid_locations == 0:
+            raise RuntimeError(
+                "No engine supports query {}".format(", ".join(query.raw_query))
+            )
+
+        # Check if only one engine supports query.
+        if (valid_locations & (valid_locations - 1)) == 0:
+            # Bitmap trick - only one bit is set.
+            if (EngineBitmapValues[Engine.Aurora] & valid_locations) != 0:
+                return Engine.Aurora
+            elif (EngineBitmapValues[Engine.Redshift] & valid_locations) != 0:
+                return Engine.Redshift
+            elif (EngineBitmapValues[Engine.Athena] & valid_locations) != 0:
+                return Engine.Athena
+            else:
+                raise RuntimeError("Unsupported bitmap value " + str(valid_locations))
 
         # Go through the indefinite routing policies. These may not return a
         # routing location.
@@ -105,7 +134,9 @@ class Router:
         # and we know >= 2 engines can support this query.
         raise AssertionError
 
-    def engine_for_sync(self, query: QueryRep) -> Engine:
+    def engine_for_sync(
+        self, query: QueryRep, session: Optional[Session] = None
+    ) -> Engine:
         """
         Selects an engine for the provided SQL query.
 
@@ -114,11 +145,35 @@ class Router:
         query passed to this method will always be a read-only query.
         """
         # Ideally we re-implement a sync version.
-        return asyncio.run(self.engine_for(query))
+        return asyncio.run(self.engine_for(query, session))
+
+    def _run_functionality_routing(self, query: QueryRep) -> int:
+        """
+        Based on the functinalities required by the query (e.g. geospatial),
+        compute the set of engines that are able to serve this query.
+        """
+
+        # Bitmap describing what functionality is required for running query
+        req_bitmap = query.get_required_functionality()
+
+        # Bitmap for each engine which features it supports
+        engine_support = self.functionality_catalog.get_engine_functionalities()
+        engines = [Engine.Athena, Engine.Aurora, Engine.Redshift]
+
+        # Narrow down the valid engines that can run the query, based on the
+        # engine functionality
+        valid_locations_list = []
+        for engine, sup_bitmap in zip(engines, engine_support):
+            query_supported = (~req_bitmap | (req_bitmap & sup_bitmap)) == -1
+
+            if query_supported:
+                valid_locations_list.append(engine)
+
+        return Engine.to_bitmap(valid_locations_list)
 
     def _run_location_routing(
         self, query: QueryRep, location_bitmap: Dict[str, int]
-    ) -> Tuple[int, Optional[Engine]]:
+    ) -> int:
         """
         Based on the provided location bitmap, compute the set of engines that
         are able to serve this query. If there is only one possible engine, this
@@ -146,16 +201,4 @@ class Router:
                 )
             )
 
-        if (valid_locations & (valid_locations - 1)) == 0:
-            # Bitmap trick - only one bit is set.
-            if (EngineBitmapValues[Engine.Aurora] & valid_locations) != 0:
-                return (valid_locations, Engine.Aurora)
-            elif (EngineBitmapValues[Engine.Redshift] & valid_locations) != 0:
-                return (valid_locations, Engine.Redshift)
-            elif (EngineBitmapValues[Engine.Athena] & valid_locations) != 0:
-                return (valid_locations, Engine.Athena)
-            else:
-                raise RuntimeError("Unsupported bitmap value " + str(valid_locations))
-
-        # There is more than one possible location.
-        return (valid_locations, None)
+        return valid_locations

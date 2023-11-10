@@ -1,7 +1,6 @@
 import logging
 from collections import Counter
 from typing import Dict, List, Tuple, Optional
-
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.query_rep import QueryRep
