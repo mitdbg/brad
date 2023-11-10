@@ -98,10 +98,10 @@ class Router:
         # Get supported engines.
         valid_locations = place_support & func_support
 
-        # check if no engine supports query
+        # Check if no engine supports query.
         if valid_locations == 0:
             raise RuntimeError(
-                "No engine supports query {}".format(", ".join(query._raw_sql_query))
+                "No engine supports query {}".format(", ".join(query.raw_query))
             )
 
         # Check if only one engine supports query.

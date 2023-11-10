@@ -2,7 +2,6 @@ import sqlglot
 import sqlglot.expressions as exp
 import yaml
 from importlib.resources import files, as_file
-import os
 import brad.routing as routing
 from brad.routing.functionality_catalog import Functionality
 from typing import List, Optional
@@ -24,7 +23,7 @@ _DATA_MODIFICATION_PREFIXES = [
 # Load geospatial keywords used to detect if geospatial query
 _GEOSPATIAL_KEYWORDS_PATH = files(routing).joinpath("geospatial_keywords.yml")
 with as_file(_GEOSPATIAL_KEYWORDS_PATH) as file:
-    with open(file, "r") as f:
+    with open(file, "r", encoding="utf8") as f:
         _GEOSPATIAL_KEYWORDS = yaml.safe_load(f)
 _GEOSPATIAL_KEYWORDS = [k.upper() for k in _GEOSPATIAL_KEYWORDS]
 

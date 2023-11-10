@@ -1,4 +1,5 @@
 # pylint: skip-file
+# type: ignore
 import requests
 from bs4 import BeautifulSoup
 import re

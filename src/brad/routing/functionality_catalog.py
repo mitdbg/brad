@@ -15,7 +15,7 @@ class Functionality:
         # Read the YAML file
         functionality_yaml = files(routing).joinpath("engine_functionality.yml")
         with as_file(functionality_yaml) as file:
-            with open(file, "r") as yaml_file:
+            with open(file, "r", encoding="utf8") as yaml_file:
                 data = yaml.load(yaml_file, Loader=yaml.FullLoader)
 
         # Initialize lists for each database engine's functionalities
