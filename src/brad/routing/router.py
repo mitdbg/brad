@@ -1,5 +1,5 @@
 from typing import Dict, Tuple, Optional, TYPE_CHECKING
-
+from brad.front_end.session import Session
 from brad.routing.functionality_catalog import Functionality
 from brad.data_stats.estimator import Estimator
 from brad.config.engine import Engine, EngineBitmapValues
@@ -27,7 +27,7 @@ class Router:
         location bitmaps).
         """
 
-    async def engine_for(self, query: QueryRep) -> Engine:
+    async def engine_for(self, query: QueryRep, session: Session) -> Engine:
         """
         Selects an engine for the provided SQL query.
 
@@ -38,9 +38,9 @@ class Router:
         You should override this method if the routing policy needs to depend on
         any asynchronous methods.
         """
-        return self.engine_for_sync(query)
+        return self.engine_for_sync(query, session)
 
-    def engine_for_sync(self, query: QueryRep) -> Engine:
+    def engine_for_sync(self, query: QueryRep, session: Session) -> Engine:
         """
         Selects an engine for the provided SQL query.
 
@@ -51,8 +51,13 @@ class Router:
         raise NotImplementedError
 
     def _filter_on_constraints(
-        self, query: QueryRep, location_bitmap: Dict[str, int]
+        self, query: QueryRep, location_bitmap: Dict[str, int], session: Session
     ) -> Tuple[int, Optional[Engine]]:
+        # If transaction return Aurora
+        # NOTE: Need to change when we have several transactional engines
+        if session.in_transaction:
+            return Engine.to_bitmap([Engine.Aurora]), Engine.Aurora
+
         # First constrain based on functinality catalog
         func_support = self._run_functionality_routing(query)
 

@@ -283,7 +283,7 @@ class BradFrontEnd(BradInterface):
                 return await self._handle_internal_command(session, query, debug_info)
 
             # 2. Select an engine for the query.
-            query_rep = QueryRep(query, session)
+            query_rep = QueryRep(query)
             engine_to_use = await self._router.engine_for(query_rep)
 
             log_verbose(

@@ -25,7 +25,7 @@ class Query(QueryRep):
     def __init__(
         self, sql_query: str, arrival_count: int = 1, session: Optional[Session] = None
     ):
-        super().__init__(sql_query, session)
+        super().__init__(sql_query)
         self._arrival_count = arrival_count
 
         # Legacy statistics.

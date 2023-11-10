@@ -3,13 +3,17 @@ import operator
 import yaml
 from functools import reduce
 from typing import Dict
+from importlib.resources import files
+import brad.routing as routing
 
 
 class Functionality:
     Geospatial = "geospatial"
     Transaction = "transactions"
 
-    def __init__(self, functionality_yaml="engine_functionality.yml"):
+    def __init__(
+        self, functionality_yaml=files(routing).joinpath("engine_functionality.yml")
+    ):
         # Read the YAML file
         with open(functionality_yaml, "r") as yaml_file:
             data = yaml.load(yaml_file, Loader=yaml.FullLoader)

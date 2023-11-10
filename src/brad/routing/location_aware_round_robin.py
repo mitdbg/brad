@@ -1,5 +1,6 @@
 from brad.config.engine import Engine
 from brad.blueprint.manager import BlueprintManager
+from brad.front_end.session import Session
 from brad.routing.router import Router
 from brad.query_rep import QueryRep
 
@@ -14,10 +15,10 @@ class LocationAwareRoundRobin(Router):
         self._blueprint_mgr = blueprint_mgr
         self._curr_idx = 0
 
-    def engine_for_sync(self, query: QueryRep) -> Engine:
+    def engine_for_sync(self, query: QueryRep, session: Session) -> Engine:
         blueprint = self._blueprint_mgr.get_blueprint()
         valid_locations, only_location = self._filter_on_constraints(
-            query, blueprint.table_locations_bitmap()
+            query, blueprint.table_locations_bitmap(), session
         )
         if only_location is not None:
             return only_location
