@@ -128,21 +128,28 @@ def best_cost_under_perf_ceilings(
         left_cost = left.get_operational_monetary_cost() + left.get_transition_cost()
         right_cost = right.get_operational_monetary_cost() + right.get_transition_cost()
 
+        left_trans = left.get_transition_time_s()
+        right_trans = right.get_transition_time_s()
+
+        left_score = math.pow(left_cost * left_trans * left_lat, 1 / 3)
+        right_score = math.pow(right_cost * right_trans * right_lat, 1 / 3)
+
         # We treat the cost differences as significant only when they differ by more than 10%.
-        max_cost_ratio = _compute_max_ratio(left_cost, right_cost)
-        if max_cost_ratio >= 1.1:
-            return left_cost < right_cost
+        #max_cost_ratio = _compute_max_ratio(left_cost, right_cost)
+        #if max_cost_ratio >= 1.1:
+        #    return left_cost < right_cost
 
         # The two blueprints have similar costs. We now rank by transition time.
-        max_trans_ratio = _compute_max_ratio(
-            left.get_transition_time_s(), right.get_transition_time_s()
-        )
-        if max_trans_ratio >= 1.1:
-            return left.get_transition_time_s() < right.get_transition_time_s()
+        #max_trans_ratio = _compute_max_ratio(
+        #    left.get_transition_time_s(), right.get_transition_time_s()
+        #)
+        #if max_trans_ratio >= 1.1:
+        #    return left.get_transition_time_s() < right.get_transition_time_s()
 
         # Rank by performance.
-        max_perf_ratio = _compute_max_ratio(left_lat, right_lat)
-        return max_perf_ratio >= 1.1 and left_lat < right_lat
+        #max_perf_ratio = _compute_max_ratio(left_lat, right_lat)
+        #return max_perf_ratio >= 1.1 and left_lat < right_lat
+        return left_score < right_score
 
     return is_better_than
 
