@@ -494,6 +494,8 @@ class BlueprintCandidate(ComparableBlueprint):
         self.update_redshift_provisioning(current_best.redshift_provisioning)
         self.provisioning_cost = current_best.provisioning_cost
         self.provisioning_trans_time_s = current_best.provisioning_trans_time_s
+        self.aurora_score = current_best.aurora_score
+        self.redshift_score = current_best.redshift_score
 
         self.feasibility = current_best.feasibility
         self.explored_provisionings = True
