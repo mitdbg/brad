@@ -1,5 +1,5 @@
 from brad.planner.compare.function import BlueprintComparator
-from brad.planner.compare.cost import best_cost_under_perf_ceilings
+from brad.planner.compare.cost import best_weighted_score_under_perf_ceilings
 
 
 class BlueprintComparatorProvider:
@@ -21,6 +21,6 @@ class PerformanceCeilingComparatorProvider(BlueprintComparatorProvider):
         self._max_txn_p90_latency_s = max_txn_p90_latency_s
 
     def get_comparator(self) -> BlueprintComparator:
-        return best_cost_under_perf_ceilings(
+        return best_weighted_score_under_perf_ceilings(
             self._max_query_latency_s, self._max_txn_p90_latency_s
         )
