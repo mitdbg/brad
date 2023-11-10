@@ -63,9 +63,11 @@ def compute_aurora_accessed_pages(
     accessed_pages_per_query: Iterable[int],
 ) -> int:
     total_pages = 0
+    arrival_counts = 0.0
     for query, accessed_pages in zip(queries, accessed_pages_per_query):
-        total_pages += query.arrival_count() * accessed_pages
-    return total_pages
+        total_pages += accessed_pages
+        arrival_counts += query.arrival_count()
+    return max(int(total_pages * arrival_counts), 1)
 
 
 def compute_aurora_scan_cost(
@@ -86,11 +88,11 @@ def compute_athena_scanned_bytes(
     # N.B. There is a minimum charge of 10 MB per query.
     min_bytes_per_query = planner_config.athena_min_mb_per_query() * 1000 * 1000
     total_accessed_bytes = 0
+    arrival_counts = 0.0
     for query, accessed_bytes in zip(queries, accessed_bytes_per_query):
-        total_accessed_bytes += query.arrival_count() * max(
-            accessed_bytes, min_bytes_per_query
-        )
-    return total_accessed_bytes
+        total_accessed_bytes += max(accessed_bytes, min_bytes_per_query)
+        arrival_counts += query.arrival_count()
+    return max(int(total_accessed_bytes * arrival_counts), 1)
 
 
 def compute_athena_scan_cost(
@@ -113,7 +115,7 @@ def compute_aurora_transition_time_s(
         return 0.0
 
     # We transition one instance at a time to minimize disruption.
-    num_nodes_to_create = new.num_nodes() - old.num_nodes()
+    num_nodes_to_create = max(new.num_nodes() - old.num_nodes(), 0)
 
     if new.instance_type() != old.instance_type():
         # We modify "overlapping" nodes. For the primary instance, we actually

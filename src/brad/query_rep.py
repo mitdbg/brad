@@ -1,7 +1,7 @@
 import sqlglot
 import sqlglot.expressions as exp
 import yaml
-from importlib.resources import files
+from importlib.resources import files, as_file
 import os
 import brad.routing as routing
 from brad.routing.functionality_catalog import Functionality
@@ -22,11 +22,10 @@ _DATA_MODIFICATION_PREFIXES = [
 ]
 
 # Load geospatial keywords used to detect if geospatial query
-_GEOSPATIAL_KEYWORDS_PATH = os.path.join(
-    files(routing).joinpath("geospatial_keywords.yml")
-)
-with open(_GEOSPATIAL_KEYWORDS_PATH, "r") as f:
-    _GEOSPATIAL_KEYWORDS = yaml.safe_load(f)
+_GEOSPATIAL_KEYWORDS_PATH = files(routing).joinpath("geospatial_keywords.yml")
+with as_file(_GEOSPATIAL_KEYWORDS_PATH) as file:
+    with open(file, "r") as f:
+        _GEOSPATIAL_KEYWORDS = yaml.safe_load(f)
 _GEOSPATIAL_KEYWORDS = [k.upper() for k in _GEOSPATIAL_KEYWORDS]
 
 
@@ -48,6 +47,14 @@ class QueryRep:
         self._ast: Optional[sqlglot.Expression] = None
         self._is_data_modification: Optional[bool] = None
         self._tables: Optional[List[str]] = None
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, QueryRep):
+            return False
+        return self._raw_sql_query == other._raw_sql_query
+
+    def __hash__(self) -> int:
+        return hash(self._raw_sql_query)
 
     @property
     def raw_query(self) -> str:

@@ -11,6 +11,8 @@ import brad.admin.train_router as train_router
 import brad.admin.workload_logs as workload_logs
 import brad.admin.run_on as run_on
 import brad.admin.control as control
+import brad.admin.restore_blueprint as restore_blueprint
+import brad.admin.replay_planner as replay_planner
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,8 @@ def register_command(subparsers) -> None:
     workload_logs.register_admin_action(admin_subparsers)
     run_on.register_admin_action(admin_subparsers)
     control.register_admin_action(admin_subparsers)
+    restore_blueprint.register_admin_action(admin_subparsers)
+    replay_planner.register_admin_action(admin_subparsers)
     parser.set_defaults(func=main)
 
 

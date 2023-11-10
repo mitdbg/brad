@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy.typing as npt
+from workloads.cross_db_benchmark.meta_tools.analyze_snowset import load_parquet
 
 
 def shift_frequency_to_match_hist(
-    runtime: npt.NDArray, target_hist: (npt.NDArray, npt.NDArray), balanced: bool
+    runtime: npt.NDArray, target_hist: (npt.NDArray, npt.NDArray), balanced: bool = True
 ) -> npt.NDArray:
     """
     change the frequency of execution for a list of queries to match the distribution of a target histogram
@@ -76,4 +77,22 @@ def shift_frequency_to_match_hist(
     return_freq[np.where(best_engines == le)[0]] += unassigned_freq / np.sum(
         best_engines == le
     )
+    return return_freq
+
+
+def match_runtime_hist_snowset(
+    runtime: npt.NDArray, parquet_file_name: str, balanced: bool = True
+) -> npt.NDArray:
+    """
+    Matching the runtime histogram of snowset
+    runtime: a numpy array of shape (n, 3) corresponding to the athena-aurora-redshift runtime of n queries
+    parquet_file_name: path to the parquet file of snowset
+    balanced: whether to balance query from the best engine.
+    """
+    df = load_parquet(
+        parquet_file_name, ["databaseId", "durationTotal", "createdTime", "endTime"]
+    )
+    target_runtime = df["durationTotal"].values / 1000
+    target_hist = plt.hist(target_runtime[target_runtime < 30], bins=100)
+    return_freq = shift_frequency_to_match_hist(runtime, target_hist, balanced)
     return return_freq

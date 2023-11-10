@@ -6,7 +6,7 @@ function start_brad() {
     --config-file $config_file \
     --schema-name $schema_name \
     --planner-config-file $planner_config_file \
-    --temp-config-file config/temp_config_sample.yml \
+    --temp-config-file config/temp_config.yml \
     &
   brad_pid=$!
   popd
@@ -20,7 +20,7 @@ function start_brad_debug() {
     --config-file $config_file \
     --schema-name $schema_name \
     --planner-config-file $planner_config_file \
-    --temp-config-file config/temp_config_sample.yml \
+    --temp-config-file config/temp_config.yml \
     --debug \
     &
   brad_pid=$!
@@ -28,16 +28,19 @@ function start_brad_debug() {
 }
 
 function cancel_experiment() {
-  kill -INT $txn_pid
-  kill -INT $rana_pid
+  for pid_var in "$@"; do
+    kill -INT $pid_var
+  done
   kill -INT $brad_pid
 }
 
 function graceful_shutdown() {
-  kill -INT $txn_pid
-  kill -INT $rana_pid
-  wait $txn_pid
-  wait $rana_pid
+  for pid_var in "$@"; do
+    kill -INT $pid_var
+  done
+  for pid_var in "$@"; do
+    wait $pid_var
+  done
 
   kill -INT $brad_pid
   wait $brad_pid
@@ -88,21 +91,31 @@ function start_repeating_olap_runner() {
   local ra_clients=$1
   local ra_gap_s=$2
   local ra_gap_std_s=$3
+  local query_indexes=$4
+  local results_name=$5
+
+  local args=(
+    --num-clients $ra_clients
+    --num-front-ends $num_front_ends
+    --query-indexes $query_indexes
+    --query-bank-file $ra_query_bank_file
+    --avg-gap-s $ra_gap_s
+    --avg-gap-std-s $ra_gap_std_s
+  )
+
+  if [[ ! -z $ra_query_frequency_path ]]; then
+    args+=(--query-frequency-path $ra_query_frequency_path)
+  fi
 
   >&2 echo "[Repeating Analytics] Running with $ra_clients..."
-  results_dir=$COND_OUT/ra_${ra_clients}
+  results_dir=$COND_OUT/$results_name
   mkdir -p $results_dir
 
-  log_workload_point "rana_${ra_clients}"
-  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py \
-    --num-clients $ra_clients \
-    --avg-gap-s $ra_gap_s \
-    --avg-gap-std-s $ra_gap_std_s \
-    --num-front-ends $num_front_ends \
-    --query-indexes $ra_query_indexes \
-    --query-bank-file $ra_query_bank_file \
-    &
-  rana_pid=$!
+  log_workload_point $results_name
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
 }
 
 function run_repeating_olap_warmup() {
@@ -125,17 +138,27 @@ function run_repeating_olap_warmup() {
 
 function start_txn_runner() {
   t_clients=$1
+  client_offset=$2
 
   >&2 echo "[Transactions] Running with $t_clients..."
   results_dir=$COND_OUT/t_${t_clients}
   mkdir -p $results_dir
 
+  local args=(
+    --num-clients $t_clients
+    --num-front-ends $num_front_ends
+  )
+
+  if [[ ! -z $client_offset ]]; then
+    args+=(--client-offset $client_offset)
+  fi
+
   log_workload_point "txn_${t_clients}"
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions.py \
-    --num-clients $t_clients \
-    --num-front-ends $num_front_ends \
-    &
-  txn_pid=$!
+    "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
 }
 
 function extract_named_arguments() {
@@ -173,6 +196,10 @@ function extract_named_arguments() {
       ra_gap_std_s=${phys_arg:15}
     fi
 
+    if [[ $phys_arg =~ --ra-query-frequency-path=.+ ]]; then
+      ra_query_frequency_path=${phys_arg:26}
+    fi
+
     if [[ $phys_arg =~ --num-front-ends=.+ ]]; then
       num_front_ends=${phys_arg:17}
     fi
@@ -195,6 +222,10 @@ function extract_named_arguments() {
 
     if [[ $phys_arg =~ --schema-name=.+ ]]; then
       schema_name=${phys_arg:14}
+    fi
+
+    if [[ $dataset_type =~ --dataset-type=.+ ]]; then
+      dataset_type=${phys_arg:15}
     fi
   done
 }

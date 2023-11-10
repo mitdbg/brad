@@ -8,7 +8,6 @@ from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning, MutableProvisioning
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.beam.feasibility import BlueprintFeasibility
-from brad.planner.router_provider import RouterProvider
 from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
@@ -111,7 +110,7 @@ class BlueprintCandidate(ComparableBlueprint):
             self.get_table_placement(),
             self.aurora_provisioning.clone(),
             self.redshift_provisioning.clone(),
-            self._source_blueprint.router_provider(),
+            self._source_blueprint.get_routing_policy(),  # TODO: Use chosen policy.
         )
 
     def to_score(self) -> Score:
@@ -202,13 +201,11 @@ class BlueprintCandidate(ComparableBlueprint):
 
     async def add_query_cluster(
         self,
-        router_provider: RouterProvider,
+        router: Router,
         query_cluster: List[int],
         reroute_prev: bool,
         ctx: ScoringContext,
     ) -> None:
-        router: Router = await router_provider.get_router(self.table_placements)
-
         if reroute_prev:
             self.query_locations[Engine.Aurora].clear()
             self.query_locations[Engine.Redshift].clear()
@@ -334,6 +331,8 @@ class BlueprintCandidate(ComparableBlueprint):
 
             if (((~cur) & nxt) & (EngineBitmapValues[Engine.Aurora])) != 0:
                 # Added table to Aurora.
+                # You only pay for 1 copy of the table on Aurora, regardless of
+                # how many read replicas you have.
                 self.storage_cost += compute_single_aurora_table_cost(tbl, ctx)
 
     def try_to_make_feasible_if_needed(self, ctx: ScoringContext) -> None:
@@ -391,6 +390,9 @@ class BlueprintCandidate(ComparableBlueprint):
             ctx.next_workload.get_predicted_analytical_latency_batch(
                 self.query_locations[Engine.Aurora], Engine.Aurora
             ),
+            ctx.next_workload.get_arrival_counts_batch(
+                self.query_locations[Engine.Aurora]
+            ),
             ctx.current_blueprint.aurora_provisioning(),
             self.aurora_provisioning,
             ctx,
@@ -398,6 +400,9 @@ class BlueprintCandidate(ComparableBlueprint):
         self.redshift_score = RedshiftProvisioningScore.compute(
             ctx.next_workload.get_predicted_analytical_latency_batch(
                 self.query_locations[Engine.Redshift], Engine.Redshift
+            ),
+            ctx.next_workload.get_arrival_counts_batch(
+                self.query_locations[Engine.Redshift]
             ),
             ctx.current_blueprint.redshift_provisioning(),
             self.redshift_provisioning,
@@ -489,6 +494,8 @@ class BlueprintCandidate(ComparableBlueprint):
         self.update_redshift_provisioning(current_best.redshift_provisioning)
         self.provisioning_cost = current_best.provisioning_cost
         self.provisioning_trans_time_s = current_best.provisioning_trans_time_s
+        self.aurora_score = current_best.aurora_score
+        self.redshift_score = current_best.redshift_score
 
         self.feasibility = current_best.feasibility
         self.explored_provisionings = True

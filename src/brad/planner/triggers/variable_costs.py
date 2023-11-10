@@ -3,14 +3,14 @@ import math
 import pytz
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Tuple
 
 from .trigger import Trigger
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
-from brad.planner.router_provider import RouterProvider
+from brad.planner.estimator import EstimatorProvider
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.query import Query
@@ -20,6 +20,7 @@ from brad.planner.scoring.provisioning import (
     compute_aurora_accessed_pages,
     compute_athena_scanned_bytes,
 )
+from brad.routing.router import Router
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +32,9 @@ class VariableCosts(Trigger):
         planner_config: PlannerConfig,
         monitor: Monitor,
         data_access_provider: DataAccessProvider,
-        router_provider: RouterProvider,
+        estimator_provider: EstimatorProvider,
         threshold_frac: float,
+        epoch_length: timedelta,
     ) -> None:
         """
         This will trigger a replan if the current variable costs (currently,
@@ -42,12 +44,12 @@ class VariableCosts(Trigger):
         For example, if `threshold_frac` is 0.2, then replanning is triggered if
         the estimated cost is +/- 20% of the previously estimated cost.
         """
-        super().__init__()
+        super().__init__(epoch_length)
         self._config = config
         self._planner_config = planner_config
         self._monitor = monitor
         self._data_access_provider = data_access_provider
-        self._router_provider = router_provider
+        self._estimator_provider = estimator_provider
         self._change_ratio = 1.0 + threshold_frac
 
     async def should_replan(self) -> bool:
@@ -59,7 +61,13 @@ class VariableCosts(Trigger):
             )
             return False
 
-        current_hourly_cost = await self._estimate_current_scan_hourly_cost()
+        aurora_cost, athena_cost = await self._estimate_current_scan_hourly_cost()
+
+        if self._planner_config.use_io_optimized_aurora():
+            current_hourly_cost = athena_cost
+        else:
+            current_hourly_cost = athena_cost + aurora_cost
+
         if current_hourly_cost <= 1e-5:
             # Treated as 0.
             logger.debug(
@@ -84,9 +92,9 @@ class VariableCosts(Trigger):
 
         return False
 
-    async def _estimate_current_scan_hourly_cost(self) -> float:
+    async def _estimate_current_scan_hourly_cost(self) -> Tuple[float, float]:
         if self._current_blueprint is None:
-            return 0.0
+            return 0.0, 0.0
 
         # Extract the queries seen in the last window.
         window_end = datetime.now()
@@ -106,7 +114,7 @@ class VariableCosts(Trigger):
             )
         )
         if len(workload.analytical_queries()) == 0:
-            return 0.0
+            return 0.0, 0.0
         self._data_access_provider.apply_access_statistics(workload)
 
         # Compute the scan cost of this last window of queries.
@@ -114,12 +122,16 @@ class VariableCosts(Trigger):
         aurora_queries: List[Query] = []
         athena_query_indices: List[int] = []
         athena_queries: List[Query] = []
-        router = await self._router_provider.get_router(
-            self._current_blueprint.table_locations_bitmap()
-        )
+        router = Router.create_from_blueprint(self._current_blueprint)
+        await router.run_setup(self._estimator_provider.get_estimator())
 
         for idx, q in enumerate(workload.analytical_queries()):
-            engine = await router.engine_for(q)
+            maybe_engine = q.primary_execution_location()
+            if maybe_engine is None:
+                engine = await router.engine_for(q)
+            else:
+                engine = maybe_engine
+
             if engine == Engine.Aurora:
                 aurora_query_indices.append(idx)
                 aurora_queries.append(q)
@@ -127,6 +139,7 @@ class VariableCosts(Trigger):
                 athena_query_indices.append(idx)
                 athena_queries.append(q)
 
+        # NOTE: Ideally we use the actual values.
         aurora_accessed_pages = compute_aurora_accessed_pages(
             aurora_queries,
             workload.get_predicted_aurora_pages_accessed_batch(aurora_query_indices),
@@ -138,10 +151,11 @@ class VariableCosts(Trigger):
         )
 
         # We use the hit rate to estimate Aurora scan costs.
+        # Note that if we are using I/O optimized Aurora, there is no
+        # incremental scan cost.
         lookback_epochs = math.ceil(
             self._planner_config.planning_window() / self._config.epoch_length
         )
-        # TODO: If there are read replicas, we should use the hit rate from them instead.
         aurora_reader_metrics = self._monitor.aurora_reader_metrics()
         if len(aurora_reader_metrics) > 0:
             reader_hit_rates = []
@@ -167,7 +181,7 @@ class VariableCosts(Trigger):
             athena_scanned_bytes, self._planner_config
         )
 
-        return aurora_scan_cost + athena_scan_cost
+        return aurora_scan_cost, athena_scan_cost
 
 
 _HIT_RATE_METRIC = "BufferCacheHitRatio_Average"

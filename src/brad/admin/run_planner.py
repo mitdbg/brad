@@ -2,7 +2,7 @@ import asyncio
 import logging
 import pathlib
 import pytz
-from typing import Dict
+from typing import Dict, Optional
 from datetime import timedelta, datetime
 
 from brad.asset_manager import AssetManager
@@ -11,9 +11,10 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.data_stats.postgres_estimator import PostgresEstimator
-from brad.planner.compare.cost import best_cost_under_perf_ceilings
+from brad.planner.compare.provider import PerformanceCeilingComparatorProvider
 from brad.planner.estimator import EstimatorProvider, FixedEstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
+from brad.planner.providers import BlueprintProviders
 from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.precomputed_values import (
     PrecomputedDataAccessProvider,
@@ -21,6 +22,8 @@ from brad.planner.scoring.data_access.precomputed_values import (
 from brad.planner.scoring.performance.precomputed_predictions import (
     PrecomputedPredictions,
 )
+from brad.planner.triggers.provider import EmptyTriggerProvider
+from brad.planner.triggers.trigger import Trigger
 from brad.planner.metrics import (
     MetricsFromMonitor,
     FixedMetricsProvider,
@@ -119,7 +122,7 @@ def parse_metrics(kv_str: str) -> Dict[str, float]:
     return metrics
 
 
-def run_planner(args) -> None:
+async def run_planner_impl(args) -> None:
     """
     This admin action is used to manually test the blueprint planner
     independently of the rest of BRAD.
@@ -153,17 +156,20 @@ def run_planner(args) -> None:
         )
         workload_dir = pathlib.Path(args.workload_dir)
         table_sizer = TableSizer(engines, config)
-        builder = WorkloadBuilder()
-        workload = (
-            builder.add_analytical_queries_and_counts_from_file(
+        builder = (
+            WorkloadBuilder()
+            .add_analytical_queries_and_counts_from_file(
                 args.query_bank_file,
                 args.query_counts_file,
             )
             .add_transactional_queries_from_file(workload_dir / "oltp.sql")
             .for_period(timedelta(hours=1))
-            .table_sizes_from_engines(blueprint_mgr.get_blueprint(), table_sizer)
-            .build()
         )
+        workload = (
+            await builder.table_sizes_from_engines(
+                blueprint_mgr.get_blueprint(), table_sizer
+            )
+        ).build()
 
     elif args.workload_source == "workload_dir":
         assert args.analytical_rate_per_s is not None
@@ -173,17 +179,20 @@ def run_planner(args) -> None:
         )
         table_sizer = TableSizer(engines, config)
         workload_dir = pathlib.Path(args.workload_dir)
-        builder = WorkloadBuilder()
-        workload = (
-            builder.add_analytical_queries_from_file(workload_dir / "olap.sql")
+        builder = (
+            WorkloadBuilder()
+            .add_analytical_queries_from_file(workload_dir / "olap.sql")
             .add_transactional_queries_from_file(workload_dir / "oltp.sql")
             .uniform_per_analytical_query_rate(
                 args.analytical_rate_per_s, period=timedelta(seconds=1)
             )
             .for_period(timedelta(hours=1))
-            .table_sizes_from_engines(blueprint_mgr.get_blueprint(), table_sizer)
-            .build()
         )
+        workload = (
+            await builder.table_sizes_from_engines(
+                blueprint_mgr.get_blueprint(), table_sizer
+            )
+        ).build()
 
     # 5. Load the pre-computed predictions.
     prediction_dir = pathlib.Path(args.predictions_dir)
@@ -220,29 +229,33 @@ def run_planner(args) -> None:
     else:
         estimator_provider = EstimatorProvider()
 
-    planner = BlueprintPlannerFactory.create(
-        current_blueprint=blueprint_mgr.get_blueprint(),
-        current_blueprint_score=blueprint_mgr.get_active_score(),
-        planner_config=planner_config,
-        monitor=monitor,
-        config=config,
-        schema_name=args.schema_name,
+    providers = BlueprintProviders(
         # Next workload is the same as the current workload.
         workload_provider=FixedWorkloadProvider(workload),
         # Used for debugging purposes.
         analytics_latency_scorer=prediction_provider,
-        # TODO: Make this configurable.
-        comparator=best_cost_under_perf_ceilings(
+        comparator_provider=PerformanceCeilingComparatorProvider(
             max_query_latency_s=args.latency_ceiling_s,
-            max_txn_p95_latency_s=0.020,  # FIXME: Add command-line argument if needed.
+            max_txn_p90_latency_s=0.030,  # FIXME: Add command-line argument if needed.
         ),
         metrics_provider=metrics_provider,
         data_access_provider=data_access_provider,
         estimator_provider=estimator_provider,
+        trigger_provider=EmptyTriggerProvider(),
+    )
+    planner = BlueprintPlannerFactory.create(
+        config=config,
+        planner_config=planner_config,
+        schema_name=args.schema_name,
+        current_blueprint=blueprint_mgr.get_blueprint(),
+        current_blueprint_score=blueprint_mgr.get_active_score(),
+        providers=providers,
     )
     asyncio.run(monitor.fetch_latest())
 
-    async def on_new_blueprint(blueprint: Blueprint, score: Score):
+    async def on_new_blueprint(
+        blueprint: Blueprint, score: Score, _trigger: Optional[Trigger]
+    ):
         logger.info("Selected new blueprint")
         logger.info("%s", blueprint)
 
@@ -270,12 +283,16 @@ def run_planner(args) -> None:
     event_loop = asyncio.new_event_loop()
     event_loop.set_debug(enabled=args.debug)
     asyncio.set_event_loop(event_loop)
-    asyncio.run(planner.run_replan())
+    asyncio.run(planner.run_replan(trigger=None))
 
     if args.save_pickle:
         workload.serialize_for_debugging(
             pathlib.Path(args.workload_dir) / _PICKLE_FILE_NAME
         )
+
+
+def run_planner(args) -> None:
+    asyncio.run(run_planner_impl(args))
 
 
 _PICKLE_FILE_NAME = "workload.pickle"

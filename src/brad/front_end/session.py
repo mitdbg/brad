@@ -1,15 +1,13 @@
 import asyncio
 import logging
-from typing import Dict, Tuple, Optional, TYPE_CHECKING
-
+import pytz
+from datetime import datetime
+from typing import Dict, Tuple, Optional
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.session import SessionId
 from .engine_connections import EngineConnections
-
-if TYPE_CHECKING:
-    from brad.blueprint.manager import BlueprintManager
-
+from brad.blueprint.manager import BlueprintManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +24,7 @@ class Session:
         self._engines = engines
         self._in_txn = False
         self._closed = False
+        self._txn_start_timestamp = datetime.now(tz=pytz.utc)
 
     @property
     def identifier(self) -> SessionId:
@@ -45,6 +44,12 @@ class Session:
 
     def set_in_transaction(self, in_txn: bool) -> None:
         self._in_txn = in_txn
+
+    def set_txn_start_timestamp(self, timestamp: datetime) -> None:
+        self._txn_start_timestamp = timestamp
+
+    def txn_start_timestamp(self) -> datetime:
+        return self._txn_start_timestamp
 
     async def close(self):
         self._closed = True

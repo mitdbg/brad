@@ -136,6 +136,8 @@ def parse_queries(
     target_path=None,
     is_brad=False,
     include_no_joins=False,
+    exclude_runtime_first_run=True,
+    only_runtime_first_run=False,
 ):
     if database == DatabaseSystem.POSTGRES:
         return parse_plans_with_query_postgres(
@@ -197,6 +199,8 @@ def parse_queries(
             target_path=target_path,
             is_brad=is_brad,
             include_no_joins=include_no_joins,
+            exclude_runtime_first_run=exclude_runtime_first_run,
+            only_runtime_first_run=only_runtime_first_run,
         )
     elif database == DatabaseSystem.ATHENA:
         return parse_queries_athena(

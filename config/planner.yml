@@ -8,10 +8,10 @@ planning_window:
   hours: 0
   minutes: 5
 
-# Each second in the previous workload is treated as 10 seconds (so a 5 min
-# planning window is treated as 50 mins). This is to make scenario run times
+# Each second in the previous workload is treated as 12 seconds (so a 5 min
+# planning window is treated as 60 mins). This is to make scenario run times
 # more managable.
-reinterpret_second_as: 10
+reinterpret_second_as: 12
 
 # The query distribution must change by at least this much for a new blueprint
 # to be accepted.
@@ -23,36 +23,43 @@ query_dist_change_frac: 0.1
 
 triggers:
   enabled: true
-  check_period_s: 60  # Triggers are checked every X seconds.
-  check_period_offset_s: 20
+  check_period_s: 90  # Triggers are checked every X seconds.
+  check_period_offset_s: 360  # Wait 6 mins before starting.
 
   elapsed_time:
     disabled: true
     multiplier: 60  # Multiplier over `planning_window`.
 
   redshift_cpu:
-    lo: 10
-    hi: 90
+    lo: 15
+    hi: 85
     sustained_epochs: 3
 
   aurora_cpu:
-    lo: 10
+    lo: 15
     hi: 85
     sustained_epochs: 3
 
   variable_costs:
-    threshold: 0.5
+    disabled: true
+    threshold: 1.0
 
   query_latency_ceiling:
     ceiling_s: 30.0
     sustained_epochs: 3
+
+  txn_latency_ceiling:
+    ceiling_s: 0.030
+    sustained_epochs: 3
+
+  recent_change: {}
 
 ###
 ### Beam planning constants.
 ###
 
 beam_size: 100
-max_provisioning_multiplier: 3
+max_provisioning_multiplier: 2.5
 max_feasible_cpu: 85
 
 
@@ -186,6 +193,33 @@ table_extract_bytes_per_row:
     movie_info: 29.449154
     person_info: 133.458044
 
+  imdb_extended_100g:
+    homes: 20.55453
+    theatres: 34.102969696969694
+    showings: 46.73179
+    ticket_orders: 36.166392
+    aka_name: 81.795698
+    aka_title: 116.07618847379604
+    cast_info: 34.775924
+    char_name: 71.25104
+    comp_cast_type: 11.25
+    company_name: 78.345222
+    company_type: 23.0
+    complete_cast: 17.87376189982678
+    info_type: 17.061946902654867
+    keyword: 28.256227174480138
+    kind_type: 12.142857142857142
+    link_type: 14.5
+    movie_companies: 42.636226
+    movie_info_idx: 26.61975
+    movie_keyword: 19.482324
+    movie_link: 21.888322165549887
+    name: 78.670034
+    role_type: 13.333333333333334
+    title: 88.5209
+    movie_info: 29.57191
+    person_info: 133.458044
+
 
 ###
 ### [Deprecated]
@@ -261,6 +295,7 @@ aurora_load_factor:
 ###
 
 aurora_txns:
+  # [Deprecated]
   # N.B. These values are for the initial IMDB "bulk insert" transactions
   client_thpt_to_load: 0.06493011
   client_thpt_to_cpu_denorm: 0.04584762
@@ -268,6 +303,7 @@ aurora_txns:
   # Should be a bit more precise.
   prov_to_peak_cpu_denorm: 0.56730588
 
+  # [Deprecated]
   # N.B. These values are for the IMDB-extended transactions.
   client_thpt_to_cpu_denorm: 0.0015366357203185784
   client_thpt_to_load: 0.0037392906617191367
@@ -276,9 +312,24 @@ aurora_txns:
   prov_to_peak_cpu_denorm: 0.6800294117647058
 
   imdb_extended_20g:
-    K: 1.0581694841384888
-    b_p50: 0.0022556402254849672
-    b_p95: 0.00383179122582078
+    # Used for "load translation"
+    C_1: 0.00282164
+    C_2: 0.00108688
+
+    # Used for latency.
+    K: 1.0194002389907837
+    b_p50: 0.005365931428968906
+    b_p90: 0.005891922861337662  # TODO: Update
+
+  imdb_extended_100g:
+    # Used for "load translation"
+    C_1: 0.00282164
+    C_2: 0.00108688
+
+    # Used for latency.
+    K: 1.0811012983322144
+    b_p50: 0.0008631267119199038
+    b_p90: 0.002251814818009734
 
 
 aurora_scaling:
@@ -298,3 +349,6 @@ redshift_scaling:
   coef4: 0.36256359
 
 use_io_optimized_aurora: true
+use_recorded_routing_if_available: true
+
+aurora_initialize_load_fraction: 0.25

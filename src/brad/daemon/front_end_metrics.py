@@ -14,6 +14,7 @@ from brad.config.metrics import FrontEndMetric
 from brad.daemon.messages import MetricsReport
 from brad.daemon.metrics_logger import MetricsLogger
 from brad.utils.streaming_metric import StreamingMetric, StreamingNumericMetric
+from brad.utils import log_verbose
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +57,8 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             FrontEndMetric.TxnEndPerSecond.value,
             FrontEndMetric.QueryLatencySecondP50.value,
             FrontEndMetric.TxnLatencySecondP50.value,
-            FrontEndMetric.QueryLatencySecondP95.value,
-            FrontEndMetric.TxnLatencySecondP95.value,
+            FrontEndMetric.QueryLatencySecondP90.value,
+            FrontEndMetric.TxnLatencySecondP90.value,
         ]
         self._values_df = pd.DataFrame(columns=self._ordered_metrics.copy())
         self._logger = MetricsLogger.create_from_config(
@@ -135,7 +136,8 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
                                 # make a copy.
                                 merged = copy.deepcopy(sketch)
 
-                        logger.debug(
+                        log_verbose(
+                            logger,
                             "[%s] [%d] Matched %d sketches with range %s -- %s",
                             metric_key,
                             fidx,
@@ -149,26 +151,26 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
                             "Missing latency sketch values for %s", metric_key
                         )
                         p50_val = 0.0
-                        p95_val = 0.0
+                        p90_val = 0.0
                     else:
                         p50_val_cand = merged.get_quantile_value(0.5)
-                        p95_val_cand = merged.get_quantile_value(0.9)
+                        p90_val_cand = merged.get_quantile_value(0.9)
                         p50_val = p50_val_cand if p50_val_cand is not None else 0.0
-                        p95_val = p95_val_cand if p95_val_cand is not None else 0.0
+                        p90_val = p90_val_cand if p90_val_cand is not None else 0.0
 
                     if metric_key == _MetricKey.QueryLatencySecond:
                         data_cols[FrontEndMetric.QueryLatencySecondP50.value].append(
                             p50_val
                         )
-                        data_cols[FrontEndMetric.QueryLatencySecondP95.value].append(
-                            p95_val
+                        data_cols[FrontEndMetric.QueryLatencySecondP90.value].append(
+                            p90_val
                         )
                     else:
                         data_cols[FrontEndMetric.TxnLatencySecondP50.value].append(
                             p50_val
                         )
-                        data_cols[FrontEndMetric.TxnLatencySecondP95.value].append(
-                            p95_val
+                        data_cols[FrontEndMetric.TxnLatencySecondP90.value].append(
+                            p90_val
                         )
                 else:
                     logger.warning("Unhandled front end metric: %s", metric_key)

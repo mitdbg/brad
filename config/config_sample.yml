@@ -77,6 +77,10 @@ front_end_query_latency_buffer_size: 100
 # select the most suitable engine.
 routing_policy: default
 
+# Whether to disable table movement for testing purposes (i.e. keep all tables on 
+# all engines.)
+disable_table_movement: true
+
 athena:
   odbc_driver: Athena
   aws_region: us-east-1

@@ -1,25 +1,21 @@
 import asyncio
 import logging
-from typing import Coroutine, Callable, List, Optional, Iterable
+from typing import Coroutine, Callable, List, Optional, Iterable, Tuple
 
 from brad.blueprint import Blueprint
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.config.system_event import SystemEvent
-from brad.daemon.monitor import Monitor
 from brad.daemon.system_event_logger import SystemEventLogger
-from brad.planner.compare.function import BlueprintComparator
-from brad.planner.estimator import EstimatorProvider
-from brad.planner.metrics import MetricsProvider
-from brad.planner.scoring.data_access.provider import DataAccessProvider
-from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyScorer
+from brad.planner.providers import BlueprintProviders
 from brad.planner.scoring.score import Score
 from brad.planner.triggers.trigger import Trigger
-from brad.planner.workload.provider import WorkloadProvider
 
 logger = logging.getLogger(__name__)
 
-NewBlueprintCallback = Callable[[Blueprint, Score], Coroutine[None, None, None]]
+NewBlueprintCallback = Callable[
+    [Blueprint, Score, Optional[Trigger]], Coroutine[None, None, None]
+]
 
 
 class BlueprintPlanner:
@@ -31,40 +27,34 @@ class BlueprintPlanner:
 
     def __init__(
         self,
+        config: ConfigFile,
         planner_config: PlannerConfig,
+        schema_name: str,
         current_blueprint: Blueprint,
         current_blueprint_score: Optional[Score],
-        monitor: Monitor,
-        config: ConfigFile,
-        schema_name: str,
-        workload_provider: WorkloadProvider,
-        analytics_latency_scorer: AnalyticsLatencyScorer,
-        comparator: BlueprintComparator,
-        metrics_provider: MetricsProvider,
-        data_access_provider: DataAccessProvider,
-        estimator_provider: EstimatorProvider,
+        providers: BlueprintProviders,
         system_event_logger: Optional[SystemEventLogger],
     ) -> None:
+        self._config = config
         self._planner_config = planner_config
+        self._schema_name = schema_name
         self._current_blueprint = current_blueprint
         self._current_blueprint_score = current_blueprint_score
         self._last_suggested_blueprint: Optional[Blueprint] = None
         self._last_suggested_blueprint_score: Optional[Score] = None
-        self._monitor = monitor
-        self._config = config
-        self._schema_name = schema_name
 
-        self._workload_provider = workload_provider
-        self._analytics_latency_scorer = analytics_latency_scorer
-        self._comparator = comparator
-        self._metrics_provider = metrics_provider
-        self._data_access_provider = data_access_provider
-        self._estimator_provider = estimator_provider
+        self._providers = providers
         self._system_event_logger = system_event_logger
 
         self._callbacks: List[NewBlueprintCallback] = []
         self._replan_in_progress = False
         self._disable_triggers = False
+
+        self._triggers = self._providers.trigger_provider.get_triggers()
+        for t in self._triggers:
+            t.update_blueprint(self._current_blueprint, self._current_blueprint_score)
+
+        self._comparator = self._providers.comparator_provider.get_comparator()
 
     async def run_forever(self) -> None:
         """
@@ -98,7 +88,7 @@ class BlueprintPlanner:
                                 SystemEvent.TriggeredReplan,
                                 "trigger={}".format(t.name()),
                             )
-                        await self.run_replan()
+                        await self.run_replan(trigger=t)
                         break
             else:
                 logger.debug(
@@ -106,19 +96,34 @@ class BlueprintPlanner:
                 )
             await asyncio.sleep(check_period)
 
-    async def run_replan(self, window_multiplier: int = 1) -> None:
+    async def run_replan(
+        self, trigger: Optional[Trigger], window_multiplier: int = 1
+    ) -> None:
         """
-        Triggers a "forced" replan. Used for debugging.
+        Initiates a replan. Call this directly to "force" a replan.
 
         Use `window_multiplier` to expand the window used for planning.
         """
         try:
             self._replan_in_progress = True
-            await self._run_replan_impl(window_multiplier)
+            for t in self.get_triggers():
+                t.on_replan(trigger)
+
+            result = await self._run_replan_impl(window_multiplier)
+            if result is None:
+                return
+            blueprint, score = result
+            self._last_suggested_blueprint = blueprint
+            self._last_suggested_blueprint_score = score
+
+            await self._notify_new_blueprint(blueprint, score, trigger)
+
         finally:
             self._replan_in_progress = False
 
-    async def _run_replan_impl(self, window_multiplier: int = 1) -> None:
+    async def _run_replan_impl(
+        self, window_multiplier: int = 1
+    ) -> Optional[Tuple[Blueprint, Score]]:
         """
         Implementers should override this method to define the blueprint
         optimization algorithm.
@@ -127,10 +132,9 @@ class BlueprintPlanner:
 
     def get_triggers(self) -> Iterable[Trigger]:
         """
-        Implementers should return the triggers used to trigger blueprint
-        replanning.
+        The triggers used to trigger blueprint replanning.
         """
-        raise NotImplementedError
+        return self._triggers
 
     def set_disable_triggers(self, disable: bool) -> None:
         """
@@ -166,12 +170,14 @@ class BlueprintPlanner:
         """
         self._callbacks.append(callback)
 
-    async def _notify_new_blueprint(self, blueprint: Blueprint, score: Score) -> None:
+    async def _notify_new_blueprint(
+        self, blueprint: Blueprint, score: Score, trigger: Optional[Trigger]
+    ) -> None:
         """
         Concrete planners should call this method to notify subscribers about
         the next blueprint.
         """
         tasks = []
         for callback in self._callbacks:
-            tasks.append(asyncio.create_task(callback(blueprint, score)))
+            tasks.append(asyncio.create_task(callback(blueprint, score, trigger)))
         await asyncio.gather(*tasks)

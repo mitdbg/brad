@@ -49,6 +49,20 @@ class ModelWrap:
         low_to_high = np.argsort(preds)
         return [ENGINE_LABELS[label] for label in reversed(low_to_high)]
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ModelWrap):
+            return False
+        if self._policy != other._policy or self._table_order != other._table_order:
+            return False
+
+        if id(self._model) == id(other._model):
+            return True
+
+        # Not very ideal, but this will check for identical copies.
+        serialized = pickle.dumps(self._model)
+        other_serialized = pickle.dumps(other._model)
+        return serialized == other_serialized
+
     def to_pickle(self) -> bytes:
         # TODO: Pickling might not be the best option.
         return pickle.dumps(self)

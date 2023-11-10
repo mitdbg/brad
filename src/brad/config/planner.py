@@ -224,3 +224,12 @@ class PlannerConfig:
             return True
         else:
             return self._raw["use_io_optimized_aurora"]
+
+    def flag(self, key: str, default: bool = False) -> bool:
+        if key not in self._raw:
+            return default
+        else:
+            return self._raw[key]
+
+    def aurora_initialize_load_fraction(self) -> float:
+        return self._raw["aurora_initialize_load_fraction"]

@@ -34,10 +34,11 @@ from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.front_end.start_front_end import start_front_end
 from brad.planner.abstract import BlueprintPlanner
-from brad.planner.compare.cost import best_cost_under_perf_ceilings
+from brad.planner.compare.provider import PerformanceCeilingComparatorProvider
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import MetricsFromMonitor
+from brad.planner.providers import BlueprintProviders
 from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.scoring.data_access.precomputed_values import (
@@ -47,6 +48,9 @@ from brad.planner.scoring.performance.analytics_latency import AnalyticsLatencyS
 from brad.planner.scoring.performance.precomputed_predictions import (
     PrecomputedPredictions,
 )
+from brad.planner.triggers.provider import ConfigDefinedTriggers
+from brad.planner.triggers.recent_change import RecentChange
+from brad.planner.triggers.trigger import Trigger
 from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import LoggedWorkloadProvider
@@ -58,6 +62,7 @@ logger = logging.getLogger(__name__)
 
 # Temporarily used.
 PERSIST_BLUEPRINT_VAR = "BRAD_PERSIST_BLUEPRINT"
+IGNORE_ALL_BLUEPRINTS_VAR = "BRAD_IGNORE_BLUEPRINT"
 
 
 class BradDaemon:
@@ -176,9 +181,9 @@ class BradDaemon:
                     aurora_accessed_pages_path=self._temp_config.aurora_data_access_path(),
                     athena_accessed_bytes_path=self._temp_config.athena_data_access_path(),
                 )
-            comparator = best_cost_under_perf_ceilings(
-                max_query_latency_s=self._temp_config.latency_ceiling_s(),
-                max_txn_p95_latency_s=self._temp_config.txn_latency_p95_ceiling_s(),
+            comparator_provider = PerformanceCeilingComparatorProvider(
+                self._temp_config.latency_ceiling_s(),
+                self._temp_config.txn_latency_p90_ceiling_s(),
             )
         else:
             logger.warning(
@@ -186,17 +191,9 @@ class BradDaemon:
             )
             latency_scorer = _NoopAnalyticsScorer()
             data_access_provider = _NoopDataAccessProvider()
-            comparator = best_cost_under_perf_ceilings(
-                max_query_latency_s=10, max_txn_p95_latency_s=0.030
-            )
+            comparator_provider = PerformanceCeilingComparatorProvider(30.0, 0.030)
 
-        self._planner = BlueprintPlannerFactory.create(
-            planner_config=self._planner_config,
-            current_blueprint=self._blueprint_mgr.get_blueprint(),
-            current_blueprint_score=self._blueprint_mgr.get_active_score(),
-            monitor=self._monitor,
-            config=self._config,
-            schema_name=self._schema_name,
+        providers = BlueprintProviders(
             workload_provider=LoggedWorkloadProvider(
                 self._config,
                 self._planner_config,
@@ -204,10 +201,25 @@ class BradDaemon:
                 self._schema_name,
             ),
             analytics_latency_scorer=latency_scorer,
-            comparator=comparator,
+            comparator_provider=comparator_provider,
             metrics_provider=MetricsFromMonitor(self._monitor, self._blueprint_mgr),
             data_access_provider=data_access_provider,
             estimator_provider=self._estimator_provider,
+            trigger_provider=ConfigDefinedTriggers(
+                self._config,
+                self._planner_config,
+                self._monitor,
+                data_access_provider,
+                self._estimator_provider,
+            ),
+        )
+        self._planner = BlueprintPlannerFactory.create(
+            config=self._config,
+            planner_config=self._planner_config,
+            schema_name=self._schema_name,
+            current_blueprint=self._blueprint_mgr.get_blueprint(),
+            current_blueprint_score=self._blueprint_mgr.get_active_score(),
+            providers=providers,
             system_event_logger=self._system_event_logger,
         )
         self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
@@ -338,14 +350,21 @@ class BradDaemon:
                     str(message),
                 )
 
-    async def _handle_new_blueprint(self, blueprint: Blueprint, score: Score) -> None:
+    async def _handle_new_blueprint(
+        self, blueprint: Blueprint, score: Score, trigger: Optional[Trigger]
+    ) -> None:
         """
         Informs the server about a new blueprint.
         """
+
+        if IGNORE_ALL_BLUEPRINTS_VAR in os.environ:
+            logger.info("Skipping all blueprints. Chosen blueprint: %s", blueprint)
+            return
+
         if self._system_event_logger is not None:
             self._system_event_logger.log(SystemEvent.NewBlueprintProposed)
 
-        if self._should_skip_blueprint(blueprint, score):
+        if self._should_skip_blueprint(blueprint, score, trigger):
             if self._system_event_logger is not None:
                 self._system_event_logger.log(SystemEvent.NewBlueprintSkipped)
             return
@@ -377,7 +396,9 @@ class BradDaemon:
             )
             self._transition_task = asyncio.create_task(self._run_transition_part_one())
 
-    def _should_skip_blueprint(self, blueprint: Blueprint, score: Score) -> bool:
+    def _should_skip_blueprint(
+        self, blueprint: Blueprint, score: Score, trigger: Optional[Trigger]
+    ) -> bool:
         """
         This is called whenever the planner chooses a new blueprint. The purpose
         is to avoid transitioning to blueprints with few changes.
@@ -401,13 +422,32 @@ class BradDaemon:
             logger.info("Planner selected an identical blueprint - skipping.")
             return True
 
-        if diff.aurora_diff() is not None or diff.redshift_diff() is not None:
-            return False
-
         current_score = self._blueprint_mgr.get_active_score()
         if current_score is None:
             # Do not skip - we are currently missing the score of the active
             # blueprint, so there is nothing to compare to.
+            return False
+
+        if trigger is not None and isinstance(trigger, RecentChange):
+            # TODO(geoffxy): This should eventually be removed. The right
+            # solution is doing a comparison during blueprint planning.  Added
+            # temporarily on November 2, 2023.
+            current_cost = (
+                current_score.provisioning_cost
+                + current_score.workload_scan_cost
+                + current_score.storage_cost
+            )
+            next_cost = (
+                score.provisioning_cost + score.workload_scan_cost + score.storage_cost
+            )
+
+            if next_cost > current_cost:
+                logger.info(
+                    "Skipping a RecentChange triggered blueprint because a higher-cost blueprint was selected."
+                )
+                return True
+
+        if diff.aurora_diff() is not None or diff.redshift_diff() is not None:
             return False
 
         current_dist = current_score.normalized_query_count_distribution()
@@ -528,7 +568,9 @@ class BradDaemon:
             if self._system_event_logger is not None:
                 self._system_event_logger.log(SystemEvent.ManuallyTriggeredReplan)
             try:
-                await self._planner.run_replan(window_multiplier)
+                await self._planner.run_replan(
+                    trigger=None, window_multiplier=window_multiplier
+                )
                 return [("Planner completed. See the daemon's logs for more details.",)]
             except Exception as ex:
                 logger.exception("Encountered exception when running the planner.")
@@ -544,9 +586,16 @@ class BradDaemon:
         transitioning_to_version = tm.next_version
 
         if self._system_event_logger is not None:
+            next_blueprint = tm.next_blueprint
+            assert next_blueprint is not None
+            next_aurora = str(next_blueprint.aurora_provisioning())
+            next_redshift = str(next_blueprint.redshift_provisioning())
+
             self._system_event_logger.log(
                 SystemEvent.PreTransitionStarted,
-                "version={}".format(transitioning_to_version),
+                f"version={transitioning_to_version};"
+                f"aurora={next_aurora};"
+                f"redshift={next_redshift}",
             )
 
         def update_monitor_sources():

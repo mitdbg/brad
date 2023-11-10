@@ -212,6 +212,7 @@ def train_model(
     skip_train=False,
     seed=0,
     save_best=False,
+    eval_on_test=False,
 ):
     if model_kwargs is None:
         model_kwargs = dict()
@@ -257,6 +258,7 @@ def train_model(
         lower_bound_num_tables=lower_bound_num_tables,
         lower_bound_runtime=lower_bound_runtime,
         loss_class_name=loss_class_name,
+        eval_on_test=eval_on_test,
     )
 
     if loss_class_name == "QLoss":
@@ -459,6 +461,7 @@ def train_default(
     max_no_epochs=None,
     skip_train=False,
     save_best=False,
+    eval_on_test=False,
 ):
     """
     Sets default parameters and trains model
@@ -518,6 +521,7 @@ def train_default(
         limit_queries_affected_wl=limit_queries_affected_wl,
         skip_train=skip_train,
         save_best=save_best,
+        eval_on_test=eval_on_test,
     )
     param_dict = flatten_dict(train_kwargs)
 
@@ -555,6 +559,7 @@ def train_readout_hyperparams(
     max_no_epochs=None,
     skip_train=False,
     save_best=False,
+    eval_on_test=False,
 ):
     """
     Reads out hyperparameters and trains model
@@ -623,6 +628,7 @@ def train_readout_hyperparams(
         lower_bound_runtime=lower_bound_runtime,
         skip_train=skip_train,
         save_best=save_best,
+        eval_on_test=eval_on_test,
     )
 
     assert len(hyperparams) == 0, (

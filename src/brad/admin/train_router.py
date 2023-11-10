@@ -9,7 +9,7 @@ from brad.config.file import ConfigFile
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.routing.policy import RoutingPolicy
-from brad.routing.tree_based.forest_router import ForestRouter
+from brad.routing.tree_based.forest_policy import ForestPolicy
 from brad.routing.tree_based.trainer import ForestTrainer
 from brad.blueprint.manager import BlueprintManager
 
@@ -163,7 +163,7 @@ def train_router(args):
             response = input("Do you want to persist this model? (y/n): ").lower()
             if response == "y":
                 assets = AssetManager(config)
-                ForestRouter.static_persist_sync(model, schema_name, assets)
+                ForestPolicy.static_persist_sync(model, schema_name, assets)
                 logger.info("Model persisted successfully.")
                 break
             elif response == "n":

@@ -86,32 +86,34 @@ def best_cost_under_max_latency(max_latency_ceiling_s: float) -> BlueprintCompar
 
 def best_cost_under_perf_ceilings(
     max_query_latency_s: float,
-    max_txn_p95_latency_s: float,
+    max_txn_p90_latency_s: float,
 ) -> BlueprintComparator:
     def is_better_than(left: ComparableBlueprint, right: ComparableBlueprint) -> bool:
         # Check transactional latency ceilings first.
-        left_txn_p95 = left.get_predicted_transactional_latencies()[0]
-        right_txn_p95 = right.get_predicted_transactional_latencies()[0]
+        left_txn_p90 = left.get_predicted_transactional_latencies()[1]
+        right_txn_p90 = right.get_predicted_transactional_latencies()[1]
 
         # If one of these candidates have NaN predictions, we need to
         # consider other factors. NaN indicates that a prediction is not
         # available (e.g., due to missing metrics).
-        if not math.isnan(left_txn_p95) and not math.isnan(right_txn_p95):
+        if not math.isnan(left_txn_p90) and not math.isnan(right_txn_p90):
             # Both above the ceiling, return the blueprint that does better on
             # performance.
             if (
-                left_txn_p95 > max_txn_p95_latency_s
-                and right_txn_p95 > max_txn_p95_latency_s
+                left_txn_p90 > max_txn_p90_latency_s
+                and right_txn_p90 > max_txn_p90_latency_s
             ):
-                return left_txn_p95 < right_txn_p95
-            elif left_txn_p95 > max_txn_p95_latency_s:
+                return left_txn_p90 < right_txn_p90
+            elif left_txn_p90 > max_txn_p90_latency_s:
                 return False
-            elif right_txn_p95 > max_txn_p95_latency_s:
+            elif right_txn_p90 > max_txn_p90_latency_s:
                 return True
 
         # Query latency ceilings.
-        left_lat = _get_or_compute_p99_latency(left)
-        right_lat = _get_or_compute_p99_latency(right)
+        # left_lat = _get_or_compute_p99_latency(left)
+        # right_lat = _get_or_compute_p99_latency(right)
+        left_lat = _get_or_compute_nth_largest_latency(left, 2)
+        right_lat = _get_or_compute_nth_largest_latency(right, 2)
 
         if left_lat > max_query_latency_s and right_lat > max_query_latency_s:
             # Both are above the latency ceiling.
@@ -163,6 +165,22 @@ def _get_or_compute_max_latency(bp: ComparableBlueprint) -> float:
         max_lat = bp.get_predicted_analytical_latencies().max()
         bp.set_memoized_value("max_latency", max_lat)
         return max_lat
+
+
+def _get_or_compute_nth_largest_latency(bp: ComparableBlueprint, n: int) -> float:
+    pred_lats = bp.get_predicted_analytical_latencies()
+    if len(pred_lats) < n:
+        actual_n = len(pred_lats)
+    else:
+        actual_n = n
+
+    stored = bp.get_memoized_value(f"{actual_n}_largest")
+    if stored is not None:
+        return stored
+
+    nth_largest = np.partition(pred_lats, -actual_n)[-actual_n]
+    bp.set_memoized_value(f"{actual_n}_largest", nth_largest)
+    return nth_largest
 
 
 def _get_or_compute_p99_latency(bp: ComparableBlueprint) -> float:

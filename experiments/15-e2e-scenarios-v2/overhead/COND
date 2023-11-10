@@ -66,6 +66,7 @@ run_experiment(
     "planner-config-file": "config/planner.yml",
     "schema-name": "imdb_extended_20g",
     "num-front-ends": 4,
+    "dataset-type": "20gb",
   },
 )
 
@@ -78,5 +79,6 @@ run_experiment(
     "schema-name": "imdb_extended_20g",
     "run-for-s": 3 * 60,
     "num-clients": 2,
+    "dataset-type": "20gb",
   },
 )

@@ -3,6 +3,7 @@ import json
 import logging
 import random
 import time
+import os
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
@@ -34,12 +35,12 @@ from brad.front_end.errors import QueryError
 from brad.front_end.grpc import BradGrpc
 from brad.front_end.session import SessionManager, SessionId, Session
 from brad.query_rep import QueryRep
+from brad.routing.abstract_policy import AbstractRoutingPolicy
 from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.rule_based import RuleBased
-from brad.routing.location_aware_round_robin import LocationAwareRoundRobin
 from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
-from brad.routing.tree_based.forest_router import ForestRouter
+from brad.routing.tree_based.forest_policy import ForestPolicy
 from brad.row_list import RowList
 from brad.utils import log_verbose
 from brad.utils.counter import Counter
@@ -52,6 +53,8 @@ from brad.workload_logging.epoch_file_handler import EpochFileHandler
 logger = logging.getLogger(__name__)
 
 LINESEP = "\n".encode()
+
+INITIAL_ROUTE_REDSHIFT_ONLY_VAR = "BRAD_INITIAL_ROUTE_REDSHIFT_ONLY"
 
 
 class BradFrontEnd(BradInterface):
@@ -107,36 +110,9 @@ class BradFrontEnd(BradInterface):
             self._config.front_end_query_latency_buffer_size
         )
 
-        # We have different routing policies for performance evaluation and
-        # testing purposes.
-        routing_policy = self._config.routing_policy
-        self._routing_policy = routing_policy
-        if routing_policy == RoutingPolicy.Default:
-            self._router: Router = LocationAwareRoundRobin(self._blueprint_mgr)
-        elif routing_policy == RoutingPolicy.AlwaysAthena:
-            self._router = AlwaysOneRouter(Engine.Athena)
-        elif routing_policy == RoutingPolicy.AlwaysAurora:
-            self._router = AlwaysOneRouter(Engine.Aurora)
-        elif routing_policy == RoutingPolicy.AlwaysRedshift:
-            self._router = AlwaysOneRouter(Engine.Redshift)
-        elif routing_policy == RoutingPolicy.RuleBased:
-            self._monitor = Monitor(config, self._blueprint_mgr)
-            self._router = RuleBased(
-                blueprint_mgr=self._blueprint_mgr, monitor=self._monitor
-            )
-        elif (
-            routing_policy == RoutingPolicy.ForestTablePresence
-            or routing_policy == RoutingPolicy.ForestTableSelectivity
-        ):
-            self._router = ForestRouter.for_server(
-                routing_policy, self._schema_name, self._assets, self._blueprint_mgr
-            )
-        else:
-            raise RuntimeError(
-                "Unsupported routing policy: {}".format(str(routing_policy))
-            )
-        logger.info("Using routing policy: %s", routing_policy)
-
+        self._routing_policy_override = self._config.routing_policy
+        # This is set up as the front end starts up.
+        self._router: Optional[Router] = None
         self._sessions = SessionManager(
             self._config, self._blueprint_mgr, self._schema_name
         )
@@ -144,7 +120,7 @@ class BradFrontEnd(BradInterface):
         self._estimator: Optional[Estimator] = None
 
         # Number of transactions that completed.
-        self._transaction_end_counter = Counter()
+        self._transaction_end_counter = Counter()  # pylint: disable=global-statement
         self._reset_latency_sketches()
         self._brad_metrics_reporting_task: Optional[asyncio.Task[None]] = None
 
@@ -161,6 +137,10 @@ class BradFrontEnd(BradInterface):
         # Used to re-establish engine connections.
         self._reestablish_connections_task: Optional[asyncio.Task[None]] = None
 
+        # This is temporary for experiment purposes. In the future, this will be
+        # part of the blueprint.
+        self._route_redshift_only = INITIAL_ROUTE_REDSHIFT_ONLY_VAR in os.environ
+
     async def serve_forever(self):
         await self._run_setup()
         try:
@@ -174,15 +154,8 @@ class BradFrontEnd(BradInterface):
             logger.info("The BRAD front end has successfully started.")
             logger.info("Listening on port %d.", port_to_use)
 
-            if self._routing_policy == RoutingPolicy.RuleBased:
-                assert (
-                    self._monitor is not None
-                ), "require monitor running for rule-based router"
-                await asyncio.gather(
-                    self._monitor.run_forever(), grpc_server.wait_for_termination()
-                )
-            else:
-                await grpc_server.wait_for_termination()
+            # N.B. If we need the Monitor, we should call `run_forever()` here.
+            await grpc_server.wait_for_termination()
         finally:
             # Not ideal, but we need to manually call this method to ensure
             # gRPC's internal shutdown process completes before we return from
@@ -199,14 +172,17 @@ class BradFrontEnd(BradInterface):
             self._monitor.set_up_metrics_sources()
             await self._monitor.fetch_latest()
 
-        if self._routing_policy == RoutingPolicy.ForestTableSelectivity:
+        if (
+            self._routing_policy_override == RoutingPolicy.ForestTableSelectivity
+            or self._routing_policy_override == RoutingPolicy.Default
+        ):
             self._estimator = await PostgresEstimator.connect(
                 self._schema_name, self._config
             )
             await self._estimator.analyze(self._blueprint_mgr.get_blueprint())
         else:
             self._estimator = None
-        await self._router.run_setup(self._estimator)
+        await self._set_up_router(self._estimator)
 
         # Start the metrics reporting task.
         self._brad_metrics_reporting_task = asyncio.create_task(
@@ -217,6 +193,50 @@ class BradFrontEnd(BradInterface):
         self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
 
         self._qlogger_refresh_task = asyncio.create_task(self._refresh_qlogger())
+
+    async def _set_up_router(self, estimator: Optional[Estimator]) -> None:
+        # We have different routing policies for performance evaluation and
+        # testing purposes.
+        blueprint = self._blueprint_mgr.get_blueprint()
+
+        if self._routing_policy_override == RoutingPolicy.Default:
+            # No override - use the blueprint's policy.
+            self._router = Router.create_from_blueprint(blueprint)
+            logger.info("Using blueprint-provided routing policy.")
+
+        else:
+            if self._routing_policy_override == RoutingPolicy.AlwaysAthena:
+                definite_policy: AbstractRoutingPolicy = AlwaysOneRouter(Engine.Athena)
+            elif self._routing_policy_override == RoutingPolicy.AlwaysAurora:
+                definite_policy = AlwaysOneRouter(Engine.Aurora)
+            elif self._routing_policy_override == RoutingPolicy.AlwaysRedshift:
+                definite_policy = AlwaysOneRouter(Engine.Redshift)
+            elif self._routing_policy_override == RoutingPolicy.RuleBased:
+                # TODO: If we need metrics, re-create the monitor here. It's
+                # easier to not have it created.
+                definite_policy = RuleBased()
+            elif (
+                self._routing_policy_override == RoutingPolicy.ForestTablePresence
+                or self._routing_policy_override == RoutingPolicy.ForestTableSelectivity
+            ):
+                definite_policy = await ForestPolicy.from_assets(
+                    self._schema_name,
+                    self._routing_policy_override,
+                    self._assets,
+                )
+            else:
+                raise RuntimeError(
+                    f"Unsupported routing policy override: {self._routing_policy_override}"
+                )
+            logger.info(
+                "Using routing policy override: %s", self._routing_policy_override.name
+            )
+            self._router = Router.create_from_definite_policy(
+                definite_policy, blueprint.table_locations_bitmap()
+            )
+
+        await self._router.run_setup(estimator)
+        self._router.log_policy()
 
     async def _run_teardown(self):
         logger.debug("Starting BRAD front end _run_teardown()")
@@ -284,7 +304,10 @@ class BradFrontEnd(BradInterface):
 
             # 2. Select an engine for the query.
             query_rep = QueryRep(query)
-            engine_to_use = await self._router.engine_for(query_rep)
+            if query_rep.is_transaction_start():
+                session.set_in_transaction(True)
+            assert self._router is not None
+            engine_to_use = await self._router.engine_for(query_rep, session)
 
             log_verbose(
                 logger,
@@ -304,6 +327,8 @@ class BradFrontEnd(BradInterface):
                     connection = session.engines.get_connection(engine_to_use)
                     cursor = connection.cursor_sync()
                     start = datetime.now(tz=timezone.utc)
+                    if query_rep.is_transaction_start():
+                        session.set_txn_start_timestamp(start)
                     # Using execute_sync() is lower overhead than the async
                     # interface. For transactions, we won't necessarily need the
                     # async interface.
@@ -336,7 +361,8 @@ class BradFrontEnd(BradInterface):
             if query_rep.is_transaction_start():
                 session.set_in_transaction(in_txn=True)
 
-            if query_rep.is_transaction_end():
+            is_transaction_end = query_rep.is_transaction_end()
+            if is_transaction_end:
                 session.set_in_transaction(in_txn=False)
                 self._transaction_end_counter.bump()
 
@@ -344,13 +370,20 @@ class BradFrontEnd(BradInterface):
             run_time_s = end - start
             if not transactional_query or (random.random() < self._config.txn_log_prob):
                 self._qlogger.info(
-                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} Engine: {engine_to_use} Duration: {run_time_s}s IsTransaction: {transactional_query}"
+                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} "
+                    f"Engine: {engine_to_use.value} "
+                    f"Duration (s): {run_time_s.total_seconds()} "
+                    f"IsTransaction: {transactional_query}"
                 )
                 run_time_s_float = run_time_s.total_seconds()
-                if transactional_query:
-                    self._txn_latency_sketch.add(run_time_s_float)
-                else:
+                if not transactional_query:
                     self._query_latency_sketch.add(run_time_s_float)
+                elif is_transaction_end:
+                    # We want to record the duration of the entire transaction
+                    # (not just one query in the transaction).
+                    self._txn_latency_sketch.add(
+                        (end - session.txn_start_timestamp()).total_seconds()
+                    )
 
             # Extract and return the results, if any.
             try:
@@ -480,6 +513,7 @@ class BradFrontEnd(BradInterface):
                 )
                 # This refreshes any cached state that depends on the old blueprint.
                 await self._run_blueprint_update(message.version)
+                self._route_redshift_only = False
                 # Tell the daemon that we have updated.
                 self._output_queue.put(
                     NewBlueprintAck(self._fe_index, message.version), block=False
@@ -578,6 +612,7 @@ class BradFrontEnd(BradInterface):
         if self._monitor is not None:
             self._monitor.update_metrics_sources()
         await self._sessions.add_connections()
+        assert self._router is not None
         self._router.update_blueprint(blueprint)
         # NOTE: This will cause any pending queries on the to-be-removed
         # connections to be cancelled. We consider this behavior to be

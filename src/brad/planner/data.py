@@ -4,6 +4,8 @@ from brad.blueprint import Blueprint
 from brad.blueprint.user import UserProvidedBlueprint
 from brad.blueprint.table import Table
 from brad.config.engine import Engine
+from brad.routing.abstract_policy import FullRoutingPolicy
+from brad.routing.round_robin import RoundRobin
 
 
 def bootstrap_blueprint(user: UserProvidedBlueprint) -> Blueprint:
@@ -90,5 +92,6 @@ def bootstrap_blueprint(user: UserProvidedBlueprint) -> Blueprint:
         table_locations,
         user.aurora_provisioning(),
         user.redshift_provisioning(),
-        None,
+        # TODO: Replace the default definite policy.
+        FullRoutingPolicy(indefinite_policies=[], definite_policy=RoundRobin()),
     )

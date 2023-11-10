@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 from brad.blueprint.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
+from brad.routing.abstract_policy import FullRoutingPolicy
 
 
 class EnumeratedBlueprint(Blueprint):
@@ -21,12 +22,13 @@ class EnumeratedBlueprint(Blueprint):
             base_blueprint.table_locations(),
             base_blueprint.aurora_provisioning(),
             base_blueprint.redshift_provisioning(),
-            base_blueprint.router_provider(),
+            base_blueprint.get_routing_policy(),
         )
         self._current_locations = base_blueprint.table_locations()
         self._current_aurora_provisioning = base_blueprint.aurora_provisioning()
         self._current_redshift_provisioning = base_blueprint.redshift_provisioning()
         self._current_table_locations_bitmap: Optional[Dict[str, int]] = None
+        self._current_routing_policy = base_blueprint.get_routing_policy()
 
     def set_table_locations(
         self, locations: Dict[str, List[Engine]]
@@ -43,6 +45,12 @@ class EnumeratedBlueprint(Blueprint):
         self._current_redshift_provisioning = prov
         return self
 
+    def set_routing_policy(
+        self, routing_policy: FullRoutingPolicy
+    ) -> "EnumeratedBlueprint":
+        self._current_routing_policy = routing_policy
+        return self
+
     def to_blueprint(self) -> Blueprint:
         """
         Makes a copy of this object as a `Blueprint`.
@@ -57,7 +65,7 @@ class EnumeratedBlueprint(Blueprint):
             },
             aurora_provisioning=self._current_aurora_provisioning.clone(),
             redshift_provisioning=self._current_redshift_provisioning.clone(),
-            router_provider=self.router_provider(),
+            full_routing_policy=self._current_routing_policy,
         )
 
     # Overridden getters.
@@ -84,3 +92,6 @@ class EnumeratedBlueprint(Blueprint):
             return self._current_locations[table_name]
         except KeyError as ex:
             raise ValueError from ex
+
+    def get_routing_policy(self) -> FullRoutingPolicy:
+        return self._current_routing_policy

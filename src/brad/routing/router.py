@@ -1,17 +1,55 @@
-from typing import Dict, Tuple, Optional, TYPE_CHECKING
+import asyncio
+import logging
+from typing import Dict, Optional, TYPE_CHECKING
 from brad.front_end.session import Session
 from brad.routing.functionality_catalog import Functionality
 from brad.data_stats.estimator import Estimator
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.query_rep import QueryRep
+from brad.routing.abstract_policy import AbstractRoutingPolicy, FullRoutingPolicy
 
 if TYPE_CHECKING:
     from brad.blueprint import Blueprint
 
+logger = logging.getLogger(__name__)
+
 
 class Router:
-    def __init__(self):
+    @classmethod
+    def create_from_blueprint(cls, blueprint: "Blueprint") -> "Router":
+        return cls(
+            blueprint.get_routing_policy(),
+            blueprint.table_locations_bitmap(),
+            use_future_blueprint_policies=True,
+        )
+
+    @classmethod
+    def create_from_definite_policy(
+        cls, policy: AbstractRoutingPolicy, table_placement_bitmap: Dict[str, int]
+    ) -> "Router":
+        return cls(
+            FullRoutingPolicy(indefinite_policies=[], definite_policy=policy),
+            table_placement_bitmap,
+            use_future_blueprint_policies=False,
+        )
+
+    def __init__(
+        self,
+        full_policy: FullRoutingPolicy,
+        table_placement_bitmap: Dict[str, int],
+        use_future_blueprint_policies: bool,
+    ) -> None:
+        self._full_policy = full_policy
+        self._table_placement_bitmap = table_placement_bitmap
+        self._use_future_blueprint_policies = use_future_blueprint_policies
         self.functionality_catalog = Functionality()
+
+    def log_policy(self) -> None:
+        logger.info("Routing policy:")
+        logger.info("  Indefinite policies:")
+        for p in self._full_policy.indefinite_policies:
+            logger.info("    - %s", p.name())
+        logger.info("  Definite policy: %s")
 
     async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
         """
@@ -20,66 +58,94 @@ class Router:
 
         If the routing policy needs an estimator, one should be provided here.
         """
+        await self._full_policy.run_setup(estimator)
 
     def update_blueprint(self, blueprint: "Blueprint") -> None:
         """
         Used to update any cached state that depends on the blueprint (e.g.,
         location bitmaps).
         """
+        self._table_placement_bitmap = blueprint.table_locations_bitmap()
+        if self._use_future_blueprint_policies:
+            self._full_policy = blueprint.get_routing_policy()
 
-    async def engine_for(self, query: QueryRep, session: Session) -> Engine:
+    def update_placement(self, table_placement_bitmap: Dict[str, int]) -> None:
+        """
+        This is only meant to be used by the planner. Updates to the router's
+        state should otherwise always be done using `update_blueprint()`.
+        """
+        self._table_placement_bitmap = table_placement_bitmap
+
+    async def engine_for(
+        self, query: QueryRep, session: Optional[Session] = None
+    ) -> Engine:
         """
         Selects an engine for the provided SQL query.
-
-        NOTE: Implementers currently do not need to consider DML queries. BRAD
-        routes all DML queries to Aurora before consulting the router. Thus the
-        query passed to this method will always be a read-only query.
-
-        You should override this method if the routing policy needs to depend on
-        any asynchronous methods.
         """
-        return self.engine_for_sync(query, session)
 
-    def engine_for_sync(self, query: QueryRep, session: Session) -> Engine:
-        """
-        Selects an engine for the provided SQL query.
+        # Hack: To be quick, immediately return Aurora if txn.
+        # We need to change this once we have several transactional engines.
+        if session is not None and session.in_transaction:
+            return Engine.Aurora
 
-        NOTE: Implementers currently do not need to consider DML queries. BRAD
-        routes all DML queries to Aurora before consulting the router. Thus the
-        query passed to this method will always be a read-only query.
-        """
-        raise NotImplementedError
+        # Table placement constraints.
+        assert self._table_placement_bitmap is not None
+        place_support = self._run_location_routing(query, self._table_placement_bitmap)
 
-    def _filter_on_constraints(
-        self, query: QueryRep, location_bitmap: Dict[str, int], session: Session
-    ) -> Tuple[int, Optional[Engine]]:
-        # If transaction return Aurora
-        # NOTE: Need to change when we have several transactional engines
-        if session.in_transaction:
-            return Engine.to_bitmap([Engine.Aurora]), Engine.Aurora
-
-        # First constrain based on functinality catalog
+        # Engine functionality constraints.
         func_support = self._run_functionality_routing(query)
 
-        # Then constrain based on table placement
-        place_support = self._run_location_routing(query, location_bitmap)
+        # Get supported engines.
+        valid_locations = place_support & func_support
 
-        # AND the two bit vectors together
-        supported_engines = place_support & func_support
+        # check if no engine supports query
+        if valid_locations == 0:
+            raise RuntimeError(
+                "No engine supports query {}".format(", ".join(query._raw_sql_query))
+            )
 
-        # Check if one engine supported
-        if (supported_engines & (supported_engines - 1)) == 0:
+        # Check if only one engine supports query.
+        if (valid_locations & (valid_locations - 1)) == 0:
             # Bitmap trick - only one bit is set.
-            if (EngineBitmapValues[Engine.Aurora] & supported_engines) != 0:
-                return (supported_engines, Engine.Aurora)
-            elif (EngineBitmapValues[Engine.Redshift] & supported_engines) != 0:
-                return (supported_engines, Engine.Redshift)
-            elif (EngineBitmapValues[Engine.Athena] & supported_engines) != 0:
-                return (supported_engines, Engine.Athena)
+            if (EngineBitmapValues[Engine.Aurora] & valid_locations) != 0:
+                return Engine.Aurora
+            elif (EngineBitmapValues[Engine.Redshift] & valid_locations) != 0:
+                return Engine.Redshift
+            elif (EngineBitmapValues[Engine.Athena] & valid_locations) != 0:
+                return Engine.Athena
             else:
-                raise RuntimeError("Unsupported bitmap value " + str(supported_engines))
+                raise RuntimeError("Unsupported bitmap value " + str(valid_locations))
 
-        return (supported_engines, None)
+        # Go through the indefinite routing policies. These may not return a
+        # routing location.
+        for policy in self._full_policy.indefinite_policies:
+            locations = await policy.engine_for(query)
+            for loc in locations:
+                if (EngineBitmapValues[loc] & valid_locations) != 0:
+                    return loc
+
+        # Rely on the definite routing policy.
+        locations = await self._full_policy.definite_policy.engine_for(query)
+        for loc in locations:
+            if (EngineBitmapValues[loc] & valid_locations) != 0:
+                return loc
+
+        # This should be unreachable. The definite policy must rank all engines,
+        # and we know >= 2 engines can support this query.
+        raise AssertionError
+
+    def engine_for_sync(
+        self, query: QueryRep, session: Optional[Session] = None
+    ) -> Engine:
+        """
+        Selects an engine for the provided SQL query.
+
+        NOTE: Implementers currently do not need to consider DML queries. BRAD
+        routes all DML queries to Aurora before consulting the router. Thus the
+        query passed to this method will always be a read-only query.
+        """
+        # Ideally we re-implement a sync version.
+        return asyncio.run(self.engine_for(query, session))
 
     def _run_functionality_routing(self, query: QueryRep) -> int:
         """

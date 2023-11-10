@@ -1,6 +1,6 @@
 import logging
-from typing import Dict, Optional
-
+from collections import Counter
+from typing import Dict, List, Tuple, Optional
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.query_rep import QueryRep
@@ -9,7 +9,6 @@ from brad.data_stats.plan_parsing import (
     extract_base_cardinalities,
 )
 from brad.front_end.engine_connections import EngineConnections
-from brad.front_end.session import Session
 
 logger = logging.getLogger(__name__)
 
@@ -23,17 +22,44 @@ class Query(QueryRep):
     """
 
     def __init__(
-        self, sql_query: str, arrival_count: int = 1, session: Optional[Session] = None
+        self,
+        sql_query: str,
+        arrival_count: float = 1.0,
+        past_executions: Optional[List[Tuple[Engine, float]]] = None,
     ):
         super().__init__(sql_query)
         self._arrival_count = arrival_count
+        self._past_executions = past_executions
+        # `arrival_count` might be scaled for a fixed period. This multiplier
+        # represents the scaling factor used; it should be applied to
+        # `past_executions` when reweighing a query distribution.
+        self._past_executions_multiplier = 1.0
 
         # Legacy statistics.
         self._data_accessed_mb: Dict[Engine, int] = {}
         self._tuples_accessed: Dict[Engine, int] = {}
 
-    def arrival_count(self) -> int:
+    def copy_as_query_rep(self) -> QueryRep:
+        return QueryRep(self.raw_query)
+
+    def past_executions(self) -> Optional[List[Tuple[Engine, float]]]:
+        """
+        Retrieve any information about past executions of this query.
+        """
+        return self._past_executions
+
+    def arrival_count(self) -> float:
+        """
+        Note that this value may be fractional due to time period adjustments in
+        the workload.
+        """
         return self._arrival_count
+
+    def set_arrival_count(self, arrival_count: float) -> None:
+        self._arrival_count = arrival_count
+
+    def set_past_executions_multiplier(self, multiplier: float) -> None:
+        self._past_executions_multiplier = multiplier
 
     # The methods below are legacy code.
 
@@ -99,3 +125,11 @@ class Query(QueryRep):
 
         # MB, so we divide by 1000 twice.
         self._data_accessed_mb[for_engine] = total_storage_bytes // 1000 // 1000
+
+    def primary_execution_location(self) -> Optional[Engine]:
+        if self._past_executions is None or len(self._past_executions) == 0:
+            return None
+
+        counter = Counter([execution[0] for execution in self._past_executions])
+        most_common, _ = counter.most_common(1)[0]
+        return most_common

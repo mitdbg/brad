@@ -3,7 +3,7 @@ import pathlib
 import logging
 import re
 from datetime import timedelta, datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
@@ -26,7 +26,11 @@ class WorkloadBuilder:
     """
 
     def __init__(self) -> None:
-        self._analytical_queries: List[str] = []
+        # Optionally includes the engine the query was executed on, and its
+        # recorded run time.
+        self._analytical_queries: List[
+            Tuple[str, Optional[Engine], Optional[float]]
+        ] = []
         self._transactional_queries: List[str] = []
         self._analytics_count_per: int = 1
         self._period = timedelta(hours=1)
@@ -60,21 +64,17 @@ class WorkloadBuilder:
             multiplier = rescale_to_period / self._period
 
         if len(self._analytical_queries) > 0:
-            analytics = [
-                Query(
-                    q,
-                    arrival_count=max(
-                        int(self._analytics_count_per * count * multiplier), 1
-                    ),
-                )
-                for q, count in self._deduplicate_queries(
-                    self._analytical_queries
-                ).items()
-            ]
+            analytics = self._deduplicate_and_construct_queries(
+                self._analytical_queries
+            )
+            for q in analytics:
+                query_multiplier = self._analytics_count_per * multiplier
+                q.set_arrival_count(q.arrival_count() * query_multiplier)
+                q.set_past_executions_multiplier(query_multiplier)
         else:
             if rescale_to_period is not None:
                 analytics = [
-                    Query(q.raw_query, max(int(q.arrival_count() * multiplier), 1))
+                    Query(q.raw_query, arrival_count=q.arrival_count() * multiplier)
                     for q in self._prespecified_queries
                 ]
             else:
@@ -82,7 +82,7 @@ class WorkloadBuilder:
 
         transactions = [
             # N.B. `count` is sampled!
-            Query(q, arrival_count=max(int(count * multiplier), 1))
+            Query(q, arrival_count=count * multiplier)
             for q, count in self._deduplicate_queries(
                 self._transactional_queries
             ).items()
@@ -136,7 +136,7 @@ class WorkloadBuilder:
                 query_idx = int(row[0])
                 run_count = int(row[1])
                 self._prespecified_queries.append(
-                    Query(all_queries[query_idx], run_count * multiplier)
+                    Query(all_queries[query_idx], arrival_count=run_count * multiplier)
                 )
         return self
 
@@ -147,7 +147,7 @@ class WorkloadBuilder:
 
         with open(file_path, encoding="UTF-8") as analytics:
             for q in analytics:
-                self._analytical_queries.append(q.strip())
+                self._analytical_queries.append((q.strip(), None, None))
         return self
 
     def add_transactional_queries_from_file(
@@ -158,17 +158,23 @@ class WorkloadBuilder:
                 self._transactional_queries.append(q.strip())
         return self
 
-    def table_sizes_from_engines(
+    async def table_sizes_from_engines(
         self, blueprint: Blueprint, table_sizer: TableSizer
     ) -> "WorkloadBuilder":
+        # For more accurate predictions, we should retrieve the size of the
+        # table that will actualy be exported/imported.
         preferred_sources = [Engine.Redshift, Engine.Aurora, Engine.Athena]
         self._table_sizes.clear()
-        for table, locations in blueprint.tables_with_locations():
+        num_tables = len(blueprint.tables_with_locations())
+        for idx, (table, locations) in enumerate(blueprint.tables_with_locations()):
             for source in preferred_sources:
                 if source not in locations:
                     continue
-                self._table_sizes[table.name] = table_sizer.table_size_rows(
-                    table.name, source
+                self._table_sizes[table.name] = await table_sizer.table_size_rows(
+                    table.name, source, approximate_allowed=True
+                )
+                logger.debug(
+                    "Fetching table size %s - %d of %d", table.name, idx + 1, num_tables
                 )
                 break
             assert table.name in self._table_sizes
@@ -190,6 +196,9 @@ class WorkloadBuilder:
         range_start: Optional[datetime] = None
         epoch_length = config.epoch_length
 
+        log_regex_str = r"Query: (?P<query>.*) Engine: (?P<engine>[a-zA-Z]+) Duration \(s\): (?P<duration>[0-9\.]+)"
+        log_regex = re.compile(log_regex_str)
+
         # The logic below extracts data from log files that represent epochs
         # that intersect with the provided window.
         #
@@ -206,11 +215,18 @@ class WorkloadBuilder:
 
             if "analytical" in log_file.file_key:
                 for line in log_file.contents.strip().split("\n"):
-                    matches = re.findall(r"Query: (.+?) Engine:", line)
-                    if len(matches) == 0:
+                    clean_line = line.strip()
+                    if len(clean_line) == 0:
                         continue
-                    q = matches[0]
-                    analytical_queries.append(q.strip())
+
+                    matches = log_regex.search(line)
+                    if matches is None:
+                        logger.debug("Failed to parse log entry: %s", line)
+                        continue
+                    q = matches.group("query")
+                    engine = Engine.from_str(matches.group("engine"))
+                    run_time_s = float(matches.group("duration"))
+                    analytical_queries.append((q.strip(), engine, run_time_s))
                 is_valid = True
 
             elif "transactional" in log_file.file_key:
@@ -219,10 +235,10 @@ class WorkloadBuilder:
                 if (prob / 100.0) < sampling_prob:
                     sampling_prob = prob
                 for line in log_file.contents.strip().split("\n"):
-                    matches = re.findall(r"Query: (.+) Engine:", line)
-                    if len(matches) == 0:
+                    tmatches = re.findall(r"Query: (.+) Engine:", line)
+                    if len(tmatches) == 0:
                         continue
-                    q = matches[0]
+                    q = tmatches[0]
                     txn_queries.append(q.strip())
                 is_valid = True
 
@@ -249,6 +265,38 @@ class WorkloadBuilder:
         self._period = range_end - range_start
 
         return self
+
+    def _deduplicate_and_construct_queries(
+        self, queries: List[Tuple[str, Optional[Engine], Optional[float]]]
+    ) -> List[Query]:
+        """
+        Deduplication is by exact string match only.
+        """
+        deduped: Dict[str, List[Optional[Tuple[Engine, float]]]] = {}
+        for q, engine, run_time_s in queries:
+            if q in deduped:
+                deduped[q].append(
+                    (engine, run_time_s)
+                    if engine is not None and run_time_s is not None
+                    else None
+                )
+            else:
+                deduped[q] = [
+                    (engine, run_time_s)
+                    if engine is not None and run_time_s is not None
+                    else None
+                ]
+
+        return [
+            Query(
+                query_str,
+                past_executions=[
+                    execution for execution in executions if execution is not None
+                ],
+                arrival_count=len(executions),
+            )
+            for query_str, executions in deduped.items()
+        ]
 
     def _deduplicate_queries(self, queries: List[str]) -> Dict[str, int]:
         """
