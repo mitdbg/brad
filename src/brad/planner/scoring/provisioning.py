@@ -144,9 +144,14 @@ def compute_redshift_transition_time_s(
         return 0.0
 
     if old.num_nodes() == 0 and new.num_nodes() > 0:
-        # Special case: Starting up a paused cluster. For now, we estimate this
-        # as an elastic resize.
-        return planner_config.redshift_elastic_resize_time_s()
+        # Special case: Starting a new cluster. We discourage the use of
+        # single-node clusters because it prevents the use of elastic resize
+        # later on. We treat 0 -> 1 as a "classic resize".
+        new_nodes = new.num_nodes()
+        if new_nodes == 1:
+            return planner_config.redshift_classic_resize_time_s()
+        else:
+            return planner_config.redshift_elastic_resize_time_s()
 
     # Some provisioning changes may take longer than others (classic vs. elastic
     # resize and also the time it takes to transfer data).
