@@ -14,6 +14,9 @@ source ../common.sh
 # TODO: This executor file should be adapted to run against the baselines too
 # (TiDB / Serverless Redshift + Aurora)
 
+initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
+heavier_queries="58,61,62,64,69"
+
 function step_txns() {
   local lo=$1
   local hi=$2
@@ -55,35 +58,40 @@ log_workload_point "brad_start_initiated"
 sleep 30
 
 # Start with 8 analytical clients.
-log_workload_point "ra_client_starting"
-start_repeating_olap_runner 8 15 5 $ra_query_indexes "ra_8"
+log_workload_point "start_rana_8"
+start_repeating_olap_runner 8 15 5 $initial_queries "ra_8"
 rana_pid=$runner_pid
 
 # Scale up to 8 transactional clients and hold for 15 minutes.
+log_workload_point "start_increase_txn_4_to_8"
 txn_sweep "4 5 6 7 8" 1 8
+log_workload_point "hold_txn_8_15_min"
 sleep $((15 * 60))
 
-# Scale up to 24 transactional clients.
+# Scale up to 28 transactional clients. Hold for 15 minutes.
+log_workload_point "start_increase_txn_12_to_28"
 kill -INT $txn_pid
 wait $txn_pid
-txn_sweep "12 16 20 24" 2 24
+txn_sweep "12 16 20 24 28" 2 28
+log_workload_point "hold_txn_28_15_min"
+sleep $((15 * 60)) 
 
-# 5 minutes
-kill -INT $rana_pid
-wait $rana_pid
-start_repeating_olap_runner 16 15 5 $ra_query_indexes "ra_16"
-rana_pid=$runner_pid
-sleep $((5 * 60))
+# 15 minutes.
+log_workload_point "start_heavy_rana_8"
+start_repeating_olap_runner 8 15 5 $heavier_queries "ra_8_heavy" 8
+heavy_rana_pid=$runner_pid
+sleep $((15 * 60))
 
-# 20 minutes
-kill -INT $rana_pid
-wait $rana_pid
-start_repeating_olap_runner 24 15 5 $ra_query_indexes "ra_24"
-rana_pid=$runner_pid
+# 20 minutes.
+log_workload_point "start_heavy_rana_20"
+kill -INT $heavy_rana_pid
+wait $heavy_rana_pid
+start_repeating_olap_runner 20 15 5 $heavier_queries "ra_20_heavy" 8
+heavy_rana_pid=$runner_pid
 sleep $((20 * 60))
 log_workload_point "experiment_workload_done"
 
 # Shut down everything now.
 >&2 echo "Experiment done. Shutting down runners..."
-graceful_shutdown $rana_pid $txn_pid
+graceful_shutdown $rana_pid $heavy_rana_pid $txn_pid
 log_workload_point "shutdown_complete"

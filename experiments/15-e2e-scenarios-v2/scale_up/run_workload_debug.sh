@@ -14,11 +14,8 @@ source ../common.sh
 # TODO: This executor file should be adapted to run against the baselines too
 # (TiDB / Serverless Redshift + Aurora)
 
-function step_txns() {
-  local lo=$1
-  local hi=$2
-  local gap_minute=$3
-}
+initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
+heavier_queries="58,61,62,64,69"
 
 # Arguments:
 # --config-file
@@ -42,7 +39,7 @@ function point_one() {
   # A: 8x
   # T: 4x
   local run_for_minutes=$1
-  start_repeating_olap_runner 8 15 5 $ra_query_indexes "ra_8"
+  start_repeating_olap_runner 8 15 5 $initial_queries "ra_8"
   rana_pid=$runner_pid
   start_txn_runner 4  # Implicit: --dataset-type
   txn_pid=$runner_pid
@@ -58,7 +55,7 @@ function point_two() {
   # A: 8x
   # T: 8x
   local run_for_minutes=$1
-  start_repeating_olap_runner 8 15 5 $ra_query_indexes "ra_8"
+  start_repeating_olap_runner 8 15 5 $initial_queries "ra_8"
   rana_pid=$runner_pid
   start_txn_runner 8  # Implicit: --dataset-type
   txn_pid=$runner_pid
@@ -72,11 +69,11 @@ function point_two() {
 
 function point_three() {
   # A: 8x
-  # T: 24x
+  # T: 28x
   local run_for_minutes=$1
-  start_repeating_olap_runner 8 15 5 $ra_query_indexes "ra_8"
+  start_repeating_olap_runner 8 15 5 $initial_queries "ra_8"
   rana_pid=$runner_pid
-  start_txn_runner 24  # Implicit: --dataset-type
+  start_txn_runner 28  # Implicit: --dataset-type
   txn_pid=$runner_pid
 
   sleep $(($run_for_minutes * 60))
@@ -88,33 +85,41 @@ function point_three() {
 
 function point_four() {
   # A: 16x
-  # T: 24x
+  # T: 28x
   local run_for_minutes=$1
-  start_repeating_olap_runner 16 15 5 $ra_query_indexes "ra_8"
+  start_repeating_olap_runner 8 15 5 $initial_queries "ra_8"
   rana_pid=$runner_pid
-  start_txn_runner 24  # Implicit: --dataset-type
+  start_repeating_olap_runner 8 15 5 $heavier_queries "ra_8_heavy" 8
+  rana_heavy_pid=$runner_pid
+  start_txn_runner 28  # Implicit: --dataset-type
   txn_pid=$runner_pid
 
   sleep $(($run_for_minutes * 60))
   kill -INT $rana_pid
+  kill -INT $rana_heavy_pid
   kill -INT $txn_pid
   wait $rana_pid
+  wait $rana_heavy_pid
   wait $txn_pid
 }
 
 function point_five() {
-  # A: 24x
-  # T: 24x
+  # A: 28x
+  # T: 28x
   local run_for_minutes=$1
-  start_repeating_olap_runner 24 15 5 $ra_query_indexes "ra_8"
+  start_repeating_olap_runner 8 15 5 $initial_queries "ra_8"
   rana_pid=$runner_pid
-  start_txn_runner 24  # Implicit: --dataset-type
+  start_repeating_olap_runner 20 15 5 $heavier_queries "ra_20_heavy" 8
+  rana_heavy_pid=$runner_pid
+  start_txn_runner 28  # Implicit: --dataset-type
   txn_pid=$runner_pid
 
   sleep $(($run_for_minutes * 60))
   kill -INT $rana_pid
+  kill -INT $rana_heavy_pid
   kill -INT $txn_pid
   wait $rana_pid
+  wait $rana_heavy_pid
   wait $txn_pid
 }
 
