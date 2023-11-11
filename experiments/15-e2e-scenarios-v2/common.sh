@@ -93,6 +93,7 @@ function start_repeating_olap_runner() {
   local ra_gap_std_s=$3
   local query_indexes=$4
   local results_name=$5
+  local client_offset=$6
 
   local args=(
     --num-clients $ra_clients
@@ -105,6 +106,10 @@ function start_repeating_olap_runner() {
 
   if [[ ! -z $ra_query_frequency_path ]]; then
     args+=(--query-frequency-path $ra_query_frequency_path)
+  fi
+
+  if [[ ! -z $client_offset ]]; then
+    args+=(--client-offset $client_offset)
   fi
 
   >&2 echo "[Repeating Analytics] Running with $ra_clients..."
