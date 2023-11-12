@@ -14,7 +14,7 @@ source ../common.sh
 # (TiDB / Serverless Redshift + Aurora)
 
 initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
-heavier_queries="58,61,62,64,69,70,71,72,73,74"
+heavier_queries="58,61,62,64,69,73,74,51,57,60"
 
 # Arguments:
 # --config-file

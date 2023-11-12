@@ -15,7 +15,7 @@ source ../common.sh
 # (TiDB / Serverless Redshift + Aurora)
 
 initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
-heavier_queries="58,61,62,64,69,70,71,72,73,74"
+heavier_queries="58,61,62,64,69,73,74,51,57,60"
 
 function step_txns() {
   local lo=$1
@@ -96,14 +96,27 @@ start_repeating_olap_runner 8 15 1 $heavier_queries "ra_8_heavy" 8
 heavy_rana_pid=$runner_pid
 sleep $((20 * 60))  # 20 mins total; 62 mins cumulative
 
-# 20 minutes.
-log_workload_point "start_heavy_rana_20"
+log_workload_point "stopping_heavy_rana_8"
 kill -INT $heavy_rana_pid
-kill -TERM $heavy_rana_pid
+sleep 5
+kill -KILL $heavy_rana_pid  # To ensure we do not get stuck.
 wait $heavy_rana_pid
+
+log_workload_point "start_heavy_rana_10"
+start_repeating_olap_runner 10 5 1 $heavier_queries "ra_10_heavy" 8
+heavy_rana_pid=$runner_pid
+sleep $((10 * 60))  # 10 mins total; 72 mins cumulative
+
+log_workload_point "stopping_heavy_rana_10"
+kill -INT $heavy_rana_pid
+sleep 5
+kill -KILL $heavy_rana_pid  # To ensure we do not get stuck.
+wait $heavy_rana_pid
+
+log_workload_point "start_heavy_rana_20"
 start_repeating_olap_runner 20 5 1 $heavier_queries "ra_20_heavy" 8
 heavy_rana_pid=$runner_pid
-sleep $((40 * 60))  # 40 mins total; 102 mins cumulative
+sleep $((30 * 60))  # 30 mins total; 102 mins cumulative
 
 log_workload_point "experiment_workload_done"
 
