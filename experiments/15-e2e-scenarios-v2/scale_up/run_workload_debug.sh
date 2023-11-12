@@ -1,5 +1,4 @@
 #! /bin/bash
-
 script_loc=$(cd $(dirname $0) && pwd -P)
 cd $script_loc
 source ../common.sh
@@ -15,7 +14,7 @@ source ../common.sh
 # (TiDB / Serverless Redshift + Aurora)
 
 initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
-heavier_queries="58,61,62,64,69"
+heavier_queries="58,61,62,64,69,70,71,72,73,74"
 
 # Arguments:
 # --config-file
@@ -107,9 +106,9 @@ function point_five() {
   # A: 28x
   # T: 28x
   local run_for_minutes=$1
-  start_repeating_olap_runner 8 15 5 $initial_queries "ra_8"
+  start_repeating_olap_runner 8 2 1 $initial_queries "ra_8"
   rana_pid=$runner_pid
-  start_repeating_olap_runner 20 15 5 $heavier_queries "ra_20_heavy" 8
+  start_repeating_olap_runner 32 2 1 $heavier_queries "ra_24_heavy" 8
   rana_heavy_pid=$runner_pid
   start_txn_runner 28  # Implicit: --dataset-type
   txn_pid=$runner_pid
@@ -125,9 +124,9 @@ function point_five() {
 
 echo "READY -- Running for 1 hour. Hit Ctrl-C to stop."
 # point_one 60
-point_two 60
+# point_two 60
 # point_three 60
 # point_four 60
-# point_five 60
+point_five 60
 
 inner_cancel_experiment
