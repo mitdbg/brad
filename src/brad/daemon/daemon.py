@@ -392,7 +392,7 @@ class BradDaemon:
             if self._planner is not None:
                 self._planner.set_disable_triggers(disable=True)
             self._transition_orchestrator = TransitionOrchestrator(
-                self._config, self._blueprint_mgr
+                self._config, self._blueprint_mgr, self._system_event_logger
             )
             self._transition_task = asyncio.create_task(self._run_transition_part_one())
 
