@@ -306,8 +306,13 @@ class BradFrontEnd(BradInterface):
             query_rep = QueryRep(query)
             if query_rep.is_transaction_start():
                 session.set_in_transaction(True)
-            assert self._router is not None
-            engine_to_use = await self._router.engine_for(query_rep, session)
+
+            if query.startswith("SET SESSION"):
+                # Support for setting transaction isolation level (temporary).
+                engine_to_use = Engine.Aurora
+            else:
+                assert self._router is not None
+                engine_to_use = await self._router.engine_for(query_rep, session)
 
             log_verbose(
                 logger,

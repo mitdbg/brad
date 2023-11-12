@@ -65,6 +65,7 @@ sleep 30
 log_workload_point "start_rana_8"
 start_repeating_olap_runner 8 15 5 $initial_queries "ra_8"
 rana_pid=$runner_pid
+sleep 2
 
 # Scale up to 8 transactional clients and hold for 15 minutes.
 log_workload_point "start_increase_txn_4_to_8"
