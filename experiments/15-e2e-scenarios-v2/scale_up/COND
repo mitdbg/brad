@@ -1,7 +1,5 @@
 include("../common.cond")
 
-aurora_alt = [99, 56, 32, 92, 91, 49, 30, 83, 94, 38, 87, 86, 76, 37, 31, 46]
-
 run_experiment(
   name="brad_100g",
   run="./run_workload.sh",
@@ -10,9 +8,8 @@ run_experiment(
     "config-file": "config/config_large_100.yml",
     "planner-config-file": "config/planner.yml",
     "schema-name": "imdb_extended_100g",
-    "ra-query-indexes": ",".join(map(str, aurora_alt)),
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "num-front-ends": 24,
+    "num-front-ends": 28,
     "dataset-type": "100gb",
   },
 )
@@ -25,9 +22,8 @@ run_command(
     "config-file": "config/config_large_100.yml",
     "planner-config-file": "config/planner.yml",
     "schema-name": "imdb_extended_100g",
-    "ra-query-indexes": ",".join(map(str, aurora_alt)),
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "num-front-ends": 24,
+    "num-front-ends": 28,
     "dataset-type": "100gb",
   },
 )

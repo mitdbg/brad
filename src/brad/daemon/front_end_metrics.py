@@ -205,7 +205,8 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             fe_index
         ].add_sample(report.txn_latency_sketch(), now)
 
-        logger.debug(
+        log_verbose(
+            logger,
             "Received metrics report: [%d] %f (ts: %s)",
             report.fe_index,
             report.txn_completions_per_s,
