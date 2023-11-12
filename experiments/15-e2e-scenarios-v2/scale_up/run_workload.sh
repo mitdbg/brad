@@ -99,10 +99,11 @@ sleep $((20 * 60))  # 20 mins total; 62 mins cumulative
 # 20 minutes.
 log_workload_point "start_heavy_rana_20"
 kill -INT $heavy_rana_pid
+kill -TERM $heavy_rana_pid
 wait $heavy_rana_pid
 start_repeating_olap_runner 20 5 1 $heavier_queries "ra_20_heavy" 8
 heavy_rana_pid=$runner_pid
-sleep $((20 * 60))  # 20 mins total; 82 mins cumulative
+sleep $((40 * 60))  # 40 mins total; 102 mins cumulative
 
 log_workload_point "experiment_workload_done"
 
