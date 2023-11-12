@@ -15,7 +15,7 @@ source ../common.sh
 # (TiDB / Serverless Redshift + Aurora)
 
 initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
-heavier_queries="58,61,62,64,69"
+heavier_queries="58,61,62,64,69,70,71,72,73,74"
 
 function step_txns() {
   local lo=$1
@@ -39,7 +39,7 @@ function txn_sweep() {
     txn_pid=$runner_pid
 
     sleep $(($gap_minute * 60))
-    if [[ ! -z $keep_last ]] && [[ $t_clients = $keep_last ]]; then
+    if [[ -z $keep_last ]] || [[ $t_clients != $keep_last ]]; then
       kill -INT $txn_pid
       wait $txn_pid
     fi
@@ -47,7 +47,11 @@ function txn_sweep() {
 }
 
 function inner_cancel_experiment() {
-  cancel_experiment $rana_pid $txn_pid
+  if [ ! -z $heavy_rana_pid ]; then
+    cancel_experiment $rana_pid $txn_pid $heavy_rana_pid
+  else
+    cancel_experiment $rana_pid $txn_pid
+  fi
 }
 
 trap "inner_cancel_experiment" INT
@@ -78,7 +82,7 @@ sleep $((15 * 60))
 
 # 15 minutes.
 log_workload_point "start_heavy_rana_8"
-start_repeating_olap_runner 8 15 5 $heavier_queries "ra_8_heavy" 8
+start_repeating_olap_runner 8 5 1 $heavier_queries "ra_8_heavy" 8
 heavy_rana_pid=$runner_pid
 sleep $((15 * 60))
 
@@ -86,7 +90,7 @@ sleep $((15 * 60))
 log_workload_point "start_heavy_rana_20"
 kill -INT $heavy_rana_pid
 wait $heavy_rana_pid
-start_repeating_olap_runner 20 15 5 $heavier_queries "ra_20_heavy" 8
+start_repeating_olap_runner 20 5 1 $heavier_queries "ra_20_heavy" 8
 heavy_rana_pid=$runner_pid
 sleep $((20 * 60))
 log_workload_point "experiment_workload_done"

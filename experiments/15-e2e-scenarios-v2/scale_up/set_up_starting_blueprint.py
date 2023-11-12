@@ -64,7 +64,7 @@ def main():
         "--redshift-queries", type=str, help="Comma separated list of indices."
     )
     args = parser.parse_args()
-    set_up_logging()
+    set_up_logging(debug_mode=True)
 
     # 1. Load the config.
     config = ConfigFile.load(args.config_file)
