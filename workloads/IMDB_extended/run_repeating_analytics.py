@@ -120,6 +120,7 @@ def runner(
         query_order = query_order_main.copy()
 
         # Signal that we're ready to start and wait for the controller.
+        print(f"Runner {runner_idx} is ready to start running.")
         start_queue.put_nowait("")
         msg = stop_queue.get()
 

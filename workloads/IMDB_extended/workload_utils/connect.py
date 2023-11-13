@@ -49,8 +49,11 @@ def connect_to_db(
 
     else:
         port_offset = (worker_index + args.client_offset) % args.num_front_ends
-        brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
+        port = args.brad_port + port_offset
+        print(f"[{worker_index}] Connecting to BRAD at {args.brad_host}:{port}")
+        brad = BradGrpcClient(args.brad_host, port)
         brad.connect()
+        print(f"[{worker_index}] Connected to BRAD.")
         db = BradDatabase(brad)
 
     return db
