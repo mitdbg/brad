@@ -122,7 +122,7 @@ class BradRawGrpcClient:
     def start_session(self) -> SessionId:
         assert self._stub is not None
         result = self._stub.StartSession(b.StartSessionRequest())
-        msg_kind = result.WhichOneOf("result")
+        msg_kind = result.WhichOneof("result")
         if msg_kind is None:
             raise BradClientError(
                 message="BRAD RPC error: Unspecified start session result."
