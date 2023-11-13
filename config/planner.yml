@@ -8,10 +8,7 @@ planning_window:
   hours: 0
   minutes: 5
 
-# Each second in the previous workload is treated as 12 seconds (so a 5 min
-# planning window is treated as 60 mins). This is to make scenario run times
-# more managable.
-reinterpret_second_as: 12
+reinterpret_second_as: 1
 
 # The query distribution must change by at least this much for a new blueprint
 # to be accepted.
