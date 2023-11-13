@@ -18,6 +18,7 @@ from brad.asset_manager import AssetManager
 from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
+from brad.connection.connection import ConnectionFailed
 from brad.daemon.monitor import Monitor
 from brad.daemon.messages import (
     ShutdownFrontEnd,
@@ -262,8 +263,24 @@ class BradFrontEnd(BradInterface):
             self._estimator = None
 
     async def start_session(self) -> SessionId:
-        session_id, _ = await self._sessions.create_new_session()
-        return session_id
+        rand_backoff = None
+        while True:
+            try:
+                session_id, _ = await self._sessions.create_new_session()
+                return session_id
+            except ConnectionFailed:
+                if rand_backoff is None:
+                    rand_backoff = RandomizedExponentialBackoff(
+                        max_retries=10, base_delay_s=0.5, max_delay_s=10.0
+                    )
+                time_to_wait = rand_backoff.wait_time_s()
+                if time_to_wait is None:
+                    logger.exception(
+                        "Failed to start a new session due to a repeated "
+                        "connection failure (10 retries)."
+                    )
+                    raise
+                await asyncio.sleep(time_to_wait)
 
     async def end_session(self, session_id: SessionId) -> None:
         await self._sessions.end_session(session_id)
