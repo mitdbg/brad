@@ -93,6 +93,7 @@ def runner(
         query_frequency = query_frequency[queries]
         query_frequency = query_frequency / np.sum(query_frequency)
 
+    exec_count = 0
     file = open(
         out_dir / "repeating_olap_batch_{}.csv".format(runner_idx),
         "w",
@@ -181,7 +182,12 @@ def runner(
                     file=file,
                     flush=True,
                 )
+                exec_count += 1
                 rand_backoff = None
+
+                if exec_count % 20 == 0:
+                    # To avoid data loss if this script crashes.
+                    os.fsync(file.fileno())
 
             except BradClientError as ex:
                 if ex.is_transient():
@@ -217,12 +223,16 @@ def runner(
 
             try:
                 _ = stop_queue.get_nowait()
+                print(f"Runner {runner_idx} is exiting.")
                 break
             except queue.Empty:
                 pass
     finally:
+        os.fsync(file.fileno())
         file.close()
         database.close_sync()
+        # Make sure the queue is drained.
+        _ = stop_queue.get_nowait()
 
 
 def simulation_runner(
