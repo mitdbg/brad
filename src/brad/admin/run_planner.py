@@ -25,7 +25,7 @@ from brad.planner.scoring.performance.precomputed_predictions import (
 from brad.planner.triggers.provider import EmptyTriggerProvider
 from brad.planner.triggers.trigger import Trigger
 from brad.planner.metrics import (
-    MetricsFromMonitor,
+    WindowedMetricsFromMonitor,
     FixedMetricsProvider,
     Metrics,
     MetricsProvider,
@@ -220,7 +220,9 @@ async def run_planner_impl(args) -> None:
             now,
         )
     else:
-        metrics_provider = MetricsFromMonitor(monitor, blueprint_mgr)
+        metrics_provider = WindowedMetricsFromMonitor(
+            monitor, blueprint_mgr, config, planner_config
+        )
 
     if config.routing_policy == RoutingPolicy.ForestTableSelectivity:
         pe = asyncio.run(PostgresEstimator.connect(args.schema_name, config))

@@ -37,7 +37,7 @@ from brad.planner.abstract import BlueprintPlanner
 from brad.planner.compare.provider import PerformanceCeilingComparatorProvider
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
-from brad.planner.metrics import MetricsFromMonitor
+from brad.planner.metrics import WindowedMetricsFromMonitor
 from brad.planner.providers import BlueprintProviders
 from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.provider import DataAccessProvider
@@ -202,7 +202,9 @@ class BradDaemon:
             ),
             analytics_latency_scorer=latency_scorer,
             comparator_provider=comparator_provider,
-            metrics_provider=MetricsFromMonitor(self._monitor, self._blueprint_mgr),
+            metrics_provider=WindowedMetricsFromMonitor(
+                self._monitor, self._blueprint_mgr, self._config, self._planner_config
+            ),
             data_access_provider=data_access_provider,
             estimator_provider=self._estimator_provider,
             trigger_provider=ConfigDefinedTriggers(
