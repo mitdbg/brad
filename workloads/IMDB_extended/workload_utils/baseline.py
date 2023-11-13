@@ -106,7 +106,21 @@ class TiDBLoader:
         return load_cmd
 
 
+    def manual_replicate_flash(self, dataset):
+        schema = load_schema_json(dataset)
+        for t in schema.tables:
+            q = f"ALTER TABLE {t} SET TIFLASH REPLICA 1"
+            self.submit_query(q, until_success=True)
 
+
+    def manual_count_all(self, dataset):
+        schema = load_schema_json(dataset)
+        for t in schema.tables:
+            q = f"SELECT COUNT(*) FROM {t}"
+            cur = self.conn.cursor()
+            cur.execute(q)
+            count = cur.fetchone()[0]
+            print(f"Count for {t}: {count}")
 
     def load_database(self, dataset, force=False, load_from: str = ""):
         # First, check existence.
@@ -216,84 +230,86 @@ class PostgresCompatibleLoader:
             self.conn.commit()
 
 
-    def manual_unload(self, dataset, do_unload=True, specific_table=None, start_chunk=0, end_chunk=0):
-        # Manual unload for use by TiDB.
-        schema = load_schema_json(dataset)
-        s3 = boto3.client("s3")
-        for t in schema.tables:
-            if specific_table is not None  and t != specific_table:
-                continue
-            start_t = time.perf_counter()
-            path_prefix = f"s3://{self.s3_bucket}/imdb_extended/test.{t}."
-            if do_unload:
-                unload_cmd = f"""
-                    UNLOAD ('select * from {t}')
-                    to '{path_prefix}'
-                    iam_role '{self.iam_role}'
-                    CSV DELIMITER AS '|'
-                    HEADER
-                    NULL AS  '\\N'
-                    MAXFILESIZE 1 GB
-                    PARALLEL OFF
-                """
-                self.submit_query(unload_cmd, until_success=True)
-            if start_chunk >= end_chunk:
-                continue
-            # Append csv to all path prefixes.
-            objects = s3.list_objects_v2(Bucket=self.s3_bucket, Prefix=f"imdb_extended/test.{t}.")
-            print(f"List Res: {objects}")
-            if "Contents" not in objects:
-                print(f"Unloaded {t} in {time.perf_counter() - start_t:.2f} secs")
-                continue
-            objects = objects["Contents"]
-            start_chunk_key = f"imdb_extended/test.{t}.{start_chunk:03d}"
-            end_chunk_key = f"imdb_extended/test.{t}.{end_chunk:03d}"
-            all_keys = set([obj["Key"] for obj in objects])
-            for obj in objects:
-                source_key = obj["Key"]
-                target_key = source_key + ".csv"
-                if source_key >= start_chunk_key and source_key < end_chunk_key:
-                    if source_key.endswith(".csv") or target_key in all_keys:
-                        continue
-                    # Copy to the target key.
-                    copy_source = {"Bucket": self.s3_bucket, "Key": source_key}
-                    print(f"Copying {source_key} to {target_key}")
-                    s3.copy_object(Bucket=self.s3_bucket, Key=target_key, CopySource=copy_source)
-                if source_key < start_chunk_key or source_key >= end_chunk_key:
-                    # Delete the target object.
-                    if target_key not in all_keys:
-                        continue
-                    print(f"Deleting {target_key}")
-                    s3.delete_object(Bucket=self.s3_bucket, Key=target_key)
-            print(f"Unloaded {t} in {time.perf_counter() - start_t:.2f} secs")
+    # def manual_unload(self, dataset, do_unload=True, specific_table=None, start_chunk=0, end_chunk=0):
+    #     # Manual unload for use by TiDB.
+    #     schema = load_schema_json(dataset)
+    #     s3 = boto3.client("s3")
+    #     for t in schema.tables:
+    #         if specific_table is not None  and t != specific_table:
+    #             continue
+    #         start_t = time.perf_counter()
+    #         path_prefix = f"s3://{self.s3_bucket}/imdb_extended/test.{t}."
+    #         if do_unload:
+    #             unload_cmd = f"""
+    #                 UNLOAD ('select * from {t}')
+    #                 to '{path_prefix}'
+    #                 iam_role '{self.iam_role}'
+    #                 CSV DELIMITER AS '|'
+    #                 HEADER
+    #                 NULL AS  '\\N'
+    #                 MAXFILESIZE 1 GB
+    #                 PARALLEL OFF
+    #             """
+    #             self.submit_query(unload_cmd, until_success=True)
+    #         # Append csv to all path prefixes.
+    #         objects = s3.list_objects_v2(Bucket=self.s3_bucket, Prefix=f"imdb_extended/test.{t}.")
+    #         print(f"List Res: {objects}")
+    #         if "Contents" not in objects:
+    #             print(f"Unloaded {t} in {time.perf_counter() - start_t:.2f} secs")
+    #             continue
+    #         objects = objects["Contents"]
+    #         start_chunk_key = f"imdb_extended/test.{t}.{start_chunk:03d}"
+    #         end_chunk_key = f"imdb_extended/test.{t}.{end_chunk:03d}"
+    #         all_keys = set([obj["Key"] for obj in objects])
+    #         for obj in objects:
+    #             source_key = obj["Key"]
+    #             target_key = source_key + ".csv"
+    #             if start_chunk == -1 and end_chunk == -1:
+    #                 print(f"Deleting {source_key}")
+    #                 s3.delete_object(Bucket=self.s3_bucket, Key=source_key)
+    #                 continue
+    #             if source_key >= start_chunk_key and source_key < end_chunk_key:
+    #                 if source_key.endswith(".csv") or target_key in all_keys:
+    #                     continue
+    #                 # Copy to the target key.
+    #                 copy_source = {"Bucket": self.s3_bucket, "Key": source_key}
+    #                 print(f"Copying {source_key} to {target_key}")
+    #                 s3.copy_object(Bucket=self.s3_bucket, Key=target_key, CopySource=copy_source)
+    #             if source_key < start_chunk_key or source_key >= end_chunk_key:
+    #                 # Delete the target object.
+    #                 if target_key not in all_keys:
+    #                     continue
+    #                 print(f"Deleting {target_key}")
+    #                 s3.delete_object(Bucket=self.s3_bucket, Key=target_key)
+    #         print(f"Unloaded {t} in {time.perf_counter() - start_t:.2f} secs")
 
 
 
-
-
-    def manually_copy_s3_data(self, dataset):
-        schema = load_schema_json(dataset)
-        s3 = boto3.resource("s3")
-        # Hacky: relies on specifc ordering
-        reached_title = False
-        for t in schema.tables:
-            if t == "title":
-                reached_title = True
-            if reached_title:
-                source_dir = "imdb_100G"
-            else:
-                source_dir = "imdb_extended_100g"
-            source_key = f"{source_dir}/{t}/{t}.csv"
-            target_key = f"imdb_extended/{t}/{t}.csv"
-            copy_source = {"Bucket": "geoffxy-research", "Key": source_key}
-            print(f"Copying {t}")
-            start_t = time.perf_counter()
-            # s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
-            # print(f"Copied {t} in {time.perf_counter() - start_t:.2f} secs")
-            # For tidb
-            target_key = f"imdb_extended/test.{t}.csv"
-            s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
-            print(f"Copied {t} in {time.perf_counter() - start_t:.2f} secs")
+    # def manually_copy_s3_data(self, dataset):
+    #     schema = load_schema_json(dataset)
+    #     s3 = boto3.resource("s3")
+    #     # Hacky: relies on specifc ordering
+    #     reached_title = False
+    #     for t in schema.tables:
+    #         if t == "title":
+    #             reached_title = True
+    #         if reached_title:
+    #             source_dir = "imdb_100G"
+    #         else:
+    #             source_dir = "imdb_extended_100g"
+    #         source_key = f"{source_dir}/{t}/{t}.csv"
+    #         target_key = f"imdb_extended/{t}/{t}.csv"
+    #         copy_source = {"Bucket": "geoffxy-research", "Key": source_key}
+    #         print(f"Copying {t}")
+    #         start_t = time.perf_counter()
+    #         # s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
+    #         # print(f"Copied {t} in {time.perf_counter() - start_t:.2f} secs")
+    #         # For tidb
+    #         if t in ["cast_info", "title", "name", "person_info", "showings", "ticket_orders", "movie_info", "char_name"]:
+    #             continue
+    #         target_key = f"imdb_extended/test.{t}.csv"
+    #         s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
+    #         print(f"Copied {t} in {time.perf_counter() - start_t:.2f} secs")
 
 
 
@@ -336,6 +352,7 @@ class PostgresCompatibleLoader:
         schema = load_schema_json(dataset)
         for t in schema.tables:
             self.reset_aurora_seq_nums(t)
+
 
     def load_database(self, dataset, force=False, load_from: str = ""):
         # First, check existence.
@@ -424,8 +441,9 @@ class PostgresCompatibleLoader:
 
 
 if __name__ == "__main__":
-    baseline = PostgresCompatibleLoader(engine="redshift")
-    baseline.manual_unload("imdb_extended", specific_table="ticket_orders", do_unload=False, start_chunk=0, end_chunk=100)
+    baseline = TiDBLoader()
+    # baseline.manual_unload("imdb_extended", do_unload=False, start_chunk=-1, end_chunk=-1)
+    baseline.manual_count_all("imdb_extended")
     # import sys
 
     # if len(sys.argv) > 1 and sys.argv[1] == "reset":

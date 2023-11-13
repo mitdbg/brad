@@ -70,7 +70,7 @@ function start_repeating_olap_runner() {
     --query-bank-file $ra_query_bank_file
     --avg-gap-s $ra_gap_s
     --avg-gap-std-s $ra_gap_std_s
-    --baseline "redshift"
+    --baseline $ANALYTICS_ENGINE
     --output-dir $results_dir
   )
 
@@ -98,7 +98,7 @@ function start_txn_runner() {
   python3 workloads/IMDB_extended/run_transactions.py \
     --num-clients $t_clients \
     --output-dir $results_dir \
-    --baseline "aurora" \
+    --baseline $TRANSACTION_ENGINE \
     &
 
   # This is a special return value variable that we use.

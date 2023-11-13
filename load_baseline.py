@@ -16,17 +16,19 @@ def main():
     parser.add_argument("--force_load", default=False, action="store_true")
     parser.add_argument("--load_from", default="")
     parser.add_argument("--run_query", default=None)
+    parser.add_argument("--run_all", default=False, action="store_true")
     parser.add_argument("--engine", default="tidb")
     args = parser.parse_args()
     if args.engine == "tidb":
+        # TIDB loaded manually
         loader = TiDBLoader()
     else:
         loader = PostgresCompatibleLoader(engine=args.engine)
-    loader.load_database(
-        dataset=args.dataset,
-        force=args.force_load,
-        load_from=args.load_from,
-    )
+        loader.load_database(
+            dataset=args.dataset,
+            force=args.force_load,
+            load_from=args.load_from,
+        )
     if args.run_query is not None:
         cur = loader.conn.cursor()
         print(f"Executing: {args.run_query}")
@@ -39,7 +41,34 @@ def main():
             print(r)
         print(f"Execution took: {end_time-start_time}s")
         loader.conn.commit()
-
+    if args.run_all:
+        query_bank = "workloads/IMDB_100GB/regular_test/queries.sql"
+        with open(query_bank, "r", encoding="utf-8") as f:
+            queries = f.read().split(";")
+        num_success = 0
+        num_fail = 0
+        fails = []
+        for i, q in enumerate(queries):
+            try:
+                cur = loader.conn.cursor()
+                print(f"Executing: {q}")
+                start_time = time.perf_counter()
+                cur.execute(q)
+                res = cur.fetchall()
+                end_time = time.perf_counter()
+                print(f"Result length: {len(res)}")
+                for r in res:
+                    print(r)
+                print(f"Execution took: {end_time-start_time}s")
+                loader.conn.commit()
+                num_success += 1
+            except Exception as e:
+                print(f"Error: {e}")
+                loader.conn.rollback()
+                num_fail += 1
+                fails.append((i, f"Error: {e}"))
+        print(f"Success: {num_success}, Fail: {num_fail}")
+        print(f"Fails: \n{fails}")
 
 if __name__ == "__main__":
     main()

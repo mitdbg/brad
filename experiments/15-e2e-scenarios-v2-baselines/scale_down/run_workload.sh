@@ -1,7 +1,10 @@
 #! /bin/bash
 
 EXPT_OUT="expt_out"
+ANALYTICS_ENGINE="tidb"
+TRANSACTION_ENGINE="tidb"
 script_loc=$(cd $(dirname $0) && pwd -P)
+total_second_phase_time_s=3600
 source $script_loc/../common.sh
 
 # TODO: This executor file should be adapted to run against the baselines too
@@ -45,11 +48,8 @@ trap "inner_cancel_experiment" TERM
 # - Turn off Redshift
 # Detection time is ~5 minutes
 # Transition time is ~7 minutes
-total_second_phase_time_s="$((60 * 60))"
 wait_start="$(date -u +%s)"
 
-poll_file_for_event $COND_OUT/brad_daemon_events.csv "post_transition_completed" 45
-log_workload_point "after_replan"
 
 wait_end="$(date -u +%s)"
 transition_elapsed_s="$(($wait_end - $wait_start))"

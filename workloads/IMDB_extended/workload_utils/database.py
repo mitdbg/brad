@@ -46,15 +46,11 @@ class PyodbcDatabase(Database):
                 cursor = self._cursor
             # Exec
             cursor.execute(query)
-            if (
-                cursor.rowcount is None
-                or cursor.rowcount <= 0
-                or not (query.strip().lower().startswith("SELECT"))
-            ):
-                rows = []
-            else:
-                print(f"Rows: {cursor.rowcount}. Q: {query}")
+            if query.strip().lower().startswith("select") or (cursor.rowcount is not None and cursor.rowcount > 0):
+                # print(f"Rows: {cursor.rowcount}. Q: {query}")
                 rows = cursor.fetchall()
+            else:
+                rows = []
             # Close if newly opened.
             if not had_cursor:
                 cursor.close()

@@ -161,6 +161,8 @@ def runner(
 
                     start = time.time()
                     _, engine = database.execute_sync_with_engine(query)
+                    if engine is None:
+                        engine = "tidb"
                     if not isinstance(engine, str):
                         engine = engine.value
                     end = time.time()
@@ -484,7 +486,7 @@ def main():
     parser.add_argument(
         "--time-scale-factor",
         type=int,
-        default=100,
+        default=50,
         help="trace 1s of simulation as X seconds in real-time to match the num-concurrent-query",
     )
     parser.add_argument("--query-indexes", type=str)
