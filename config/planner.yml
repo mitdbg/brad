@@ -110,6 +110,7 @@ athena_load_rate_mb_per_s: 10.0
 s3_usd_per_mb_per_month: 0.000023
 aurora_regular_usd_per_mb_per_month: 0.00010
 aurora_io_opt_usd_per_mb_per_month: 0.000225
+aurora_storage_index_multiplier: 3.0
 
 ###
 ### Dataset-specific Transition Constants
