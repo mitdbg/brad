@@ -14,6 +14,20 @@ run_experiment(
   },
 )
 
+run_experiment(
+  name="brad_100g_2",
+  run="./run_workload_2.sh",
+  options={
+    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
+    "config-file": "config/config_large_100.yml",
+    "planner-config-file": "config/planner.yml",
+    "schema-name": "imdb_extended_100g",
+    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+    "num-front-ends": 28,
+    "dataset-type": "100gb",
+  },
+)
+
 run_command(
   name="brad_100g_debug",
   run="./run_workload_debug.sh",

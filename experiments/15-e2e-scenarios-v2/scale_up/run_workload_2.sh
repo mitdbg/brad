@@ -67,34 +67,17 @@ start_repeating_olap_runner 8 15 5 $initial_queries "ra_8"
 rana_pid=$runner_pid
 sleep 2
 
-# Start with 4 transactional clients; hold for 10 minutes to stabilize.
-log_workload_point "start_txn_4"
+# Start with 8 transactional clients; hold for 10 minutes to stabilize.
+log_workload_point "start_txn_8"
 start_txn_runner 4
 txn_pid=$runner_pid
 sleep $((10 * 60))
-
-# Scale up to 8 transactional clients and hold for 20 minutes.
-log_workload_point "start_increase_txn_4_to_8"
-kill -INT $txn_pid
-wait $txn_pid
-txn_sweep "5 6 7 8" 3 8
-log_workload_point "hold_txn_8_20_min"
-sleep $((20 * 60))  # 32 mins total; 42 mins cumulative
-
-# Disabled for now - this will take too long.
-# Scale up to 28 transactional clients. Hold for 15 minutes.
-# log_workload_point "start_increase_txn_12_to_28"
-# kill -INT $txn_pid
-# wait $txn_pid
-# txn_sweep "12 16 20 24 28" 2 28
-# log_workload_point "hold_txn_28_15_min"
-# sleep $((15 * 60))
 
 # 20 minutes.
 log_workload_point "start_heavy_rana_8"
 start_repeating_olap_runner 8 15 1 $heavier_queries "ra_8_heavy" 8
 heavy_rana_pid=$runner_pid
-sleep $((20 * 60))  # 20 mins total; 62 mins cumulative
+sleep $((20 * 60))  # 20 mins total; 30 mins cumulative
 
 log_workload_point "stopping_heavy_rana_8"
 kill -INT $heavy_rana_pid
@@ -103,7 +86,7 @@ wait $heavy_rana_pid
 log_workload_point "start_heavy_rana_10"
 start_repeating_olap_runner 10 5 1 $heavier_queries "ra_10_heavy" 8
 heavy_rana_pid=$runner_pid
-sleep $((10 * 60))  # 10 mins total; 72 mins cumulative
+sleep $((10 * 60))  # 10 mins total; 40 mins cumulative
 
 log_workload_point "stopping_heavy_rana_10"
 kill -INT $heavy_rana_pid
@@ -112,7 +95,7 @@ wait $heavy_rana_pid
 log_workload_point "start_heavy_rana_20"
 start_repeating_olap_runner 20 5 1 $heavier_queries "ra_20_heavy" 8
 heavy_rana_pid=$runner_pid
-sleep $((30 * 60))  # 30 mins total; 102 mins cumulative
+sleep $((30 * 60))  # 30 mins total; 70 mins cumulative
 
 log_workload_point "experiment_workload_done"
 

@@ -254,8 +254,20 @@ class BlueprintCandidate(ComparableBlueprint):
                 planner_config=ctx.planner_config,
             )
 
-        # Table movement costs that this query imposes.
+        # Storage costs and table movement that this query imposes.
         for name, next_placement in table_diffs:
+            # If we added a table to Athena or Aurora, we need to take into
+            # account its storage costs.
+            if (next_placement & EngineBitmapValues[Engine.Athena]) != 0:
+                # We added the table to Athena.
+                self.storage_cost += compute_single_athena_table_cost(name, ctx)
+
+            if (next_placement & EngineBitmapValues[Engine.Aurora]) != 0:
+                # Added table to Aurora.
+                # You only pay for 1 copy of the table on Aurora, regardless of
+                # how many read replicas you have.
+                self.storage_cost += compute_single_aurora_table_cost(name, ctx)
+
             curr = ctx.current_blueprint.table_locations_bitmap()[name]
             if ((~curr) & next_placement) == 0:
                 # This table was already present on the engine.
@@ -266,18 +278,6 @@ class BlueprintCandidate(ComparableBlueprint):
             )
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
-
-            # If we added a table to Athena or Aurora, we need to take into
-            # account its storage costs.
-            if (((~curr) & next_placement) & (EngineBitmapValues[Engine.Athena])) != 0:
-                # We added the table to Athena.
-                self.storage_cost += compute_single_athena_table_cost(name, ctx)
-
-            if (((~curr) & next_placement) & (EngineBitmapValues[Engine.Aurora])) != 0:
-                # Added table to Aurora.
-                # You only pay for 1 copy of the table on Aurora, regardless of
-                # how many read replicas you have.
-                self.storage_cost += compute_single_aurora_table_cost(name, ctx)
 
         # Adding a new query can affect the feasibility of the provisioning.
         self.feasibility = BlueprintFeasibility.Unchecked
@@ -365,6 +365,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
     def add_transactional_tables(self, ctx: ScoringContext) -> None:
         referenced_tables = set()
+        newly_added = set()
 
         # Make sure that tables referenced in transactions are present on
         # Aurora.
@@ -373,8 +374,16 @@ class BlueprintCandidate(ComparableBlueprint):
                 if tbl not in self.table_placements:
                     # This is a CTE.
                     continue
+                orig = self.table_placements[tbl]
                 self.table_placements[tbl] |= EngineBitmapValues[Engine.Aurora]
                 referenced_tables.add(tbl)
+
+                if ((~orig) & self.table_placements[tbl]) != 0:
+                    newly_added.add(tbl)
+
+        # Account for storage costs (Aurora only charges for 1 copy).
+        for tbl in newly_added:
+            self.storage_cost += compute_single_aurora_table_cost(tbl, ctx)
 
         # Update the table movement score if needed.
         for tbl in referenced_tables:

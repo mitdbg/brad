@@ -190,6 +190,18 @@ class BlueprintCandidate(ComparableBlueprint):
                 changed_tables.append(table_name)
                 changed = True
 
+            # If we added the table to Athena or Aurora, we need to take into
+            # account its storage costs.
+            if (((~cur) & nxt) & (EngineBitmapValues[Engine.Athena])) != 0:
+                # We added the table to Athena.
+                self.storage_cost += compute_single_athena_table_cost(table_name, ctx)
+
+            if (((~cur) & nxt) & (EngineBitmapValues[Engine.Aurora])) != 0:
+                # Added table to Aurora.
+                # You only pay for 1 copy of the table on Aurora, regardless of
+                # how many read replicas you have.
+                self.storage_cost += compute_single_aurora_table_cost(table_name, ctx)
+
         # Update movement scoring.
         self._update_movement_score(changed_tables, ctx)
 
@@ -295,6 +307,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
     def add_transactional_tables(self, ctx: ScoringContext) -> None:
         referenced_tables = set()
+        newly_added = set()
 
         # Make sure that tables referenced in transactions are present on
         # Aurora.
@@ -303,8 +316,16 @@ class BlueprintCandidate(ComparableBlueprint):
                 if tbl not in self.table_placements:
                     # This is a CTE.
                     continue
+                orig = self.table_placements[tbl]
                 self.table_placements[tbl] |= EngineBitmapValues[Engine.Aurora]
                 referenced_tables.add(tbl)
+
+                if ((~orig) & self.table_placements[tbl]) != 0:
+                    newly_added.add(tbl)
+
+        for tbl in newly_added:
+            # Aurora only charges for 1 copy of the data.
+            self.storage_cost += compute_single_aurora_table_cost(tbl, ctx)
 
         # If we made a change to the table placement, see if it corresponds to a
         # table score change.
@@ -322,18 +343,6 @@ class BlueprintCandidate(ComparableBlueprint):
             result = compute_single_table_movement_time_and_cost(tbl, cur, nxt, ctx)
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
-
-            # If we added the table to Athena or Aurora, we need to take into
-            # account its storage costs.
-            if (((~cur) & nxt) & (EngineBitmapValues[Engine.Athena])) != 0:
-                # We added the table to Athena.
-                self.storage_cost += compute_single_athena_table_cost(tbl, ctx)
-
-            if (((~cur) & nxt) & (EngineBitmapValues[Engine.Aurora])) != 0:
-                # Added table to Aurora.
-                # You only pay for 1 copy of the table on Aurora, regardless of
-                # how many read replicas you have.
-                self.storage_cost += compute_single_aurora_table_cost(tbl, ctx)
 
     def try_to_make_feasible_if_needed(self, ctx: ScoringContext) -> None:
         """

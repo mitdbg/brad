@@ -103,6 +103,33 @@ class Workload:
         self._table_sizes_mb: Dict[Tuple[str, Engine], int] = {}
         self._dataset_size_mb = 0
 
+    def add_priming_analytical_query(self, query_str: str) -> None:
+        """
+        Used to add queries to the workload that should be used during planning
+        as "constraints". This should be called after the workload/statistics
+        providers.
+        """
+        query = Query(query_str, arrival_count=0)
+        self._analytical_queries.append(query)
+
+        if self._predicted_analytical_latencies is not None:
+            self._predicted_analytical_latencies = np.append(
+                self._predicted_analytical_latencies, np.zeros((1, 3)), axis=0
+            )
+        if self._predicted_aurora_pages_accessed is not None:
+            self._predicted_aurora_pages_accessed = np.append(
+                self._predicted_aurora_pages_accessed, np.zeros((1,)), axis=0
+            )
+        if self._predicted_athena_bytes_accessed is not None:
+            self._predicted_athena_bytes_accessed = np.append(
+                self._predicted_athena_bytes_accessed, np.zeros((1,)), axis=0
+            )
+        self._query_index_mapping.append(-1)
+
+        self._analytical_query_arrival_counts = np.append(
+            self._analytical_query_arrival_counts, np.zeros((1,)), axis=0
+        )
+
     def clone(self) -> "Workload":
         workload = Workload(
             self._period,
@@ -218,6 +245,7 @@ class Workload:
             ratios.append(preds[:, j] / preds[:, i])
         combined = np.stack(ratios, axis=1)
         gains = np.amax(combined, axis=1)
+        gains[~np.isfinite(gains)] = 0.0
         return gains
 
     ###

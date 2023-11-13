@@ -233,3 +233,6 @@ class PlannerConfig:
 
     def aurora_initialize_load_fraction(self) -> float:
         return self._raw["aurora_initialize_load_fraction"]
+
+    def aurora_storage_index_multiplier(self) -> float:
+        return float(self._raw["aurora_storage_index_multiplier"])
