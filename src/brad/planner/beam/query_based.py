@@ -70,6 +70,17 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         self._providers.data_access_provider.apply_access_statistics(next_workload)
         self._providers.data_access_provider.apply_access_statistics(current_workload)
 
+        if self._planner_config.flag("ensure_tables_together_on_one_engine"):
+            # This adds a constraint to ensure all tables are present together
+            # on at least one engine. This ensures that arbitrary unseen join
+            # templates can always be immediately handled.
+            all_tables = ", ".join(
+                [table.name for table in self._current_blueprint.tables()]
+            )
+            next_workload.add_priming_analytical_query(
+                f"SELECT 1 FROM {all_tables} LIMIT 1"
+            )
+
         # If requested, we record this planning pass for later debugging.
         if (
             not self._disable_external_logging
