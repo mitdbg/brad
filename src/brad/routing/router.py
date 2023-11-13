@@ -93,7 +93,7 @@ class Router:
         place_support = self._run_location_routing(query, self._table_placement_bitmap)
 
         # Engine functionality constraints.
-        func_support = self._run_functionality_routing(query)
+        func_support = self.run_functionality_routing(query)
 
         # Get supported engines.
         valid_locations = place_support & func_support
@@ -145,7 +145,7 @@ class Router:
         # Ideally we re-implement a sync version.
         return asyncio.run(self.engine_for(query, session))
 
-    def _run_functionality_routing(self, query: QueryRep) -> int:
+    def run_functionality_routing(self, query: QueryRep) -> int:
         """
         Based on the functinalities required by the query (e.g. geospatial),
         compute the set of engines that are able to serve this query.

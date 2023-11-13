@@ -137,24 +137,21 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         ctx.compute_engine_latency_norm_factor()
 
         beam_size = self._planner_config.beam_size()
-        engines = [Engine.Aurora, Engine.Redshift, Engine.Athena]
         first_query_idx = query_indices[0]
+        first_query = analytical_queries[first_query_idx]
         current_top_k: List[BlueprintCandidate] = []
 
-        # Not a fundamental limitation, but it simplifies the implementation
-        # below if this condition is true.
-        assert beam_size >= len(engines)
-
         # 4. Initialize the top-k set (beam).
-        for routing_engine in engines:
+        for routing_engine in Engine.from_bitmap(
+            planning_router.run_functionality_routing(first_query)
+        ):
             candidate = BlueprintCandidate.based_on(
                 self._current_blueprint, self._comparator
             )
             candidate.add_transactional_tables(ctx)
-            query = analytical_queries[first_query_idx]
             candidate.add_query(
                 first_query_idx,
-                query,
+                first_query,
                 routing_engine,
                 next_workload.get_predicted_analytical_latency(
                     first_query_idx, routing_engine
@@ -187,10 +184,16 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             next_top_k: List[BlueprintCandidate] = []
             query = analytical_queries[query_idx]
 
+            # Only a subset of the engines may support this query if it uses
+            # "special functionality".
+            engine_candidates = Engine.from_bitmap(
+                planning_router.run_functionality_routing(query)
+            )
+
             # For each candidate in the current top k, expand it by one
             # query in the workload.
             for curr_candidate in current_top_k:
-                for routing_engine in engines:
+                for routing_engine in engine_candidates:
                     next_candidate = curr_candidate.clone()
                     next_candidate.add_query(
                         query_idx,

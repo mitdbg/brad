@@ -102,6 +102,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             )
 
         # 2. Cluster queries by tables and sort by gains (sum).
+        # TODO: Need to consider functionality when creating clusters.
         clusters = self._preprocess_workload_queries(next_workload)
 
         # Sanity check. We cannot run planning without at least one query in the
