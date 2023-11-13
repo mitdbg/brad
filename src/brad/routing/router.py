@@ -151,23 +151,21 @@ class Router:
         compute the set of engines that are able to serve this query.
         """
 
-        # Bitmap describing what functionality is required for running query
+        # Bitmap describing what special functionality is required for running
+        # the query.
         req_bitmap = query.get_required_functionality()
 
         # Bitmap for each engine which features it supports
         engine_support = self.functionality_catalog.get_engine_functionalities()
-        engines = [Engine.Athena, Engine.Aurora, Engine.Redshift]
 
         # Narrow down the valid engines that can run the query, based on the
         # engine functionality
-        valid_locations_list = []
-        for engine, sup_bitmap in zip(engines, engine_support):
-            query_supported = (~req_bitmap | (req_bitmap & sup_bitmap)) == -1
+        supported_engines_bitmap = 0
+        for engine_mask, sup_bitmap in engine_support:
+            if (req_bitmap & sup_bitmap) == req_bitmap:
+                supported_engines_bitmap |= engine_mask
 
-            if query_supported:
-                valid_locations_list.append(engine)
-
-        return Engine.to_bitmap(valid_locations_list)
+        return supported_engines_bitmap
 
     def _run_location_routing(
         self, query: QueryRep, location_bitmap: Dict[str, int]
