@@ -3,6 +3,7 @@ from typing import List
 from brad.config.engine import Engine
 from brad.query_rep import QueryRep
 from brad.routing.abstract_policy import AbstractRoutingPolicy
+from brad.routing.context import RoutingContext
 
 
 class RoundRobin(AbstractRoutingPolicy):
@@ -16,7 +17,7 @@ class RoundRobin(AbstractRoutingPolicy):
     def name(self) -> str:
         return "RoundRobin"
 
-    def engine_for_sync(self, _query: QueryRep) -> List[Engine]:
+    def engine_for_sync(self, _query: QueryRep, _ctx: RoutingContext) -> List[Engine]:
         tmp = self._ordering[0]
         self._ordering[0] = self._ordering[1]
         self._ordering[1] = self._ordering[2]

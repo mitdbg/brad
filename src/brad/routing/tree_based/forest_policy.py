@@ -6,6 +6,7 @@ from brad.config.engine import Engine
 from brad.data_stats.estimator import Estimator
 from brad.query_rep import QueryRep
 from brad.routing.abstract_policy import AbstractRoutingPolicy
+from brad.routing.context import RoutingContext
 from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.model_wrap import ModelWrap
 
@@ -27,7 +28,6 @@ class ForestPolicy(AbstractRoutingPolicy):
     def __init__(self, policy: RoutingPolicy, model: ModelWrap) -> None:
         self._policy = policy
         self._model = model
-        self._estimator: Optional[Estimator] = None
 
     def __getstate__(self) -> Dict[Any, Any]:
         return {
@@ -38,7 +38,6 @@ class ForestPolicy(AbstractRoutingPolicy):
     def __setstate__(self, d: Dict[Any, Any]) -> None:
         self._policy = d["policy"]
         self._model = d["model"]
-        self._estimator = None
 
     def name(self) -> str:
         return f"ForestPolicy({self._policy.name})"
@@ -49,13 +48,15 @@ class ForestPolicy(AbstractRoutingPolicy):
         return self._policy == other._policy and self._model == other._model
 
     async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
-        self._estimator = estimator
+        pass
 
-    async def engine_for(self, query_rep: QueryRep) -> List[Engine]:
-        return await self._model.engine_for(query_rep, self._estimator)
+    async def engine_for(
+        self, query_rep: QueryRep, ctx: RoutingContext
+    ) -> List[Engine]:
+        return await self._model.engine_for(query_rep, ctx.estimator)
 
-    def engine_for_sync(self, query_rep: QueryRep) -> List[Engine]:
-        return asyncio.run(self.engine_for(query_rep))
+    def engine_for_sync(self, query_rep: QueryRep, ctx: RoutingContext) -> List[Engine]:
+        return asyncio.run(self.engine_for(query_rep, ctx))
 
     # The methods below are used to save/load `ModelWrap` from S3. We
     # historically separated out the model's implementation details because the

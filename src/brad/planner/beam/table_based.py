@@ -127,7 +127,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             self._planner_config,
         )
         planning_router = Router.create_from_blueprint(self._current_blueprint)
-        await planning_router.run_setup(
+        await planning_router.run_setup_for_standalone(
             self._providers.estimator_provider.get_estimator()
         )
         await ctx.simulate_current_workload_routing(planning_router)

@@ -83,7 +83,8 @@ class VariableCosts(Trigger):
 
         if ratio > self._change_ratio:
             logger.info(
-                "Triggering replanning due to variable costs changing. Previously estimated: %.4f. Current estimated: %.4f. Change ratio: %.4f",
+                "Triggering replanning due to variable costs changing. Previously "
+                "estimated: %.4f. Current estimated: %.4f. Change ratio: %.4f",
                 estimated_hourly_cost,
                 current_hourly_cost,
                 self._change_ratio,
@@ -123,7 +124,7 @@ class VariableCosts(Trigger):
         athena_query_indices: List[int] = []
         athena_queries: List[Query] = []
         router = Router.create_from_blueprint(self._current_blueprint)
-        await router.run_setup(self._estimator_provider.get_estimator())
+        await router.run_setup_for_standalone(self._estimator_provider.get_estimator())
 
         for idx, q in enumerate(workload.analytical_queries()):
             maybe_engine = q.primary_execution_location()

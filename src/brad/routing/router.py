@@ -2,11 +2,12 @@ import asyncio
 import logging
 from typing import Dict, Optional, TYPE_CHECKING
 from brad.front_end.session import Session
-from brad.routing.functionality_catalog import Functionality
 from brad.data_stats.estimator import Estimator
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.query_rep import QueryRep
 from brad.routing.abstract_policy import AbstractRoutingPolicy, FullRoutingPolicy
+from brad.routing.context import RoutingContext
+from brad.routing.functionality_catalog import Functionality
 
 if TYPE_CHECKING:
     from brad.blueprint import Blueprint
@@ -44,6 +45,9 @@ class Router:
         self._use_future_blueprint_policies = use_future_blueprint_policies
         self.functionality_catalog = Functionality()
 
+        # This should only be used when the router is being used in the planner.
+        self._shared_estimator: Optional[Estimator] = None
+
     def log_policy(self) -> None:
         logger.info("Routing policy:")
         logger.info("  Indefinite policies:")
@@ -51,14 +55,15 @@ class Router:
             logger.info("    - %s", p.name())
         logger.info("  Definite policy: %s", self._full_policy.definite_policy.name())
 
-    async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
+    async def run_setup_for_standalone(self, estimator: Optional[Estimator] = None) -> None:
         """
-        Should be called before using the router. This is used to set up any
-        dynamic state.
+        Should be called before using the router "standalone" contexts (i.e.,
+        outside the front end). This is used to set up any dynamic state that is
+        typically passed in via a `Session`.
 
         If the routing policy needs an estimator, one should be provided here.
         """
-        await self._full_policy.run_setup(estimator)
+        self._shared_estimator = estimator
 
     def update_blueprint(self, blueprint: "Blueprint") -> None:
         """
@@ -114,16 +119,23 @@ class Router:
             else:
                 raise RuntimeError("Unsupported bitmap value " + str(valid_locations))
 
+        # Right now, this context can be created once per session. But we may
+        # also want to include other shared state (e.g., metrics) that is not
+        # session-specific.
+        ctx = RoutingContext()
+        if session is not None:
+            ctx.estimator = session.estimator
+
         # Go through the indefinite routing policies. These may not return a
         # routing location.
         for policy in self._full_policy.indefinite_policies:
-            locations = await policy.engine_for(query)
+            locations = await policy.engine_for(query, ctx)
             for loc in locations:
                 if (EngineBitmapValues[loc] & valid_locations) != 0:
                     return loc
 
         # Rely on the definite routing policy.
-        locations = await self._full_policy.definite_policy.engine_for(query)
+        locations = await self._full_policy.definite_policy.engine_for(query, ctx)
         for loc in locations:
             if (EngineBitmapValues[loc] & valid_locations) != 0:
                 return loc

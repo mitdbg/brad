@@ -4,6 +4,7 @@ from brad.config.engine import Engine
 from brad.planner.workload import Workload
 from brad.query_rep import QueryRep
 from brad.routing.abstract_policy import AbstractRoutingPolicy
+from brad.routing.context import RoutingContext
 
 
 class CachedLocationPolicy(AbstractRoutingPolicy):
@@ -30,7 +31,9 @@ class CachedLocationPolicy(AbstractRoutingPolicy):
     def name(self) -> str:
         return "CachedLocationPolicy"
 
-    def engine_for_sync(self, query_rep: QueryRep) -> List[Engine]:
+    def engine_for_sync(
+        self, query_rep: QueryRep, _ctx: RoutingContext
+    ) -> List[Engine]:
         try:
             return [self._query_map[query_rep]]
         except KeyError:

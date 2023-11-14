@@ -3,11 +3,15 @@ import logging
 import pytz
 from datetime import datetime
 from typing import Dict, Tuple, Optional
+
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.session import SessionId
-from .engine_connections import EngineConnections
 from brad.blueprint.manager import BlueprintManager
+from brad.front_end.engine_connections import EngineConnections
+from brad.planner.estimator import Estimator
+from brad.routing.policy import RoutingPolicy
+from brad.data_stats.postgres_estimator import PostgresEstimator
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +23,18 @@ class Session:
     `SessionManager`.
     """
 
-    def __init__(self, session_id: SessionId, engines: EngineConnections):
+    def __init__(
+        self,
+        session_id: SessionId,
+        engines: EngineConnections,
+        estimator: Optional[Estimator],
+    ):
         self._session_id = session_id
         self._engines = engines
         self._in_txn = False
         self._closed = False
         self._txn_start_timestamp = datetime.now(tz=pytz.utc)
+        self._estimator = estimator
 
     @property
     def identifier(self) -> SessionId:
@@ -37,6 +47,10 @@ class Session:
     @property
     def in_transaction(self) -> bool:
         return self._in_txn
+
+    @property
+    def estimator(self) -> Optional[Estimator]:
+        return self._estimator
 
     @property
     def closed(self) -> bool:
@@ -54,6 +68,7 @@ class Session:
     async def close(self):
         self._closed = True
         await self._engines.close()
+        await self._estimator.close()
 
 
 class SessionManager:
@@ -91,7 +106,20 @@ class SessionManager:
             specific_engines=engines,
             connect_to_aurora_read_replicas=True,
         )
-        session = Session(session_id, connections)
+
+        # Create an estimator if needed. The estimator should be
+        # session-specific since it currently depends on a DB connection.
+        routing_policy_override = self._config.routing_policy
+        if (
+            routing_policy_override == RoutingPolicy.ForestTableSelectivity
+            or routing_policy_override == RoutingPolicy.Default
+        ):
+            estimator = await PostgresEstimator.connect(self._schema_name, self._config)
+            await estimator.analyze(self._blueprint_mgr.get_blueprint())
+        else:
+            estimator = None
+
+        session = Session(session_id, connections, estimator)
         self._sessions[session_id] = session
         logger.debug("Established a new session: %s", session_id)
         return (session_id, session)

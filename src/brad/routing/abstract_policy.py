@@ -3,6 +3,7 @@ from typing import List, Optional
 from brad.config.engine import Engine
 from brad.planner.estimator import Estimator
 from brad.query_rep import QueryRep
+from brad.routing.context import RoutingContext
 
 
 class AbstractRoutingPolicy:
@@ -21,7 +22,9 @@ class AbstractRoutingPolicy:
         If this routing policy needs an estimator, one should be provided here.
         """
 
-    async def engine_for(self, query_rep: QueryRep) -> List[Engine]:
+    async def engine_for(
+        self, query_rep: QueryRep, ctx: RoutingContext
+    ) -> List[Engine]:
         """
         Produces a preference order for query routing (the first element in the
         list is the most preferred engine, and so on).
@@ -33,9 +36,9 @@ class AbstractRoutingPolicy:
         You should override this method if the routing policy needs to depend on
         any asynchronous methods.
         """
-        return self.engine_for_sync(query_rep)
+        return self.engine_for_sync(query_rep, ctx)
 
-    def engine_for_sync(self, query_rep: QueryRep) -> List[Engine]:
+    def engine_for_sync(self, query_rep: QueryRep, ctx: RoutingContext) -> List[Engine]:
         """
         Produces a preference order for query routing (the first element in the
         list is the most preferred engine, and so on).

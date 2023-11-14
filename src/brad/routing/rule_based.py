@@ -8,9 +8,10 @@ import brad.routing
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.daemon.monitor import Monitor
-from brad.routing.abstract_policy import AbstractRoutingPolicy
-from brad.query_rep import QueryRep
 from brad.front_end.session import SessionManager
+from brad.query_rep import QueryRep
+from brad.routing.abstract_policy import AbstractRoutingPolicy
+from brad.routing.context import RoutingContext
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +191,9 @@ class RuleBased(AbstractRoutingPolicy):
             return True
         return not_overloaded
 
-    def engine_for_sync(self, query_rep: QueryRep) -> List[Engine]:
+    def engine_for_sync(
+        self, query_rep: QueryRep, _ctx: RoutingContext
+    ) -> List[Engine]:
         touched_tables = query_rep.tables()
         if (
             len(touched_tables)
