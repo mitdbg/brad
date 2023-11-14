@@ -247,7 +247,7 @@ class AuroraDatabaseConnection(DatabaseConnection):
         }
 
     def run_query_collect_statistics(
-        self, sql, repetitions=1, prefix="", explain_only=False, plain_run=True
+        self, sql, repetitions=1, prefix="", explain_only=False, plain_run=False
     ):
         analyze_plans = None
         verbose_plan = None
