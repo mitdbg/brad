@@ -246,8 +246,6 @@ def runner(
         os.fsync(file.fileno())
         file.close()
         database.close_sync()
-        # Make sure the queue is drained.
-        _ = stop_queue.get_nowait()
 
 
 def simulation_runner(

@@ -162,6 +162,15 @@ def runner(
                     file=latency_file,
                 )
 
+                # Warn if the abort rate is high.
+                total_aborts = sum(aborts)
+                total_commits = sum(commits)
+                abort_rate = total_aborts / (total_aborts + total_commits)
+                if abort_rate > 0.15:
+                    print(
+                        f"[T {worker_idx}] Abort rate is higher than expected ({abort_rate:.4f})."
+                    )
+
             try:
                 _ = stop_queue.get_nowait()
                 break
