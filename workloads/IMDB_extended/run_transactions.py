@@ -103,16 +103,19 @@ def runner(
                 else:
                     succeeded = txn(db)
 
-                rand_backoff = None
+                if rand_backoff is not None:
+                    print(f"[T {worker_idx}] Continued after transient errors.")
+                    rand_backoff = None
 
             except BradClientError as ex:
                 succeeded = False
                 if ex.is_transient():
-                    print(
-                        "Encountered transient error (probably engine change). Will retry...",
-                        flush=True,
-                        file=sys.stderr,
-                    )
+                    # Too verbose during a transition.
+                    # print(
+                    #     "Encountered transient error (probably engine change). Will retry...",
+                    #     flush=True,
+                    #     file=sys.stderr,
+                    # )
 
                     if rand_backoff is None:
                         rand_backoff = RandomizedExponentialBackoff(
@@ -120,6 +123,7 @@ def runner(
                             base_delay_s=0.1,
                             max_delay_s=timedelta(minutes=1).total_seconds(),
                         )
+                        print(f"[T {worker_idx}] Backing off due to transient errors.")
 
                     # Delay retrying in the case of a transient error (this
                     # happens during blueprint transitions).

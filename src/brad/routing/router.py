@@ -49,7 +49,7 @@ class Router:
         logger.info("  Indefinite policies:")
         for p in self._full_policy.indefinite_policies:
             logger.info("    - %s", p.name())
-        logger.info("  Definite policy: %s")
+        logger.info("  Definite policy: %s", self._full_policy.definite_policy.name())
 
     async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
         """

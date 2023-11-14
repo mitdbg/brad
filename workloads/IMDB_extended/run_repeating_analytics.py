@@ -27,6 +27,7 @@ EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
 ENGINE_NAMES = ["ATHENA", "AURORA", "REDSHIFT"]
 
 RUNNER_EXIT = "runner_exit"
+STARTUP_FAILED = "startup_failed"
 
 
 def get_time_of_the_day_unsimulated(
@@ -80,14 +81,20 @@ def runner(
     else:
         engine = None
 
-    database = connect_to_db(
-        args,
-        runner_idx,
-        direct_engine=engine,
-        # Ensure we disable the result cache if we are running directly on
-        # Redshift.
-        disable_direct_redshift_result_cache=True,
-    )
+    try:
+        database = connect_to_db(
+            args,
+            runner_idx,
+            direct_engine=engine,
+            # Ensure we disable the result cache if we are running directly on
+            # Redshift.
+            disable_direct_redshift_result_cache=True,
+        )
+    except BradClientError as ex:
+        print(f"[RA {runner_idx}] Failed to connect to BRAD:", str(ex))
+        start_queue.put_nowait(STARTUP_FAILED)
+        _ = stop_queue.get()
+        return
 
     if query_frequency is not None:
         query_frequency = query_frequency[queries]
@@ -120,6 +127,7 @@ def runner(
         query_order = query_order_main.copy()
 
         # Signal that we're ready to start and wait for the controller.
+        print(f"Runner {runner_idx} is ready to start running.")
         start_queue.put_nowait("")
         msg = stop_queue.get()
 
@@ -182,21 +190,25 @@ def runner(
                     file=file,
                     flush=True,
                 )
-                exec_count += 1
-                rand_backoff = None
 
                 if exec_count % 20 == 0:
                     # To avoid data loss if this script crashes.
                     os.fsync(file.fileno())
 
+                exec_count += 1
+                if rand_backoff is not None:
+                    print(f"[RA {runner_idx}] Continued after transient errors.")
+                    rand_backoff = None
+
             except BradClientError as ex:
                 if ex.is_transient():
-                    print(
-                        "Transient query error:",
-                        ex.message(),
-                        flush=True,
-                        file=sys.stderr,
-                    )
+                    # This is too verbose during a transition.
+                    # print(
+                    #     "Transient query error:",
+                    #     ex.message(),
+                    #     flush=True,
+                    #     file=sys.stderr,
+                    # )
 
                     if rand_backoff is None:
                         rand_backoff = RandomizedExponentialBackoff(
@@ -204,12 +216,15 @@ def runner(
                             base_delay_s=2.0,
                             max_delay_s=timedelta(minutes=10).total_seconds(),
                         )
+                        print(f"[RA {runner_idx}] Backing off due to transient errors.")
 
                     # Delay retrying in the case of a transient error (this
                     # happens during blueprint transitions).
                     wait_s = rand_backoff.wait_time_s()
                     if wait_s is None:
-                        print("Aborting benchmark. Too many transient errors.")
+                        print(
+                            f"[RA {runner_idx}] Aborting benchmark. Too many transient errors."
+                        )
                         break
                     time.sleep(wait_s)
 
@@ -628,8 +643,20 @@ def main():
             processes.append(p)
 
     print("Waiting for startup...", flush=True)
+    one_startup_failed = False
     for i in range(args.num_clients):
-        start_queue[i].get()
+        msg = start_queue[i].get()
+        if msg == STARTUP_FAILED:
+            one_startup_failed = True
+
+    if one_startup_failed:
+        print("At least one runner failed to start up. Aborting the experiment.")
+        for i in range(args.num_clients):
+            stop_queue[i].put_nowait(RUNNER_EXIT)
+        for p in processes:
+            p.join()
+        print("Abort complete.")
+        return
 
     global EXECUTE_START_TIME  # pylint: disable=global-statement
     EXECUTE_START_TIME = datetime.now().astimezone(
