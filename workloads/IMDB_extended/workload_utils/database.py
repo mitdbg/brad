@@ -46,7 +46,9 @@ class PyodbcDatabase(Database):
                 cursor = self._cursor
             # Exec
             cursor.execute(query)
-            if query.strip().lower().startswith("select") or (cursor.rowcount is not None and cursor.rowcount > 0):
+            if query.strip().lower().startswith("select") or (
+                cursor.rowcount is not None and cursor.rowcount > 0
+            ):
                 # print(f"Rows: {cursor.rowcount}. Q: {query}")
                 rows = cursor.fetchall()
             else:

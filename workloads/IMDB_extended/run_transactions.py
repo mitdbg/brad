@@ -304,7 +304,7 @@ def main():
             num_client_trace = pickle.load(f)
         # Multiply each client with multiplier
         multiplier = args.num_client_multiplier
-        num_client_trace = {t:n*multiplier for t,n in num_client_trace.items()}
+        num_client_trace = {t: n * multiplier for t, n in num_client_trace.items()}
         # Replace args.num_clients with maximum number of clients in trace.
         args.num_clients = max(num_client_trace.values())
     else:
@@ -317,7 +317,8 @@ def main():
     processes = []
     for idx in range(args.num_clients):
         p = mp.Process(
-            target=runner, args=(args, idx, directory, start_queue[idx], stop_queue[idx])
+            target=runner,
+            args=(args, idx, directory, start_queue[idx], stop_queue[idx]),
         )
         p.start()
         processes.append(p)
@@ -362,7 +363,10 @@ def main():
                 # starting additional clients
                 for add_client in range(num_running_client, num_client_required):
                     print(
-                        "[Transactions] Telling client no.{} to start.".format(add_client), flush=True
+                        "[Transactions] Telling client no.{} to start.".format(
+                            add_client
+                        ),
+                        flush=True,
                     )
                     stop_queue[add_client].put("")
                     num_running_client += 1
@@ -370,7 +374,9 @@ def main():
                 # shutting down clients
                 for delete_client in range(num_running_client, num_client_required, -1):
                     print(
-                        "[Transactions] Telling client no.{} to stop.".format(delete_client - 1),
+                        "[Transactions] Telling client no.{} to stop.".format(
+                            delete_client - 1
+                        ),
                         flush=True,
                     )
                     stop_queue[delete_client - 1].put("")
@@ -388,7 +394,10 @@ def main():
             )
 
     else:
-        print("[Transactions] Telling all {} clients to start.".format(args.num_clients), flush=True)
+        print(
+            "[Transactions] Telling all {} clients to start.".format(args.num_clients),
+            flush=True,
+        )
         for i in range(args.num_clients):
             stop_queue[i].put("")
 
@@ -429,6 +438,7 @@ def main():
         p.join()
 
     print("Done!")
+
 
 if __name__ == "__main__":
     # On Unix platforms, the default way to start a process is by forking, which

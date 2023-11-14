@@ -162,9 +162,11 @@ def runner(
                     start = time.time()
                     _, engine = database.execute_sync_with_engine(query)
                     if engine is None:
-                        engine = "tidb"
-                    if not isinstance(engine, str):
-                        engine = engine.value
+                        engine_name = "tidb"
+                    elif isinstance(engine, Engine):
+                        engine_name = engine.value
+                    else:
+                        engine_name = engine
                     end = time.time()
                     print(
                         "{},{},{},{},{},{}".format(
@@ -173,7 +175,7 @@ def runner(
                             time_unsimulated_str,
                             qidx,
                             end - start,
-                            engine,
+                            engine_name,
                         ),
                         file=file,
                         flush=True,

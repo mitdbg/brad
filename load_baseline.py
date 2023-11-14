@@ -50,6 +50,7 @@ def main():
         fails = []
         # Select 100 queries at random
         import random
+
         random.shuffle(queries)
         queries = queries[:100]
         for i, q in enumerate(queries):
@@ -73,6 +74,7 @@ def main():
                 fails.append((i, f"Error: {e}"))
         print(f"Success: {num_success}, Fail: {num_fail}")
         print(f"Fails: \n{fails}")
+
 
 if __name__ == "__main__":
     main()

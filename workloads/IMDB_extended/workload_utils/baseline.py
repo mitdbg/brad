@@ -3,8 +3,6 @@ import mysql.connector
 import psycopg2
 import os, json, sys
 import time
-from pathlib import Path
-import pandas as pd
 import platform
 from types import SimpleNamespace
 import boto3
@@ -105,13 +103,11 @@ class TiDBLoader:
         load_cmd = f"LOAD DATA INFILE '{s3_path}' INTO TABLE {t} {load_args}"
         return load_cmd
 
-
     def manual_replicate_flash(self, dataset):
         schema = load_schema_json(dataset)
         for t in schema.tables:
             q = f"ALTER TABLE {t} SET TIFLASH REPLICA 1"
             self.submit_query(q, until_success=True)
-
 
     def manual_count_all(self, dataset):
         schema = load_schema_json(dataset)
@@ -150,7 +146,7 @@ class TiDBLoader:
             print(f"Replicating {t} for HTAP")
             replica_cmd = f"ALTER TABLE {t} SET TIFLASH REPLICA 1"
             self.submit_query(replica_cmd, until_success=True)
-            sys.exit(0) # Just for testing.
+            sys.exit(0)  # Just for testing.
 
         # print("Creating Indexes")
         # indexes_sql = load_schema_sql(dataset, "indexes.sql")
@@ -229,7 +225,6 @@ class PostgresCompatibleLoader:
             cur.execute("CREATE EXTENSION IF NOT EXISTS aws_s3 CASCADE;")
             self.conn.commit()
 
-
     # def manual_unload(self, dataset, do_unload=True, specific_table=None, start_chunk=0, end_chunk=0):
     #     # Manual unload for use by TiDB.
     #     schema = load_schema_json(dataset)
@@ -283,35 +278,40 @@ class PostgresCompatibleLoader:
     #                 s3.delete_object(Bucket=self.s3_bucket, Key=target_key)
     #         print(f"Unloaded {t} in {time.perf_counter() - start_t:.2f} secs")
 
-
-
-    # def manually_copy_s3_data(self, dataset):
-    #     schema = load_schema_json(dataset)
-    #     s3 = boto3.resource("s3")
-    #     # Hacky: relies on specifc ordering
-    #     reached_title = False
-    #     for t in schema.tables:
-    #         if t == "title":
-    #             reached_title = True
-    #         if reached_title:
-    #             source_dir = "imdb_100G"
-    #         else:
-    #             source_dir = "imdb_extended_100g"
-    #         source_key = f"{source_dir}/{t}/{t}.csv"
-    #         target_key = f"imdb_extended/{t}/{t}.csv"
-    #         copy_source = {"Bucket": "geoffxy-research", "Key": source_key}
-    #         print(f"Copying {t}")
-    #         start_t = time.perf_counter()
-    #         # s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
-    #         # print(f"Copied {t} in {time.perf_counter() - start_t:.2f} secs")
-    #         # For tidb
-    #         if t in ["cast_info", "title", "name", "person_info", "showings", "ticket_orders", "movie_info", "char_name"]:
-    #             continue
-    #         target_key = f"imdb_extended/test.{t}.csv"
-    #         s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
-    #         print(f"Copied {t} in {time.perf_counter() - start_t:.2f} secs")
-
-
+    def manually_copy_s3_data(self, dataset):
+        schema = load_schema_json(dataset)
+        s3 = boto3.resource("s3")
+        # Hacky: relies on specifc ordering
+        reached_title = False
+        for t in schema.tables:
+            if t == "title":
+                reached_title = True
+            if reached_title:
+                source_dir = "imdb_100G"
+            else:
+                source_dir = "imdb_extended_100g"
+            source_key = f"{source_dir}/{t}/{t}.csv"
+            target_key = f"imdb_extended/{t}/{t}.csv"
+            copy_source = {"Bucket": "geoffxy-research", "Key": source_key}
+            print(f"Copying {t}")
+            start_t = time.perf_counter()
+            # s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
+            # print(f"Copied {t} in {time.perf_counter() - start_t:.2f} secs")
+            # For tidb
+            if t in [
+                "cast_info",
+                "title",
+                "name",
+                "person_info",
+                "showings",
+                "ticket_orders",
+                "movie_info",
+                "char_name",
+            ]:
+                continue
+            target_key = f"imdb_extended/test.{t}.csv"
+            s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
+            print(f"Copied {t} in {time.perf_counter() - start_t:.2f} secs")
 
     def make_load_cmd(self, t, load_args) -> str:
         if self.engine == "redshift":
@@ -352,7 +352,6 @@ class PostgresCompatibleLoader:
         schema = load_schema_json(dataset)
         for t in schema.tables:
             self.reset_aurora_seq_nums(t)
-
 
     def load_database(self, dataset, force=False, load_from: str = ""):
         # First, check existence.
