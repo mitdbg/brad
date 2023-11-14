@@ -59,7 +59,7 @@ class PyodbcDatabase(Database):
         except pyodbc.ProgrammingError:
             return []
         except mysql.connector.errors.DatabaseError as e:
-            print(f"Transient error: {e}", flush=True, file=sys.stderr)
+            print(f"Transient error: {e}.\nQuery: {query}", flush=True, file=sys.stderr)
             return []
 
     def begin_sync(self) -> None:

@@ -42,12 +42,16 @@ def main():
         print(f"Execution took: {end_time-start_time}s")
         loader.conn.commit()
     if args.run_all:
-        query_bank = "workloads/IMDB_100GB/regular_test/queries.sql"
+        query_bank = "workloads/IMDB_100GB/ad_hoc/queries.sql"
         with open(query_bank, "r", encoding="utf-8") as f:
             queries = f.read().split(";")
         num_success = 0
         num_fail = 0
         fails = []
+        # Select 100 queries at random
+        import random
+        random.shuffle(queries)
+        queries = queries[:100]
         for i, q in enumerate(queries):
             try:
                 cur = loader.conn.cursor()

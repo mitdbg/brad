@@ -8,6 +8,7 @@ import sys
 import threading
 import time
 import os
+import pickle
 import pytz
 import multiprocessing as mp
 from datetime import datetime, timedelta
@@ -20,6 +21,8 @@ from brad.provisioning.directory import Directory
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from workload_utils.connect import connect_to_db
 from workload_utils.transaction_worker import TransactionWorker
+
+EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
 
 
 def runner(
@@ -67,9 +70,11 @@ def runner(
     db = connect_to_db(
         args, worker_idx, direct_engine=Engine.Aurora, directory=directory
     )
-    db.execute_sync(
-        f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
-    )
+
+    if args.baseline != "tidb":
+        db.execute_sync(
+            f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
+        )
 
     # For printing out results.
     if "COND_OUT" in os.environ:
@@ -205,6 +210,18 @@ def main():
         help="The number of transactional clients.",
     )
     parser.add_argument(
+        "--num-client-path",
+        type=str,
+        default=None,
+        help="Path to the distribution of number of clients for each period of a day",
+    )
+    parser.add_argument(
+        "--num-client-multiplier",
+        type=int,
+        default=2,
+        help="The multiplier to the number of clients for each period of a day",
+    )
+    parser.add_argument(
         "--seed", type=int, default=42, help="Random seed for reproducibility."
     )
     parser.add_argument(
@@ -257,14 +274,16 @@ def main():
         default=0.01,
         help="The probability that a transaction's latency will be recorded.",
     )
+    parser.add_argument(
+        "--time-scale-factor",
+        type=int,
+        default=50,
+        help="trace 1s of simulation as X seconds in real-time to match the num-concurrent-query",
+    )
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)
     parser.add_argument("--num-front-ends", type=int, default=1)
     args = parser.parse_args()
-
-    mgr = mp.Manager()
-    start_queue = mgr.Queue()
-    stop_queue = mgr.Queue()
 
     if args.brad_direct:
         assert args.config_file is not None
@@ -275,37 +294,115 @@ def main():
     else:
         directory = None
 
-    clients = []
+    if (
+        args.num_client_path is not None
+        and os.path.exists(args.num_client_path)
+        and args.time_scale_factor is not None
+    ):
+        # we can only set the num_concurrent_query trace in presence of time_scale_factor
+        with open(args.num_client_path, "rb") as f:
+            num_client_trace = pickle.load(f)
+        # Multiply each client with multiplier
+        multiplier = args.num_client_multiplier
+        num_client_trace = {t:n*multiplier for t,n in num_client_trace.items()}
+        # Replace args.num_clients with maximum number of clients in trace.
+        args.num_clients = max(num_client_trace.values())
+    else:
+        num_client_trace = None
+
+    mgr = mp.Manager()
+    start_queue = [mgr.Queue() for _ in range(args.num_clients)]
+    stop_queue = [mgr.Queue() for _ in range(args.num_clients)]
+
+    processes = []
     for idx in range(args.num_clients):
         p = mp.Process(
-            target=runner, args=(args, idx, directory, start_queue, stop_queue)
+            target=runner, args=(args, idx, directory, start_queue[idx], stop_queue[idx])
         )
         p.start()
-        clients.append(p)
+        processes.append(p)
 
     print("Waiting for startup...", file=sys.stderr, flush=True)
-    for _ in range(args.num_clients):
-        start_queue.get()
+    for idx in range(args.num_clients):
+        start_queue[idx].get()
 
-    print(
-        "Telling {} clients to start.".format(args.num_clients),
-        file=sys.stderr,
-        flush=True,
-    )
-    for _ in range(args.num_clients):
-        stop_queue.put("")
+    global EXECUTE_START_TIME  # pylint: disable=global-statement
+    EXECUTE_START_TIME = datetime.now().astimezone(
+        pytz.utc
+    )  # pylint: disable=global-statement
 
-    if args.run_for_s is not None:
+    if num_client_trace is not None:
+        assert args.time_scale_factor is not None, "need to set args.time_scale_factor"
+        print("[Transactions] Telling client no.{} to start.".format(0), flush=True)
+        stop_queue[0].put("")
+        num_running_client = 1
+
+        finished_one_day = True
+        curr_day_start_time = datetime.now().astimezone(pytz.utc)
+        for time_of_day in num_client_trace:
+            if time_of_day == 0:
+                continue
+            # at this time_of_day start/shut-down more clients
+            time_in_s = time_of_day / args.time_scale_factor
+            now = datetime.now().astimezone(pytz.utc)
+            curr_time_in_s = (now - curr_day_start_time).total_seconds()
+            total_exec_time_in_s = (now - EXECUTE_START_TIME).total_seconds()
+            if args.run_for_s <= total_exec_time_in_s:
+                finished_one_day = False
+                break
+            if args.run_for_s - total_exec_time_in_s <= (time_in_s - curr_time_in_s):
+                wait_time = args.run_for_s - total_exec_time_in_s
+                if wait_time > 0:
+                    time.sleep(wait_time)
+                finished_one_day = False
+                break
+            time.sleep(time_in_s - curr_time_in_s)
+            num_client_required = min(num_client_trace[time_of_day], args.num_clients)
+            if num_client_required > num_running_client:
+                # starting additional clients
+                for add_client in range(num_running_client, num_client_required):
+                    print(
+                        "[Transactions] Telling client no.{} to start.".format(add_client), flush=True
+                    )
+                    stop_queue[add_client].put("")
+                    num_running_client += 1
+            elif num_running_client > num_client_required:
+                # shutting down clients
+                for delete_client in range(num_running_client, num_client_required, -1):
+                    print(
+                        "[Transactions] Telling client no.{} to stop.".format(delete_client - 1),
+                        flush=True,
+                    )
+                    stop_queue[delete_client - 1].put("")
+                    num_running_client -= 1
+        now = datetime.now().astimezone(pytz.utc)
+        total_exec_time_in_s = (now - EXECUTE_START_TIME).total_seconds()
+        if finished_one_day:
+            print(
+                f"[Transactions] Finished executing one day of workload in {total_exec_time_in_s}s, will ignore the rest of "
+                f"pre-set execution time {args.run_for_s}s"
+            )
+        else:
+            print(
+                f"[Transactions] Executed ended but unable to finish executing the trace of a full day within {args.run_for_s}s"
+            )
+
+    else:
+        print("[Transactions] Telling all {} clients to start.".format(args.num_clients), flush=True)
+        for i in range(args.num_clients):
+            stop_queue[i].put("")
+
+    if args.run_for_s and num_client_trace is None:
         print(
-            "Letting the experiment run for {} seconds...".format(args.run_for_s),
+            "[Transactions] Waiting for {} seconds...".format(args.run_for_s),
             flush=True,
             file=sys.stderr,
         )
         time.sleep(args.run_for_s)
-
-    else:
+    elif num_client_trace is None:
+        # Wait until requested to stop.
         print(
-            "Waiting until requested to stop... (hit Ctrl-C)",
+            "[Transactions] Waiting until requested to stop... (hit Ctrl-C)",
             flush=True,
             file=sys.stderr,
         )
@@ -319,14 +416,19 @@ def main():
 
         should_shutdown.wait()
 
-    print("Stopping clients...", flush=True, file=sys.stderr)
-    for _ in range(args.num_clients):
-        stop_queue.put("")
+    print("Stopping all clients...", flush=True, file=sys.stderr)
+    for i in range(args.num_clients):
+        stop_queue[i].put("")
 
-    print("Waiting for clients to terminate...", flush=True, file=sys.stderr)
-    for c in clients:
-        c.join()
+    # stop again, just incase some client hasn't started yet
+    for i in range(args.num_clients):
+        stop_queue[i].put("")
 
+    print("Waiting for the clients to complete.")
+    for p in processes:
+        p.join()
+
+    print("Done!")
 
 if __name__ == "__main__":
     # On Unix platforms, the default way to start a process is by forking, which
