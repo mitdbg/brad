@@ -17,12 +17,6 @@ source ../common.sh
 initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
 heavier_queries="58,61,62,64,69,73,74,51,57,60"
 
-function step_txns() {
-  local lo=$1
-  local hi=$2
-  local gap_minute=$3
-}
-
 # Arguments:
 # --config-file
 # --planner-config-file
@@ -82,31 +76,11 @@ txn_sweep "5 6 7 8" 3 8
 log_workload_point "hold_txn_8_20_min"
 sleep $((20 * 60))  # 32 mins total; 42 mins cumulative
 
-# Disabled for now - this will take too long.
-# Scale up to 28 transactional clients. Hold for 15 minutes.
-# log_workload_point "start_increase_txn_12_to_28"
-# kill -INT $txn_pid
-# wait $txn_pid
-# txn_sweep "12 16 20 24 28" 2 28
-# log_workload_point "hold_txn_28_15_min"
-# sleep $((15 * 60))
-
-# 20 minutes.
-log_workload_point "start_heavy_rana_8"
-start_repeating_olap_runner 8 15 1 $heavier_queries "ra_8_heavy" 8
-heavy_rana_pid=$runner_pid
-log_workload_point "started_heavy_rana_8_$heavy_rana_pid"
-sleep $((20 * 60))  # 20 mins total; 62 mins cumulative
-
-log_workload_point "stopping_heavy_rana_8"
-kill -INT $heavy_rana_pid
-terminate_process_group $heavy_rana_pid 10
-
 log_workload_point "start_heavy_rana_10"
 start_repeating_olap_runner 10 5 1 $heavier_queries "ra_10_heavy" 8
 heavy_rana_pid=$runner_pid
 log_workload_point "started_heavy_rana_10_$heavy_rana_pid"
-sleep $((10 * 60))  # 10 mins total; 72 mins cumulative
+sleep $((40 * 60))  # 40 mins total; 82 mins cumulative
 
 log_workload_point "stopping_heavy_rana_10"
 kill -INT $heavy_rana_pid
@@ -116,7 +90,7 @@ log_workload_point "start_heavy_rana_20"
 start_repeating_olap_runner 20 5 1 $heavier_queries "ra_20_heavy" 8
 heavy_rana_pid=$runner_pid
 log_workload_point "started_heavy_rana_20_$heavy_rana_pid"
-sleep $((30 * 60))  # 30 mins total; 102 mins cumulative
+sleep $((40 * 60))  # 40 mins total; 122 mins cumulative
 
 log_workload_point "experiment_workload_done"
 
