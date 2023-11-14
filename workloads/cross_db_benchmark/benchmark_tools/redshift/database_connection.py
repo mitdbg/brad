@@ -179,7 +179,7 @@ class RedshiftDatabaseConnection(DatabaseConnection):
         explain_only=False,
         timeout_sec=None,
         clear_cache=True,
-        plain_run=True,
+        plain_run=False,
     ):
         results = None
         runtimes = None

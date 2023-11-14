@@ -419,7 +419,7 @@ def parse_queries_athena_classic_format(
             q.sql,
             column_id_mapping,
             table_id_mapping,
-            is_explain_only=True,
+            is_explain_only=False,
             use_true_card=use_true_card,
             db_conn=db_conn,
             cursor=cursor,
