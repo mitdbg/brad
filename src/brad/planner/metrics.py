@@ -429,15 +429,6 @@ class MetricsFromMonitor(MetricsProvider):
             most_recent_common.to_pydatetime(),
         )
 
-    def _fill_empty_metrics(
-        self, to_fill: pd.DataFrame, guide: pd.DataFrame
-    ) -> pd.DataFrame:
-        num_rows = guide.shape[0]
-        num_cols = len(to_fill.columns)
-        return pd.DataFrame(
-            np.zeros((num_rows, num_cols)), columns=to_fill.columns, index=guide.index
-        )
-
     def _extract_most_recent_possibly_missing(
         self, series: pd.Series, default_value: int | float, name: Optional[str] = None
     ) -> int | float:
