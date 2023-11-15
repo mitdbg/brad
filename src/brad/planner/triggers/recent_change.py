@@ -3,9 +3,11 @@ import pytz
 from datetime import timedelta, datetime
 from typing import Optional
 
-from brad.config.planner import PlannerConfig
 from brad.blueprint import Blueprint
 from brad.blueprint.diff.blueprint import BlueprintDiff
+from brad.config.planner import PlannerConfig
+from brad.daemon.aurora_metrics import AuroraMetrics
+from brad.daemon.redshift_metrics import RedshiftMetrics
 from brad.planner.scoring.score import Score
 
 from .trigger import Trigger
@@ -23,6 +25,11 @@ class RecentChange(Trigger):
         self._planner_config = planner_config
         self._is_first_change = True
         self._last_provisioning_change: Optional[datetime] = None
+        # Metrics sources can be delayed; we do not want to replan before the
+        # metrics are available in the planning window.
+        self._metrics_delay = max(
+            AuroraMetrics.METRICS_DELAY, RedshiftMetrics.METRICS_DELAY
+        )
 
     async def should_replan(self) -> bool:
         if self._last_provisioning_change is None:
@@ -31,7 +38,7 @@ class RecentChange(Trigger):
         window = self._planner_config.planning_window()
         now = datetime.now(tz=pytz.utc)
 
-        if now >= self._last_provisioning_change + window:
+        if now > self._last_provisioning_change + window + self._metrics_delay:
             self._last_provisioning_change = None
             logger.info("Triggering replan because of a recent provisioning change.")
             return True

@@ -14,6 +14,10 @@ reinterpret_second_as: 1
 # to be accepted.
 query_dist_change_frac: 0.1
 
+metrics_agg:
+  method: ewm         # 'mean' is another option
+  alpha: 0.86466472   # 1 - 1 / e^2
+
 ###
 ### Trigger configs.
 ###
