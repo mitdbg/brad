@@ -14,14 +14,6 @@ class AbstractRoutingPolicy:
     def name(self) -> str:
         raise NotImplementedError
 
-    async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
-        """
-        Should be called before using this policy. This is used to set up any
-        dynamic state.
-
-        If this routing policy needs an estimator, one should be provided here.
-        """
-
     async def engine_for(
         self, query_rep: QueryRep, ctx: RoutingContext
     ) -> List[Engine]:
@@ -64,17 +56,6 @@ class FullRoutingPolicy:
     ) -> None:
         self.indefinite_policies = indefinite_policies
         self.definite_policy = definite_policy
-
-    async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
-        """
-        Should be called before using the policy. This is used to set up any
-        dynamic state.
-
-        If this routing policy needs an estimator, one should be provided here.
-        """
-        for policy in self.indefinite_policies:
-            await policy.run_setup(estimator)
-        await self.definite_policy.run_setup(estimator)
 
     def __eq__(self, other: object):
         if not isinstance(other, FullRoutingPolicy):

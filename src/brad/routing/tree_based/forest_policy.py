@@ -1,9 +1,8 @@
 import asyncio
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 
 from brad.asset_manager import AssetManager
 from brad.config.engine import Engine
-from brad.data_stats.estimator import Estimator
 from brad.query_rep import QueryRep
 from brad.routing.abstract_policy import AbstractRoutingPolicy
 from brad.routing.context import RoutingContext
@@ -46,9 +45,6 @@ class ForestPolicy(AbstractRoutingPolicy):
         if not isinstance(other, ForestPolicy):
             return False
         return self._policy == other._policy and self._model == other._model
-
-    async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
-        pass
 
     async def engine_for(
         self, query_rep: QueryRep, ctx: RoutingContext
