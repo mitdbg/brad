@@ -243,3 +243,6 @@ class PlannerConfig:
 
     def aurora_storage_index_multiplier(self) -> float:
         return float(self._raw["aurora_storage_index_multiplier"])
+
+    def metrics_agg(self) -> Dict[str, Any]:
+        return self._raw["metrics_agg"]
