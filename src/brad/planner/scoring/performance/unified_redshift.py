@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 import numpy.typing as npt
-from typing import Dict, TYPE_CHECKING
+from typing import Dict, TYPE_CHECKING, Optional
 
 from brad.config.engine import Engine
 from brad.blueprint.provisioning import Provisioning
@@ -18,13 +18,11 @@ class RedshiftProvisioningScore:
         self,
         scaled_run_times: npt.NDArray,
         overall_cpu_denorm: float,
-        for_next_prov: Provisioning,
         debug_values: Dict[str, int | float],
     ) -> None:
         self.scaled_run_times = scaled_run_times
         self.debug_values = debug_values
         self.overall_cpu_denorm = overall_cpu_denorm
-        self.for_next_prov = for_next_prov
 
     @classmethod
     def compute(
@@ -39,55 +37,119 @@ class RedshiftProvisioningScore:
         Computes all of the Redshift provisioning-dependent scoring components in one
         place.
         """
-        # Special case: If we turn off Redshift (set the number of nodes to 0).
-        if next_prov.num_nodes() == 0:
+        query_factor = cls.query_movement_factor(
+            base_query_run_times, query_arrival_counts, ctx
+        )
+        predicted_cpu_denorm = cls.predict_cpu_denorm(
+            curr_prov, next_prov, query_factor, ctx
+        )
+
+        # Special case (turning off Redshift).
+        if predicted_cpu_denorm == 0.0:
             return cls(
                 base_query_run_times,
                 0.0,
-                next_prov,
                 {
                     "redshift_query_factor": 0.0,
                 },
             )
-
-        overall_forecasted_cpu_util_pct = ctx.metrics.redshift_cpu_avg
-        overall_cpu_util_denorm = (
-            (overall_forecasted_cpu_util_pct / 100)
-            * redshift_num_cpus(curr_prov)
-            * curr_prov.num_nodes()
-        )
-
-        # 1. Adjust the analytical portion of the system load for query movement.
-        if (
-            Engine.Redshift not in ctx.engine_latency_norm_factor
-            or curr_prov.num_nodes() == 0
-        ):
-            # Special case. We cannot reweigh the queries because nothing in the
-            # current workload ran on Redshift.
-            query_factor = 1.0
         else:
-            # Query movement scaling factor.
-            # Captures change in queries routed to this engine.
-            norm_factor = ctx.engine_latency_norm_factor[Engine.Redshift]
-            assert norm_factor != 0.0
-            total_next_latency = np.dot(base_query_run_times, query_arrival_counts)
-            query_factor = total_next_latency / norm_factor
+            scaled_rt = cls.scale_load_resources(
+                base_query_run_times, next_prov, predicted_cpu_denorm, ctx
+            )
+            return cls(
+                scaled_rt,
+                predicted_cpu_denorm,
+                {
+                    "redshift_query_factor": query_factor
+                    if query_factor is not None
+                    else 0.0,
+                },
+            )
 
-        adjusted_cpu_denorm = query_factor * overall_cpu_util_denorm
+    @classmethod
+    def predict_cpu_denorm(
+        cls,
+        curr_prov: Provisioning,
+        next_prov: Provisioning,
+        query_factor: Optional[float],
+        ctx: "ScoringContext",
+    ) -> float:
+        """
+        Returns the predicted overall denormalized CPU utilization across the
+        entire cluster for `next_prov`.
+        """
+        # 4 cases
+        # Redshift off -> Redshift off (no-op)
+        # Redshift off -> Redshift on
+        # Redshift on -> Redshift on
+        # Redshift on -> Redshift off
 
-        # 2. Scale query execution times based on load and provisioning.
-        scaled_rt = cls.scale_load_resources(
-            base_query_run_times, next_prov, adjusted_cpu_denorm, ctx
-        )
+        curr_on = curr_prov.num_nodes() > 0
+        next_on = next_prov.num_nodes() > 0
 
-        return cls(
-            scaled_rt,
-            adjusted_cpu_denorm,
-            next_prov,
-            {
-                "redshift_query_factor": query_factor,
-            },
-        )
+        # Simple no-op cases.
+        if (not curr_on and not next_on) or (curr_on and not next_on):
+            return 0.0
+
+        if not curr_on and next_on:
+            # Turning on Redshift.
+            # We cannot reweigh the queries because nothing in the current
+            # workload ran on Redshift. We prime the load with a fraction of the
+            # proposed cluster's peak load.
+            return (
+                redshift_num_cpus(next_prov)
+                * next_prov.num_nodes()
+                * ctx.planner_config.redshift_initialize_load_fraction()
+            )
+        else:
+            # Redshift is staying on, but there is a potential provisioning
+            # change.
+            assert curr_on and next_on
+
+            # Special case. Redshift was on, but nothing ran on it and now we
+            # want to run queries on it. We use the same load priming approach
+            # but on the current cluster.
+            if (
+                query_factor is None
+                and len(ctx.current_query_locations[Engine.Redshift]) > 0
+            ):
+                return (
+                    redshift_num_cpus(curr_prov)
+                    * curr_prov.num_nodes()
+                    * ctx.planner_config.redshift_initialize_load_fraction()
+                )
+
+            curr_cpu_util_denorm = (
+                (ctx.metrics.redshift_cpu_avg / 100.0)
+                * redshift_num_cpus(curr_prov)
+                * curr_prov.num_nodes()
+            )
+
+            # We stay conservative here.
+            if query_factor is not None and query_factor > 1.0:
+                adjusted_cpu_denorm = query_factor * curr_cpu_util_denorm
+            else:
+                adjusted_cpu_denorm = curr_cpu_util_denorm
+
+            return adjusted_cpu_denorm
+
+    @staticmethod
+    def query_movement_factor(
+        base_query_run_times: npt.NDArray,
+        query_arrival_counts: npt.NDArray,
+        ctx: "ScoringContext",
+    ) -> Optional[float]:
+        # Query movement scaling factor.
+        # Captures change in queries routed to this engine.
+        if Engine.Redshift not in ctx.engine_latency_norm_factor:
+            # Special case. We cannot reweigh the queries because nothing in the
+            # current workload ran on Redshift (it could have been off).
+            return None
+        norm_factor = ctx.engine_latency_norm_factor[Engine.Redshift]
+        assert norm_factor != 0.0
+        total_next_latency = np.dot(base_query_run_times, query_arrival_counts)
+        return total_next_latency / norm_factor
 
     @staticmethod
     def scale_load_resources(
@@ -121,12 +183,11 @@ class RedshiftProvisioningScore:
         return RedshiftProvisioningScore(
             self.scaled_run_times,
             self.overall_cpu_denorm,
-            self.for_next_prov,
             self.debug_values.copy(),
         )
 
     def add_debug_values(self, dest: Dict[str, int | float | str]) -> None:
-        dest["redshift_cpu_denorm"] = self.overall_cpu_denorm
+        dest["redshift_predicted_cpu_denorm"] = self.overall_cpu_denorm
         dest.update(self.debug_values)
 
 

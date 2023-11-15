@@ -131,7 +131,7 @@ async def run_planner_impl(args) -> None:
     config = ConfigFile.load(args.config_file)
 
     # 2. Load the planner config.
-    planner_config = PlannerConfig(args.planner_config_file)
+    planner_config = PlannerConfig.load(args.planner_config_file)
 
     # 3. Load the blueprint.
     assets = AssetManager(config)

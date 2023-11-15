@@ -351,3 +351,4 @@ use_recorded_routing_if_available: true
 ensure_tables_together_on_one_engine: true
 
 aurora_initialize_load_fraction: 0.25
+redshift_initialize_load_fraction: 0.25

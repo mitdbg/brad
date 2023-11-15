@@ -12,10 +12,14 @@ class PlannerConfig:
     shared across planning strategies, some are specific to a strategy.
     """
 
-    def __init__(self, path: str):
-        self._raw_path = path
+    @classmethod
+    def load(cls, path: str) -> "PlannerConfig":
         with open(path, "r", encoding="UTF-8") as file:
-            self._raw = yaml.load(file, Loader=yaml.Loader)
+            raw = yaml.load(file, Loader=yaml.Loader)
+        return cls(raw)
+
+    def __init__(self, raw: Dict[str, Any]):
+        self._raw = raw
 
         self._aurora_scaling_coefs: Optional[npt.NDArray] = None
         self._redshift_scaling_coefs: Optional[npt.NDArray] = None
@@ -233,6 +237,9 @@ class PlannerConfig:
 
     def aurora_initialize_load_fraction(self) -> float:
         return self._raw["aurora_initialize_load_fraction"]
+
+    def redshift_initialize_load_fraction(self) -> float:
+        return self._raw["redshift_initialize_load_fraction"]
 
     def aurora_storage_index_multiplier(self) -> float:
         return float(self._raw["aurora_storage_index_multiplier"])
