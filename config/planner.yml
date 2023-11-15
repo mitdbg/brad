@@ -19,7 +19,7 @@ query_dist_change_frac: 0.1
 ###
 
 triggers:
-  enabled: false
+  enabled: true
   check_period_s: 90  # Triggers are checked every X seconds.
   check_period_offset_s: 360  # Wait 6 mins before starting.
 
