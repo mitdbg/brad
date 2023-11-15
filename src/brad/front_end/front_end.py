@@ -29,8 +29,6 @@ from brad.daemon.messages import (
     NewBlueprint,
     NewBlueprintAck,
 )
-from brad.data_stats.estimator import Estimator
-from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.front_end.brad_interface import BradInterface
 from brad.front_end.errors import QueryError
 from brad.front_end.grpc import BradGrpc
@@ -118,7 +116,6 @@ class BradFrontEnd(BradInterface):
             self._config, self._blueprint_mgr, self._schema_name
         )
         self._daemon_messages_task: Optional[asyncio.Task[None]] = None
-        self._estimator: Optional[Estimator] = None
 
         # Number of transactions that completed.
         self._transaction_end_counter = Counter()  # pylint: disable=global-statement
@@ -173,17 +170,7 @@ class BradFrontEnd(BradInterface):
             self._monitor.set_up_metrics_sources()
             await self._monitor.fetch_latest()
 
-        if (
-            self._routing_policy_override == RoutingPolicy.ForestTableSelectivity
-            or self._routing_policy_override == RoutingPolicy.Default
-        ):
-            self._estimator = await PostgresEstimator.connect(
-                self._schema_name, self._config
-            )
-            await self._estimator.analyze(self._blueprint_mgr.get_blueprint())
-        else:
-            self._estimator = None
-        await self._set_up_router(self._estimator)
+        await self._set_up_router()
 
         # Start the metrics reporting task.
         self._brad_metrics_reporting_task = asyncio.create_task(
@@ -195,7 +182,7 @@ class BradFrontEnd(BradInterface):
 
         self._qlogger_refresh_task = asyncio.create_task(self._refresh_qlogger())
 
-    async def _set_up_router(self, estimator: Optional[Estimator]) -> None:
+    async def _set_up_router(self) -> None:
         # We have different routing policies for performance evaluation and
         # testing purposes.
         blueprint = self._blueprint_mgr.get_blueprint()
@@ -236,7 +223,6 @@ class BradFrontEnd(BradInterface):
                 definite_policy, blueprint.table_locations_bitmap()
             )
 
-        await self._router.run_setup(estimator)
         self._router.log_policy()
 
     async def _run_teardown(self):
@@ -257,10 +243,6 @@ class BradFrontEnd(BradInterface):
         if self._qlogger_refresh_task is not None:
             self._qlogger_refresh_task.cancel()
             self._qlogger_refresh_task = None
-
-        if self._estimator is not None:
-            await self._estimator.close()
-            self._estimator = None
 
     async def start_session(self) -> SessionId:
         rand_backoff = None
