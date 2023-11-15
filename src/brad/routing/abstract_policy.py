@@ -1,7 +1,6 @@
-from typing import List, Optional
+from typing import List
 
 from brad.config.engine import Engine
-from brad.planner.estimator import Estimator
 from brad.query_rep import QueryRep
 from brad.routing.context import RoutingContext
 
