@@ -29,8 +29,6 @@ from brad.daemon.messages import (
     NewBlueprint,
     NewBlueprintAck,
 )
-from brad.data_stats.estimator import Estimator
-from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.front_end.brad_interface import BradInterface
 from brad.front_end.errors import QueryError
 from brad.front_end.grpc import BradGrpc

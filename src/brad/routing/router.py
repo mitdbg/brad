@@ -55,7 +55,9 @@ class Router:
             logger.info("    - %s", p.name())
         logger.info("  Definite policy: %s", self._full_policy.definite_policy.name())
 
-    async def run_setup_for_standalone(self, estimator: Optional[Estimator] = None) -> None:
+    async def run_setup_for_standalone(
+        self, estimator: Optional[Estimator] = None
+    ) -> None:
         """
         Should be called before using the router "standalone" contexts (i.e.,
         outside the front end). This is used to set up any dynamic state that is
