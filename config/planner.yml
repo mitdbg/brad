@@ -19,7 +19,7 @@ query_dist_change_frac: 0.1
 ###
 
 triggers:
-  enabled: true
+  enabled: false
   check_period_s: 90  # Triggers are checked every X seconds.
   check_period_offset_s: 360  # Wait 6 mins before starting.
 
@@ -351,3 +351,4 @@ use_recorded_routing_if_available: true
 ensure_tables_together_on_one_engine: true
 
 aurora_initialize_load_fraction: 0.25
+redshift_initialize_load_fraction: 0.25
