@@ -117,11 +117,10 @@ class AuroraProvisioningScore:
         if not current_has_replicas:
             if not next_has_replicas:
                 # No replicas -> No replicas
-
-                # Special case. If no queries ran on Aurora and now we are
-                # running queries, we need to prime the system with some load.
-                # We use a constant factor to prime the system.
                 if adding_ana_first_time:
+                    # Special case. If no queries ran on Aurora and now we are
+                    # running queries, we need to prime the system with some
+                    # load. We use a constant factor to prime the system.
                     initialized_load = (
                         ctx.planner_config.aurora_initialize_load_fraction()
                         * aurora_num_cpus(curr_prov)
@@ -137,11 +136,10 @@ class AuroraProvisioningScore:
                     )
             else:
                 # No replicas -> Yes replicas
-
-                # Special case. If no queries ran on Aurora and now we are
-                # running queries, we need to prime the system with some load.
-                # We use a constant factor to prime the system.
                 if adding_ana_first_time:
+                    # Special case. If no queries ran on Aurora and now we are
+                    # running queries, we need to prime the system with some
+                    # load. We use a constant factor to prime the system.
                     initialized_load = (
                         ctx.planner_config.aurora_initialize_load_fraction()
                         * aurora_num_cpus(curr_prov)
@@ -168,23 +166,45 @@ class AuroraProvisioningScore:
                 * aurora_num_cpus(curr_prov)
                 * curr_num_read_replicas
             )
+            # Handling a special case of moving queries onto Aurora where none
+            # previously executed. Note that this should be very rare here
+            # because there are already read replicas.
+            initialized_load = (
+                ctx.planner_config.aurora_initialize_load_fraction()
+                * aurora_num_cpus(curr_prov)
+                * curr_num_read_replicas
+            )
 
             if not next_has_replicas:
                 # Yes replicas -> No replicas
-                return (
-                    curr_writer_cpu_util_denorm
-                    + (total_reader_cpu_denorm * query_factor_clean),
-                    curr_writer_load + (total_reader_load * query_factor_clean),
-                )
+                if adding_ana_first_time:
+                    # Special case.
+                    return (
+                        curr_writer_cpu_util_denorm + initialized_load,
+                        curr_writer_load + initialized_load,
+                    )
+                else:
+                    return (
+                        curr_writer_cpu_util_denorm
+                        + (total_reader_cpu_denorm * query_factor_clean),
+                        curr_writer_load + (total_reader_load * query_factor_clean),
+                    )
 
             else:
                 # Yes replicas -> Yes replicas
-                return (
-                    curr_writer_cpu_util_denorm,
-                    total_reader_load
-                    * query_factor_clean
-                    / (next_prov.num_nodes() - 1),
-                )
+                if adding_ana_first_time:
+                    # Special case.
+                    return (
+                        curr_writer_cpu_util_denorm,
+                        initialized_load / (next_prov.num_nodes() - 1),
+                    )
+                else:
+                    return (
+                        curr_writer_cpu_util_denorm,
+                        total_reader_load
+                        * query_factor_clean
+                        / (next_prov.num_nodes() - 1),
+                    )
 
     @staticmethod
     def query_movement_factor(

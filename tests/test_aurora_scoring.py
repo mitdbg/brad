@@ -197,6 +197,19 @@ def test_multi_to_single() -> None:
     assert txn_cpu_denorm == pytest.approx(4.0)
     assert ana_load == pytest.approx(4.0)
 
+    # Special case (no queries executed previously and now we are executing
+    # queries). Should be rare because there are read replicas.
+    ctx.current_query_locations[Engine.Aurora].append(0)
+    txn_cpu_denorm, ana_load = AuroraProvisioningScore.predict_loads(
+        curr_prov, next_prov, None, ctx
+    )
+    assert txn_cpu_denorm == pytest.approx(
+        2.0 + ctx.planner_config.aurora_initialize_load_fraction() * 4.0
+    )
+    assert ana_load == pytest.approx(
+        2.0 + ctx.planner_config.aurora_initialize_load_fraction() * 4.0
+    )
+
 
 def test_multi_to_multi() -> None:
     # Doubling the number of replicas (2 to 4).
@@ -241,3 +254,14 @@ def test_multi_to_multi() -> None:
     )
     assert txn_cpu_denorm == pytest.approx(2.0)
     assert ana_load == pytest.approx(2.0)
+
+    # Special case (no queries executed previously and now we are executing
+    # queries). Should be rare because there are read replicas.
+    ctx.current_query_locations[Engine.Aurora].append(0)
+    txn_cpu_denorm, ana_load = AuroraProvisioningScore.predict_loads(
+        curr_prov, next_prov, None, ctx
+    )
+    assert txn_cpu_denorm == pytest.approx(2.0)
+    assert ana_load == pytest.approx(
+        ctx.planner_config.aurora_initialize_load_fraction() * 4.0 * 2.0 / 4.0
+    )
