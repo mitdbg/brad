@@ -102,6 +102,13 @@ class AuroraProvisioningScore:
         if query_factor is not None and query_factor > 1.0:
             query_factor_clean = query_factor
 
+        # This is true iff we did not run any queries on Aurora with the current
+        # blueprint and are now going to run queries on Aurora on the next
+        # blueprint.
+        adding_ana_first_time = (
+            query_factor is None and len(ctx.current_query_locations[Engine.Aurora]) > 0
+        )
+
         # 4 cases:
         # - No replicas -> No replicas
         # - No replicas -> Yes replicas
@@ -110,24 +117,34 @@ class AuroraProvisioningScore:
         if not current_has_replicas:
             if not next_has_replicas:
                 # No replicas -> No replicas
-                return (
-                    curr_writer_cpu_util_denorm * query_factor_clean,
-                    curr_writer_load * query_factor_clean,
-                )
+
+                # Special case. If no queries ran on Aurora and now we are
+                # running queries, we need to prime the system with some load.
+                # We use a constant factor to prime the system.
+                if adding_ana_first_time:
+                    initialized_load = (
+                        ctx.planner_config.aurora_initialize_load_fraction()
+                        * aurora_num_cpus(curr_prov)
+                    )
+                    return (
+                        curr_writer_cpu_util_denorm + initialized_load,
+                        curr_writer_load + initialized_load,
+                    )
+                else:
+                    return (
+                        curr_writer_cpu_util_denorm * query_factor_clean,
+                        curr_writer_load * query_factor_clean,
+                    )
             else:
                 # No replicas -> Yes replicas
 
                 # Special case. If no queries ran on Aurora and now we are
                 # running queries, we need to prime the system with some load.
                 # We use a constant factor to prime the system.
-                if (
-                    query_factor is None
-                    and len(ctx.current_query_locations[Engine.Aurora]) > 0
-                ):
+                if adding_ana_first_time:
                     initialized_load = (
                         ctx.planner_config.aurora_initialize_load_fraction()
-                        * aurora_num_cpus(ctx.current_blueprint.aurora_provisioning())
-                        * ctx.current_blueprint.aurora_provisioning().num_nodes()
+                        * aurora_num_cpus(curr_prov)
                     )
                     return (
                         curr_writer_cpu_util_denorm,
@@ -136,7 +153,8 @@ class AuroraProvisioningScore:
                 else:
                     return (
                         curr_writer_cpu_util_denorm,
-                        curr_writer_load * query_factor_clean,
+                        (curr_writer_load * query_factor_clean)
+                        / (next_prov.num_nodes() - 1),
                     )
 
         else:

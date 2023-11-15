@@ -12,10 +12,14 @@ class PlannerConfig:
     shared across planning strategies, some are specific to a strategy.
     """
 
-    def __init__(self, path: str):
-        self._raw_path = path
+    @classmethod
+    def load(cls, path: str) -> "PlannerConfig":
         with open(path, "r", encoding="UTF-8") as file:
-            self._raw = yaml.load(file, Loader=yaml.Loader)
+            raw = yaml.load(file, Loader=yaml.Loader)
+        return cls(raw)
+
+    def __init__(self, raw: Dict[str, Any]):
+        self._raw = raw
 
         self._aurora_scaling_coefs: Optional[npt.NDArray] = None
         self._redshift_scaling_coefs: Optional[npt.NDArray] = None

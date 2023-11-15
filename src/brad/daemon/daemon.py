@@ -86,7 +86,7 @@ class BradDaemon:
         self._temp_config = temp_config
         self._schema_name = schema_name
         self._path_to_planner_config = path_to_planner_config
-        self._planner_config = PlannerConfig(path_to_planner_config)
+        self._planner_config = PlannerConfig.load(path_to_planner_config)
         self._debug_mode = debug_mode
 
         self._assets = AssetManager(self._config)
