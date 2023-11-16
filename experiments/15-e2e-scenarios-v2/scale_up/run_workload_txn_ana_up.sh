@@ -37,7 +37,7 @@ function rana_sweep_offset4() {
   local query_indices=$4
 
   for ra_clients in $sweep; do
-    start_repeating_olap_runner $ra_clients 15 5 $query_indices "ra_${ra_clients}" 4
+    start_repeating_olap_runner $ra_clients 15 5 $query_indices "ra_sweep_${ra_clients}" 4
     sweep_rana_pid=$runner_pid
 
     sleep $(($gap_minute * 60))
