@@ -14,6 +14,7 @@ reinterpret_second_as: 1
 # to be accepted.
 query_dist_change_frac: 0.1
 
+# Used to aggregate metrics collected in the planning window.
 metrics_agg:
   method: ewm         # 'mean' is another option
   alpha: 0.86466472   # 1 - 1 / e^2
@@ -98,11 +99,15 @@ aurora_per_instance_change_time_s: 300  # 5 minutes
 redshift_elastic_resize_time_s: 900  # 15 minutes - https://repost.aws/knowledge-center/resize-redshift-cluster
 redshift_classic_resize_time_s: 7200  # 2 hours (This is very difficult to estimate; it depends on state we have no visibility into.)
 
-redshift_extract_rate_mb_per_s: 10.0
-redshift_load_rate_mb_per_s: 10.0
+# Minimum of 5 seconds per table, but this amount is negligible since we work
+# with relatively large tables.
+redshift_extract_rate_mb_per_s: 30.0
+redshift_load_rate_mb_per_s: 20.0
 
-aurora_extract_rate_mb_per_s: 10.0
-aurora_load_rate_mb_per_s: 10.0
+# There is a minimum of 1 second per table. But this is negligible since we work
+# with relatively large tables.
+aurora_extract_rate_mb_per_s: 12.0
+aurora_load_rate_mb_per_s: 12.0
 
 # Extracting / loading in Athena corresponds to a conversion to/from Iceberg.
 athena_extract_rate_mb_per_s: 10.0
