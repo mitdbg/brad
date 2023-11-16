@@ -83,7 +83,9 @@ class RdsProvisioningManager:
             await asyncio.sleep(20)
             await self.wait_until_instance_is_available(instance_id)
 
-    async def delete_replica(self, instance_id: str) -> None:
+    async def delete_replica(
+        self, instance_id: str, wait_until_status_updated: bool = True
+    ) -> None:
         def do_delete():
             self._rds.delete_db_instance(
                 DBInstanceIdentifier=instance_id,
@@ -93,6 +95,11 @@ class RdsProvisioningManager:
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, do_delete)
+
+        # Will poll until the instance's status is no longer "available".
+        if wait_until_status_updated:
+            await asyncio.sleep(10)
+            await self.wait_until_instance_is_not_available(instance_id)
 
     async def wait_until_instance_is_available(
         self, instance_id: str, polling_interval: float = 20
@@ -105,6 +112,20 @@ class RdsProvisioningManager:
                 break
             logger.debug(
                 "Waiting for Aurora instance %s to become available...", instance_id
+            )
+            await asyncio.sleep(polling_interval)
+
+    async def wait_until_instance_is_not_available(
+        self, instance_id: str, polling_interval: float = 20
+    ) -> None:
+        while True:
+            response = await self._describe_db_instance(instance_id)
+            instance = response["DBInstances"][0]
+            status = instance["DBInstanceStatus"]
+            if status != "available":
+                break
+            logger.debug(
+                "Waiting for Aurora instance %s to be NOT available...", instance_id
             )
             await asyncio.sleep(polling_interval)
 

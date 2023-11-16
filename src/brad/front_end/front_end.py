@@ -263,6 +263,10 @@ class BradFrontEnd(BradInterface):
                     )
                     raise
                 await asyncio.sleep(time_to_wait)
+                # Defensively refresh the blueprint and directory before
+                # retrying. Maybe we are getting outdated endpoint information
+                # from AWS.
+                await self._blueprint_mgr.load()
 
     async def end_session(self, session_id: SessionId) -> None:
         await self._sessions.end_session(session_id)
