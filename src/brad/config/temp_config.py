@@ -1,6 +1,7 @@
 import pathlib
 import yaml
 from typing import Any, Dict, Optional
+from datetime import timedelta
 
 
 class TempConfig:
@@ -24,6 +25,21 @@ class TempConfig:
 
     def txn_latency_p90_ceiling_s(self) -> float:
         return float(self._raw["txn_latency_p90_ceiling_s"])
+
+    def use_payoff_period(self) -> bool:
+        return self._raw["use_payoff_period"]
+
+    def payoff_period(self) -> timedelta:
+        period = self._raw["payoff_period"]
+        return timedelta(
+            weeks=period["weeks"],
+            days=period["days"],
+            hours=period["hours"],
+            minutes=period["minutes"],
+        )
+
+    def payoff_penalty(self) -> float:
+        return self._raw["payoff_penalty"]
 
     def std_dataset_path(self) -> Optional[pathlib.Path]:
         if "std_dataset_path" not in self._raw:
