@@ -83,7 +83,7 @@ def runner(
 
     # Signal that we are ready to start and wait for other clients.
     start_queue.put("")
-    control_semaphore.acquire()
+    control_semaphore.acquire()  # type: ignore
 
     rand_backoff = None
     overall_start = time.time()
@@ -286,6 +286,7 @@ def main():
 
     mgr = mp.Manager()
     start_queue = [mgr.Queue() for _ in range(args.num_clients)]
+    # pylint: disable-next=no-member
     control_semaphore = [mgr.Semaphore(value=0) for _ in range(args.num_clients)]
 
     if args.brad_direct:

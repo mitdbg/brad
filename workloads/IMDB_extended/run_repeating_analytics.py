@@ -7,7 +7,6 @@ import pickle
 import numpy as np
 import pathlib
 import random
-import queue
 import sys
 import threading
 import signal
@@ -26,7 +25,6 @@ logger = logging.getLogger(__name__)
 EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
 ENGINE_NAMES = ["ATHENA", "AURORA", "REDSHIFT"]
 
-RUNNER_EXIT = "runner_exit"
 STARTUP_FAILED = "startup_failed"
 
 
@@ -257,7 +255,7 @@ def simulation_runner(
     all_query_runtime: npt.NDArray,
     runner_idx: int,
     start_queue: mp.Queue,
-    control_semaphore: mp.Semaphore,
+    control_semaphore: mp.Semaphore,  # type: ignore
     args,
     queries: List[int],
     query_frequency_original: Optional[npt.NDArray] = None,
@@ -307,10 +305,10 @@ def simulation_runner(
 
         # Signal that we're ready to start and wait for the controller.
         start_queue.put_nowait("")
-        control_semaphore.acquire()
+        control_semaphore.acquire()  # type: ignore
 
         while True:
-            should_exit = control_semaphore.acquire(False)
+            should_exit = control_semaphore.acquire(False)  # type: ignore
             if should_exit:
                 break
 
