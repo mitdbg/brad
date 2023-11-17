@@ -649,9 +649,9 @@ class BradFrontEnd(BradInterface):
 
             if rand_backoff is None:
                 rand_backoff = RandomizedExponentialBackoff(
-                    max_retries=10,
-                    base_delay_s=2.0,
-                    max_delay_s=timedelta(minutes=10).total_seconds(),
+                    max_retries=100,
+                    base_delay_s=1.0,
+                    max_delay_s=timedelta(minutes=1).total_seconds(),
                 )
 
             wait_time = rand_backoff.wait_time_s()

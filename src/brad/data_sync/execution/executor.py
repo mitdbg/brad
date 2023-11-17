@@ -65,7 +65,11 @@ class DataSyncExecutor:
             expected_engines.add(Engine.Redshift)
 
         await self._engines.add_connections(self._config, directory, expected_engines)
-        await self._engines.remove_connections(expected_engines)
+        await self._engines.remove_connections(
+            expected_engines,
+            # We do not need to connect to the read replicas.
+            expected_aurora_read_replicas=0,
+        )
 
     async def shutdown(self) -> None:
         if self._engines is None:

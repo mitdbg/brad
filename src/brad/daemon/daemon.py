@@ -615,7 +615,9 @@ class BradDaemon:
         assert tm.next_version is not None, "Missing next version."
 
         directory = self._blueprint_mgr.get_directory()
-        logger.debug("Using new directory: %s", directory)
+        logger.info(
+            "Switched to new directory during blueprint transition: %s", directory
+        )
         self._monitor.update_metrics_sources()
 
         await self._data_sync_executor.update_connections()

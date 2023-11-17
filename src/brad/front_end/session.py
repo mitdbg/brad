@@ -170,13 +170,19 @@ class SessionManager:
         blueprint = self._blueprint_mgr.get_blueprint()
 
         expected_engines = {Engine.Athena}
+        expected_aurora_read_replicas = 0
         if blueprint.aurora_provisioning().num_nodes() > 0:
             expected_engines.add(Engine.Aurora)
+            expected_aurora_read_replicas = (
+                blueprint.aurora_provisioning().num_nodes() - 1
+            )
         if blueprint.redshift_provisioning().num_nodes() > 0:
             expected_engines.add(Engine.Redshift)
 
         for session in self._sessions.values():
-            await session.engines.remove_connections(expected_engines)
+            await session.engines.remove_connections(
+                expected_engines, expected_aurora_read_replicas
+            )
 
     async def reestablish_connections(self) -> bool:
         """

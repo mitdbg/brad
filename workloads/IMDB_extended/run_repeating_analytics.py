@@ -216,7 +216,7 @@ def runner(
 
                     if rand_backoff is None:
                         rand_backoff = RandomizedExponentialBackoff(
-                            max_retries=20,
+                            max_retries=100,
                             base_delay_s=1.0,
                             max_delay_s=timedelta(minutes=1).total_seconds(),
                         )
