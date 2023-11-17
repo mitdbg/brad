@@ -257,7 +257,7 @@ def simulation_runner(
     all_query_runtime: npt.NDArray,
     runner_idx: int,
     start_queue: mp.Queue,
-    stop_queue: mp.Queue,
+    control_semaphore: mp.Semaphore,
     args,
     queries: List[int],
     query_frequency_original: Optional[npt.NDArray] = None,
@@ -307,13 +307,13 @@ def simulation_runner(
 
         # Signal that we're ready to start and wait for the controller.
         start_queue.put_nowait("")
-        msg = stop_queue.get()
-
-        if msg == RUNNER_EXIT:
-            print(f"Simulation runner {runner_idx} is stopping without having started.")
-            return
+        control_semaphore.acquire()
 
         while True:
+            should_exit = control_semaphore.acquire(False)
+            if should_exit:
+                break
+
             if execution_gap_dist is not None:
                 now = datetime.now().astimezone(pytz.utc)
                 time_unsimulated = get_time_of_the_day_unsimulated(
@@ -367,12 +367,6 @@ def simulation_runner(
                 file=file,
                 flush=True,
             )
-
-            try:
-                _ = stop_queue.get_nowait()
-                break
-            except queue.Empty:
-                pass
 
 
 def run_warmup(args, query_bank: List[str], queries: List[int]):
