@@ -197,7 +197,11 @@ def runner(
 
                 exec_count += 1
                 if rand_backoff is not None:
-                    print(f"[RA {runner_idx}] Continued after transient errors.")
+                    print(
+                        f"[RA {runner_idx}] Continued after transient errors.",
+                        flush=True,
+                        file=sys.stderr,
+                    )
                     rand_backoff = None
 
             except BradClientError as ex:
@@ -212,18 +216,24 @@ def runner(
 
                     if rand_backoff is None:
                         rand_backoff = RandomizedExponentialBackoff(
-                            max_retries=10,
-                            base_delay_s=2.0,
-                            max_delay_s=timedelta(minutes=10).total_seconds(),
+                            max_retries=20,
+                            base_delay_s=1.0,
+                            max_delay_s=timedelta(minutes=1).total_seconds(),
                         )
-                        print(f"[RA {runner_idx}] Backing off due to transient errors.")
+                        print(
+                            f"[RA {runner_idx}] Backing off due to transient errors.",
+                            flush=True,
+                            file=sys.stderr,
+                        )
 
                     # Delay retrying in the case of a transient error (this
                     # happens during blueprint transitions).
                     wait_s = rand_backoff.wait_time_s()
                     if wait_s is None:
                         print(
-                            f"[RA {runner_idx}] Aborting benchmark. Too many transient errors."
+                            f"[RA {runner_idx}] Aborting benchmark. Too many transient errors.",
+                            flush=True,
+                            file=sys.stderr,
                         )
                         break
                     time.sleep(wait_s)
