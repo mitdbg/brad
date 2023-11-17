@@ -41,10 +41,16 @@ class BradGrpcClient:
         self._session_id = self._impl.start_session()
 
     def close(self):
-        assert self._session_id is not None
-        self._impl.end_session(self._session_id)
-        self._impl.close()
-        self._session_id = None
+        try:
+            assert self._session_id is not None
+            self._impl.end_session(self._session_id)
+            self._impl.close()
+        except grpc.RpcError:
+            # Among other possibilities, usually this means the BRAD front end
+            # has already shut down.
+            pass
+        finally:
+            self._session_id = None
 
     def run_query(
         self, query: str
