@@ -41,11 +41,7 @@ function txn_sweep() {
 }
 
 function inner_cancel_experiment() {
-  if [ ! -z $heavy_rana_pid ]; then
-    cancel_experiment $rana_pid $txn_pid $heavy_rana_pid
-  else
-    cancel_experiment $rana_pid $txn_pid
-  fi
+  cancel_experiment $rana_pid $txn_pid
 }
 
 trap "inner_cancel_experiment" INT
@@ -81,5 +77,5 @@ sleep $((35 * 60))  # 47 mins total; 57 mins cumulative
 # Shut down everything now.
 log_workload_point "experiment_workload_done"
 >&2 echo "Experiment done. Shutting down runners..."
-graceful_shutdown $rana_pid $heavy_rana_pid $txn_pid
+graceful_shutdown $rana_pid $txn_pid
 log_workload_point "shutdown_complete"

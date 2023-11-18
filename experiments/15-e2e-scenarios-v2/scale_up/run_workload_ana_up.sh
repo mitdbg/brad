@@ -49,8 +49,8 @@ function rana_sweep_offset4() {
 }
 
 function inner_cancel_experiment() {
-  if [ ! -z $heavy_rana_pid ]; then
-    cancel_experiment $rana_pid $txn_pid $heavy_rana_pid
+  if [ ! -z $sweep_rana_pid ]; then
+    cancel_experiment $rana_pid $txn_pid $sweep_rana_pid
   else
     cancel_experiment $rana_pid $txn_pid
   fi
@@ -86,5 +86,5 @@ log_workload_point "experiment_workload_done"
 
 # Shut down everything now.
 >&2 echo "Experiment done. Shutting down runners..."
-graceful_shutdown $rana_pid $heavy_rana_pid $txn_pid
+graceful_shutdown $rana_pid $sweep_rana_pid $txn_pid
 log_workload_point "shutdown_complete"

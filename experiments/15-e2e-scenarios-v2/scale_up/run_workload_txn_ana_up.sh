@@ -50,7 +50,7 @@ function rana_sweep_offset4() {
 
 function inner_cancel_experiment() {
   if [ ! -z $heavy_rana_pid ]; then
-    cancel_experiment $rana_pid $txn_pid $heavy_rana_pid
+    cancel_experiment $rana_pid $txn_pid $sweep_rana_pid
   else
     cancel_experiment $rana_pid $txn_pid
   fi
