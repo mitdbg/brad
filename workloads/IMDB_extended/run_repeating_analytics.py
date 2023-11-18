@@ -124,7 +124,11 @@ def runner(
         query_order = query_order_main.copy()
 
         # Signal that we're ready to start and wait for the controller.
-        print(f"Runner {runner_idx} is ready to start running.")
+        print(
+            f"Runner {runner_idx} is ready to start running.",
+            flush=True,
+            file=sys.stderr,
+        )
         start_queue.put_nowait("")
         control_semaphore.acquire()  # type: ignore
 
@@ -132,7 +136,7 @@ def runner(
             # Note that `False` means to not block.
             should_exit = control_semaphore.acquire(False)  # type: ignore
             if should_exit:
-                print(f"Runner {runner_idx} is exiting.")
+                print(f"Runner {runner_idx} is exiting.", file=sys.stderr, flush=True)
                 break
 
             if execution_gap_dist is not None:
@@ -249,6 +253,7 @@ def runner(
         os.fsync(file.fileno())
         file.close()
         database.close_sync()
+        print(f"Runner {runner_idx} has exited.", flush=True, file=sys.stderr)
 
 
 def simulation_runner(
@@ -768,6 +773,9 @@ def main():
     print("Waiting for the clients to complete...", flush=True, file=sys.stderr)
     for p in processes:
         p.join()
+
+    for idx, p in enumerate(processes):
+        print("Runner {idx} exit code:", p.exitcode, flush=True, file=sys.stderr)
 
     print("Done repeating analytics!", flush=True, file=sys.stderr)
 
