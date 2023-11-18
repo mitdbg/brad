@@ -30,6 +30,7 @@ from brad.planner.scoring.table_placement import (
     compute_single_aurora_table_cost,
     compute_single_table_movement_time_and_cost,
 )
+from brad.planner.workload import Workload
 from brad.routing.router import Router
 
 logger = logging.getLogger(__name__)
@@ -616,6 +617,18 @@ class BlueprintCandidate(ComparableBlueprint):
 
     def get_redshift_provisioning(self) -> Provisioning:
         return self.redshift_provisioning
+
+    def get_routing_decisions(self) -> npt.NDArray:
+        engine_query = np.array(
+            [
+                (Workload.EngineLatencyIndex[engine], idx)
+                for engine, qidxs in self.query_locations.items()
+                for idx in qidxs
+            ]
+        )
+        si = np.argsort(engine_query[:, 1])
+        sorted_queries = engine_query[si]
+        return sorted_queries[:, 0]
 
     def get_predicted_analytical_latencies(self) -> npt.NDArray:
         relevant = []

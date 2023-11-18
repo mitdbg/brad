@@ -22,6 +22,15 @@ class ComparableBlueprint:
     def get_redshift_provisioning(self) -> Provisioning:
         raise NotImplementedError
 
+    def get_routing_decisions(self) -> npt.NDArray:
+        """
+        The query routing decisions for each analytical query in the workload.
+        Use `Workload.EngineLatencyIndex` to map engines to numeric indices.
+
+        Should return an NDArray of shape (N,).
+        """
+        raise NotImplementedError
+
     # Predicted performance.
 
     def get_predicted_analytical_latencies(self) -> npt.NDArray:
