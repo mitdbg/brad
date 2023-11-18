@@ -7,7 +7,6 @@ import pickle
 import numpy as np
 import pathlib
 import random
-import queue
 import sys
 import threading
 import signal
@@ -26,7 +25,6 @@ logger = logging.getLogger(__name__)
 EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
 ENGINE_NAMES = ["ATHENA", "AURORA", "REDSHIFT"]
 
-RUNNER_EXIT = "runner_exit"
 STARTUP_FAILED = "startup_failed"
 
 
@@ -55,7 +53,7 @@ def time_in_minute_to_datetime_str(time_unsimulated: Optional[int]) -> str:
 def runner(
     runner_idx: int,
     start_queue: mp.Queue,
-    stop_queue: mp.Queue,
+    control_semaphore: mp.Semaphore,  # type: ignore
     args,
     query_bank: List[str],
     queries: List[int],
@@ -93,7 +91,6 @@ def runner(
     except BradClientError as ex:
         print(f"[RA {runner_idx}] Failed to connect to BRAD:", str(ex))
         start_queue.put_nowait(STARTUP_FAILED)
-        _ = stop_queue.get()
         return
 
     if query_frequency is not None:
@@ -129,13 +126,15 @@ def runner(
         # Signal that we're ready to start and wait for the controller.
         print(f"Runner {runner_idx} is ready to start running.")
         start_queue.put_nowait("")
-        msg = stop_queue.get()
-
-        if msg == RUNNER_EXIT:
-            print(f"Runner {runner_idx} is stopping without having started.")
-            return
+        control_semaphore.acquire()  # type: ignore
 
         while True:
+            # Note that `False` means to not block.
+            should_exit = control_semaphore.acquire(False)  # type: ignore
+            if should_exit:
+                print(f"Runner {runner_idx} is exiting.")
+                break
+
             if execution_gap_dist is not None:
                 now = datetime.now().astimezone(pytz.utc)
                 time_unsimulated = get_time_of_the_day_unsimulated(
@@ -246,12 +245,6 @@ def runner(
                         file=sys.stderr,
                     )
 
-            try:
-                _ = stop_queue.get_nowait()
-                print(f"Runner {runner_idx} is exiting.")
-                break
-            except queue.Empty:
-                pass
     finally:
         os.fsync(file.fileno())
         file.close()
@@ -262,7 +255,7 @@ def simulation_runner(
     all_query_runtime: npt.NDArray,
     runner_idx: int,
     start_queue: mp.Queue,
-    stop_queue: mp.Queue,
+    control_semaphore: mp.Semaphore,  # type: ignore
     args,
     queries: List[int],
     query_frequency_original: Optional[npt.NDArray] = None,
@@ -312,13 +305,13 @@ def simulation_runner(
 
         # Signal that we're ready to start and wait for the controller.
         start_queue.put_nowait("")
-        msg = stop_queue.get()
-
-        if msg == RUNNER_EXIT:
-            print(f"Simulation runner {runner_idx} is stopping without having started.")
-            return
+        control_semaphore.acquire()  # type: ignore
 
         while True:
+            should_exit = control_semaphore.acquire(False)  # type: ignore
+            if should_exit:
+                break
+
             if execution_gap_dist is not None:
                 now = datetime.now().astimezone(pytz.utc)
                 time_unsimulated = get_time_of_the_day_unsimulated(
@@ -372,12 +365,6 @@ def simulation_runner(
                 file=file,
                 flush=True,
             )
-
-            try:
-                _ = stop_queue.get_nowait()
-                break
-            except queue.Empty:
-                pass
 
 
 def run_warmup(args, query_bank: List[str], queries: List[int]):
@@ -600,9 +587,21 @@ def main():
         run_warmup(args, query_bank, queries)
         return
 
+    # Our control protocol is as follows.
+    # - Runner processes write to their `start_queue` when they have finished
+    #   setting up and are ready to start running. They then wait on the control
+    #   semaphore.
+    # - The control process blocks and waits on each `start_queue` to ensure
+    #   runners can start together (if needed).
+    # - The control process signals the control semaphore twice. Once to tell a
+    #   runner to start, once to tell it to stop.
+    # - If there is an error, a runner is free to exit as long as they have
+    #   written to `start_queue`.
     mgr = mp.Manager()
     start_queue = [mgr.Queue() for _ in range(args.num_clients)]
-    stop_queue = [mgr.Queue() for _ in range(args.num_clients)]
+    # N.B. `value = 0` since we use this for synchronization, not mutual exclusion.
+    # pylint: disable-next=no-member
+    control_semaphore = [mgr.Semaphore(value=0) for _ in range(args.num_clients)]
 
     if args.run_simulation:
         assert (
@@ -621,7 +620,7 @@ def main():
                     all_query_runtime,
                     idx,
                     start_queue[idx],
-                    stop_queue[idx],
+                    control_semaphore[idx],
                     args,
                     queries,
                     query_frequency,
@@ -639,7 +638,7 @@ def main():
                 args=(
                     idx,
                     start_queue[idx],
-                    stop_queue[idx],
+                    control_semaphore[idx],
                     args,
                     query_bank,
                     queries,
@@ -660,7 +659,9 @@ def main():
     if one_startup_failed:
         print("At least one runner failed to start up. Aborting the experiment.")
         for i in range(args.num_clients):
-            stop_queue[i].put_nowait(RUNNER_EXIT)
+            # Ideally we should be able to release twice atomically.
+            control_semaphore[i].release()
+            control_semaphore[i].release()
         for p in processes:
             p.join()
         print("Abort complete.")
@@ -674,7 +675,7 @@ def main():
     if num_client_trace is not None:
         assert args.time_scale_factor is not None, "need to set args.time_scale_factor"
         print("Telling client no.{} to start.".format(0), flush=True)
-        stop_queue[0].put("")
+        control_semaphore[0].release()
         num_running_client = 1
 
         finished_one_day = True
@@ -704,7 +705,7 @@ def main():
                     print(
                         "Telling client no.{} to start.".format(add_client), flush=True
                     )
-                    stop_queue[add_client].put("")
+                    control_semaphore[add_client].release()
                     num_running_client += 1
             elif num_running_client > num_client_required:
                 # shutting down clients
@@ -713,7 +714,7 @@ def main():
                         "Telling client no.{} to stop.".format(delete_client - 1),
                         flush=True,
                     )
-                    stop_queue[delete_client - 1].put("")
+                    control_semaphore[delete_client - 1].release()
                     num_running_client -= 1
         now = datetime.now().astimezone(pytz.utc)
         total_exec_time_in_s = (now - EXECUTE_START_TIME).total_seconds()
@@ -730,7 +731,7 @@ def main():
     else:
         print("Telling all {} clients to start.".format(args.num_clients), flush=True)
         for i in range(args.num_clients):
-            stop_queue[i].put("")
+            control_semaphore[i].release()
 
     if args.run_for_s and num_client_trace is None:
         print(
@@ -758,16 +759,17 @@ def main():
 
     print("Stopping all clients...", flush=True, file=sys.stderr)
     for i in range(args.num_clients):
-        # N.B. This process will hang if there is unconsumed data in the
-        # cross-process queues. Please be careful when modifying how these
-        # queues are used.
-        stop_queue[i].put(RUNNER_EXIT)
+        # Note that in most cases, one release will have already run. This is OK
+        # because downstream runners will not hang if there is a unconsumed
+        # semaphore value.
+        control_semaphore[i].release()
+        control_semaphore[i].release()
 
-    print("Waiting for the clients to complete.")
+    print("Waiting for the clients to complete...", flush=True, file=sys.stderr)
     for p in processes:
         p.join()
 
-    print("Done!")
+    print("Done repeating analytics!", flush=True, file=sys.stderr)
 
 
 if __name__ == "__main__":
