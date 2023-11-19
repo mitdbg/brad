@@ -194,7 +194,6 @@ def parse_queries_athena_boto_format(
             is_brad=is_brad,
             cache=cache,
         )
-        parsed_query["query_index"] = query_no
         if "tables" in verbose_plan:
             verbose_plan["tables"] = list(verbose_plan["tables"])
         else:
@@ -202,6 +201,7 @@ def parse_queries_athena_boto_format(
         if parsed_query is not None and (
             len(parsed_query["join_nodes"]) != 0 or include_no_joins
         ):
+            parsed_query["query_index"] = query_no
             parsed_queries.append(parsed_query)
             parsed_plans.append(verbose_plan)
             sql_queries.append(q.sql)
