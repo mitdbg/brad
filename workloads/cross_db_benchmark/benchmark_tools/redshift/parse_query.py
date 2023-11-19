@@ -141,39 +141,45 @@ def parse_queries_redshift(
             print(f"Aurora has no verbose plan for query {query_no}")
             skipped.append(query_no)
             continue
-        verbose_plan, _, _ = parse_plan(
-            aurora_q.verbose_plan, analyze=False, parse=True
-        )
-        verbose_plan.parse_lines_recursively(
-            alias_dict=alias_dict,
-            parse_baseline=False,
-            parse_join_conds=False,
-            is_brad=is_brad,
-        )
 
-        tables, filter_columns, operators = plan_statistics(verbose_plan)
+        try:
+            verbose_plan, _, _ = parse_plan(
+                aurora_q.verbose_plan, analyze=False, parse=True
+            )
+            verbose_plan.parse_lines_recursively(
+                alias_dict=alias_dict,
+                parse_baseline=False,
+                parse_join_conds=False,
+                is_brad=is_brad,
+            )
 
-        verbose_plan.parse_columns_bottom_up(
-            column_id_mapping,
-            partial_column_name_mapping,
-            table_id_mapping,
-            alias_dict=alias_dict,
-        )
-        verbose_plan.tables = tables
-        verbose_plan.num_tables = len(tables)
-        verbose_plan.plan_runtime = runtime
+            tables, filter_columns, operators = plan_statistics(verbose_plan)
 
-        def augment_no_workers(p, top_no_workers=0):
-            no_workers = p.plan_parameters.get("workers_planned")
-            if no_workers is None:
-                no_workers = top_no_workers
+            verbose_plan.parse_columns_bottom_up(
+                column_id_mapping,
+                partial_column_name_mapping,
+                table_id_mapping,
+                alias_dict=alias_dict,
+            )
+            verbose_plan.tables = tables
+            verbose_plan.num_tables = len(tables)
+            verbose_plan.plan_runtime = runtime
 
-            p.plan_parameters["workers_planned"] = top_no_workers
+            def augment_no_workers(p, top_no_workers=0):
+                no_workers = p.plan_parameters.get("workers_planned")
+                if no_workers is None:
+                    no_workers = top_no_workers
 
-            for c in p.children:
-                augment_no_workers(c, top_no_workers=no_workers)
+                p.plan_parameters["workers_planned"] = top_no_workers
 
-        augment_no_workers(verbose_plan)
+                for c in p.children:
+                    augment_no_workers(c, top_no_workers=no_workers)
+
+            augment_no_workers(verbose_plan)
+        except:
+            print(f"parsed_query {query_no} failed to parse Aurora's verbose plan")
+            skipped.append(query_no)
+            continue
 
         if min_runtime is not None and runtime < min_runtime:
             print(f"parsed_query {query_no} runtime too small")
