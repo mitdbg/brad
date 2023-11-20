@@ -122,7 +122,7 @@ class ConfigDefinedTriggers(TriggerProvider):
                 RecentChange(
                     self._planner_config,
                     self._config.epoch_length,
-                    self._delay_epochs,
+                    recent_change["delay_epochs"],
                 )
             )
 
