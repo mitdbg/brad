@@ -775,7 +775,7 @@ def main():
         p.join()
 
     for idx, p in enumerate(processes):
-        print("Runner {idx} exit code:", p.exitcode, flush=True, file=sys.stderr)
+        print(f"Runner {idx} exit code:", p.exitcode, flush=True, file=sys.stderr)
 
     print("Done repeating analytics!", flush=True, file=sys.stderr)
 
