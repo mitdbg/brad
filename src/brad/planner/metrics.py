@@ -12,6 +12,7 @@ from brad.config.file import ConfigFile
 from brad.config.metrics import FrontEndMetric
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
+from brad.utils.time_periods import elapsed_time
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +84,7 @@ class WindowedMetricsFromMonitor(MetricsProvider):
         self._system_startup_timestamp = system_startup_timestamp
 
     def get_metrics(self) -> Tuple[Metrics, datetime]:
-        running_time = (
-            datetime.now().replace(tzinfo=pytz.utc) - self._system_startup_timestamp
-        )
+        running_time = elapsed_time(self._system_startup_timestamp)
         planning_window = self._planner_config.planning_window()
         epoch_length = self._config.epoch_length
         if running_time > planning_window:

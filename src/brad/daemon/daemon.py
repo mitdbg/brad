@@ -56,7 +56,7 @@ from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import LoggedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
 from brad.row_list import RowList
-from brad.utils.time_periods import period_start
+from brad.utils.time_periods import period_start, universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ class BradDaemon:
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
         self._internal_command_tasks: Set[asyncio.Task] = set()
 
-        self._startup_timestamp: datetime = datetime.now().replace(tzinfo=pytz.utc)
+        self._startup_timestamp = universal_now()
 
     async def run_forever(self) -> None:
         """
@@ -196,7 +196,7 @@ class BradDaemon:
             comparator_provider = PerformanceCeilingComparatorProvider(30.0, 0.030)
 
         # Update just to get the most recent startup time.
-        self._startup_timestamp = datetime.now().replace(tzinfo=pytz.utc)
+        self._startup_timestamp = universal_now()
 
         providers = BlueprintProviders(
             workload_provider=LoggedWorkloadProvider(

@@ -21,6 +21,7 @@ from brad.planner.scoring.provisioning import (
     compute_athena_scanned_bytes,
 )
 from brad.routing.router import Router
+from brad.utils.time_periods import elapsed_time
 
 logger = logging.getLogger(__name__)
 
@@ -103,10 +104,8 @@ class VariableCosts(Trigger):
         window_end = datetime.now()
         window_end = window_end.astimezone(pytz.utc)
         planning_window = self._planner_config.planning_window()
-        if (
-            datetime.now().astimezone(pytz.utc) - self._startup_timestamp
-            > planning_window
-        ):
+        running_time = elapsed_time(self._startup_timestamp)
+        if running_time > planning_window:
             window_start = window_end - planning_window - self._config.epoch_length
         else:
             window_start = self._startup_timestamp

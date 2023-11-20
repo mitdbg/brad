@@ -6,10 +6,10 @@ from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
+from brad.front_end.engine_connections import EngineConnections
 from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.utils.table_sizer import TableSizer
-from brad.front_end.engine_connections import EngineConnections
 
 logger = logging.getLogger(__name__)
 
