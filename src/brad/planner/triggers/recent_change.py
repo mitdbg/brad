@@ -20,7 +20,12 @@ class RecentChange(Trigger):
     This triggers a replan if there was a recent provisioning change.
     """
 
-    def __init__(self, planner_config: PlannerConfig, epoch_length: timedelta) -> None:
+    def __init__(
+        self,
+        planner_config: PlannerConfig,
+        epoch_length: timedelta,
+        delay_epochs: int,
+    ) -> None:
         super().__init__(epoch_length)
         self._planner_config = planner_config
         self._is_first_change = True
@@ -30,15 +35,16 @@ class RecentChange(Trigger):
         self._metrics_delay = max(
             AuroraMetrics.METRICS_DELAY, RedshiftMetrics.METRICS_DELAY
         )
+        self._delay_epochs = delay_epochs
 
     async def should_replan(self) -> bool:
         if self._last_provisioning_change is None:
             return False
 
-        window = self._planner_config.planning_window()
+        delay_window = self._delay_epochs * self._epoch_length
         now = datetime.now(tz=pytz.utc)
 
-        if now > self._last_provisioning_change + window + self._metrics_delay:
+        if now > self._last_provisioning_change + delay_window + self._metrics_delay:
             self._last_provisioning_change = None
             logger.info("Triggering replan because of a recent provisioning change.")
             return True

@@ -112,6 +112,8 @@ class BradDaemon:
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
         self._internal_command_tasks: Set[asyncio.Task] = set()
 
+        self._startup_timestamp: datetime = datetime.now().replace(tzinfo=pytz.utc)
+
     async def run_forever(self) -> None:
         """
         Starts running the daemon.
@@ -193,12 +195,16 @@ class BradDaemon:
             data_access_provider = _NoopDataAccessProvider()
             comparator_provider = PerformanceCeilingComparatorProvider(30.0, 0.030)
 
+        # Update just to get the most recent startup time.
+        self._startup_timestamp = datetime.now().replace(tzinfo=pytz.utc)
+
         providers = BlueprintProviders(
             workload_provider=LoggedWorkloadProvider(
                 self._config,
                 self._planner_config,
                 self._blueprint_mgr,
                 self._schema_name,
+                self._startup_timestamp,
             ),
             analytics_latency_scorer=latency_scorer,
             comparator_provider=comparator_provider,

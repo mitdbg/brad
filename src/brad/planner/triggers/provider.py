@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 
 from brad.config.file import ConfigFile
@@ -118,7 +119,11 @@ class ConfigDefinedTriggers(TriggerProvider):
         recent_change = trigger_config["recent_change"]
         if "disabled" not in recent_change:
             trigger_list.append(
-                RecentChange(self._planner_config, self._config.epoch_length)
+                RecentChange(
+                    self._planner_config,
+                    self._config.epoch_length,
+                    self._delay_epochs,
+                )
             )
 
         return trigger_list

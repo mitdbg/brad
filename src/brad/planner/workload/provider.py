@@ -71,12 +71,14 @@ class LoggedWorkloadProvider(WorkloadProvider):
         planner_config: PlannerConfig,
         blueprint_mgr: BlueprintManager,
         schema_name: str,
+        system_startup_time: datetime,
     ) -> None:
         self._config = config
         self._planner_config = planner_config
         self._workload: Optional[Workload] = None
         self._blueprint_mgr = blueprint_mgr
         self._schema_name = schema_name
+        self._system_startup_time = system_startup_time
 
     async def get_workloads(
         self,
@@ -86,6 +88,12 @@ class LoggedWorkloadProvider(WorkloadProvider):
     ) -> Tuple[Workload, Workload]:
         window_length = self._planner_config.planning_window() * window_multiplier
         window_start = window_end - window_length
+        if window_start < self._system_startup_time:
+            logger.info(
+                "Adjusting lookback window to start at system startup: %s",
+                self._system_startup_time.strftime("%Y-%m-%d %H:%M:%S,%f"),
+            )
+            window_start = self._system_startup_time
         logger.debug(
             "Retrieving workload in range %s -- %s. Length: %s",
             window_start,
