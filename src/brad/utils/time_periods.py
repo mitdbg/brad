@@ -1,3 +1,4 @@
+import pytz
 import pandas as pd
 from typing import Iterator
 from datetime import datetime, timedelta
@@ -64,3 +65,18 @@ def time_point_intersect(start: datetime, end: datetime, timepoint: datetime) ->
     NOTE: The left endpoint is inclusive. The right endpoint is exclusive.
     """
     return timepoint >= start and timepoint < end
+
+
+def elapsed_time(startup_timestamp: datetime) -> timedelta:
+    """
+    Returns the time elapsed since the provided system startup timestamp.
+    """
+    return universal_now() - startup_timestamp
+
+
+def universal_now() -> datetime:
+    """
+    Returns a timestamp that represents the current date and time in a
+    standardized timezone.
+    """
+    return datetime.now(tz=pytz.utc)

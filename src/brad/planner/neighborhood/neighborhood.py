@@ -1,10 +1,8 @@
 import asyncio
 import logging
-import pytz
 import pandas as pd
 from io import TextIOWrapper
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
 
 from brad.blueprint.blueprint import Blueprint
 from brad.config.engine import Engine
@@ -32,6 +30,7 @@ from brad.routing.context import RoutingContext
 from brad.routing.rule_based import RuleBased
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
+from brad.utils.time_periods import universal_now
 
 # from brad.planner.neighborhood.scaling_scorer import ALL_METRICS
 
@@ -97,7 +96,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             current_workload,
             next_workload,
         ) = await self._providers.workload_provider.get_workloads(
-            datetime.now().astimezone(pytz.utc), window_multiplier
+            universal_now(), window_multiplier
         )
         workload_filters = [
             AuroraTransactions(next_workload),

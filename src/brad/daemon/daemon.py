@@ -1,12 +1,10 @@
 import asyncio
 import logging
 import queue
-import pytz
 import os
 import multiprocessing as mp
 import numpy as np
 from typing import Optional, List, Set
-from datetime import datetime
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -56,7 +54,7 @@ from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import LoggedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
 from brad.row_list import RowList
-from brad.utils.time_periods import period_start
+from brad.utils.time_periods import period_start, universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +109,8 @@ class BradDaemon:
         # This is used to hold references to internal command tasks we create.
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
         self._internal_command_tasks: Set[asyncio.Task] = set()
+
+        self._startup_timestamp = universal_now()
 
     async def run_forever(self) -> None:
         """
@@ -193,17 +193,25 @@ class BradDaemon:
             data_access_provider = _NoopDataAccessProvider()
             comparator_provider = PerformanceCeilingComparatorProvider(30.0, 0.030)
 
+        # Update just to get the most recent startup time.
+        self._startup_timestamp = universal_now()
+
         providers = BlueprintProviders(
             workload_provider=LoggedWorkloadProvider(
                 self._config,
                 self._planner_config,
                 self._blueprint_mgr,
                 self._schema_name,
+                self._startup_timestamp,
             ),
             analytics_latency_scorer=latency_scorer,
             comparator_provider=comparator_provider,
             metrics_provider=WindowedMetricsFromMonitor(
-                self._monitor, self._blueprint_mgr, self._config, self._planner_config
+                self._monitor,
+                self._blueprint_mgr,
+                self._config,
+                self._planner_config,
+                self._startup_timestamp,
             ),
             data_access_provider=data_access_provider,
             estimator_provider=self._estimator_provider,
@@ -213,6 +221,7 @@ class BradDaemon:
                 self._monitor,
                 data_access_provider,
                 self._estimator_provider,
+                self._startup_timestamp,
             ),
         )
         self._planner = BlueprintPlannerFactory.create(
@@ -524,7 +533,7 @@ class BradDaemon:
             return to_return
 
         elif command.startswith("BRAD_INSPECT_WORKLOAD"):
-            now = datetime.now().astimezone(pytz.utc)
+            now = universal_now()
             epoch_length = self._config.epoch_length
             planning_window = self._planner_config.planning_window()
             window_end = period_start(now, self._config.epoch_length) + epoch_length
@@ -539,6 +548,14 @@ class BradDaemon:
                 window_multiplier = 1
 
             window_start = window_end - planning_window * window_multiplier
+            if window_start < self._startup_timestamp:
+                window_start = period_start(
+                    self._startup_timestamp, self._config.epoch_length
+                )
+                logger.info(
+                    "Adjusting lookback window to start at system startup: %s",
+                    self._startup_timestamp.strftime("%Y-%m-%d %H:%M:%S,%f"),
+                )
             w = (
                 WorkloadBuilder()
                 .add_queries_from_s3_logs(self._config, window_start, window_end)

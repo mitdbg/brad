@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 
 from brad.config.file import ConfigFile
@@ -37,12 +38,14 @@ class ConfigDefinedTriggers(TriggerProvider):
         monitor: Monitor,
         data_access_provider: DataAccessProvider,
         estimator_provider: EstimatorProvider,
+        startup_timestamp: datetime,
     ) -> None:
         self._config = config
         self._planner_config = planner_config
         self._monitor = monitor
         self._data_access_provider = data_access_provider
         self._estimator_provider = estimator_provider
+        self._startup_timestamp = startup_timestamp
 
     def get_triggers(self) -> List[Trigger]:
         trigger_config = self._planner_config.trigger_configs()
@@ -90,6 +93,7 @@ class ConfigDefinedTriggers(TriggerProvider):
                     self._estimator_provider,
                     var_costs["threshold"],
                     self._config.epoch_length,
+                    self._startup_timestamp,
                 )
             )
 
@@ -118,7 +122,11 @@ class ConfigDefinedTriggers(TriggerProvider):
         recent_change = trigger_config["recent_change"]
         if "disabled" not in recent_change:
             trigger_list.append(
-                RecentChange(self._planner_config, self._config.epoch_length)
+                RecentChange(
+                    self._planner_config,
+                    self._config.epoch_length,
+                    recent_change["delay_epochs"],
+                )
             )
 
         return trigger_list

@@ -1,8 +1,7 @@
 import asyncio
 import pandas as pd
 import json
-import pytz
-from datetime import timedelta, datetime
+from datetime import timedelta
 from typing import List, Optional
 from importlib.resources import files, as_file
 
@@ -13,7 +12,7 @@ from .metrics_logger import MetricsLogger
 from .cloudwatch import CloudWatchClient
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
-from brad.utils.time_periods import impute_old_missing_metrics
+from brad.utils.time_periods import impute_old_missing_metrics, universal_now
 
 
 class RedshiftMetrics(MetricsSourceWithForecasting):
@@ -61,7 +60,7 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
         # This approach ensures that clients of this object have reliable access
         # to metrics (i.e., a set of metrics for a period will only appear in
         # the DataFrame once we are confident they are all available).
-        now = datetime.now().astimezone(pytz.utc)
+        now = universal_now()
         cutoff_ts = now - self.METRICS_DELAY
         new_metrics = impute_old_missing_metrics(new_metrics, cutoff_ts, value=0.0)
         new_metrics = new_metrics.dropna()

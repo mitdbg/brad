@@ -1,9 +1,10 @@
 import logging
-from datetime import timedelta, datetime
+from datetime import timedelta
 from typing import Optional
 
 from brad.blueprint import Blueprint
 from brad.planner.scoring.score import Score
+from brad.utils.time_periods import universal_now
 
 from .trigger import Trigger
 
@@ -17,7 +18,7 @@ class ElapsedTimeTrigger(Trigger):
         self._reset_trigger_next()
 
     async def should_replan(self) -> bool:
-        now = datetime.now()
+        now = universal_now()
         if now >= self._trigger_next:
             self._reset_trigger_next()
             logger.info(

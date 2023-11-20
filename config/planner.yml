@@ -5,8 +5,8 @@ strategy: query_based_beam
 planning_window:
   weeks: 0
   days: 0
-  hours: 0
-  minutes: 5
+  hours: 1
+  minutes: 0
 
 reinterpret_second_as: 1
 
@@ -53,7 +53,8 @@ triggers:
     ceiling_s: 0.030
     sustained_epochs: 3
 
-  recent_change: {}
+  recent_change:
+    delay_epochs: 5
 
 ###
 ### Beam planning constants.

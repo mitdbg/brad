@@ -1,11 +1,10 @@
 import csv
 import pathlib
-import pytz
-from datetime import datetime
 from typing import Optional
 
 from brad.config.file import ConfigFile
 from brad.config.system_event import SystemEvent
+from brad.utils.time_periods import universal_now
 
 
 class SystemEventLogger:
@@ -33,7 +32,7 @@ class SystemEventLogger:
             self._csv_writer.writerow(self._headers)
             self._logged_header = True
 
-        now = datetime.now().replace(tzinfo=pytz.utc)
+        now = universal_now()
         self._csv_writer.writerow(
             [
                 now.strftime("%Y-%m-%d %H:%M:%S"),

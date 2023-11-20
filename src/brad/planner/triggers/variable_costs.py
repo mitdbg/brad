@@ -1,6 +1,5 @@
 import logging
 import math
-import pytz
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Tuple
@@ -21,6 +20,7 @@ from brad.planner.scoring.provisioning import (
     compute_athena_scanned_bytes,
 )
 from brad.routing.router import Router
+from brad.utils.time_periods import elapsed_time, universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ class VariableCosts(Trigger):
         estimator_provider: EstimatorProvider,
         threshold_frac: float,
         epoch_length: timedelta,
+        startup_timestamp: datetime,
     ) -> None:
         """
         This will trigger a replan if the current variable costs (currently,
@@ -51,6 +52,7 @@ class VariableCosts(Trigger):
         self._data_access_provider = data_access_provider
         self._estimator_provider = estimator_provider
         self._change_ratio = 1.0 + threshold_frac
+        self._startup_timestamp = startup_timestamp
 
     async def should_replan(self) -> bool:
         if self._current_blueprint is None or self._current_score is None:
@@ -98,13 +100,13 @@ class VariableCosts(Trigger):
             return 0.0, 0.0
 
         # Extract the queries seen in the last window.
-        window_end = datetime.now()
-        window_end = window_end.astimezone(pytz.utc)
-        window_start = (
-            window_end
-            - self._planner_config.planning_window()
-            - self._config.epoch_length
-        )
+        window_end = universal_now()
+        planning_window = self._planner_config.planning_window()
+        running_time = elapsed_time(self._startup_timestamp)
+        if running_time > planning_window:
+            window_start = window_end - planning_window - self._config.epoch_length
+        else:
+            window_start = self._startup_timestamp
         logger.debug("Variable costs range: %s -- %s", window_start, window_end)
         workload = (
             WorkloadBuilder()
