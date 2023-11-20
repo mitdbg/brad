@@ -4,10 +4,11 @@ import logging
 import pandas as pd
 from botocore.exceptions import ClientError
 from typing import List, Optional
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from .metrics_def import MetricDef
 from brad.config.file import ConfigFile
+from brad.utils.time_periods import universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class PerfInsightsClient:
         self, metrics_list: List[MetricDef], period: timedelta, num_prev_points: int
     ) -> pd.DataFrame:
         # Retrieve datapoints
-        now = datetime.now(tz=timezone.utc)
+        now = universal_now()
         end_time = now - (now - datetime.min.replace(tzinfo=pytz.UTC)) % period
 
         # Retrieve more than 1 epoch, for robustness; If we retrieve once per

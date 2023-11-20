@@ -1,6 +1,5 @@
 import logging
 import math
-import pytz
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -12,7 +11,7 @@ from brad.config.file import ConfigFile
 from brad.config.metrics import FrontEndMetric
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
-from brad.utils.time_periods import elapsed_time
+from brad.utils.time_periods import elapsed_time, universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +105,10 @@ class WindowedMetricsFromMonitor(MetricsProvider):
 
         if redshift.empty and aurora_writer.empty and front_end.empty:
             logger.warning("All metrics are empty.")
-            now = datetime.now().astimezone(pytz.utc)
-            return (Metrics(1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0), now)
+            return (
+                Metrics(1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0),
+                universal_now(),
+            )
 
         assert not front_end.empty, "Front end metrics are empty."
 
@@ -337,8 +338,10 @@ class MetricsFromMonitor(MetricsProvider):
 
         if redshift.empty and aurora_writer.empty and front_end.empty:
             logger.warning("All metrics are empty.")
-            now = datetime.now().astimezone(pytz.utc)
-            return (Metrics(1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0), now)
+            return (
+                Metrics(1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0),
+                universal_now(),
+            )
 
         assert not front_end.empty, "Front end metrics are empty."
 

@@ -1,11 +1,10 @@
 import csv
-import datetime
 import pathlib
-import pytz
 import pickle
 from typing import Optional, Dict, List, Any
 
 from brad.config.file import ConfigFile
+from brad.utils.time_periods import universal_now
 
 
 class BlueprintPlanningDebugLogger:
@@ -68,6 +67,5 @@ class BlueprintPickleDebugLogger:
 
 
 def _get_timestamp_str() -> str:
-    timestamp = datetime.datetime.now()
-    timestamp = timestamp.astimezone(pytz.utc)  # UTC for consistency.
+    timestamp = universal_now()
     return timestamp.strftime("%Y-%m-%d_%H-%M-%S")

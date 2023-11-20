@@ -1,8 +1,8 @@
 import csv
-import datetime
 
 from brad.blueprint import Blueprint
 from brad.planner.neighborhood.score import Score
+from brad.utils.time_periods import universal_now
 
 
 class BlueprintPlanningLogger:
@@ -11,7 +11,7 @@ class BlueprintPlanningLogger:
     """
 
     def __init__(self) -> None:
-        curr_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        curr_time = universal_now().strftime("%Y-%m-%d_%H-%M-%S")
         out_file_name = f"brad_planning_{curr_time}.csv"
         self._out_file = open(out_file_name, "w", encoding="UTF-8")
         self._first_log = True

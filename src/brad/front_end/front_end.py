@@ -6,7 +6,7 @@ import time
 import os
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from ddsketch import DDSketch
 
 import grpc
@@ -47,6 +47,7 @@ from brad.utils.json_decimal_encoder import DecimalEncoder
 from brad.utils.mailbox import Mailbox
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from brad.utils.run_time_reservoir import RunTimeReservoir
+from brad.utils.time_periods import universal_now
 from brad.workload_logging.epoch_file_handler import EpochFileHandler
 
 logger = logging.getLogger(__name__)
@@ -334,7 +335,7 @@ class BradFrontEnd(BradInterface):
                 if transactional_query:
                     connection = session.engines.get_connection(engine_to_use)
                     cursor = connection.cursor_sync()
-                    start = datetime.now(tz=timezone.utc)
+                    start = universal_now()
                     if query_rep.is_transaction_start():
                         session.set_txn_start_timestamp(start)
                     # Using execute_sync() is lower overhead than the async
@@ -344,9 +345,9 @@ class BradFrontEnd(BradInterface):
                 else:
                     connection = session.engines.get_reader_connection(engine_to_use)
                     cursor = connection.cursor_sync()
-                    start = datetime.now(tz=timezone.utc)
+                    start = universal_now()
                     await cursor.execute(query_rep.raw_query)
-                end = datetime.now(tz=timezone.utc)
+                end = universal_now()
             except (
                 pyodbc.ProgrammingError,
                 pyodbc.Error,

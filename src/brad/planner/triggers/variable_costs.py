@@ -1,6 +1,5 @@
 import logging
 import math
-import pytz
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Tuple
@@ -21,7 +20,7 @@ from brad.planner.scoring.provisioning import (
     compute_athena_scanned_bytes,
 )
 from brad.routing.router import Router
-from brad.utils.time_periods import elapsed_time
+from brad.utils.time_periods import elapsed_time, universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -101,8 +100,7 @@ class VariableCosts(Trigger):
             return 0.0, 0.0
 
         # Extract the queries seen in the last window.
-        window_end = datetime.now()
-        window_end = window_end.astimezone(pytz.utc)
+        window_end = universal_now()
         planning_window = self._planner_config.planning_window()
         running_time = elapsed_time(self._startup_timestamp)
         if running_time > planning_window:

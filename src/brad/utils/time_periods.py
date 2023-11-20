@@ -79,4 +79,4 @@ def universal_now() -> datetime:
     Returns a timestamp that represents the current date and time in a
     standardized timezone.
     """
-    return datetime.now().astimezone(pytz.utc)
+    return datetime.now(tz=pytz.utc)

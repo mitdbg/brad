@@ -1,5 +1,4 @@
 import logging
-import pytz
 from datetime import timedelta, datetime
 from typing import Optional
 
@@ -9,6 +8,7 @@ from brad.config.planner import PlannerConfig
 from brad.daemon.aurora_metrics import AuroraMetrics
 from brad.daemon.redshift_metrics import RedshiftMetrics
 from brad.planner.scoring.score import Score
+from brad.utils.time_periods import universal_now
 
 from .trigger import Trigger
 
@@ -42,7 +42,7 @@ class RecentChange(Trigger):
             return False
 
         delay_window = self._delay_epochs * self._epoch_length
-        now = datetime.now(tz=pytz.utc)
+        now = universal_now()
 
         if now > self._last_provisioning_change + delay_window + self._metrics_delay:
             self._last_provisioning_change = None
@@ -75,7 +75,7 @@ class RecentChange(Trigger):
         aurora_diff = diff.aurora_diff()
         redshift_diff = diff.redshift_diff()
         if aurora_diff is not None or redshift_diff is not None:
-            self._last_provisioning_change = datetime.now(tz=pytz.utc)
+            self._last_provisioning_change = universal_now()
             logger.info(
                 "RecentChangeTrigger: Will trigger one planning window after %s",
                 self._last_provisioning_change.strftime("%Y-%m-%d_%H-%M-%S"),

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import pytz
 from datetime import datetime
 from typing import Dict, Tuple, Optional
 
@@ -12,6 +11,7 @@ from brad.front_end.engine_connections import EngineConnections
 from brad.planner.estimator import Estimator
 from brad.routing.policy import RoutingPolicy
 from brad.data_stats.postgres_estimator import PostgresEstimator
+from brad.utils.time_periods import universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class Session:
         self._engines = engines
         self._in_txn = False
         self._closed = False
-        self._txn_start_timestamp = datetime.now(tz=pytz.utc)
+        self._txn_start_timestamp = universal_now()
         self._estimator = estimator
 
     @property

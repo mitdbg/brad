@@ -1,9 +1,8 @@
 import asyncio
 import logging
 import pathlib
-import pytz
 from typing import Dict, Optional
-from datetime import timedelta, datetime
+from datetime import timedelta
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -37,6 +36,7 @@ from brad.routing.policy import RoutingPolicy
 from brad.blueprint.manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
+from brad.utils.time_periods import universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -214,10 +214,9 @@ async def run_planner_impl(args) -> None:
     monitor = Monitor(config, blueprint_mgr)
     monitor.set_up_metrics_sources()
     if args.use_fixed_metrics is not None:
-        now = datetime.now().astimezone(pytz.utc)
         metrics_provider: MetricsProvider = FixedMetricsProvider(
             Metrics(**parse_metrics(args.use_fixed_metrics)),
-            now,
+            universal_now(),
         )
     else:
         metrics_provider = WindowedMetricsFromMonitor(
@@ -226,7 +225,7 @@ async def run_planner_impl(args) -> None:
             config,
             planner_config,
             # N.B. This means the metrics window will be essentially empty.
-            datetime.now().replace(tzinfo=pytz.utc),
+            universal_now(),
         )
 
     if config.routing_policy == RoutingPolicy.ForestTableSelectivity:

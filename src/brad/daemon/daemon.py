@@ -1,12 +1,10 @@
 import asyncio
 import logging
 import queue
-import pytz
 import os
 import multiprocessing as mp
 import numpy as np
 from typing import Optional, List, Set
-from datetime import datetime
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -535,7 +533,7 @@ class BradDaemon:
             return to_return
 
         elif command.startswith("BRAD_INSPECT_WORKLOAD"):
-            now = datetime.now().astimezone(pytz.utc)
+            now = universal_now()
             epoch_length = self._config.epoch_length
             planning_window = self._planner_config.planning_window()
             window_end = period_start(now, self._config.epoch_length) + epoch_length
