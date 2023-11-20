@@ -221,7 +221,12 @@ async def run_planner_impl(args) -> None:
         )
     else:
         metrics_provider = WindowedMetricsFromMonitor(
-            monitor, blueprint_mgr, config, planner_config
+            monitor,
+            blueprint_mgr,
+            config,
+            planner_config,
+            # N.B. This means the metrics window will be essentially empty.
+            datetime.now().replace(tzinfo=pytz.utc),
         )
 
     if config.routing_policy == RoutingPolicy.ForestTableSelectivity:

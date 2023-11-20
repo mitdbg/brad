@@ -74,24 +74,35 @@ class WindowedMetricsFromMonitor(MetricsProvider):
         blueprint_mgr: BlueprintManager,
         config: ConfigFile,
         planner_config: PlannerConfig,
+        system_startup_timestamp: datetime,
     ) -> None:
         self._monitor = monitor
         self._blueprint_mgr = blueprint_mgr
         self._config = config
         self._planner_config = planner_config
+        self._system_startup_timestamp = system_startup_timestamp
 
     def get_metrics(self) -> Tuple[Metrics, datetime]:
-        epochs_per_planning_window = math.ceil(
-            self._planner_config.planning_window().total_seconds()
-            / self._config.epoch_length.total_seconds()
+        running_time = (
+            datetime.now().replace(tzinfo=pytz.utc) - self._system_startup_timestamp
         )
+        planning_window = self._planner_config.planning_window()
+        epoch_length = self._config.epoch_length
+        if running_time > planning_window:
+            epochs_to_extract = math.ceil(
+                planning_window.total_seconds() / epoch_length.total_seconds()
+            )
+        else:
+            epochs_to_extract = math.ceil(
+                running_time.total_seconds() / epoch_length.total_seconds()
+            )
         (
             redshift,
             aurora_writer,
             aurora_reader,
             front_end,
         ) = _extract_metrics_from_monitor(
-            self._monitor, self._blueprint_mgr, epochs_per_planning_window
+            self._monitor, self._blueprint_mgr, epochs_to_extract
         )
 
         if redshift.empty and aurora_writer.empty and front_end.empty:
@@ -131,12 +142,12 @@ class WindowedMetricsFromMonitor(MetricsProvider):
             str(most_recent_common),
         )
 
-        aggregate_epochs = min(len(common_timestamps), epochs_per_planning_window)
-        if aggregate_epochs < epochs_per_planning_window:
+        aggregate_epochs = min(len(common_timestamps), epochs_to_extract)
+        if aggregate_epochs < epochs_to_extract:
             logger.warning(
-                "Aggregating metrics across %d epochs. The planning window has %d epochs.",
+                "Aggregating metrics across %d epochs. Wanted to extract %d epochs.",
                 aggregate_epochs,
-                epochs_per_planning_window,
+                epochs_to_extract,
             )
 
         agg_cfg = self._planner_config.metrics_agg()

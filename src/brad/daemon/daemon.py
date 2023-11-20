@@ -209,7 +209,11 @@ class BradDaemon:
             analytics_latency_scorer=latency_scorer,
             comparator_provider=comparator_provider,
             metrics_provider=WindowedMetricsFromMonitor(
-                self._monitor, self._blueprint_mgr, self._config, self._planner_config
+                self._monitor,
+                self._blueprint_mgr,
+                self._config,
+                self._planner_config,
+                self._startup_timestamp,
             ),
             data_access_provider=data_access_provider,
             estimator_provider=self._estimator_provider,
@@ -219,6 +223,7 @@ class BradDaemon:
                 self._monitor,
                 data_access_provider,
                 self._estimator_provider,
+                self._startup_timestamp,
             ),
         )
         self._planner = BlueprintPlannerFactory.create(
@@ -545,6 +550,14 @@ class BradDaemon:
                 window_multiplier = 1
 
             window_start = window_end - planning_window * window_multiplier
+            if window_start < self._startup_timestamp:
+                window_start = period_start(
+                    self._startup_timestamp, self._config.epoch_length
+                )
+                logger.info(
+                    "Adjusting lookback window to start at system startup: %s",
+                    self._startup_timestamp.strftime("%Y-%m-%d %H:%M:%S,%f"),
+                )
             w = (
                 WorkloadBuilder()
                 .add_queries_from_s3_logs(self._config, window_start, window_end)
