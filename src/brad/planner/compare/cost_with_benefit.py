@@ -14,6 +14,7 @@ def best_cost_under_perf_ceilings_with_benefit_horizon(
     curr_txn_p90_latency_s: float,
     curr_hourly_cost: float,
     benefit_horizon: timedelta,
+    penalty_threshold: float,
 ) -> BlueprintComparator:
     def is_better_than(left: ComparableBlueprint, right: ComparableBlueprint) -> bool:
         # Transactional latency ceilings (feasibility check).
@@ -51,7 +52,7 @@ def best_cost_under_perf_ceilings_with_benefit_horizon(
             max_txn_p90_latency_s,
             curr_query_p90_latency_s,
             curr_txn_p90_latency_s,
-            0.8,
+            penalty_threshold,
         )
 
         left_score = _compute_scalar_score(

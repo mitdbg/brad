@@ -32,6 +32,8 @@ def get_fixtures(
         txn_completions_per_s=10.0,
         txn_lat_s_p50=0.010,
         txn_lat_s_p90=0.020,
+        query_lat_s_p50=10.0,
+        query_lat_s_p90=20.0,
     )
     planner_config = PlannerConfig(
         {

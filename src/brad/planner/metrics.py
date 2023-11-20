@@ -28,6 +28,8 @@ Metrics = namedtuple(
         "txn_completions_per_s",
         "txn_lat_s_p50",
         "txn_lat_s_p90",
+        "query_lat_s_p50",
+        "query_lat_s_p90",
     ],
 )
 
@@ -106,7 +108,7 @@ class WindowedMetricsFromMonitor(MetricsProvider):
         if redshift.empty and aurora_writer.empty and front_end.empty:
             logger.warning("All metrics are empty.")
             return (
-                Metrics(1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0),
+                Metrics(1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0),
                 universal_now(),
             )
 
@@ -185,6 +187,26 @@ class WindowedMetricsFromMonitor(MetricsProvider):
             agg_cfg=agg_cfg,
             name="txn_lat_s_p90",
         )
+        query_lat_s_p50 = self._aggregate_possibly_missing(
+            front_end.loc[
+                front_end.index <= most_recent_common,
+                FrontEndMetric.QueryLatencySecondP50.value,
+            ],
+            num_epochs=aggregate_epochs,
+            default_value=0.0,
+            agg_cfg=agg_cfg,
+            name="query_lat_s_p50",
+        )
+        query_lat_s_p90 = self._aggregate_possibly_missing(
+            front_end.loc[
+                front_end.index <= most_recent_common,
+                FrontEndMetric.QueryLatencySecondP90.value,
+            ],
+            num_epochs=aggregate_epochs,
+            default_value=0.0,
+            agg_cfg=agg_cfg,
+            name="query_lat_s_p90",
+        )
 
         aurora_writer_rel = aurora_writer.loc[aurora_writer.index <= most_recent_common]
         aurora_reader_rel = aurora_reader.loc[aurora_reader.index <= most_recent_common]
@@ -238,6 +260,8 @@ class WindowedMetricsFromMonitor(MetricsProvider):
                 txn_completions_per_s=txn_per_s,
                 txn_lat_s_p50=txn_lat_s_p50,
                 txn_lat_s_p90=txn_lat_s_p90,
+                query_lat_s_p50=query_lat_s_p50,
+                query_lat_s_p90=query_lat_s_p90,
             ),
             most_recent_common.to_pydatetime(),
         )
@@ -339,7 +363,7 @@ class MetricsFromMonitor(MetricsProvider):
         if redshift.empty and aurora_writer.empty and front_end.empty:
             logger.warning("All metrics are empty.")
             return (
-                Metrics(1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0),
+                Metrics(1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0),
                 universal_now(),
             )
 
@@ -400,6 +424,22 @@ class MetricsFromMonitor(MetricsProvider):
             default_value=0.0,
             name="txn_lat_s_p90",
         )
+        query_lat_s_p50 = self._extract_most_recent_possibly_missing(
+            front_end.loc[
+                front_end.index <= most_recent_common,
+                FrontEndMetric.QueryLatencySecondP50.value,
+            ],
+            default_value=0.0,
+            name="query_lat_s_p50",
+        )
+        query_lat_s_p90 = self._extract_most_recent_possibly_missing(
+            front_end.loc[
+                front_end.index <= most_recent_common,
+                FrontEndMetric.QueryLatencySecondP90.value,
+            ],
+            default_value=0.0,
+            name="query_lat_s_p90",
+        )
 
         aurora_writer_rel = aurora_writer.loc[aurora_writer.index <= most_recent_common]
         aurora_reader_rel = aurora_reader.loc[aurora_reader.index <= most_recent_common]
@@ -445,6 +485,8 @@ class MetricsFromMonitor(MetricsProvider):
                 txn_completions_per_s=txn_per_s,
                 txn_lat_s_p50=txn_lat_s_p50,
                 txn_lat_s_p90=txn_lat_s_p90,
+                query_lat_s_p50=query_lat_s_p50,
+                query_lat_s_p90=query_lat_s_p90,
             ),
             most_recent_common.to_pydatetime(),
         )
@@ -572,4 +614,6 @@ _FRONT_END_METRICS = [
     FrontEndMetric.TxnEndPerSecond.value,
     FrontEndMetric.TxnLatencySecondP50.value,
     FrontEndMetric.TxnLatencySecondP90.value,
+    FrontEndMetric.QueryLatencySecondP50.value,
+    FrontEndMetric.QueryLatencySecondP90.value,
 ]
