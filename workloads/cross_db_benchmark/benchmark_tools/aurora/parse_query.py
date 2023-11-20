@@ -27,12 +27,16 @@ from workloads.cross_db_benchmark.benchmark_tools.utils import load_json, dumper
 
 def get_runtime_aurora(raw, timeout_ms=300000):
     all_runtime = []
-    for query in raw['query_list']:
-        if query['timeout'] or query['analyze_plans'] is None or len(query['analyze_plans']) == 0:
+    for query in raw["query_list"]:
+        if (
+            query["timeout"]
+            or query["analyze_plans"] is None
+            or len(query["analyze_plans"]) == 0
+        ):
             all_runtime.append(timeout_ms)
             continue
         curr_runtime = []
-        for plan in query['analyze_plans']:
+        for plan in query["analyze_plans"]:
             rt = plan[-1][0].split("Execution Time:")[-1].split("ms")[0]
             rt = float(rt.strip())
             curr_runtime.append(rt)
