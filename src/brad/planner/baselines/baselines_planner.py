@@ -98,7 +98,7 @@ class BaselinePlanner(BlueprintPlanner):
         costs. Choose table placement and provisioning accordingly.
         """
         latencies: npt.NDArray = (
-            workload._predicted_analytical_latencies # pylint: disable=protected-access
+            workload._predicted_analytical_latencies  # pylint: disable=protected-access
         )
         chosen_engine_idx = np.argmin(latencies, axis=1)
 

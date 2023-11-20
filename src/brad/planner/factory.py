@@ -5,6 +5,7 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.system_event_logger import SystemEventLogger
 from brad.planner.abstract import BlueprintPlanner
+from brad.planner.baselines.baselines_planner import BaselinePlanner
 from brad.planner.beam.query_based import QueryBasedBeamPlanner
 from brad.planner.beam.query_based_legacy import QueryBasedLegacyBeamPlanner
 from brad.planner.beam.table_based import TableBasedBeamPlanner
@@ -70,6 +71,42 @@ class BlueprintPlannerFactory:
                 current_blueprint_score=current_blueprint_score,
                 providers=providers,
                 system_event_logger=system_event_logger,
+            )
+
+        elif strategy == PlanningStrategy.RandomBaseline:
+            return BaselinePlanner(
+                config=config,
+                planner_config=planner_config,
+                schema_name=schema_name,
+                current_blueprint=current_blueprint,
+                current_blueprint_score=current_blueprint_score,
+                providers=providers,
+                system_event_logger=system_event_logger,
+                baseline="random",
+            )
+
+        elif strategy == PlanningStrategy.GreedyBaseline:
+            return BaselinePlanner(
+                config=config,
+                planner_config=planner_config,
+                schema_name=schema_name,
+                current_blueprint=current_blueprint,
+                current_blueprint_score=current_blueprint_score,
+                providers=providers,
+                system_event_logger=system_event_logger,
+                baseline="greedy",
+            )
+
+        elif strategy == PlanningStrategy.ExhaustiveBaseline:
+            return BaselinePlanner(
+                config=config,
+                planner_config=planner_config,
+                schema_name=schema_name,
+                current_blueprint=current_blueprint,
+                current_blueprint_score=current_blueprint_score,
+                providers=providers,
+                system_event_logger=system_event_logger,
+                baseline="exhaustive",
             )
 
         else:
