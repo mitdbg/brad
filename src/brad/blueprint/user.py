@@ -1,7 +1,8 @@
 import yaml
 import pathlib
-from typing import List, Set
+from typing import List, Set, Dict
 
+from brad.config.engine import Engine
 from .provisioning import Provisioning
 from .table import Column, Table
 
@@ -34,6 +35,7 @@ class UserProvidedBlueprint:
     @classmethod
     def _load_from_raw_yaml(cls, raw_yaml) -> "UserProvidedBlueprint":
         tables: List[Table] = []
+        bootstrap_locations: Dict[str, Set[Engine]] = {}
         for raw_table in raw_yaml["tables"]:
             name = raw_table["table_name"]
             columns = list(
@@ -65,6 +67,13 @@ class UserProvidedBlueprint:
                 Table(name, columns, table_deps, transform, secondary_indexed_columns)
             )
 
+            if "bootstrap_locations" in raw_table:
+                engine_set = {
+                    Engine.from_str(engine)
+                    for engine in raw_table["bootstrap_locations"]
+                }
+                bootstrap_locations[name] = engine_set
+
         if "provisioning" in raw_yaml:
             aurora = raw_yaml["provisioning"]["aurora"]
             redshift = raw_yaml["provisioning"]["redshift"]
@@ -94,11 +103,13 @@ class UserProvidedBlueprint:
         tables: List[Table],
         aurora_provisioning: Provisioning,
         redshift_provisioning: Provisioning,
+        bootstrap_locations: Dict[str, Set[Engine]],
     ):
         self._schema_name = schema_name
         self._tables = tables
         self._aurora_provisioning = aurora_provisioning
         self._redshift_provisioning = redshift_provisioning
+        self._bootstrap_locations = bootstrap_locations
 
     @property
     def schema_name(self) -> str:
@@ -113,6 +124,9 @@ class UserProvidedBlueprint:
 
     def redshift_provisioning(self) -> Provisioning:
         return self._redshift_provisioning
+
+    def bootstrap_locations(self) -> Dict[str, Set[Engine]]:
+        return self._bootstrap_locations
 
     def validate(self) -> None:
         """

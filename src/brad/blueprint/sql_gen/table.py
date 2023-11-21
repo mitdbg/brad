@@ -217,6 +217,21 @@ class TableSqlGenerator:
 
         return (queries, Engine.Aurora)
 
+    def generate_extraction_progress_init(
+        self, table_name: str
+    ) -> Tuple[List[str], Engine]:
+        queries = []
+        initialize_template = (
+            "INSERT INTO "
+            + AURORA_EXTRACT_PROGRESS_TABLE_NAME
+            + " (table_name, next_extract_seq, next_shadow_extract_seq) VALUES ('{table_name}', 0, 0)"
+        )
+        base_table_names = self._blueprint.base_table_names()
+        table_locations = self._blueprint.get_table_locations(table_name)
+        if Engine.Aurora in table_locations and table_name in base_table_names:
+            queries.append(initialize_template.format(table_name=table_name))
+        return (queries, Engine.Aurora)
+
 
 def generate_create_index_sql(
     table: Table, indexes: List[Tuple[Column, ...]]
