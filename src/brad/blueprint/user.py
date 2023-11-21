@@ -95,6 +95,7 @@ class UserProvidedBlueprint:
             tables,
             aurora_provisioning,
             redshift_provisioning,
+            bootstrap_locations,
         )
 
     def __init__(

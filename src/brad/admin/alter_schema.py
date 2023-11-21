@@ -78,7 +78,9 @@ async def alter_schema_impl(args):
     # 5. Figure out which tables are new. These will be created.
     existing_tables = {table.name for table in current_blueprint.tables()}
     tables_to_create = {
-        table.name for table in altered_blueprint if table.name not in existing_tables
+        table.name
+        for table in altered_blueprint.tables()
+        if table.name not in existing_tables
     }
 
     # 6. Set up the new tables.
