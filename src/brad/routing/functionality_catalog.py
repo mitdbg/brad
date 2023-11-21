@@ -10,6 +10,7 @@ import brad.routing as routing
 class Functionality:
     Geospatial = "geospatial"
     Transaction = "transactions"
+    Vector = "vector"
 
     def __init__(self):
         # Read the YAML file
@@ -62,5 +63,6 @@ class Functionality:
 
 
 FunctionalityBitmapValues: Dict[str, int] = {}
-FunctionalityBitmapValues[Functionality.Geospatial] = 0b01
-FunctionalityBitmapValues[Functionality.Transaction] = 0b10
+FunctionalityBitmapValues[Functionality.Geospatial] = 0b001
+FunctionalityBitmapValues[Functionality.Transaction] = 0b010
+FunctionalityBitmapValues[Functionality.Vector] = 0b100

@@ -3,6 +3,7 @@ database_engines:
     functionalities:
       - geospatial
       - transactions
+      - vector
 
   - name: Athena
     functionalities:

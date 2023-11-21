@@ -27,6 +27,7 @@ with as_file(_GEOSPATIAL_KEYWORDS_PATH) as file:
         _GEOSPATIAL_KEYWORDS = yaml.safe_load(f)
 _GEOSPATIAL_KEYWORDS = [k.upper() for k in _GEOSPATIAL_KEYWORDS]
 
+_VECTOR_KEYWORDS = ["<=>"]
 
 class QueryRep:
     """
@@ -80,10 +81,19 @@ class QueryRep:
                 return True
         return False
 
+    def is_vector(self) -> bool:
+        query = self._raw_sql_query.upper()
+        for keyword in _VECTOR_KEYWORDS:
+            if keyword in query:
+                return True
+        return False
+
     def get_required_functionality(self) -> int:
         req_functionality: List[str] = []
         if self.is_geospatial():
             req_functionality.append(Functionality.Geospatial)
+        if self.is_vector():
+            req_functionality.append(Functionality.Vector)
 
         return Functionality.to_bitmap(req_functionality)
 
