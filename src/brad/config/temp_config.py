@@ -17,8 +17,8 @@ class TempConfig:
     def __init__(self, raw: Dict[str, Any]) -> None:
         self._raw = raw
 
-    def latency_ceiling_s(self) -> float:
-        return float(self._raw["latency_ceiling_s"])
+    def query_latency_p90_ceiling_s(self) -> float:
+        return float(self._raw["query_latency_p90_ceiling_s"])
 
     def txn_latency_p50_ceiling_s(self) -> float:
         return float(self._raw["txn_latency_p50_ceiling_s"])
@@ -26,11 +26,11 @@ class TempConfig:
     def txn_latency_p90_ceiling_s(self) -> float:
         return float(self._raw["txn_latency_p90_ceiling_s"])
 
-    def use_payoff_period(self) -> bool:
-        return self._raw["use_payoff_period"]
+    def comparator_type(self) -> str:
+        return self._raw["comparator"]["type"]
 
-    def payoff_period(self) -> timedelta:
-        period = self._raw["payoff_period"]
+    def benefit_horizon(self) -> timedelta:
+        period = self._raw["comparator"]["benefit_horizon"]
         return timedelta(
             weeks=period["weeks"],
             days=period["days"],

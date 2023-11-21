@@ -1,16 +1,15 @@
-latency_ceiling_s: 30.0
+query_latency_p90_ceiling_s: 30.0
 txn_latency_p50_ceiling_s: 0.020  # Currently unused.
 txn_latency_p90_ceiling_s: 0.030
 
-# This is a new concept that we use to reconcile a blueprint's costs and
-# transition times.
-use_payoff_period: true
+comparator:
+  type: perf_ceiling  # or `benefit_perf_ceiling`
 
-payoff_period:
-  weeks: 0
-  days: 0
-  hours: 1
-  minutes: 0
+  benefit_horizon:  # Only used by the `benefit_perf_ceiling` comparator
+    weeks: 0
+    days: 0
+    hours: 1
+    minutes: 0
 
 # This is used when the current blueprint is violating performance constraints
 # (due to a changed workload) and we want to transition quickly to a better
