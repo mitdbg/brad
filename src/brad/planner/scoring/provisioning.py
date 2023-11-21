@@ -4,16 +4,18 @@ import importlib.resources as pkg_resources
 import numpy as np
 import numpy.typing as npt
 from collections import namedtuple
-from typing import Dict, Iterable
+from typing import Dict, Iterable, TYPE_CHECKING
 
 import brad.planner.scoring.data as score_data
 
 from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.provisioning import Provisioning
 from brad.config.planner import PlannerConfig
-from brad.planner.scoring.context import ScoringContext
 from brad.planner.workload.query import Query
 from brad.provisioning.redshift import RedshiftProvisioningManager
+
+if TYPE_CHECKING:
+    from brad.planner.scoring.context import ScoringContext
 
 
 ProvisioningResources = namedtuple(
@@ -43,7 +45,7 @@ RedshiftSpecs = _load_instance_specs("redshift_instances.json")
 
 
 def compute_aurora_hourly_operational_cost(
-    provisioning: Provisioning, ctx: ScoringContext
+    provisioning: Provisioning, ctx: "ScoringContext"
 ) -> float:
     prov = AuroraSpecs[provisioning.instance_type()]
     if ctx.planner_config.use_io_optimized_aurora():

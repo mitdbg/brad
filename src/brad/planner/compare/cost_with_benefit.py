@@ -72,6 +72,10 @@ def best_cost_under_perf_ceilings_with_benefit_horizon(
             penalty_multiplier,
         )
 
+        # For debugging purposes.
+        left.set_memoized_value("benefit_penalty_multiplier", penalty_multiplier)
+        right.set_memoized_value("benefit_penalty_multiplier", penalty_multiplier)
+
         return left_score < right_score
 
     return is_better_than

@@ -33,6 +33,7 @@ from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.front_end.start_front_end import start_front_end
 from brad.planner.abstract import BlueprintPlanner
 from brad.planner.compare.provider import (
+    BlueprintComparatorProvider,
     PerformanceCeilingComparatorProvider,
     BenefitPerformanceCeilingComparatorProvider,
 )
@@ -186,11 +187,13 @@ class BradDaemon:
                 )
 
             if self._temp_config.comparator_type() == "benefit_perf_ceiling":
-                comparator_provider = BenefitPerformanceCeilingComparatorProvider(
-                    self._temp_config.query_latency_p90_ceiling_s(),
-                    self._temp_config.txn_latency_p90_ceiling_s(),
-                    self._temp_config.benefit_horizon(),
-                    self._temp_config.penalty_threshold(),
+                comparator_provider: BlueprintComparatorProvider = (
+                    BenefitPerformanceCeilingComparatorProvider(
+                        self._temp_config.query_latency_p90_ceiling_s(),
+                        self._temp_config.txn_latency_p90_ceiling_s(),
+                        self._temp_config.benefit_horizon(),
+                        self._temp_config.penalty_threshold(),
+                    )
                 )
             else:
                 comparator_provider = PerformanceCeilingComparatorProvider(
