@@ -78,8 +78,50 @@ def make_postgres_compatible_conn(engine="redshift"):
         password=password,
         database=database,
     )
+    # Disable query cache.
+    if engine == "redshift":
+        cur = conn.cursor()
+        cur.execute("SET enable_result_cache_for_session = off;")
+        conn.commit()
     return conn
 
+
+def redshift_stress_test(query_bank, num_threads):
+    with open(query_bank, "r", encoding="utf-8") as f:
+        queries = f.read().split(";")
+    # Select 100 queries.
+    import threading, random
+    threads = []
+    def run_queries(thread_queries, thread_idx):
+        random.shuffle(thread_queries)
+        conn = make_postgres_compatible_conn(engine="redshift")
+        print(f"Thread {thread_idx}. Starting.")
+        num_success = 0
+        num_fail = 0
+        for q in thread_queries:
+            try:
+                cur = conn.cursor()
+                start_time = time.perf_counter()
+                print(f"Thread {thread_idx}. Executing: {q}")
+                cur.execute(q)
+                end_time = time.perf_counter()
+                _res = cur.fetchall()
+                conn.commit()
+                print(f"Thread {thread_idx}. Execution took: {end_time-start_time}s")
+                num_success += 1
+            except Exception as e:
+                print(f"Error: {e}")
+                conn.rollback()
+                num_fail += 1
+        print(f"Thread {thread_idx}. Success: {num_success}, Fail: {num_fail}")
+    for i in range(num_threads):
+        thread = threading.Thread(
+            target=run_queries, args=(queries + [], i)
+        )
+        thread.start()
+        threads.append(thread)
+    for thread in threads:
+        thread.join()
 
 # TODO: Implement loading from S3. This currenlty loads from local disk.
 class TiDBLoader:
@@ -224,6 +266,7 @@ class PostgresCompatibleLoader:
             cur = self.conn.cursor()
             cur.execute("CREATE EXTENSION IF NOT EXISTS aws_s3 CASCADE;")
             self.conn.commit()
+
 
     # def manual_unload(self, dataset, do_unload=True, specific_table=None, start_chunk=0, end_chunk=0):
     #     # Manual unload for use by TiDB.

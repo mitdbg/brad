@@ -1,6 +1,7 @@
 import random
 import logging
 from datetime import datetime, timedelta
+import time
 from typing import List, Tuple, Any
 
 from brad.grpc_client import RowList, BradClientError
@@ -163,14 +164,12 @@ class TransactionWorker:
         - Insert into `ticket_order`
         - Update the `showing` entry
         """
-
         # 1. Select a random theatre number.
         theatre_num = self.prng.randint(self.min_theatre_id, self.max_theatre_id)
 
         try:
             # Start the transaction.
             db.begin_sync()
-
             if select_using_name:
                 results = db.execute_sync(
                     f"SELECT id FROM theatres WHERE name = 'Theatre #{theatre_num}'"
@@ -203,14 +202,16 @@ class TransactionWorker:
 
             # 4. Insert the ticket order.
             quantity = min(self.prng.randint(*self.ticket_quantity), seats_left)
-            contact_name = "P{}".format(self.worker_id)
-            loc_x = self.prng.random() * self.loc_max
-            loc_y = self.prng.random() * self.loc_max
-            db.execute_sync(
-                "INSERT INTO ticket_orders (showing_id, quantity, contact_name, location_x, location_y) "
-                f"VALUES ({showing_id}, {quantity}, '{contact_name}', {loc_x:.4f}, {loc_y:.4f})"
-            )
-
+            # contact_name = "P{}".format(self.worker_id)
+            # loc_x = self.prng.random() * self.loc_max
+            # loc_y = self.prng.random() * self.loc_max
+            # start_time = time.time()
+            # db.execute_sync(
+            #     "INSERT INTO ticket_orders (showing_id, quantity, contact_name, location_x, location_y) "
+            #     f"VALUES ({showing_id}, {quantity}, '{contact_name}', {loc_x:.4f}, {loc_y:.4f})"
+            # )
+            # end_time = time.time()
+            # print(f"Inserting ticket order took: {end_time-start_time}s")
             # 5. Update the showing's seats left.
             db.execute_sync(
                 f"UPDATE showings SET seats_left = {seats_left - quantity} WHERE id = {showing_id}"

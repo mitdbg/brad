@@ -5,8 +5,12 @@ import sys
 from workloads.IMDB_extended.workload_utils.baseline import (
     PostgresCompatibleLoader,
     TiDBLoader,
+    redshift_stress_test,
 )
 import time
+import pickle
+import numpy as np
+import pandas as pd
 
 
 def main():
@@ -16,13 +20,19 @@ def main():
     parser.add_argument("--force_load", default=False, action="store_true")
     parser.add_argument("--load_from", default="")
     parser.add_argument("--run_query", default=None)
-    parser.add_argument("--run_all", default=False, action="store_true")
-    parser.add_argument("--engine", default="tidb")
+    parser.add_argument("--redshift-stress", default=False, action="store_true")
+    parser.add_argument("--tidb-stress", default=False, action="store_true")
+    parser.add_argument("--tidb-comparison", default=False, action="store_true")
+    parser.add_argument("--engine", default="")
     args = parser.parse_args()
+    if args.redshift_stress:
+        query_bank = "workloads/IMDB_100GB/ad_hoc/queries.sql"
+        redshift_stress_test(query_bank, 64)
+        sys.exit(0)
     if args.engine == "tidb":
         # TIDB loaded manually
         loader = TiDBLoader()
-    else:
+    elif args.engine == "aurora" or args.engine == "redshift":
         loader = PostgresCompatibleLoader(engine=args.engine)
         loader.load_database(
             dataset=args.dataset,
@@ -41,19 +51,18 @@ def main():
             print(r)
         print(f"Execution took: {end_time-start_time}s")
         loader.conn.commit()
-    if args.run_all:
-        query_bank = "workloads/IMDB_100GB/ad_hoc/queries.sql"
+    if args.tidb_stress:
+        query_bank = "adhoc_queries.sql"
         with open(query_bank, "r", encoding="utf-8") as f:
             queries = f.read().split(";")
         num_success = 0
         num_fail = 0
         fails = []
-        # Select 100 queries at random
-        import random
-
-        random.shuffle(queries)
-        queries = queries[:100]
         for i, q in enumerate(queries):
+            if i % 10 == 0:
+                # Checkpoint to pkl
+                print(f"Checkpoint {i}. Success: {num_success}, Fail: {num_fail}")
+                pickle.dump(fails, open("fails.pkl", "wb"))
             try:
                 cur = loader.conn.cursor()
                 print(f"Executing: {q}")
@@ -74,7 +83,32 @@ def main():
                 fails.append((i, f"Error: {e}"))
         print(f"Success: {num_success}, Fail: {num_fail}")
         print(f"Fails: \n{fails}")
-
+        # Write all to pkl.
+        pickle.dump(fails, open("fails.pkl", "wb"))
+    if args.tidb_comparison:
+        numpy_file = "run_time_s-athena-aurora-redshift.npy"
+        # Triplets of [athena, aurora, redshift] runtimes.
+        run_times = np.load(numpy_file)
+        df = pd.DataFrame(run_times, columns=["athena", "aurora", "redshift"])
+        # Find indexes in which athena is faster than redshift and aurora.
+        athena_faster = (df["athena"] < df["redshift"]) & (df["athena"] < df["aurora"])
+        athena_faster = [i for i, x in enumerate(athena_faster) if x]
+        print(f"Athena faster than redshift: {athena_faster}")
+        print(f"Run time:\n{df.head()}\n{len(df)}")
+        fails0 = pickle.load(open("fails0.pkl", "rb"))
+        fails1 = pickle.load(open("fails1.pkl", "rb"))
+        fails = set([i for i, _x in fails0])
+        fails.update([i for i, _x in fails1])
+        print(f"Fails: {len(fails)}. Fails0: {len(fails0)}, Fails1: {len(fails1)}")
+        still_faster = [i for i in athena_faster if i not in fails]
+        print(f"Still faster: {len(still_faster)}")
+        query_bank = "adhoc_queries.sql"
+        with open(query_bank, "r", encoding="utf-8") as f:
+            queries = f.read().split(";")
+            queries = [q.strip() for q in queries if len(q.strip()) > 0]
+        res = [f"{q.strip()};" for i, q in enumerate(queries) if i not in fails]
+        with open("good_adhoc_queries.sql", "w", encoding="utf-8") as f:
+            f.write("\n".join(res))
 
 if __name__ == "__main__":
     main()
