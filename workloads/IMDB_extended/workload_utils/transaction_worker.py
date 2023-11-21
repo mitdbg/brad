@@ -100,7 +100,8 @@ class TransactionWorker:
             return True
 
         except:  # pylint: disable=bare-except
-            logger.exception("Need to rollback.")
+            # This is too verbose when we have a lot of clients hitting the DB.
+            # logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
 
@@ -150,7 +151,8 @@ class TransactionWorker:
             return True
 
         except:  # pylint: disable=bare-except
-            logger.exception("Need to rollback.")
+            # This is too verbose when we have a lot of clients hitting the DB.
+            # logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
 
@@ -225,7 +227,8 @@ class TransactionWorker:
             return False
 
         except:  # pylint: disable=bare-except
-            logger.exception("Need to rollback.")
+            # This is too verbose when we have a lot of clients hitting the DB.
+            # logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
 

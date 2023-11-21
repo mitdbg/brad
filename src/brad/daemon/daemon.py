@@ -1,12 +1,10 @@
 import asyncio
 import logging
 import queue
-import pytz
 import os
 import multiprocessing as mp
 import numpy as np
 from typing import Optional, List, Set
-from datetime import datetime
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -34,10 +32,14 @@ from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.front_end.start_front_end import start_front_end
 from brad.planner.abstract import BlueprintPlanner
-from brad.planner.compare.provider import PerformanceCeilingComparatorProvider
+from brad.planner.compare.provider import (
+    BlueprintComparatorProvider,
+    PerformanceCeilingComparatorProvider,
+    BenefitPerformanceCeilingComparatorProvider,
+)
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
-from brad.planner.metrics import MetricsFromMonitor
+from brad.planner.metrics import WindowedMetricsFromMonitor
 from brad.planner.providers import BlueprintProviders
 from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.provider import DataAccessProvider
@@ -56,7 +58,7 @@ from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import LoggedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
 from brad.row_list import RowList
-from brad.utils.time_periods import period_start
+from brad.utils.time_periods import period_start, universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +88,7 @@ class BradDaemon:
         self._temp_config = temp_config
         self._schema_name = schema_name
         self._path_to_planner_config = path_to_planner_config
-        self._planner_config = PlannerConfig(path_to_planner_config)
+        self._planner_config = PlannerConfig.load(path_to_planner_config)
         self._debug_mode = debug_mode
 
         self._assets = AssetManager(self._config)
@@ -111,6 +113,8 @@ class BradDaemon:
         # This is used to hold references to internal command tasks we create.
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
         self._internal_command_tasks: Set[asyncio.Task] = set()
+
+        self._startup_timestamp = universal_now()
 
     async def run_forever(self) -> None:
         """
@@ -181,10 +185,21 @@ class BradDaemon:
                     aurora_accessed_pages_path=self._temp_config.aurora_data_access_path(),
                     athena_accessed_bytes_path=self._temp_config.athena_data_access_path(),
                 )
-            comparator_provider = PerformanceCeilingComparatorProvider(
-                self._temp_config.latency_ceiling_s(),
-                self._temp_config.txn_latency_p90_ceiling_s(),
-            )
+
+            if self._temp_config.comparator_type() == "benefit_perf_ceiling":
+                comparator_provider: BlueprintComparatorProvider = (
+                    BenefitPerformanceCeilingComparatorProvider(
+                        self._temp_config.query_latency_p90_ceiling_s(),
+                        self._temp_config.txn_latency_p90_ceiling_s(),
+                        self._temp_config.benefit_horizon(),
+                        self._temp_config.penalty_threshold(),
+                    )
+                )
+            else:
+                comparator_provider = PerformanceCeilingComparatorProvider(
+                    self._temp_config.query_latency_p90_ceiling_s(),
+                    self._temp_config.txn_latency_p90_ceiling_s(),
+                )
         else:
             logger.warning(
                 "TempConfig not provided. The planner will not be able to run correctly."
@@ -193,16 +208,26 @@ class BradDaemon:
             data_access_provider = _NoopDataAccessProvider()
             comparator_provider = PerformanceCeilingComparatorProvider(30.0, 0.030)
 
+        # Update just to get the most recent startup time.
+        self._startup_timestamp = universal_now()
+
         providers = BlueprintProviders(
             workload_provider=LoggedWorkloadProvider(
                 self._config,
                 self._planner_config,
                 self._blueprint_mgr,
                 self._schema_name,
+                self._startup_timestamp,
             ),
             analytics_latency_scorer=latency_scorer,
             comparator_provider=comparator_provider,
-            metrics_provider=MetricsFromMonitor(self._monitor, self._blueprint_mgr),
+            metrics_provider=WindowedMetricsFromMonitor(
+                self._monitor,
+                self._blueprint_mgr,
+                self._config,
+                self._planner_config,
+                self._startup_timestamp,
+            ),
             data_access_provider=data_access_provider,
             estimator_provider=self._estimator_provider,
             trigger_provider=ConfigDefinedTriggers(
@@ -211,6 +236,7 @@ class BradDaemon:
                 self._monitor,
                 data_access_provider,
                 self._estimator_provider,
+                self._startup_timestamp,
             ),
         )
         self._planner = BlueprintPlannerFactory.create(
@@ -392,7 +418,7 @@ class BradDaemon:
             if self._planner is not None:
                 self._planner.set_disable_triggers(disable=True)
             self._transition_orchestrator = TransitionOrchestrator(
-                self._config, self._blueprint_mgr
+                self._config, self._blueprint_mgr, self._system_event_logger
             )
             self._transition_task = asyncio.create_task(self._run_transition_part_one())
 
@@ -522,7 +548,7 @@ class BradDaemon:
             return to_return
 
         elif command.startswith("BRAD_INSPECT_WORKLOAD"):
-            now = datetime.now().astimezone(pytz.utc)
+            now = universal_now()
             epoch_length = self._config.epoch_length
             planning_window = self._planner_config.planning_window()
             window_end = period_start(now, self._config.epoch_length) + epoch_length
@@ -537,6 +563,14 @@ class BradDaemon:
                 window_multiplier = 1
 
             window_start = window_end - planning_window * window_multiplier
+            if window_start < self._startup_timestamp:
+                window_start = period_start(
+                    self._startup_timestamp, self._config.epoch_length
+                )
+                logger.info(
+                    "Adjusting lookback window to start at system startup: %s",
+                    self._startup_timestamp.strftime("%Y-%m-%d %H:%M:%S,%f"),
+                )
             w = (
                 WorkloadBuilder()
                 .add_queries_from_s3_logs(self._config, window_start, window_end)
@@ -613,7 +647,9 @@ class BradDaemon:
         assert tm.next_version is not None, "Missing next version."
 
         directory = self._blueprint_mgr.get_directory()
-        logger.debug("Using new directory: %s", directory)
+        logger.info(
+            "Switched to new directory during blueprint transition: %s", directory
+        )
         self._monitor.update_metrics_sources()
 
         await self._data_sync_executor.update_connections()

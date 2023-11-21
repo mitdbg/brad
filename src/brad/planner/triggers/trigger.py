@@ -1,8 +1,8 @@
-import pytz
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import timedelta
 from brad.blueprint import Blueprint
 from brad.planner.scoring.score import Score
+from brad.utils.time_periods import universal_now
 
 
 class Trigger:
@@ -40,8 +40,8 @@ class Trigger:
         """
 
     def _reset_cutoff(self) -> None:
-        self._cutoff = datetime.now(tz=pytz.utc)
+        self._cutoff = universal_now()
 
     def _passed_n_epochs_since_cutoff(self, n: int) -> bool:
-        elapsed = datetime.now(tz=pytz.utc) - self._cutoff
+        elapsed = universal_now() - self._cutoff
         return elapsed >= n * self._epoch_length

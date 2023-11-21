@@ -40,5 +40,6 @@ class Connection:
 
 class ConnectionFailed(Exception):
     """
-    Used when
+    Used when an existing connection fails for any reason, or we failed to
+    establish a connection to an underlying engine.
     """

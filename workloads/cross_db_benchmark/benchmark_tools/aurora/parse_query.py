@@ -5,7 +5,6 @@ import pandas as pd
 import psycopg2
 from tqdm import tqdm
 from types import SimpleNamespace
-from typing import Dict, Any
 from brad.connection.cursor import Cursor
 
 from workloads.cross_db_benchmark.benchmark_tools.database import DatabaseSystem
@@ -24,6 +23,25 @@ from workloads.cross_db_benchmark.benchmark_tools.aurora.aurora_executor import 
     get_est_card,
 )
 from workloads.cross_db_benchmark.benchmark_tools.utils import load_json, dumper
+
+
+def get_runtime_aurora(raw, timeout_ms=300000):
+    all_runtime = []
+    for query in raw["query_list"]:
+        if (
+            query["timeout"]
+            or query["analyze_plans"] is None
+            or len(query["analyze_plans"]) == 0
+        ):
+            all_runtime.append(timeout_ms)
+            continue
+        curr_runtime = []
+        for plan in query["analyze_plans"]:
+            rt = plan[-1][0].split("Execution Time:")[-1].split("ms")[0]
+            rt = float(rt.strip())
+            curr_runtime.append(rt)
+        all_runtime.append(np.mean(curr_runtime))
+    return all_runtime
 
 
 def dict_to_namespace(d):
@@ -636,7 +654,8 @@ def parse_plans_with_query_aurora(
             is_brad=is_brad,
             cache=cache,
         )
-        parsed_query["query_index"] = query_no
+        if parsed_query is not None:
+            parsed_query["query_index"] = query_no
         if "tables" in analyze_plan:
             analyze_plan["tables"] = list(analyze_plan["tables"])
         else:

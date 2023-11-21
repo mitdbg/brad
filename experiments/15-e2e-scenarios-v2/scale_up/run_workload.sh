@@ -14,11 +14,8 @@ source ../common.sh
 # TODO: This executor file should be adapted to run against the baselines too
 # (TiDB / Serverless Redshift + Aurora)
 
-function step_txns() {
-  local lo=$1
-  local hi=$2
-  local gap_minute=$3
-}
+initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
+heavier_queries="58,61,62,64,69,73,74,51,57,60"
 
 # Arguments:
 # --config-file
@@ -36,7 +33,7 @@ function txn_sweep() {
     txn_pid=$runner_pid
 
     sleep $(($gap_minute * 60))
-    if [[ ! -z $keep_last ]] && [[ $t_clients = $keep_last ]]; then
+    if [[ -z $keep_last ]] || [[ $t_clients != $keep_last ]]; then
       kill -INT $txn_pid
       wait $txn_pid
     fi
@@ -44,7 +41,11 @@ function txn_sweep() {
 }
 
 function inner_cancel_experiment() {
-  cancel_experiment $rana_pid $txn_pid
+  if [ ! -z $heavy_rana_pid ]; then
+    cancel_experiment $rana_pid $txn_pid $heavy_rana_pid
+  else
+    cancel_experiment $rana_pid $txn_pid
+  fi
 }
 
 trap "inner_cancel_experiment" INT
@@ -55,35 +56,45 @@ log_workload_point "brad_start_initiated"
 sleep 30
 
 # Start with 8 analytical clients.
-log_workload_point "ra_client_starting"
-start_repeating_olap_runner 8 15 5 $ra_query_indexes "ra_8"
+log_workload_point "start_rana_8"
+start_repeating_olap_runner 8 15 5 $initial_queries "ra_8"
 rana_pid=$runner_pid
+log_workload_point "started_rana_8_$rana_pid"
+sleep 2
 
-# Scale up to 8 transactional clients and hold for 15 minutes.
-txn_sweep "4 5 6 7 8" 1 8
-sleep $((15 * 60))
+# Start with 4 transactional clients; hold for 10 minutes to stabilize.
+log_workload_point "start_txn_4"
+start_txn_runner 4
+txn_pid=$runner_pid
+sleep $((10 * 60))
 
-# Scale up to 24 transactional clients.
+# Scale up to 8 transactional clients and hold for 20 minutes.
+log_workload_point "start_increase_txn_4_to_8"
 kill -INT $txn_pid
 wait $txn_pid
-txn_sweep "12 16 20 24" 2 24
+txn_sweep "5 6 7 8" 3 8
+log_workload_point "hold_txn_8_20_min"
+sleep $((20 * 60))  # 32 mins total; 42 mins cumulative
 
-# 5 minutes
-kill -INT $rana_pid
-wait $rana_pid
-start_repeating_olap_runner 16 15 5 $ra_query_indexes "ra_16"
-rana_pid=$runner_pid
-sleep $((5 * 60))
+log_workload_point "start_heavy_rana_10"
+start_repeating_olap_runner 10 5 1 $heavier_queries "ra_10_heavy" 8
+heavy_rana_pid=$runner_pid
+log_workload_point "started_heavy_rana_10_$heavy_rana_pid"
+sleep $((40 * 60))  # 40 mins total; 82 mins cumulative
 
-# 20 minutes
-kill -INT $rana_pid
-wait $rana_pid
-start_repeating_olap_runner 24 15 5 $ra_query_indexes "ra_24"
-rana_pid=$runner_pid
-sleep $((20 * 60))
+log_workload_point "stopping_heavy_rana_10"
+kill -INT $heavy_rana_pid
+terminate_process_group $heavy_rana_pid 10
+
+log_workload_point "start_heavy_rana_20"
+start_repeating_olap_runner 20 5 1 $heavier_queries "ra_20_heavy" 8
+heavy_rana_pid=$runner_pid
+log_workload_point "started_heavy_rana_20_$heavy_rana_pid"
+sleep $((40 * 60))  # 40 mins total; 122 mins cumulative
+
 log_workload_point "experiment_workload_done"
 
 # Shut down everything now.
 >&2 echo "Experiment done. Shutting down runners..."
-graceful_shutdown $rana_pid $txn_pid
+graceful_shutdown $rana_pid $heavy_rana_pid $txn_pid
 log_workload_point "shutdown_complete"

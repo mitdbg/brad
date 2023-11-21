@@ -33,6 +33,9 @@ class Provisioning:
             and self._num_nodes == other._num_nodes
         )
 
+    def __hash__(self) -> int:
+        return hash((self._instance_type, self._num_nodes))
+
 
 class MutableProvisioning(Provisioning):
     def set_instance_type(self, instance_type: str) -> None:

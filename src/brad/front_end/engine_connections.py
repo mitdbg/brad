@@ -172,7 +172,9 @@ class EngineConnections:
                 directory, self._schema_name, config, self._autocommit
             )
 
-    async def remove_connections(self, expected_engines: Set[Engine]) -> None:
+    async def remove_connections(
+        self, expected_engines: Set[Engine], expected_aurora_read_replicas: int
+    ) -> None:
         """
         Removes connections from engines that are not in `expected_engines` but
         are currently connected to.
@@ -187,13 +189,9 @@ class EngineConnections:
         for engine in to_remove:
             del self._connection_map[engine]
 
-        if (
-            Engine.Aurora not in expected_engines
-            and len(self._aurora_read_replicas) > 0
-        ):
-            for conn in self._aurora_read_replicas:
-                await conn.close()
-            self._aurora_read_replicas.clear()
+        while len(self._aurora_read_replicas) > expected_aurora_read_replicas:
+            replica_to_remove = self._aurora_read_replicas.pop()
+            await replica_to_remove.close()
 
     async def reestablish_connections(
         self, config: ConfigFile, directory: Directory

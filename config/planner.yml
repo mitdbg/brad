@@ -5,17 +5,19 @@ strategy: query_based_beam
 planning_window:
   weeks: 0
   days: 0
-  hours: 0
-  minutes: 5
+  hours: 1
+  minutes: 0
 
-# Each second in the previous workload is treated as 12 seconds (so a 5 min
-# planning window is treated as 60 mins). This is to make scenario run times
-# more managable.
-reinterpret_second_as: 12
+reinterpret_second_as: 1
 
 # The query distribution must change by at least this much for a new blueprint
 # to be accepted.
 query_dist_change_frac: 0.1
+
+# Used to aggregate metrics collected in the planning window.
+metrics_agg:
+  method: ewm         # 'mean' is another option
+  alpha: 0.86466472   # 1 - 1 / e^2
 
 ###
 ### Trigger configs.
@@ -52,7 +54,8 @@ triggers:
     ceiling_s: 0.030
     sustained_epochs: 3
 
-  recent_change: {}
+  recent_change:
+    delay_epochs: 5
 
 ###
 ### Beam planning constants.
@@ -96,20 +99,27 @@ aurora_per_instance_change_time_s: 300  # 5 minutes
 redshift_elastic_resize_time_s: 900  # 15 minutes - https://repost.aws/knowledge-center/resize-redshift-cluster
 redshift_classic_resize_time_s: 7200  # 2 hours (This is very difficult to estimate; it depends on state we have no visibility into.)
 
-redshift_extract_rate_mb_per_s: 10.0
-redshift_load_rate_mb_per_s: 10.0
+# Minimum of 5 seconds per table, but this amount is negligible since we work
+# with relatively large tables.
+redshift_extract_rate_mb_per_s: 30.0
+redshift_load_rate_mb_per_s: 20.0
 
-aurora_extract_rate_mb_per_s: 10.0
-aurora_load_rate_mb_per_s: 10.0
+# There is a minimum of 1 second per table. But this is negligible since we work
+# with relatively large tables.
+aurora_extract_rate_mb_per_s: 12.0
+aurora_load_rate_mb_per_s: 12.0
 
 # Extracting / loading in Athena corresponds to a conversion to/from Iceberg.
-athena_extract_rate_mb_per_s: 10.0
-athena_load_rate_mb_per_s: 10.0
+athena_extract_rate_mb_per_s: 15.0
+# From experiments: 820 MB/s * data size + 2.2 s
+# But we just ignore the 2.2 for simplicity as we work with large tables.
+athena_load_rate_mb_per_s: 820.0
 
 # Storage costs.
 s3_usd_per_mb_per_month: 0.000023
 aurora_regular_usd_per_mb_per_month: 0.00010
 aurora_io_opt_usd_per_mb_per_month: 0.000225
+aurora_storage_index_multiplier: 3.0
 
 ###
 ### Dataset-specific Transition Constants
@@ -350,5 +360,7 @@ redshift_scaling:
 
 use_io_optimized_aurora: true
 use_recorded_routing_if_available: true
+ensure_tables_together_on_one_engine: true
 
 aurora_initialize_load_fraction: 0.25
+redshift_initialize_load_fraction: 0.25

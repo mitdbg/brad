@@ -1,8 +1,8 @@
-from typing import List, Optional
+from typing import List
 
 from brad.config.engine import Engine
-from brad.planner.estimator import Estimator
 from brad.query_rep import QueryRep
+from brad.routing.context import RoutingContext
 
 
 class AbstractRoutingPolicy:
@@ -13,15 +13,9 @@ class AbstractRoutingPolicy:
     def name(self) -> str:
         raise NotImplementedError
 
-    async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
-        """
-        Should be called before using this policy. This is used to set up any
-        dynamic state.
-
-        If this routing policy needs an estimator, one should be provided here.
-        """
-
-    async def engine_for(self, query_rep: QueryRep) -> List[Engine]:
+    async def engine_for(
+        self, query_rep: QueryRep, ctx: RoutingContext
+    ) -> List[Engine]:
         """
         Produces a preference order for query routing (the first element in the
         list is the most preferred engine, and so on).
@@ -33,9 +27,9 @@ class AbstractRoutingPolicy:
         You should override this method if the routing policy needs to depend on
         any asynchronous methods.
         """
-        return self.engine_for_sync(query_rep)
+        return self.engine_for_sync(query_rep, ctx)
 
-    def engine_for_sync(self, query_rep: QueryRep) -> List[Engine]:
+    def engine_for_sync(self, query_rep: QueryRep, ctx: RoutingContext) -> List[Engine]:
         """
         Produces a preference order for query routing (the first element in the
         list is the most preferred engine, and so on).
@@ -61,17 +55,6 @@ class FullRoutingPolicy:
     ) -> None:
         self.indefinite_policies = indefinite_policies
         self.definite_policy = definite_policy
-
-    async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
-        """
-        Should be called before using the policy. This is used to set up any
-        dynamic state.
-
-        If this routing policy needs an estimator, one should be provided here.
-        """
-        for policy in self.indefinite_policies:
-            await policy.run_setup(estimator)
-        await self.definite_policy.run_setup(estimator)
 
     def __eq__(self, other: object):
         if not isinstance(other, FullRoutingPolicy):

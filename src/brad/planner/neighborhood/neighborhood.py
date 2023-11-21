@@ -1,10 +1,8 @@
 import asyncio
 import logging
-import pytz
 import pandas as pd
 from io import TextIOWrapper
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
 
 from brad.blueprint.blueprint import Blueprint
 from brad.config.engine import Engine
@@ -28,9 +26,11 @@ from brad.planner.scoring.score import Score
 from brad.planner.strategy import PlanningStrategy
 from brad.planner.workload import Workload
 from brad.provisioning.directory import Directory
+from brad.routing.context import RoutingContext
 from brad.routing.rule_based import RuleBased
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
+from brad.utils.time_periods import universal_now
 
 # from brad.planner.neighborhood.scaling_scorer import ALL_METRICS
 
@@ -96,7 +96,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
             current_workload,
             next_workload,
         ) = await self._providers.workload_provider.get_workloads(
-            datetime.now().astimezone(pytz.utc), window_multiplier
+            universal_now(), window_multiplier
         )
         workload_filters = [
             AuroraTransactions(next_workload),
@@ -195,6 +195,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         self, engines: EngineConnections, current_workload: Workload
     ) -> Dict[Engine, int]:
         current_router = RuleBased()
+        ctx = RoutingContext()
 
         total_accessed_mb: Dict[Engine, int] = {}
         total_accessed_mb[Engine.Aurora] = 0
@@ -204,7 +205,7 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
         # Compute the total amount of data accessed on each engine in the
         # current workload (used to weigh the workload assigned to each engine).
         for q in current_workload.analytical_queries():
-            current_engines = current_router.engine_for_sync(q)
+            current_engines = current_router.engine_for_sync(q, ctx)
             assert len(current_engines) > 0
             current_engine = current_engines[0]
             q.populate_data_accessed_mb(

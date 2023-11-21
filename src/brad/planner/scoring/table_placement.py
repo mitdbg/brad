@@ -43,11 +43,15 @@ def compute_single_aurora_table_cost(table_name: str, ctx: ScoringContext) -> fl
 
     if ctx.planner_config.use_io_optimized_aurora():
         storage_usd_per_mb_per_month += (
-            raw_extract_mb * ctx.planner_config.aurora_io_opt_usd_per_mb_per_month()
+            raw_extract_mb
+            * ctx.planner_config.aurora_io_opt_usd_per_mb_per_month()
+            * ctx.planner_config.aurora_storage_index_multiplier()
         )
     else:
         storage_usd_per_mb_per_month += (
-            raw_extract_mb * ctx.planner_config.aurora_regular_usd_per_mb_per_month()
+            raw_extract_mb
+            * ctx.planner_config.aurora_regular_usd_per_mb_per_month()
+            * ctx.planner_config.aurora_storage_index_multiplier()
         )
 
     source_period = timedelta(days=30)

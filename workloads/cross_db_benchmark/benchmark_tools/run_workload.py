@@ -98,6 +98,7 @@ def run_workload(
             cap_workload=cap_workload,
             rank=rank,
             world_size=world_size,
+            use_boto_client=False,
             s3_output_path=s3_output_path,
         )
     else:

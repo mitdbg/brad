@@ -1,8 +1,7 @@
 import asyncio
 import pandas as pd
 import json
-import pytz
-from datetime import timedelta, datetime
+from datetime import timedelta
 from typing import List, Optional, Tuple
 from importlib.resources import files, as_file
 
@@ -15,7 +14,7 @@ from .perf_insights import PerfInsightsClient
 from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
-from brad.utils.time_periods import impute_old_missing_metrics
+from brad.utils.time_periods import impute_old_missing_metrics, universal_now
 
 
 class AuroraMetrics(MetricsSourceWithForecasting):
@@ -88,7 +87,7 @@ class AuroraMetrics(MetricsSourceWithForecasting):
         )
 
         # See the comment in `redshift_metrics.py`.
-        now = datetime.now().astimezone(pytz.utc)
+        now = universal_now()
         cutoff_ts = now - self.METRICS_DELAY
         new_metrics = impute_old_missing_metrics(new_metrics, cutoff_ts, value=0.0)
         new_metrics = new_metrics.dropna()

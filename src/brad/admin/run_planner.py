@@ -1,9 +1,8 @@
 import asyncio
 import logging
 import pathlib
-import pytz
 from typing import Dict, Optional
-from datetime import timedelta, datetime
+from datetime import timedelta
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -25,7 +24,7 @@ from brad.planner.scoring.performance.precomputed_predictions import (
 from brad.planner.triggers.provider import EmptyTriggerProvider
 from brad.planner.triggers.trigger import Trigger
 from brad.planner.metrics import (
-    MetricsFromMonitor,
+    WindowedMetricsFromMonitor,
     FixedMetricsProvider,
     Metrics,
     MetricsProvider,
@@ -37,6 +36,7 @@ from brad.routing.policy import RoutingPolicy
 from brad.blueprint.manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
+from brad.utils.time_periods import universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ async def run_planner_impl(args) -> None:
     config = ConfigFile.load(args.config_file)
 
     # 2. Load the planner config.
-    planner_config = PlannerConfig(args.planner_config_file)
+    planner_config = PlannerConfig.load(args.planner_config_file)
 
     # 3. Load the blueprint.
     assets = AssetManager(config)
@@ -214,13 +214,19 @@ async def run_planner_impl(args) -> None:
     monitor = Monitor(config, blueprint_mgr)
     monitor.set_up_metrics_sources()
     if args.use_fixed_metrics is not None:
-        now = datetime.now().astimezone(pytz.utc)
         metrics_provider: MetricsProvider = FixedMetricsProvider(
             Metrics(**parse_metrics(args.use_fixed_metrics)),
-            now,
+            universal_now(),
         )
     else:
-        metrics_provider = MetricsFromMonitor(monitor, blueprint_mgr)
+        metrics_provider = WindowedMetricsFromMonitor(
+            monitor,
+            blueprint_mgr,
+            config,
+            planner_config,
+            # N.B. This means the metrics window will be essentially empty.
+            universal_now(),
+        )
 
     if config.routing_policy == RoutingPolicy.ForestTableSelectivity:
         pe = asyncio.run(PostgresEstimator.connect(args.schema_name, config))

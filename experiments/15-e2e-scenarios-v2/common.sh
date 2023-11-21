@@ -46,6 +46,19 @@ function graceful_shutdown() {
   wait $brad_pid
 }
 
+function terminate_process_group() {
+  local pid=$1
+  local initial_wait_s=$2
+  sleep $2
+  if kill -0 $pid >/dev/null 2>&1; then
+    pkill -KILL -P $pid
+    pkill -KILL $pid
+    echo "NOTE: Forced process $pid to stop."
+  else
+    echo "Process $pid stopped gracefully."
+  fi
+}
+
 function log_workload_point() {
   msg=$1
   now=$(date --utc "+%Y-%m-%d %H:%M:%S")
@@ -93,6 +106,7 @@ function start_repeating_olap_runner() {
   local ra_gap_std_s=$3
   local query_indexes=$4
   local results_name=$5
+  local client_offset=$6
 
   local args=(
     --num-clients $ra_clients
@@ -107,12 +121,16 @@ function start_repeating_olap_runner() {
     args+=(--query-frequency-path $ra_query_frequency_path)
   fi
 
+  if [[ ! -z $client_offset ]]; then
+    args+=(--client-offset $client_offset)
+  fi
+
   >&2 echo "[Repeating Analytics] Running with $ra_clients..."
   results_dir=$COND_OUT/$results_name
   mkdir -p $results_dir
 
   log_workload_point $results_name
-  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py "${args[@]}" &
+  COND_OUT=$results_dir python3.11 ../../../workloads/IMDB_extended/run_repeating_analytics.py "${args[@]}" &
 
   # This is a special return value variable that we use.
   runner_pid=$!

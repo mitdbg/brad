@@ -6,7 +6,7 @@ import time
 import os
 import multiprocessing as mp
 from typing import AsyncIterable, Optional, Dict, Any
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from ddsketch import DDSketch
 
 import grpc
@@ -18,6 +18,7 @@ from brad.asset_manager import AssetManager
 from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
+from brad.connection.connection import ConnectionFailed
 from brad.daemon.monitor import Monitor
 from brad.daemon.messages import (
     ShutdownFrontEnd,
@@ -28,8 +29,6 @@ from brad.daemon.messages import (
     NewBlueprint,
     NewBlueprintAck,
 )
-from brad.data_stats.estimator import Estimator
-from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.front_end.brad_interface import BradInterface
 from brad.front_end.errors import QueryError
 from brad.front_end.grpc import BradGrpc
@@ -48,6 +47,7 @@ from brad.utils.json_decimal_encoder import DecimalEncoder
 from brad.utils.mailbox import Mailbox
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from brad.utils.run_time_reservoir import RunTimeReservoir
+from brad.utils.time_periods import universal_now
 from brad.workload_logging.epoch_file_handler import EpochFileHandler
 
 logger = logging.getLogger(__name__)
@@ -117,7 +117,6 @@ class BradFrontEnd(BradInterface):
             self._config, self._blueprint_mgr, self._schema_name
         )
         self._daemon_messages_task: Optional[asyncio.Task[None]] = None
-        self._estimator: Optional[Estimator] = None
 
         # Number of transactions that completed.
         self._transaction_end_counter = Counter()  # pylint: disable=global-statement
@@ -172,17 +171,7 @@ class BradFrontEnd(BradInterface):
             self._monitor.set_up_metrics_sources()
             await self._monitor.fetch_latest()
 
-        if (
-            self._routing_policy_override == RoutingPolicy.ForestTableSelectivity
-            or self._routing_policy_override == RoutingPolicy.Default
-        ):
-            self._estimator = await PostgresEstimator.connect(
-                self._schema_name, self._config
-            )
-            await self._estimator.analyze(self._blueprint_mgr.get_blueprint())
-        else:
-            self._estimator = None
-        await self._set_up_router(self._estimator)
+        await self._set_up_router()
 
         # Start the metrics reporting task.
         self._brad_metrics_reporting_task = asyncio.create_task(
@@ -194,7 +183,7 @@ class BradFrontEnd(BradInterface):
 
         self._qlogger_refresh_task = asyncio.create_task(self._refresh_qlogger())
 
-    async def _set_up_router(self, estimator: Optional[Estimator]) -> None:
+    async def _set_up_router(self) -> None:
         # We have different routing policies for performance evaluation and
         # testing purposes.
         blueprint = self._blueprint_mgr.get_blueprint()
@@ -235,7 +224,6 @@ class BradFrontEnd(BradInterface):
                 definite_policy, blueprint.table_locations_bitmap()
             )
 
-        await self._router.run_setup(estimator)
         self._router.log_policy()
 
     async def _run_teardown(self):
@@ -257,13 +245,29 @@ class BradFrontEnd(BradInterface):
             self._qlogger_refresh_task.cancel()
             self._qlogger_refresh_task = None
 
-        if self._estimator is not None:
-            await self._estimator.close()
-            self._estimator = None
-
     async def start_session(self) -> SessionId:
-        session_id, _ = await self._sessions.create_new_session()
-        return session_id
+        rand_backoff = None
+        while True:
+            try:
+                session_id, _ = await self._sessions.create_new_session()
+                return session_id
+            except ConnectionFailed:
+                if rand_backoff is None:
+                    rand_backoff = RandomizedExponentialBackoff(
+                        max_retries=10, base_delay_s=0.5, max_delay_s=10.0
+                    )
+                time_to_wait = rand_backoff.wait_time_s()
+                if time_to_wait is None:
+                    logger.exception(
+                        "Failed to start a new session due to a repeated "
+                        "connection failure (10 retries)."
+                    )
+                    raise
+                await asyncio.sleep(time_to_wait)
+                # Defensively refresh the blueprint and directory before
+                # retrying. Maybe we are getting outdated endpoint information
+                # from AWS.
+                await self._blueprint_mgr.load()
 
     async def end_session(self, session_id: SessionId) -> None:
         await self._sessions.end_session(session_id)
@@ -306,8 +310,13 @@ class BradFrontEnd(BradInterface):
             query_rep = QueryRep(query)
             if query_rep.is_transaction_start():
                 session.set_in_transaction(True)
-            assert self._router is not None
-            engine_to_use = await self._router.engine_for(query_rep, session)
+
+            if query.startswith("SET SESSION"):
+                # Support for setting transaction isolation level (temporary).
+                engine_to_use = Engine.Aurora
+            else:
+                assert self._router is not None
+                engine_to_use = await self._router.engine_for(query_rep, session)
 
             log_verbose(
                 logger,
@@ -326,7 +335,7 @@ class BradFrontEnd(BradInterface):
                 if transactional_query:
                     connection = session.engines.get_connection(engine_to_use)
                     cursor = connection.cursor_sync()
-                    start = datetime.now(tz=timezone.utc)
+                    start = universal_now()
                     if query_rep.is_transaction_start():
                         session.set_txn_start_timestamp(start)
                     # Using execute_sync() is lower overhead than the async
@@ -336,9 +345,9 @@ class BradFrontEnd(BradInterface):
                 else:
                     connection = session.engines.get_reader_connection(engine_to_use)
                     cursor = connection.cursor_sync()
-                    start = datetime.now(tz=timezone.utc)
+                    start = universal_now()
                     await cursor.execute(query_rep.raw_query)
-                end = datetime.now(tz=timezone.utc)
+                end = universal_now()
             except (
                 pyodbc.ProgrammingError,
                 pyodbc.Error,
@@ -641,9 +650,9 @@ class BradFrontEnd(BradInterface):
 
             if rand_backoff is None:
                 rand_backoff = RandomizedExponentialBackoff(
-                    max_retries=10,
-                    base_delay_s=2.0,
-                    max_delay_s=timedelta(minutes=10).total_seconds(),
+                    max_retries=100,
+                    base_delay_s=1.0,
+                    max_delay_s=timedelta(minutes=1).total_seconds(),
                 )
 
             wait_time = rand_backoff.wait_time_s()

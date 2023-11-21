@@ -90,8 +90,6 @@
 - ST_GeogFromText
 - ST_GeogFromWKB
 - ST_GeographyFromText
-- '='
-- '&&'
 - ST_Intersection
 - ST_Intersects
 - ST_Length
@@ -233,9 +231,6 @@
 - ST_GeomFromText
 - ST_GeomFromWKB
 - ST_GeometryN
-- '='
-- '&<|'
-- '&&'
 - ST_HasArc
 - ST_IsClosed
 - ST_IsEmpty
@@ -280,8 +275,6 @@
 - ST_GMLToSQL
 - ST_GeomFromGML
 - ST_GeomFromKML
-- '&&'
-- ~=
 - ST_HausdorffDistance
 - ST_Intersection
 - ST_Intersects

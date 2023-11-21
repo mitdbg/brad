@@ -27,6 +27,7 @@ with as_file(_GEOSPATIAL_KEYWORDS_PATH) as file:
         _GEOSPATIAL_KEYWORDS = yaml.safe_load(f)
 _GEOSPATIAL_KEYWORDS = [k.upper() for k in _GEOSPATIAL_KEYWORDS]
 
+# Define vector keywords.
 _VECTOR_KEYWORDS = ["<=>"]
 
 

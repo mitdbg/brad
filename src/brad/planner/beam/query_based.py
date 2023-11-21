@@ -70,6 +70,17 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         self._providers.data_access_provider.apply_access_statistics(next_workload)
         self._providers.data_access_provider.apply_access_statistics(current_workload)
 
+        if self._planner_config.flag("ensure_tables_together_on_one_engine"):
+            # This adds a constraint to ensure all tables are present together
+            # on at least one engine. This ensures that arbitrary unseen join
+            # templates can always be immediately handled.
+            all_tables = ", ".join(
+                [table.name for table in self._current_blueprint.tables()]
+            )
+            next_workload.add_priming_analytical_query(
+                f"SELECT 1 FROM {all_tables} LIMIT 1"
+            )
+
         # If requested, we record this planning pass for later debugging.
         if (
             not self._disable_external_logging
@@ -119,31 +130,35 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             self._planner_config,
         )
         planning_router = Router.create_from_blueprint(self._current_blueprint)
-        await planning_router.run_setup(
+        await planning_router.run_setup_for_standalone(
             self._providers.estimator_provider.get_estimator()
         )
         await ctx.simulate_current_workload_routing(planning_router)
         ctx.compute_engine_latency_norm_factor()
+        ctx.compute_current_workload_predicted_hourly_scan_cost()
+        ctx.compute_current_blueprint_provisioning_hourly_cost()
 
+        comparator = self._providers.comparator_provider.get_comparator(
+            metrics,
+            curr_hourly_cost=(
+                ctx.current_workload_predicted_hourly_scan_cost
+                + ctx.current_blueprint_provisioning_hourly_cost
+            ),
+        )
         beam_size = self._planner_config.beam_size()
-        engines = [Engine.Aurora, Engine.Redshift, Engine.Athena]
         first_query_idx = query_indices[0]
+        first_query = analytical_queries[first_query_idx]
         current_top_k: List[BlueprintCandidate] = []
 
-        # Not a fundamental limitation, but it simplifies the implementation
-        # below if this condition is true.
-        assert beam_size >= len(engines)
-
         # 4. Initialize the top-k set (beam).
-        for routing_engine in engines:
-            candidate = BlueprintCandidate.based_on(
-                self._current_blueprint, self._comparator
-            )
+        for routing_engine in Engine.from_bitmap(
+            planning_router.run_functionality_routing(first_query)
+        ):
+            candidate = BlueprintCandidate.based_on(self._current_blueprint, comparator)
             candidate.add_transactional_tables(ctx)
-            query = analytical_queries[first_query_idx]
             candidate.add_query(
                 first_query_idx,
-                query,
+                first_query,
                 routing_engine,
                 next_workload.get_predicted_analytical_latency(
                     first_query_idx, routing_engine
@@ -176,10 +191,16 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             next_top_k: List[BlueprintCandidate] = []
             query = analytical_queries[query_idx]
 
+            # Only a subset of the engines may support this query if it uses
+            # "special functionality".
+            engine_candidates = Engine.from_bitmap(
+                planning_router.run_functionality_routing(query)
+            )
+
             # For each candidate in the current top k, expand it by one
             # query in the workload.
             for curr_candidate in current_top_k:
-                for routing_engine in engines:
+                for routing_engine in engine_candidates:
                     next_candidate = curr_candidate.clone()
                     next_candidate.add_query(
                         query_idx,

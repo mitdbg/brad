@@ -25,7 +25,7 @@ def test_provisioning_enumerate_aurora():
 
 def test_provisioning_enumerate_redshift():
     redshift = ProvisioningEnumerator(Engine.Redshift)
-    base_redshift = Provisioning("dc2.large", 1)
+    base_redshift = Provisioning("dc2.large", 2)
 
     redshift_nearby = [
         p.clone()

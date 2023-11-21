@@ -54,8 +54,6 @@ class BlueprintPlanner:
         for t in self._triggers:
             t.update_blueprint(self._current_blueprint, self._current_blueprint_score)
 
-        self._comparator = self._providers.comparator_provider.get_comparator()
-
     async def run_forever(self) -> None:
         """
         Called to start the planner. The planner is meant to run until its task

@@ -41,10 +41,16 @@ class BradGrpcClient:
         self._session_id = self._impl.start_session()
 
     def close(self):
-        assert self._session_id is not None
-        self._impl.end_session(self._session_id)
-        self._impl.close()
-        self._session_id = None
+        try:
+            assert self._session_id is not None
+            self._impl.end_session(self._session_id)
+            self._impl.close()
+        except grpc.RpcError:
+            # Among other possibilities, usually this means the BRAD front end
+            # has already shut down.
+            pass
+        finally:
+            self._session_id = None
 
     def run_query(
         self, query: str
@@ -122,7 +128,19 @@ class BradRawGrpcClient:
     def start_session(self) -> SessionId:
         assert self._stub is not None
         result = self._stub.StartSession(b.StartSessionRequest())
-        return SessionId(result.id.id_value)
+        msg_kind = result.WhichOneof("result")
+        if msg_kind is None:
+            raise BradClientError(
+                message="BRAD RPC error: Unspecified start session result."
+            )
+        elif msg_kind == "id":
+            return SessionId(result.id.id_value)
+        elif msg_kind == "error":
+            raise BradClientError(message=result.error.error_msg)
+        else:
+            raise BradClientError(
+                message="BRAD RPC error: Unknown start session result."
+            )
 
     def end_session(self, session_id: SessionId) -> None:
         assert self._stub is not None

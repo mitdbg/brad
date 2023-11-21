@@ -133,39 +133,44 @@ def parse_queries_athena_boto_format(
             print(f"Aurora has no verbose plan for query {query_no}")
             skipped.append(query_no)
             continue
-        verbose_plan, _, _ = parse_plan(
-            aurora_q.verbose_plan, analyze=False, parse=True
-        )
-        verbose_plan.parse_lines_recursively(
-            alias_dict=alias_dict,
-            parse_baseline=False,
-            parse_join_conds=False,
-            is_brad=is_brad,
-        )
+        try:
+            verbose_plan, _, _ = parse_plan(
+                aurora_q.verbose_plan, analyze=False, parse=True
+            )
+            verbose_plan.parse_lines_recursively(
+                alias_dict=alias_dict,
+                parse_baseline=False,
+                parse_join_conds=False,
+                is_brad=is_brad,
+            )
 
-        tables, filter_columns, operators = plan_statistics(verbose_plan)
+            tables, filter_columns, operators = plan_statistics(verbose_plan)
 
-        verbose_plan.parse_columns_bottom_up(
-            column_id_mapping,
-            partial_column_name_mapping,
-            table_id_mapping,
-            alias_dict=alias_dict,
-        )
-        verbose_plan.tables = tables
-        verbose_plan.num_tables = len(tables)
-        verbose_plan.plan_runtime = runtime
+            verbose_plan.parse_columns_bottom_up(
+                column_id_mapping,
+                partial_column_name_mapping,
+                table_id_mapping,
+                alias_dict=alias_dict,
+            )
+            verbose_plan.tables = tables
+            verbose_plan.num_tables = len(tables)
+            verbose_plan.plan_runtime = runtime
 
-        def augment_no_workers(p, top_no_workers=0):
-            no_workers = p.plan_parameters.get("workers_planned")
-            if no_workers is None:
-                no_workers = top_no_workers
+            def augment_no_workers(p, top_no_workers=0):
+                no_workers = p.plan_parameters.get("workers_planned")
+                if no_workers is None:
+                    no_workers = top_no_workers
 
-            p.plan_parameters["workers_planned"] = top_no_workers
+                p.plan_parameters["workers_planned"] = top_no_workers
 
-            for c in p.children:
-                augment_no_workers(c, top_no_workers=no_workers)
+                for c in p.children:
+                    augment_no_workers(c, top_no_workers=no_workers)
 
-        augment_no_workers(verbose_plan)
+            augment_no_workers(verbose_plan)
+        except:
+            print(f"parsed_query {query_no} failed to parse Aurora's verbose plan")
+            skipped.append(query_no)
+            continue
 
         if min_runtime is not None and runtime < min_runtime:
             print(f"parsed_query {query_no} runtime too small")
@@ -194,7 +199,6 @@ def parse_queries_athena_boto_format(
             is_brad=is_brad,
             cache=cache,
         )
-        parsed_query["query_index"] = query_no
         if "tables" in verbose_plan:
             verbose_plan["tables"] = list(verbose_plan["tables"])
         else:
@@ -202,6 +206,7 @@ def parse_queries_athena_boto_format(
         if parsed_query is not None and (
             len(parsed_query["join_nodes"]) != 0 or include_no_joins
         ):
+            parsed_query["query_index"] = query_no
             parsed_queries.append(parsed_query)
             parsed_plans.append(verbose_plan)
             sql_queries.append(q.sql)
@@ -419,7 +424,7 @@ def parse_queries_athena_classic_format(
             q.sql,
             column_id_mapping,
             table_id_mapping,
-            is_explain_only=True,
+            is_explain_only=False,
             use_true_card=use_true_card,
             db_conn=db_conn,
             cursor=cursor,

@@ -1,13 +1,16 @@
 import asyncio
 import logging
-import pytz
 from datetime import datetime
 from typing import Dict, Tuple, Optional
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.session import SessionId
-from .engine_connections import EngineConnections
 from brad.blueprint.manager import BlueprintManager
+from brad.front_end.engine_connections import EngineConnections
+from brad.planner.estimator import Estimator
+from brad.routing.policy import RoutingPolicy
+from brad.data_stats.postgres_estimator import PostgresEstimator
+from brad.utils.time_periods import universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +22,18 @@ class Session:
     `SessionManager`.
     """
 
-    def __init__(self, session_id: SessionId, engines: EngineConnections):
+    def __init__(
+        self,
+        session_id: SessionId,
+        engines: EngineConnections,
+        estimator: Optional[Estimator],
+    ):
         self._session_id = session_id
         self._engines = engines
         self._in_txn = False
         self._closed = False
-        self._txn_start_timestamp = datetime.now(tz=pytz.utc)
+        self._txn_start_timestamp = universal_now()
+        self._estimator = estimator
 
     @property
     def identifier(self) -> SessionId:
@@ -37,6 +46,10 @@ class Session:
     @property
     def in_transaction(self) -> bool:
         return self._in_txn
+
+    @property
+    def estimator(self) -> Optional[Estimator]:
+        return self._estimator
 
     @property
     def closed(self) -> bool:
@@ -54,6 +67,7 @@ class Session:
     async def close(self):
         self._closed = True
         await self._engines.close()
+        await self._estimator.close()
 
 
 class SessionManager:
@@ -91,7 +105,20 @@ class SessionManager:
             specific_engines=engines,
             connect_to_aurora_read_replicas=True,
         )
-        session = Session(session_id, connections)
+
+        # Create an estimator if needed. The estimator should be
+        # session-specific since it currently depends on a DB connection.
+        routing_policy_override = self._config.routing_policy
+        if (
+            routing_policy_override == RoutingPolicy.ForestTableSelectivity
+            or routing_policy_override == RoutingPolicy.Default
+        ):
+            estimator = await PostgresEstimator.connect(self._schema_name, self._config)
+            await estimator.analyze(self._blueprint_mgr.get_blueprint())
+        else:
+            estimator = None
+
+        session = Session(session_id, connections, estimator)
         self._sessions[session_id] = session
         logger.debug("Established a new session: %s", session_id)
         return (session_id, session)
@@ -142,13 +169,19 @@ class SessionManager:
         blueprint = self._blueprint_mgr.get_blueprint()
 
         expected_engines = {Engine.Athena}
+        expected_aurora_read_replicas = 0
         if blueprint.aurora_provisioning().num_nodes() > 0:
             expected_engines.add(Engine.Aurora)
+            expected_aurora_read_replicas = (
+                blueprint.aurora_provisioning().num_nodes() - 1
+            )
         if blueprint.redshift_provisioning().num_nodes() > 0:
             expected_engines.add(Engine.Redshift)
 
         for session in self._sessions.values():
-            await session.engines.remove_connections(expected_engines)
+            await session.engines.remove_connections(
+                expected_engines, expected_aurora_read_replicas
+            )
 
     async def reestablish_connections(self) -> bool:
         """

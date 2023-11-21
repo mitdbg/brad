@@ -2,11 +2,12 @@ import asyncio
 import logging
 from typing import Dict, Optional, TYPE_CHECKING
 from brad.front_end.session import Session
-from brad.routing.functionality_catalog import Functionality
 from brad.data_stats.estimator import Estimator
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.query_rep import QueryRep
 from brad.routing.abstract_policy import AbstractRoutingPolicy, FullRoutingPolicy
+from brad.routing.context import RoutingContext
+from brad.routing.functionality_catalog import Functionality
 
 if TYPE_CHECKING:
     from brad.blueprint import Blueprint
@@ -44,21 +45,27 @@ class Router:
         self._use_future_blueprint_policies = use_future_blueprint_policies
         self.functionality_catalog = Functionality()
 
+        # This should only be used when the router is being used in the planner.
+        self._shared_estimator: Optional[Estimator] = None
+
     def log_policy(self) -> None:
         logger.info("Routing policy:")
         logger.info("  Indefinite policies:")
         for p in self._full_policy.indefinite_policies:
             logger.info("    - %s", p.name())
-        logger.info("  Definite policy: %s")
+        logger.info("  Definite policy: %s", self._full_policy.definite_policy.name())
 
-    async def run_setup(self, estimator: Optional[Estimator] = None) -> None:
+    async def run_setup_for_standalone(
+        self, estimator: Optional[Estimator] = None
+    ) -> None:
         """
-        Should be called before using the router. This is used to set up any
-        dynamic state.
+        Should be called before using the router "standalone" contexts (i.e.,
+        outside the front end). This is used to set up any dynamic state that is
+        typically passed in via a `Session`.
 
         If the routing policy needs an estimator, one should be provided here.
         """
-        await self._full_policy.run_setup(estimator)
+        self._shared_estimator = estimator
 
     def update_blueprint(self, blueprint: "Blueprint") -> None:
         """
@@ -93,16 +100,14 @@ class Router:
         place_support = self._run_location_routing(query, self._table_placement_bitmap)
 
         # Engine functionality constraints.
-        func_support = self._run_functionality_routing(query)
+        func_support = self.run_functionality_routing(query)
 
         # Get supported engines.
         valid_locations = place_support & func_support
 
         # Check if no engine supports query.
         if valid_locations == 0:
-            raise RuntimeError(
-                "No engine supports query {}".format(", ".join(query.raw_query))
-            )
+            raise RuntimeError("No engine supports query '{}'".format(query.raw_query))
 
         # Check if only one engine supports query.
         if (valid_locations & (valid_locations - 1)) == 0:
@@ -116,16 +121,23 @@ class Router:
             else:
                 raise RuntimeError("Unsupported bitmap value " + str(valid_locations))
 
+        # Right now, this context can be created once per session. But we may
+        # also want to include other shared state (e.g., metrics) that is not
+        # session-specific.
+        ctx = RoutingContext()
+        if session is not None:
+            ctx.estimator = session.estimator
+
         # Go through the indefinite routing policies. These may not return a
         # routing location.
         for policy in self._full_policy.indefinite_policies:
-            locations = await policy.engine_for(query)
+            locations = await policy.engine_for(query, ctx)
             for loc in locations:
                 if (EngineBitmapValues[loc] & valid_locations) != 0:
                     return loc
 
         # Rely on the definite routing policy.
-        locations = await self._full_policy.definite_policy.engine_for(query)
+        locations = await self._full_policy.definite_policy.engine_for(query, ctx)
         for loc in locations:
             if (EngineBitmapValues[loc] & valid_locations) != 0:
                 return loc
@@ -147,29 +159,27 @@ class Router:
         # Ideally we re-implement a sync version.
         return asyncio.run(self.engine_for(query, session))
 
-    def _run_functionality_routing(self, query: QueryRep) -> int:
+    def run_functionality_routing(self, query: QueryRep) -> int:
         """
         Based on the functinalities required by the query (e.g. geospatial),
         compute the set of engines that are able to serve this query.
         """
 
-        # Bitmap describing what functionality is required for running query
+        # Bitmap describing what special functionality is required for running
+        # the query.
         req_bitmap = query.get_required_functionality()
 
         # Bitmap for each engine which features it supports
         engine_support = self.functionality_catalog.get_engine_functionalities()
-        engines = [Engine.Athena, Engine.Aurora, Engine.Redshift]
 
         # Narrow down the valid engines that can run the query, based on the
         # engine functionality
-        valid_locations_list = []
-        for engine, sup_bitmap in zip(engines, engine_support):
-            query_supported = (~req_bitmap | (req_bitmap & sup_bitmap)) == -1
+        supported_engines_bitmap = 0
+        for engine_mask, sup_bitmap in engine_support:
+            if (req_bitmap & sup_bitmap) == req_bitmap:
+                supported_engines_bitmap |= engine_mask
 
-            if query_supported:
-                valid_locations_list.append(engine)
-
-        return Engine.to_bitmap(valid_locations_list)
+        return supported_engines_bitmap
 
     def _run_location_routing(
         self, query: QueryRep, location_bitmap: Dict[str, int]

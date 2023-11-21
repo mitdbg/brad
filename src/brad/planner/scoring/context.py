@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 from typing import Dict, List
+from datetime import timedelta
 
 from brad.config.engine import Engine
 from brad.blueprint import Blueprint
@@ -8,6 +9,11 @@ from brad.config.planner import PlannerConfig
 from brad.planner.metrics import Metrics
 from brad.planner.workload import Workload
 from brad.routing.router import Router
+from brad.planner.scoring.provisioning import compute_athena_scan_cost_numpy
+from brad.planner.scoring.provisioning import (
+    compute_aurora_hourly_operational_cost,
+    compute_redshift_hourly_operational_cost,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +44,11 @@ class ScoringContext:
         self.current_query_locations[Engine.Redshift] = []
         self.current_query_locations[Engine.Athena] = []
 
+        # TODO: This is messy - we should have one place for blueprint scoring
+        # relative to a workload.
+        self.current_workload_predicted_hourly_scan_cost = 0.0
+        self.current_blueprint_provisioning_hourly_cost = 0.0
+
         # This is used for reweighing metrics due to query routing changes
         # across blueprints.
         self.engine_latency_norm_factor: Dict[Engine, float] = {}
@@ -65,6 +76,40 @@ class ScoringContext:
             # available.
             eng = await router.engine_for(query)
             self.current_query_locations[eng].append(qidx)
+
+    def compute_current_workload_predicted_hourly_scan_cost(self) -> None:
+        # Note that this is not ideal. We should use the actual _recorded_ scan
+        # cost (but this is not readily recorded through PyAthena).
+        # Athena bytes:
+        bytes_accessed = (
+            self.current_workload.get_predicted_athena_bytes_accessed_batch(
+                self.current_query_locations[Engine.Athena]
+            )
+        )
+        arrival_counts = self.current_workload.get_arrival_counts_batch(
+            self.current_query_locations[Engine.Athena]
+        )
+        period_scan_cost = compute_athena_scan_cost_numpy(
+            bytes_accessed, arrival_counts, self.planner_config
+        )
+        scaling_factor = (
+            timedelta(hours=1).total_seconds()
+            / self.current_workload.period().total_seconds()
+        )
+        self.current_workload_predicted_hourly_scan_cost = (
+            period_scan_cost * scaling_factor
+        )
+        if not self.planner_config.use_io_optimized_aurora():
+            logger.warning("Aurora blocks accessed is not implemented.")
+
+    def compute_current_blueprint_provisioning_hourly_cost(self) -> None:
+        aurora_cost = compute_aurora_hourly_operational_cost(
+            self.current_blueprint.aurora_provisioning(), self
+        )
+        redshift_cost = compute_redshift_hourly_operational_cost(
+            self.current_blueprint.redshift_provisioning()
+        )
+        self.current_blueprint_provisioning_hourly_cost = aurora_cost + redshift_cost
 
     def compute_engine_latency_norm_factor(self) -> None:
         for engine in [Engine.Aurora, Engine.Redshift, Engine.Athena]:

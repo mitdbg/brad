@@ -70,6 +70,17 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         self._providers.data_access_provider.apply_access_statistics(next_workload)
         self._providers.data_access_provider.apply_access_statistics(current_workload)
 
+        if self._planner_config.flag("ensure_tables_together_on_one_engine"):
+            # This adds a constraint to ensure all tables are present together
+            # on at least one engine. This ensures that arbitrary unseen join
+            # templates can always be immediately handled.
+            all_tables = ", ".join(
+                [table.name for table in self._current_blueprint.tables()]
+            )
+            next_workload.add_priming_analytical_query(
+                f"SELECT 1 FROM {all_tables} LIMIT 1"
+            )
+
         if (
             not self._disable_external_logging
             and BlueprintPickleDebugLogger.is_log_requested(self._config)
@@ -91,6 +102,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             )
 
         # 2. Cluster queries by tables and sort by gains (sum).
+        # TODO: Need to consider functionality when creating clusters.
         clusters = self._preprocess_workload_queries(next_workload)
 
         # Sanity check. We cannot run planning without at least one query in the
@@ -115,12 +127,21 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             self._planner_config,
         )
         planning_router = Router.create_from_blueprint(self._current_blueprint)
-        await planning_router.run_setup(
+        await planning_router.run_setup_for_standalone(
             self._providers.estimator_provider.get_estimator()
         )
         await ctx.simulate_current_workload_routing(planning_router)
         ctx.compute_engine_latency_norm_factor()
+        ctx.compute_current_workload_predicted_hourly_scan_cost()
+        ctx.compute_current_blueprint_provisioning_hourly_cost()
 
+        comparator = self._providers.comparator_provider.get_comparator(
+            metrics,
+            curr_hourly_cost=(
+                ctx.current_workload_predicted_hourly_scan_cost
+                + ctx.current_blueprint_provisioning_hourly_cost
+            ),
+        )
         beam_size = self._planner_config.beam_size()
         placement_options = self._get_table_placement_options_bitmap()
         first_cluster = clusters[0]
@@ -132,9 +153,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         # 4. Initialize the top-k set (beam).
         for placement_bitmap in placement_options:
-            candidate = BlueprintCandidate.based_on(
-                self._current_blueprint, self._comparator
-            )
+            candidate = BlueprintCandidate.based_on(self._current_blueprint, comparator)
             candidate.add_transactional_tables(ctx)
             tables, queries, _ = first_cluster
             placement_changed = candidate.add_placement(placement_bitmap, tables, ctx)

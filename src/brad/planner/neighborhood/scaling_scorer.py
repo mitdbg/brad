@@ -13,6 +13,7 @@ from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
+from brad.routing.context import RoutingContext
 from brad.routing.rule_based import RuleBased
 
 logger = logging.getLogger(__name__)
@@ -58,10 +59,11 @@ class ScalingScorer(Scorer):
         # NOTE: The routing policy should be included in the blueprint. We
         # currently hardcode it here for engineering convenience.
         router = RuleBased()
+        rctx = RoutingContext()
 
         # See where each analytical query gets routed.
         for q in ctx.next_workload.analytical_queries():
-            next_engines = router.engine_for_sync(q)
+            next_engines = router.engine_for_sync(q, rctx)
             assert len(next_engines) > 0
             next_engine = next_engines[0]
             ctx.next_dest[next_engine].append(q)

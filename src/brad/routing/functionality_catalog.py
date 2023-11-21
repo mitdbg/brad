@@ -1,10 +1,11 @@
-from typing import List
 import operator
 import yaml
+from typing import List, Tuple, Dict
 from functools import reduce
-from typing import Dict
 from importlib.resources import files, as_file
+
 import brad.routing as routing
+from brad.config.engine import Engine, EngineBitmapValues
 
 
 class Functionality:
@@ -34,13 +35,19 @@ class Functionality:
                 redshift_functionalities = engine["functionalities"]
 
         # Convert to bitmaps
-        engine_functionality_strings = [
-            athena_functionalities,
-            aurora_functionalities,
-            redshift_functionalities,
-        ]
         self.engine_functionalities = [
-            Functionality.to_bitmap(f) for f in engine_functionality_strings
+            (
+                EngineBitmapValues[Engine.Athena],
+                Functionality.to_bitmap(athena_functionalities),
+            ),
+            (
+                EngineBitmapValues[Engine.Aurora],
+                Functionality.to_bitmap(aurora_functionalities),
+            ),
+            (
+                EngineBitmapValues[Engine.Redshift],
+                Functionality.to_bitmap(redshift_functionalities),
+            ),
         ]
 
     @staticmethod
@@ -54,10 +61,14 @@ class Functionality:
             0,
         )
 
-    def get_engine_functionalities(self) -> List[int]:
+    def get_engine_functionalities(self) -> List[Tuple[int, int]]:
         """
         Return a bitmap for each engine that states what functionalities the
-        engine supports
+        engine supports.
+
+        The first value in the tuple is the bitmask representing the engine.
+        The second value in the tuple is the bitmap representing its supported
+        functionalities.
         """
         return self.engine_functionalities
 

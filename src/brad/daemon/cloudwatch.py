@@ -4,11 +4,12 @@ import numpy as np
 import pandas as pd
 import logging
 from typing import List, Optional, Tuple
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from .metrics_def import MetricDef
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
+from brad.utils.time_periods import universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class CloudWatchClient:
         available later.
         """
 
-        now = datetime.now(tz=timezone.utc)
+        now = universal_now()
         end_time = now - (now - datetime.min.replace(tzinfo=pytz.UTC)) % period
 
         # Retrieve more than 1 epoch, for robustness; If we retrieve once per

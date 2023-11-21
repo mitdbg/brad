@@ -7,7 +7,6 @@ import pickle
 import numpy as np
 import pathlib
 import random
-import queue
 import sys
 import threading
 import signal
@@ -25,6 +24,8 @@ from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 logger = logging.getLogger(__name__)
 EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
 ENGINE_NAMES = ["ATHENA", "AURORA", "REDSHIFT"]
+
+STARTUP_FAILED = "startup_failed"
 
 
 def get_time_of_the_day_unsimulated(
@@ -52,7 +53,7 @@ def time_in_minute_to_datetime_str(time_unsimulated: Optional[int]) -> str:
 def runner(
     runner_idx: int,
     start_queue: mp.Queue,
-    stop_queue: mp.Queue,
+    control_semaphore: mp.Semaphore,  # type: ignore
     args,
     query_bank: List[str],
     queries: List[int],
@@ -78,150 +79,188 @@ def runner(
     else:
         engine = None
 
-    database = connect_to_db(
-        args,
-        runner_idx,
-        direct_engine=engine,
-        # Ensure we disable the result cache if we are running directly on
-        # Redshift.
-        disable_direct_redshift_result_cache=True,
-    )
+    try:
+        database = connect_to_db(
+            args,
+            runner_idx,
+            direct_engine=engine,
+            # Ensure we disable the result cache if we are running directly on
+            # Redshift.
+            disable_direct_redshift_result_cache=True,
+        )
+    except BradClientError as ex:
+        print(f"[RA {runner_idx}] Failed to connect to BRAD:", str(ex))
+        start_queue.put_nowait(STARTUP_FAILED)
+        return
 
     if query_frequency is not None:
         query_frequency = query_frequency[queries]
         query_frequency = query_frequency / np.sum(query_frequency)
 
+    exec_count = 0
+    file = open(
+        out_dir / "repeating_olap_batch_{}.csv".format(runner_idx),
+        "w",
+        encoding="UTF-8",
+    )
+
     try:
-        with open(
-            out_dir / "repeating_olap_batch_{}.csv".format(runner_idx),
-            "w",
-            encoding="UTF-8",
-        ) as file:
-            print(
-                "timestamp,time_since_execution_s,time_of_day,query_idx,run_time_s,engine",
-                file=file,
-                flush=True,
-            )
+        print(
+            "timestamp,time_since_execution_s,time_of_day,query_idx,run_time_s,engine",
+            file=file,
+            flush=True,
+        )
 
-            prng = random.Random(args.seed ^ runner_idx)
-            rand_backoff = None
+        prng = random.Random(args.seed ^ runner_idx)
+        rand_backoff = None
 
-            logger.info(
-                "[Repeating Analytics Runner %d] Queries to run: %s",
-                runner_idx,
-                queries,
-            )
-            query_order_main = queries.copy()
-            prng.shuffle(query_order_main)
-            query_order = query_order_main.copy()
+        logger.info(
+            "[Repeating Analytics Runner %d] Queries to run: %s",
+            runner_idx,
+            queries,
+        )
+        query_order_main = queries.copy()
+        prng.shuffle(query_order_main)
+        query_order = query_order_main.copy()
 
-            # Signal that we're ready to start and wait for the controller.
-            start_queue.put_nowait("")
-            _ = stop_queue.get()
+        # Signal that we're ready to start and wait for the controller.
+        print(
+            f"Runner {runner_idx} is ready to start running.",
+            flush=True,
+            file=sys.stderr,
+        )
+        start_queue.put_nowait("")
+        control_semaphore.acquire()  # type: ignore
 
-            while True:
-                if execution_gap_dist is not None:
-                    now = datetime.now().astimezone(pytz.utc)
+        while True:
+            # Note that `False` means to not block.
+            should_exit = control_semaphore.acquire(False)  # type: ignore
+            if should_exit:
+                print(f"Runner {runner_idx} is exiting.", file=sys.stderr, flush=True)
+                break
+
+            if execution_gap_dist is not None:
+                now = datetime.now().astimezone(pytz.utc)
+                time_unsimulated = get_time_of_the_day_unsimulated(
+                    now, args.time_scale_factor
+                )
+                wait_for_s = execution_gap_dist[
+                    int(time_unsimulated / (60 * 24) * len(execution_gap_dist))
+                ]
+                time.sleep(wait_for_s)
+            elif args.avg_gap_s is not None:
+                # Wait times are normally distributed if execution_gap_dist is not provided.
+                wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
+                if wait_for_s < 0.0:
+                    wait_for_s = 0.0
+                time.sleep(wait_for_s)
+
+            if query_frequency is not None:
+                qidx = prng.choices(queries, list(query_frequency))[0]
+            else:
+                if len(query_order) == 0:
+                    query_order = query_order_main.copy()
+
+                qidx = query_order.pop()
+            logger.debug("Executing qidx: %d", qidx)
+            query = query_bank[qidx]
+
+            try:
+                engine = None
+                now = datetime.now().astimezone(pytz.utc)
+                if args.time_scale_factor is not None:
                     time_unsimulated = get_time_of_the_day_unsimulated(
                         now, args.time_scale_factor
                     )
-                    wait_for_s = execution_gap_dist[
-                        int(time_unsimulated / (60 * 24) * len(execution_gap_dist))
-                    ]
-                    time.sleep(wait_for_s)
-                elif args.avg_gap_s is not None:
-                    # Wait times are normally distributed if execution_gap_dist is not provided.
-                    wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
-                    if wait_for_s < 0.0:
-                        wait_for_s = 0.0
-                    time.sleep(wait_for_s)
-
-                if query_frequency is not None:
-                    qidx = prng.choices(queries, list(query_frequency))[0]
+                    time_unsimulated_str = time_in_minute_to_datetime_str(
+                        time_unsimulated
+                    )
                 else:
-                    if len(query_order) == 0:
-                        query_order = query_order_main.copy()
+                    time_unsimulated_str = "xxx"
 
-                    qidx = query_order.pop()
-                logger.debug("Executing qidx: %d", qidx)
-                query = query_bank[qidx]
+                start = time.time()
+                _, engine = database.execute_sync_with_engine(query)
+                end = time.time()
+                print(
+                    "{},{},{},{},{},{}".format(
+                        now,
+                        (now - EXECUTE_START_TIME).total_seconds(),
+                        time_unsimulated_str,
+                        qidx,
+                        end - start,
+                        engine.value,
+                    ),
+                    file=file,
+                    flush=True,
+                )
 
-                try:
-                    engine = None
-                    now = datetime.now().astimezone(pytz.utc)
-                    if args.time_scale_factor is not None:
-                        time_unsimulated = get_time_of_the_day_unsimulated(
-                            now, args.time_scale_factor
-                        )
-                        time_unsimulated_str = time_in_minute_to_datetime_str(
-                            time_unsimulated
-                        )
-                    else:
-                        time_unsimulated_str = "xxx"
+                if exec_count % 20 == 0:
+                    # To avoid data loss if this script crashes.
+                    os.fsync(file.fileno())
 
-                    start = time.time()
-                    _, engine = database.execute_sync_with_engine(query)
-                    end = time.time()
+                exec_count += 1
+                if rand_backoff is not None:
                     print(
-                        "{},{},{},{},{},{}".format(
-                            now,
-                            (now - EXECUTE_START_TIME).total_seconds(),
-                            time_unsimulated_str,
-                            qidx,
-                            end - start,
-                            engine.value,
-                        ),
-                        file=file,
+                        f"[RA {runner_idx}] Continued after transient errors.",
                         flush=True,
+                        file=sys.stderr,
                     )
                     rand_backoff = None
 
-                except BradClientError as ex:
-                    if ex.is_transient():
+            except BradClientError as ex:
+                if ex.is_transient():
+                    # This is too verbose during a transition.
+                    # print(
+                    #     "Transient query error:",
+                    #     ex.message(),
+                    #     flush=True,
+                    #     file=sys.stderr,
+                    # )
+
+                    if rand_backoff is None:
+                        rand_backoff = RandomizedExponentialBackoff(
+                            max_retries=100,
+                            base_delay_s=1.0,
+                            max_delay_s=timedelta(minutes=1).total_seconds(),
+                        )
                         print(
-                            "Transient query error:",
-                            ex.message(),
+                            f"[RA {runner_idx}] Backing off due to transient errors.",
                             flush=True,
                             file=sys.stderr,
                         )
 
-                        if rand_backoff is None:
-                            rand_backoff = RandomizedExponentialBackoff(
-                                max_retries=10,
-                                base_delay_s=2.0,
-                                max_delay_s=timedelta(minutes=10).total_seconds(),
-                            )
-
-                        # Delay retrying in the case of a transient error (this
-                        # happens during blueprint transitions).
-                        wait_s = rand_backoff.wait_time_s()
-                        if wait_s is None:
-                            print("Aborting benchmark. Too many transient errors.")
-                            break
-                        time.sleep(wait_s)
-
-                    else:
+                    # Delay retrying in the case of a transient error (this
+                    # happens during blueprint transitions).
+                    wait_s = rand_backoff.wait_time_s()
+                    if wait_s is None:
                         print(
-                            "Unexpected query error:",
-                            ex.message(),
+                            f"[RA {runner_idx}] Aborting benchmark. Too many transient errors.",
                             flush=True,
                             file=sys.stderr,
                         )
+                        break
+                    time.sleep(wait_s)
 
-                try:
-                    _ = stop_queue.get_nowait()
-                    break
-                except queue.Empty:
-                    pass
+                else:
+                    print(
+                        "Unexpected query error:",
+                        ex.message(),
+                        flush=True,
+                        file=sys.stderr,
+                    )
+
     finally:
+        os.fsync(file.fileno())
+        file.close()
         database.close_sync()
+        print(f"Runner {runner_idx} has exited.", flush=True, file=sys.stderr)
 
 
 def simulation_runner(
     all_query_runtime: npt.NDArray,
     runner_idx: int,
     start_queue: mp.Queue,
-    stop_queue: mp.Queue,
+    control_semaphore: mp.Semaphore,  # type: ignore
     args,
     queries: List[int],
     query_frequency_original: Optional[npt.NDArray] = None,
@@ -271,9 +310,13 @@ def simulation_runner(
 
         # Signal that we're ready to start and wait for the controller.
         start_queue.put_nowait("")
-        _ = stop_queue.get()
+        control_semaphore.acquire()  # type: ignore
 
         while True:
+            should_exit = control_semaphore.acquire(False)  # type: ignore
+            if should_exit:
+                break
+
             if execution_gap_dist is not None:
                 now = datetime.now().astimezone(pytz.utc)
                 time_unsimulated = get_time_of_the_day_unsimulated(
@@ -327,12 +370,6 @@ def simulation_runner(
                 file=file,
                 flush=True,
             )
-
-            try:
-                _ = stop_queue.get_nowait()
-                break
-            except queue.Empty:
-                pass
 
 
 def run_warmup(args, query_bank: List[str], queries: List[int]):
@@ -555,9 +592,21 @@ def main():
         run_warmup(args, query_bank, queries)
         return
 
+    # Our control protocol is as follows.
+    # - Runner processes write to their `start_queue` when they have finished
+    #   setting up and are ready to start running. They then wait on the control
+    #   semaphore.
+    # - The control process blocks and waits on each `start_queue` to ensure
+    #   runners can start together (if needed).
+    # - The control process signals the control semaphore twice. Once to tell a
+    #   runner to start, once to tell it to stop.
+    # - If there is an error, a runner is free to exit as long as they have
+    #   written to `start_queue`.
     mgr = mp.Manager()
     start_queue = [mgr.Queue() for _ in range(args.num_clients)]
-    stop_queue = [mgr.Queue() for _ in range(args.num_clients)]
+    # N.B. `value = 0` since we use this for synchronization, not mutual exclusion.
+    # pylint: disable-next=no-member
+    control_semaphore = [mgr.Semaphore(value=0) for _ in range(args.num_clients)]
 
     if args.run_simulation:
         assert (
@@ -576,7 +625,7 @@ def main():
                     all_query_runtime,
                     idx,
                     start_queue[idx],
-                    stop_queue[idx],
+                    control_semaphore[idx],
                     args,
                     queries,
                     query_frequency,
@@ -594,7 +643,7 @@ def main():
                 args=(
                     idx,
                     start_queue[idx],
-                    stop_queue[idx],
+                    control_semaphore[idx],
                     args,
                     query_bank,
                     queries,
@@ -606,8 +655,22 @@ def main():
             processes.append(p)
 
     print("Waiting for startup...", flush=True)
+    one_startup_failed = False
     for i in range(args.num_clients):
-        start_queue[i].get()
+        msg = start_queue[i].get()
+        if msg == STARTUP_FAILED:
+            one_startup_failed = True
+
+    if one_startup_failed:
+        print("At least one runner failed to start up. Aborting the experiment.")
+        for i in range(args.num_clients):
+            # Ideally we should be able to release twice atomically.
+            control_semaphore[i].release()
+            control_semaphore[i].release()
+        for p in processes:
+            p.join()
+        print("Abort complete.")
+        return
 
     global EXECUTE_START_TIME  # pylint: disable=global-statement
     EXECUTE_START_TIME = datetime.now().astimezone(
@@ -617,7 +680,7 @@ def main():
     if num_client_trace is not None:
         assert args.time_scale_factor is not None, "need to set args.time_scale_factor"
         print("Telling client no.{} to start.".format(0), flush=True)
-        stop_queue[0].put("")
+        control_semaphore[0].release()
         num_running_client = 1
 
         finished_one_day = True
@@ -647,7 +710,7 @@ def main():
                     print(
                         "Telling client no.{} to start.".format(add_client), flush=True
                     )
-                    stop_queue[add_client].put("")
+                    control_semaphore[add_client].release()
                     num_running_client += 1
             elif num_running_client > num_client_required:
                 # shutting down clients
@@ -656,7 +719,7 @@ def main():
                         "Telling client no.{} to stop.".format(delete_client - 1),
                         flush=True,
                     )
-                    stop_queue[delete_client - 1].put("")
+                    control_semaphore[delete_client - 1].release()
                     num_running_client -= 1
         now = datetime.now().astimezone(pytz.utc)
         total_exec_time_in_s = (now - EXECUTE_START_TIME).total_seconds()
@@ -673,7 +736,7 @@ def main():
     else:
         print("Telling all {} clients to start.".format(args.num_clients), flush=True)
         for i in range(args.num_clients):
-            stop_queue[i].put("")
+            control_semaphore[i].release()
 
     if args.run_for_s and num_client_trace is None:
         print(
@@ -701,17 +764,20 @@ def main():
 
     print("Stopping all clients...", flush=True, file=sys.stderr)
     for i in range(args.num_clients):
-        stop_queue[i].put("")
+        # Note that in most cases, one release will have already run. This is OK
+        # because downstream runners will not hang if there is a unconsumed
+        # semaphore value.
+        control_semaphore[i].release()
+        control_semaphore[i].release()
 
-    # stop again, just incase some client hasn't started yet
-    for i in range(args.num_clients):
-        stop_queue[i].put("")
-
-    print("Waiting for the clients to complete.")
+    print("Waiting for the clients to complete...", flush=True, file=sys.stderr)
     for p in processes:
         p.join()
 
-    print("Done!")
+    for idx, p in enumerate(processes):
+        print(f"Runner {idx} exit code:", p.exitcode, flush=True, file=sys.stderr)
+
+    print("Done repeating analytics!", flush=True, file=sys.stderr)
 
 
 if __name__ == "__main__":
