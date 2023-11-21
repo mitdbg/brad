@@ -31,6 +31,7 @@ Metrics = namedtuple(
         "query_lat_s_p50",
         "query_lat_s_p90",
     ],
+    defaults=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
 )
 
 AggCfg = Dict[str, Any]
