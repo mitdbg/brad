@@ -85,7 +85,7 @@ def best_cost_under_max_latency(max_latency_ceiling_s: float) -> BlueprintCompar
 
 
 def best_cost_under_perf_ceilings(
-    max_query_latency_s: float,
+    max_query_p90_latency_s: float,
     max_txn_p90_latency_s: float,
 ) -> BlueprintComparator:
     def is_better_than(left: ComparableBlueprint, right: ComparableBlueprint) -> bool:
@@ -110,18 +110,16 @@ def best_cost_under_perf_ceilings(
                 return True
 
         # Query latency ceilings.
-        # left_lat = _get_or_compute_p99_latency(left)
-        # right_lat = _get_or_compute_p99_latency(right)
-        left_lat = _get_or_compute_nth_largest_latency(left, 2)
-        right_lat = _get_or_compute_nth_largest_latency(right, 2)
+        left_lat = _get_or_compute_p90_latency(left)
+        right_lat = _get_or_compute_p90_latency(right)
 
-        if left_lat > max_query_latency_s and right_lat > max_query_latency_s:
+        if left_lat > max_query_p90_latency_s and right_lat > max_query_p90_latency_s:
             # Both are above the latency ceiling.
             # So the better blueprint is the one that does better on performance.
             return left_lat < right_lat
-        elif left_lat > max_query_latency_s:
+        elif left_lat > max_query_p90_latency_s:
             return False
-        elif right_lat > max_query_latency_s:
+        elif right_lat > max_query_p90_latency_s:
             return True
 
         # Both are under the performance ceilings.
@@ -208,22 +206,22 @@ def best_weighted_score_under_perf_ceilings(
 
 
 def _get_or_compute_geomean_latency(bp: ComparableBlueprint) -> float:
-    stored = bp.get_memoized_value("geomean_latency")
+    stored = bp.get_memoized_value("query_geomean_latency")
     if stored is not None:
         return stored
     else:
         geomean_lat = np.exp(np.log(bp.get_predicted_analytical_latencies()).mean())
-        bp.set_memoized_value("geomean_latency", geomean_lat)
+        bp.set_memoized_value("query_geomean_latency", geomean_lat)
         return geomean_lat
 
 
 def _get_or_compute_max_latency(bp: ComparableBlueprint) -> float:
-    stored = bp.get_memoized_value("max_latency")
+    stored = bp.get_memoized_value("query_max_latency")
     if stored is not None:
         return stored
     else:
         max_lat = bp.get_predicted_analytical_latencies().max()
-        bp.set_memoized_value("max_latency", max_lat)
+        bp.set_memoized_value("query_max_latency", max_lat)
         return max_lat
 
 
@@ -234,25 +232,37 @@ def _get_or_compute_nth_largest_latency(bp: ComparableBlueprint, n: int) -> floa
     else:
         actual_n = n
 
-    stored = bp.get_memoized_value(f"{actual_n}_largest")
+    stored = bp.get_memoized_value(f"query_{actual_n}_largest")
     if stored is not None:
         return stored
 
     nth_largest = np.partition(pred_lats, -actual_n)[-actual_n]
-    bp.set_memoized_value(f"{actual_n}_largest", nth_largest)
+    bp.set_memoized_value(f"query_{actual_n}_largest", nth_largest)
     return nth_largest
 
 
 def _get_or_compute_p99_latency(bp: ComparableBlueprint) -> float:
-    stored = bp.get_memoized_value("p99_latency")
+    stored = bp.get_memoized_value("query_p99_latency")
     if stored is not None:
         return stored
     else:
         p99_lat = np.quantile(
             bp.get_predicted_analytical_latencies(), 0.99, method="lower"
         )
-        bp.set_memoized_value("p99_latency", p99_lat)
+        bp.set_memoized_value("query_p99_latency", p99_lat)
         return p99_lat
+
+
+def _get_or_compute_p90_latency(bp: ComparableBlueprint) -> float:
+    stored = bp.get_memoized_value("query_p90_latency")
+    if stored is not None:
+        return stored
+    else:
+        p90_lat = np.quantile(
+            bp.get_predicted_analytical_latencies(), 0.90, method="lower"
+        )
+        bp.set_memoized_value("query_p90_latency", p90_lat)
+        return p90_lat
 
 
 def _compute_max_ratio(value1: float, value2: float) -> float:

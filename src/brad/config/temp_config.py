@@ -1,6 +1,7 @@
 import pathlib
 import yaml
 from typing import Any, Dict, Optional
+from datetime import timedelta
 
 
 class TempConfig:
@@ -16,14 +17,29 @@ class TempConfig:
     def __init__(self, raw: Dict[str, Any]) -> None:
         self._raw = raw
 
-    def latency_ceiling_s(self) -> float:
-        return float(self._raw["latency_ceiling_s"])
+    def query_latency_p90_ceiling_s(self) -> float:
+        return float(self._raw["query_latency_p90_ceiling_s"])
 
     def txn_latency_p50_ceiling_s(self) -> float:
         return float(self._raw["txn_latency_p50_ceiling_s"])
 
     def txn_latency_p90_ceiling_s(self) -> float:
         return float(self._raw["txn_latency_p90_ceiling_s"])
+
+    def comparator_type(self) -> str:
+        return self._raw["comparator"]["type"]
+
+    def benefit_horizon(self) -> timedelta:
+        period = self._raw["comparator"]["benefit_horizon"]
+        return timedelta(
+            weeks=period["weeks"],
+            days=period["days"],
+            hours=period["hours"],
+            minutes=period["minutes"],
+        )
+
+    def penalty_threshold(self) -> float:
+        return self._raw["comparator"]["penalty_threshold"]
 
     def std_dataset_path(self) -> Optional[pathlib.Path]:
         if "std_dataset_path" not in self._raw:

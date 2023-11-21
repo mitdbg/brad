@@ -32,7 +32,11 @@ from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.front_end.start_front_end import start_front_end
 from brad.planner.abstract import BlueprintPlanner
-from brad.planner.compare.provider import PerformanceCeilingComparatorProvider
+from brad.planner.compare.provider import (
+    BlueprintComparatorProvider,
+    PerformanceCeilingComparatorProvider,
+    BenefitPerformanceCeilingComparatorProvider,
+)
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import WindowedMetricsFromMonitor
@@ -181,10 +185,21 @@ class BradDaemon:
                     aurora_accessed_pages_path=self._temp_config.aurora_data_access_path(),
                     athena_accessed_bytes_path=self._temp_config.athena_data_access_path(),
                 )
-            comparator_provider = PerformanceCeilingComparatorProvider(
-                self._temp_config.latency_ceiling_s(),
-                self._temp_config.txn_latency_p90_ceiling_s(),
-            )
+
+            if self._temp_config.comparator_type() == "benefit_perf_ceiling":
+                comparator_provider: BlueprintComparatorProvider = (
+                    BenefitPerformanceCeilingComparatorProvider(
+                        self._temp_config.query_latency_p90_ceiling_s(),
+                        self._temp_config.txn_latency_p90_ceiling_s(),
+                        self._temp_config.benefit_horizon(),
+                        self._temp_config.penalty_threshold(),
+                    )
+                )
+            else:
+                comparator_provider = PerformanceCeilingComparatorProvider(
+                    self._temp_config.query_latency_p90_ceiling_s(),
+                    self._temp_config.txn_latency_p90_ceiling_s(),
+                )
         else:
             logger.warning(
                 "TempConfig not provided. The planner will not be able to run correctly."

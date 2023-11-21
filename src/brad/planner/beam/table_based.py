@@ -132,7 +132,16 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         )
         await ctx.simulate_current_workload_routing(planning_router)
         ctx.compute_engine_latency_norm_factor()
+        ctx.compute_current_workload_predicted_hourly_scan_cost()
+        ctx.compute_current_blueprint_provisioning_hourly_cost()
 
+        comparator = self._providers.comparator_provider.get_comparator(
+            metrics,
+            curr_hourly_cost=(
+                ctx.current_workload_predicted_hourly_scan_cost
+                + ctx.current_blueprint_provisioning_hourly_cost
+            ),
+        )
         beam_size = self._planner_config.beam_size()
         placement_options = self._get_table_placement_options_bitmap()
         first_cluster = clusters[0]
@@ -144,9 +153,7 @@ class TableBasedBeamPlanner(BlueprintPlanner):
 
         # 4. Initialize the top-k set (beam).
         for placement_bitmap in placement_options:
-            candidate = BlueprintCandidate.based_on(
-                self._current_blueprint, self._comparator
-            )
+            candidate = BlueprintCandidate.based_on(self._current_blueprint, comparator)
             candidate.add_transactional_tables(ctx)
             tables, queries, _ = first_cluster
             placement_changed = candidate.add_placement(placement_bitmap, tables, ctx)

@@ -124,7 +124,16 @@ class QueryBasedLegacyBeamPlanner(BlueprintPlanner):
         )
         await ctx.simulate_current_workload_routing(planning_router)
         ctx.compute_engine_latency_norm_factor()
+        ctx.compute_current_workload_predicted_hourly_scan_cost()
+        ctx.compute_current_blueprint_provisioning_hourly_cost()
 
+        comparator = self._providers.comparator_provider.get_comparator(
+            metrics,
+            curr_hourly_cost=(
+                ctx.current_workload_predicted_hourly_scan_cost
+                + ctx.current_blueprint_provisioning_hourly_cost
+            ),
+        )
         beam_size = self._planner_config.beam_size()
         engines = [Engine.Aurora, Engine.Redshift, Engine.Athena]
         first_query_idx = query_indices[0]
@@ -136,9 +145,7 @@ class QueryBasedLegacyBeamPlanner(BlueprintPlanner):
 
         # 4. Initialize the top-k set (beam).
         for routing_engine in engines:
-            candidate = BlueprintCandidate.based_on(
-                self._current_blueprint, self._comparator
-            )
+            candidate = BlueprintCandidate.based_on(self._current_blueprint, comparator)
             candidate.add_transactional_tables(ctx)
             query = analytical_queries[first_query_idx]
             candidate.add_query(
