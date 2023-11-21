@@ -13,6 +13,7 @@ import brad.admin.run_on as run_on
 import brad.admin.control as control
 import brad.admin.restore_blueprint as restore_blueprint
 import brad.admin.replay_planner as replay_planner
+import brad.admin.clean_dataset as clean_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ def register_command(subparsers) -> None:
     control.register_admin_action(admin_subparsers)
     restore_blueprint.register_admin_action(admin_subparsers)
     replay_planner.register_admin_action(admin_subparsers)
+    clean_dataset.register_admin_action(admin_subparsers)
     parser.set_defaults(func=main)
 
 
