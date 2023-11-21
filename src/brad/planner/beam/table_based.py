@@ -132,9 +132,16 @@ class TableBasedBeamPlanner(BlueprintPlanner):
         )
         await ctx.simulate_current_workload_routing(planning_router)
         ctx.compute_engine_latency_norm_factor()
+        ctx.compute_current_workload_predicted_hourly_scan_cost()
+        ctx.compute_current_blueprint_provisioning_hourly_cost()
 
-        # TODO: Set the curr hourly cost properly.
-        comparator = self._providers.comparator_provider.get_comparator(metrics, 0.0)
+        comparator = self._providers.comparator_provider.get_comparator(
+            metrics,
+            curr_hourly_cost=(
+                ctx.current_workload_predicted_hourly_scan_cost
+                + ctx.current_blueprint_provisioning_hourly_cost
+            ),
+        )
         beam_size = self._planner_config.beam_size()
         placement_options = self._get_table_placement_options_bitmap()
         first_cluster = clusters[0]

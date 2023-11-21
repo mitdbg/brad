@@ -1,6 +1,8 @@
 import json
 import math
 import importlib.resources as pkg_resources
+import numpy as np
+import numpy.typing as npt
 from collections import namedtuple
 from typing import Dict, Iterable
 
@@ -87,12 +89,12 @@ def compute_athena_scanned_bytes(
 ) -> int:
     # N.B. There is a minimum charge of 10 MB per query.
     min_bytes_per_query = planner_config.athena_min_mb_per_query() * 1000 * 1000
-    total_accessed_bytes = 0
-    arrival_counts = 0.0
+    total_accessed_bytes = 0.0
     for query, accessed_bytes in zip(queries, accessed_bytes_per_query):
-        total_accessed_bytes += max(accessed_bytes, min_bytes_per_query)
-        arrival_counts += query.arrival_count()
-    return max(int(total_accessed_bytes * arrival_counts), 1)
+        total_accessed_bytes += (
+            max(accessed_bytes, min_bytes_per_query) * query.arrival_count()
+        )
+    return max(int(total_accessed_bytes), 1)
 
 
 def compute_athena_scan_cost(
@@ -101,6 +103,20 @@ def compute_athena_scan_cost(
 ) -> float:
     accessed_mb = total_accessed_bytes / 1000 / 1000
     return accessed_mb * planner_config.athena_usd_per_mb_scanned()
+
+
+def compute_athena_scan_cost_numpy(
+    bytes_accessed: npt.NDArray,
+    arrival_counts: npt.NDArray,
+    planner_config: PlannerConfig,
+) -> float:
+    # Note we use MB instead of MiB
+    mb_accessed = bytes_accessed / 1000.0 / 1000.0
+    mb_accessed = np.clip(
+        mb_accessed, a_min=float(planner_config.athena_min_mb_per_query()), a_max=None
+    )
+    total_mb = np.dot(mb_accessed, arrival_counts)
+    return total_mb * planner_config.athena_usd_per_mb_scanned()
 
 
 def compute_aurora_transition_time_s(
