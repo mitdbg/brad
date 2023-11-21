@@ -110,8 +110,10 @@ aurora_extract_rate_mb_per_s: 12.0
 aurora_load_rate_mb_per_s: 12.0
 
 # Extracting / loading in Athena corresponds to a conversion to/from Iceberg.
-athena_extract_rate_mb_per_s: 10.0
-athena_load_rate_mb_per_s: 10.0
+athena_extract_rate_mb_per_s: 15.0
+# From experiments: 820 MB/s * data size + 2.2 s
+# But we just ignore the 2.2 for simplicity as we work with large tables.
+athena_load_rate_mb_per_s: 820.0
 
 # Storage costs.
 s3_usd_per_mb_per_month: 0.000023
