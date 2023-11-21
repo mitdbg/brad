@@ -190,6 +190,7 @@ class BradDaemon:
                     self._temp_config.query_latency_p90_ceiling_s(),
                     self._temp_config.txn_latency_p90_ceiling_s(),
                     self._temp_config.benefit_horizon(),
+                    self._temp_config.penalty_threshold(),
                 )
             else:
                 comparator_provider = PerformanceCeilingComparatorProvider(

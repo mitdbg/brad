@@ -38,8 +38,8 @@ class TempConfig:
             minutes=period["minutes"],
         )
 
-    def payoff_penalty(self) -> float:
-        return self._raw["payoff_penalty"]
+    def penalty_threshold(self) -> float:
+        return self._raw["comparator"]["penalty_threshold"]
 
     def std_dataset_path(self) -> Optional[pathlib.Path]:
         if "std_dataset_path" not in self._raw:

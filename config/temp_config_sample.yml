@@ -11,11 +11,7 @@ comparator:
     hours: 1
     minutes: 0
 
-# This is used when the current blueprint is violating performance constraints
-# (due to a changed workload) and we want to transition quickly to a better
-# blueprint. The larger this value, the more we prefer higher cost but faster to
-# transition to blueprints. Units are in $/hour.
-payoff_penalty: 100.0
+  penalty_threshold: 0.8  # Only used by the `benefit_perf_ceiling` comparator
 
 # Use this instead of the individual paths below.
 std_dataset_path: workloads/IMDB_20GB/regular_test/
