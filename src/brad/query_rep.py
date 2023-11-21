@@ -29,6 +29,7 @@ _GEOSPATIAL_KEYWORDS = [k.upper() for k in _GEOSPATIAL_KEYWORDS]
 
 _VECTOR_KEYWORDS = ["<=>"]
 
+
 class QueryRep:
     """
     A SQL query's "internal representation" within BRAD.
