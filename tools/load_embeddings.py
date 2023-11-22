@@ -73,7 +73,7 @@ def main():
     else:
         embeddings = None
 
-    config = ConfigFile.load(args.config_File)
+    config = ConfigFile.load(args.config_file)
     assets = AssetManager(config)
     blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
     asyncio.run(blueprint_mgr.load())
