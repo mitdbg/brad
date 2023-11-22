@@ -1,10 +1,7 @@
 import argparse
-import copy
 import multiprocessing as mp
 import time
 import os
-import pickle
-import numpy as np
 import pathlib
 import random
 import sys
@@ -12,14 +9,17 @@ import threading
 import signal
 import pytz
 import logging
-from typing import List, Optional
-import numpy.typing as npt
+from typing import List
 from datetime import datetime, timedelta
 
 from workload_utils.connect import connect_to_db
 from brad.config.engine import Engine
 from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
+from workloads.IMDB_extended.run_repeating_analytics import (
+    get_time_of_the_day_unsimulated,
+    time_in_minute_to_datetime_str,
+)
 
 logger = logging.getLogger(__name__)
 EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
@@ -30,13 +30,17 @@ STARTUP_FAILED = "startup_failed"
 
 def runner(
     runner_idx: int,
+    num_runners: int,
     start_queue: mp.Queue,
     control_semaphore: mp.Semaphore,  # type: ignore
     args,
     queries: List[str],
-    query_frequency: Optional[npt.NDArray] = None,
-    execution_gap_dist: Optional[npt.NDArray] = None,
 ) -> None:
+    # Check args.
+    assert num_runners > runner_idx
+    assert args.avg_gap_s is not None
+    assert args.avg_gap_std_s is not None
+
     def noop(_signal, _frame):
         pass
 
@@ -66,24 +70,23 @@ def runner(
             disable_direct_redshift_result_cache=True,
         )
     except BradClientError as ex:
-        print(f"[RA {runner_idx}] Failed to connect to BRAD:", str(ex))
+        print(f"[Ad-hoc runner {runner_idx}] Failed to connect to BRAD:", str(ex))
         start_queue.put_nowait(STARTUP_FAILED)
         return
 
-    if query_frequency is not None:
-        query_frequency = query_frequency[queries]
-        query_frequency = query_frequency / np.sum(query_frequency)
+    # Query indexes the runner should execute.
+    runner_qidx = [i for i in range(len(queries)) if i % num_runners == runner_idx]
 
     exec_count = 0
     file = open(
-        out_dir / "repeating_olap_batch_{}.csv".format(runner_idx),
+        out_dir / "ad_hoc_queries_{}.csv".format(runner_idx),
         "w",
         encoding="UTF-8",
     )
 
     try:
         print(
-            "timestamp,time_since_execution_s,time_of_day,query_idx,run_time_s,engine",
+            "timestamp,time_of_day,query_idx,run_time_s,engine",
             file=file,
             flush=True,
         )
@@ -92,58 +95,42 @@ def runner(
         rand_backoff = None
 
         logger.info(
-            "[Repeating Analytics Runner %d] Queries to run: %s",
+            "[Ad hoc Runner %d] Queries to run: %s",
             runner_idx,
             queries,
         )
-        query_order_main = queries.copy()
-        prng.shuffle(query_order_main)
-        query_order = query_order_main.copy()
 
         # Signal that we're ready to start and wait for the controller.
         print(
-            f"Runner {runner_idx} is ready to start running.",
+            f"Ad-hoc Runner {runner_idx} is ready to start running.",
             flush=True,
             file=sys.stderr,
         )
         start_queue.put_nowait("")
         control_semaphore.acquire()  # type: ignore
 
-        while True:
+        for qidx in runner_qidx:
             # Note that `False` means to not block.
             should_exit = control_semaphore.acquire(False)  # type: ignore
             if should_exit:
-                print(f"Runner {runner_idx} is exiting.", file=sys.stderr, flush=True)
+                print(
+                    f"Ad-hoc Runner {runner_idx} is exiting.",
+                    file=sys.stderr,
+                    flush=True,
+                )
                 break
 
-            if execution_gap_dist is not None:
-                now = datetime.now().astimezone(pytz.utc)
-                time_unsimulated = get_time_of_the_day_unsimulated(
-                    now, args.time_scale_factor
-                )
-                wait_for_s = execution_gap_dist[
-                    int(time_unsimulated / (60 * 24) * len(execution_gap_dist))
-                ]
-                time.sleep(wait_for_s)
-            elif args.avg_gap_s is not None:
-                # Wait times are normally distributed if execution_gap_dist is not provided.
-                wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
-                if wait_for_s < 0.0:
-                    wait_for_s = 0.0
-                time.sleep(wait_for_s)
+            # Wait for some time. Wait times are normally distributed.
+            wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
+            if wait_for_s < 0.0:
+                wait_for_s = 0.0
+            time.sleep(wait_for_s)
 
-            if query_frequency is not None:
-                qidx = prng.choices(queries, list(query_frequency))[0]
-            else:
-                if len(query_order) == 0:
-                    query_order = query_order_main.copy()
-
-                qidx = query_order.pop()
-            logger.debug("Executing qidx: %d", qidx)
-            query = query_bank[qidx]
+            logger.debug("Executing ad-hoc qidx: %d", qidx)
+            query = queries[qidx]
 
             try:
-                engine = None
+                # Get time stamp for logging.
                 now = datetime.now().astimezone(pytz.utc)
                 if args.time_scale_factor is not None:
                     time_unsimulated = get_time_of_the_day_unsimulated(
@@ -155,17 +142,22 @@ def runner(
                 else:
                     time_unsimulated_str = "xxx"
 
+                # Execute query.
                 start = time.time()
                 _, engine = database.execute_sync_with_engine(query)
                 end = time.time()
+
+                # Log.
+                engine_log = "xxx"
+                if engine is not None:
+                    engine_log = engine.value
                 print(
-                    "{},{},{},{},{},{}".format(
+                    "{},{},{},{},{}".format(
                         now,
-                        (now - EXECUTE_START_TIME).total_seconds(),
                         time_unsimulated_str,
                         qidx,
                         end - start,
-                        engine.value,
+                        engine_log,
                     ),
                     file=file,
                     flush=True,
@@ -178,7 +170,7 @@ def runner(
                 exec_count += 1
                 if rand_backoff is not None:
                     print(
-                        f"[RA {runner_idx}] Continued after transient errors.",
+                        f"[Ad-hoc Runner {runner_idx}] Continued after transient errors.",
                         flush=True,
                         file=sys.stderr,
                     )
@@ -201,7 +193,7 @@ def runner(
                             max_delay_s=timedelta(minutes=1).total_seconds(),
                         )
                         print(
-                            f"[RA {runner_idx}] Backing off due to transient errors.",
+                            f"[Ad-hoc Runner {runner_idx}] Backing off due to transient errors.",
                             flush=True,
                             file=sys.stderr,
                         )
@@ -211,7 +203,7 @@ def runner(
                     wait_s = rand_backoff.wait_time_s()
                     if wait_s is None:
                         print(
-                            f"[RA {runner_idx}] Aborting benchmark. Too many transient errors.",
+                            f"[Ad-hoc Runner {runner_idx}] Aborting benchmark. Too many transient errors.",
                             flush=True,
                             file=sys.stderr,
                         )
@@ -220,7 +212,7 @@ def runner(
 
                 else:
                     print(
-                        "Unexpected query error:",
+                        "Unexpected ad-hoc query error:",
                         ex.message(),
                         flush=True,
                         file=sys.stderr,
@@ -230,7 +222,7 @@ def runner(
         os.fsync(file.fileno())
         file.close()
         database.close_sync()
-        print(f"Runner {runner_idx} has exited.", flush=True, file=sys.stderr)
+        print(f"Ad-hoc Runner {runner_idx} has exited.", flush=True, file=sys.stderr)
 
 
 def main():
@@ -239,19 +231,28 @@ def main():
     parser.add_argument("--brad-port", type=int, default=6583)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--num-front-ends", type=int, default=1)
-    parser.add_argument("--run-warmup", action="store_true")
     parser.add_argument(
         "--cstr-var",
         type=str,
         help="Set to connect via ODBC instead of the BRAD client (for use with other baselines).",
     )
     parser.add_argument(
-        "--query-sequence-file", type=str, required=True, help="Path to a query sequence."
+        "--query-sequence-file",
+        type=str,
+        required=True,
+        help="Path to a query sequence.",
     )
     parser.add_argument("--query-sequence-offset", type=int, default=0)
-    parser.add_argument("--query-sequence-length", type=int)  # By default, use the whole file.
+    parser.add_argument(
+        "--query-sequence-length",
+        type=int,
+        default=-1,
+        help="Default value (-1) means use the whole file.",
+    )
     parser.add_argument("--num-clients", type=int, default=1)
     parser.add_argument("--client-offset", type=int, default=0)
+    parser.add_argument("--avg-gap-s", type=float)
+    parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
     parser.add_argument("--per-client-rate-per-query", type=float, default=0)
     parser.add_argument(
         "--brad-direct",
@@ -276,6 +277,13 @@ def main():
 
     with open(args.query_sequence_file, "r", encoding="UTF-8") as file:
         query_seq = [line.strip() for line in file]
+
+        # Truncate according to requested offset and sequence length.
+        offset = args.query_sequence_offset
+        seq_len = args.query_sequence_length
+        query_seq = query_seq[offset:]
+        if args.query_sequence_length > -1:
+            query_seq = query_seq[: offset + seq_len]
 
     # Our control protocol is as follows.
     # - Runner processes write to their `start_queue` when they have finished
@@ -302,13 +310,13 @@ def main():
                 start_queue[idx],
                 control_semaphore[idx],
                 args,
-                queries,
+                query_seq,
             ),
         )
         p.start()
         processes.append(p)
 
-    print("Waiting for startup...", flush=True)
+    print("Ad-hoc: Waiting for startup...", flush=True)
     one_startup_failed = False
     for i in range(args.num_clients):
         msg = start_queue[i].get()
@@ -316,7 +324,7 @@ def main():
             one_startup_failed = True
 
     if one_startup_failed:
-        print("At least one runner failed to start up. Aborting the experiment.")
+        print("At least one ad-hoc runner failed to start up. Aborting the experiment.")
         for i in range(args.num_clients):
             # Ideally we should be able to release twice atomically.
             control_semaphore[i].release()
@@ -326,13 +334,15 @@ def main():
         print("Abort complete.")
         return
 
-    print("Telling all {} clients to start.".format(args.num_clients), flush=True)
+    print(
+        "Telling all {} ad-hoc clients to start.".format(args.num_clients), flush=True
+    )
     for i in range(args.num_clients):
         control_semaphore[i].release()
 
     if args.run_for_s is not None:
         print(
-            "Waiting for {} seconds...".format(args.run_for_s),
+            "Ad-hoc: Waiting for {} seconds...".format(args.run_for_s),
             flush=True,
             file=sys.stderr,
         )
@@ -340,7 +350,7 @@ def main():
     else:
         # Wait until requested to stop.
         print(
-            "Repeating analytics waiting until requested to stop... (hit Ctrl-C)",
+            "Ad-hoc queries running until requested to stop... (hit Ctrl-C)",
             flush=True,
             file=sys.stderr,
         )
@@ -354,7 +364,7 @@ def main():
 
         should_shutdown.wait()
 
-    print("Stopping all clients...", flush=True, file=sys.stderr)
+    print("Stopping all ad-hoc clients...", flush=True, file=sys.stderr)
     for i in range(args.num_clients):
         # Note that in most cases, one release will have already run. This is OK
         # because downstream runners will not hang if there is a unconsumed
@@ -362,14 +372,16 @@ def main():
         control_semaphore[i].release()
         control_semaphore[i].release()
 
-    print("Waiting for the clients to complete...", flush=True, file=sys.stderr)
+    print("Waiting for the ad-hoc clients to complete...", flush=True, file=sys.stderr)
     for p in processes:
         p.join()
 
     for idx, p in enumerate(processes):
-        print(f"Runner {idx} exit code:", p.exitcode, flush=True, file=sys.stderr)
+        print(
+            f"Ad-hoc Runner {idx} exit code:", p.exitcode, flush=True, file=sys.stderr
+        )
 
-    print("Done query sequence!", flush=True, file=sys.stderr)
+    print("Done ad-hoc query sequence!", flush=True, file=sys.stderr)
 
 
 if __name__ == "__main__":
