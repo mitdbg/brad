@@ -179,6 +179,36 @@ function start_txn_runner() {
   runner_pid=$!
 }
 
+function start_other_repeating_runner() {
+  local clients=$1
+  local gap_s=$2
+  local gap_std_s=$3
+  local results_name=$4
+  local client_offset=$5
+
+  local args=(
+    --num-clients $clients
+    --num-front-ends $num_front_ends
+    --query-bank-file $other_query_bank_file
+    --avg-gap-s $gap_s
+    --avg-gap-std-s $gap_std_s
+  )
+
+  if [[ ! -z $client_offset ]]; then
+    args+=(--client-offset $client_offset)
+  fi
+
+  >&2 echo "[Other queries] Running with $clients..."
+  results_dir=$COND_OUT/$results_name
+  mkdir -p $results_dir
+
+  log_workload_point $results_name
+  COND_OUT=$results_dir python3.11 ../../../workloads/IMDB_extended/run_repeating_analytics.py "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
 function extract_named_arguments() {
   # Evaluates any environment variables in this script's arguments. This script
   # should only be run on trusted input.
@@ -204,6 +234,10 @@ function extract_named_arguments() {
 
     if [[ $phys_arg =~ --ra-query-bank-file=.+ ]]; then
       ra_query_bank_file=${phys_arg:21}
+    fi
+
+    if [[ $phys_arg =~ --other-query-bank-file=.+ ]]; then
+      other_query_bank_file=${phys_arg:24}
     fi
 
     if [[ $phys_arg =~ --ra-gap-s=.+ ]]; then
