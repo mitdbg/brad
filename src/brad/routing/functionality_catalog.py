@@ -11,6 +11,7 @@ from brad.config.engine import Engine, EngineBitmapValues
 class Functionality:
     Geospatial = "geospatial"
     Transaction = "transactions"
+    Vector = "vector"
 
     def __init__(self):
         # Read the YAML file
@@ -65,7 +66,7 @@ class Functionality:
         Return a bitmap for each engine that states what functionalities the
         engine supports.
 
-        The first value in the tuple is the bitmask representing the the engine.
+        The first value in the tuple is the bitmask representing the engine.
         The second value in the tuple is the bitmap representing its supported
         functionalities.
         """
@@ -73,5 +74,6 @@ class Functionality:
 
 
 FunctionalityBitmapValues: Dict[str, int] = {}
-FunctionalityBitmapValues[Functionality.Geospatial] = 0b01
-FunctionalityBitmapValues[Functionality.Transaction] = 0b10
+FunctionalityBitmapValues[Functionality.Geospatial] = 0b001
+FunctionalityBitmapValues[Functionality.Transaction] = 0b010
+FunctionalityBitmapValues[Functionality.Vector] = 0b100
