@@ -23,19 +23,40 @@ _ATHENA_CREATE_LOAD_TABLE = """
 """
 
 
+async def check_if_redshift_empty(connection: Connection) -> bool:
+    cursor = connection.cursor_sync()
+    await cursor.execute("SELECT 1 FROM telemetry LIMIT 1")
+    rows = await cursor.fetchall()
+    return len(rows) == 0
+
+
 async def load_redshift(args, config: ConfigFile, connection: Connection):
     cursor = connection.cursor_sync()
 
     times = args.load_times
+    start_idx = 0
     print(f"[Redshift] Loading the base data {times} times")
-    for idx in range(times):
-        print(f"[Redshift] Time {idx + 1} of {times}")
+
+    redshift_empty = await check_if_redshift_empty(connection)
+    if redshift_empty:
+        print("[Redshift] Table is currently empty. Doing initial load from S3.")
+        print(f"[Redshift] Time 1 of {times}")
         await cursor.execute(
             _REDSHIFT_LOAD_TEMPLATE.format(
                 s3_bucket=args.data_s3_bucket,
                 s3_path=args.data_s3_path,
                 s3_iam_role=config.redshift_s3_iam_role,
             )
+        )
+        await cursor.commit()
+        start_idx += 1
+
+    print("[Redshift] Doing the remaining load from Redshift itself.")
+    for idx in range(times):
+        print(f"[Redshift] Time {idx + 1} of {times}")
+        await cursor.execute(
+            "INSERT INTO telemetry (ip, timestamp, movie_id, event_id) "
+            '(SELECT ip, "timestamp", movie_id, event_id FROM telemetry WHERE id = 0)'
         )
         cursor.commit_sync()
 
