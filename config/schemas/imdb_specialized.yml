@@ -25,6 +25,9 @@ tables:
 
 - table_name: telemetry
   columns:
+  # N.B. This is problematic on Redshift (for loading).
+  # Solution is to remove the pkey and not null constraint manually using
+  # `psql`. This is OK for our experiment purposes.
   - name: id
     data_type: SERIAL
     primary_key: true

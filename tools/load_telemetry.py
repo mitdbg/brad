@@ -68,7 +68,6 @@ async def main():
     parser.add_argument("--data-s3-bucket", type=str, required=True)
     parser.add_argument("--data-s3-path", type=str, required=True)
     parser.add_argument("--load-times", type=int, default=1)
-    parser.add_argument("--load", action="store_true")
     parser.add_argument("--engines", type=str, nargs="+")
     args = parser.parse_args()
 
