@@ -16,7 +16,7 @@ _REDSHIFT_LOAD_TEMPLATE = """
 """
 
 _ATHENA_CREATE_LOAD_TABLE = """
-    CREATE EXTERNAL TABLE telemetry_base (ip, timestamp, movie_id, event_id)
+    CREATE EXTERNAL TABLE telemetry_base (ip STRING, timestamp TIMESTAMP, movie_id BIGINT, event_id INT)
     ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     LOCATION 's3://{s3_bucket}/{s3_path}'
     TBLPROPERTIES ('skip.header.line.count' = '1')
@@ -43,11 +43,14 @@ async def load_redshift(args, config: ConfigFile, connection: Connection):
 async def load_athena(args, connection: Connection):
     cursor = connection.cursor_sync()
 
+    table_path_parts = args.data_s3_path.split("/")
+    table_path = "/".join(table_path_parts[:-1])
+
     print("[Athena] Registering the base table.")
     await cursor.execute(
         _ATHENA_CREATE_LOAD_TABLE.format(
             s3_bucket=args.data_s3_bucket,
-            s3_path=args.data_s3_path,
+            s3_path=table_path,
         )
     )
 
