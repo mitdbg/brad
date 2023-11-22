@@ -19,12 +19,15 @@ tables:
   - name: movie_id
     data_type: BIGINT
   - name: embedding
-    data_type: embedding vector(1536)
+    data_type: vector(1536)
   bootstrap_locations:
   - aurora
 
 - table_name: telemetry
   columns:
+  - name: id
+    data_type: SERIAL
+    primary_key: true
   - name: ip
     data_type: TEXT
   - name: timestamp

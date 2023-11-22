@@ -155,7 +155,7 @@ async def alter_schema_impl(args):
             )
 
         merged_blueprint = Blueprint(
-            current_blueprint.schema_name,
+            current_blueprint.schema_name(),
             merged_tables,
             merged_table_locations,
             current_blueprint.aurora_provisioning(),
