@@ -27,6 +27,7 @@ from brad.daemon.messages import (
 from brad.daemon.monitor import Monitor
 from brad.daemon.system_event_logger import SystemEventLogger
 from brad.daemon.transition_orchestrator import TransitionOrchestrator
+from brad.daemon.blueprint_watchdog import BlueprintWatchdog
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
@@ -109,6 +110,7 @@ class BradDaemon:
         self._transition_task: Optional[asyncio.Task[None]] = None
 
         self._system_event_logger = SystemEventLogger.create_if_requested(self._config)
+        self._watchdog = BlueprintWatchdog(self._system_event_logger)
 
         # This is used to hold references to internal command tasks we create.
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
@@ -393,6 +395,12 @@ class BradDaemon:
         if self._should_skip_blueprint(blueprint, score, trigger):
             if self._system_event_logger is not None:
                 self._system_event_logger.log(SystemEvent.NewBlueprintSkipped)
+            return
+
+        if self._watchdog.reject_blueprint(blueprint):
+            logger.warning(
+                "Blueprint watchdog fired! Must re-run this blueprint planning pass."
+            )
             return
 
         if PERSIST_BLUEPRINT_VAR in os.environ:

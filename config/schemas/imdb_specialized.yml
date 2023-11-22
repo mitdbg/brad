@@ -1,0 +1,441 @@
+schema_name: imdb_specialized
+
+tables:
+- table_name: homes
+  columns:
+  - name: id
+    data_type: SERIAL
+    primary_key: true
+  - name: location_x
+    data_type: DECIMAL(10)
+  - name: location_y
+    data_type: DECIMAL(10)
+
+- table_name: embeddings
+  columns:
+  - name: id
+    data_type: SERIAL
+    primary_key: true
+  - name: movie_id
+    data_type: BIGINT
+  - name: embedding
+    data_type: vector(1536)
+  bootstrap_locations:
+  - aurora
+
+- table_name: telemetry
+  columns:
+  - name: id
+    data_type: SERIAL
+    primary_key: true
+  - name: ip
+    data_type: TEXT
+  - name: timestamp
+    data_type: TIMESTAMP
+  - name: movie_id
+    data_type: BIGINT
+  - name: event_id
+    data_type: INT
+  bootstrap_locations:
+  - athena
+  - redshift
+
+- table_name: theatres
+  columns:
+  - name: id
+    data_type: SERIAL
+    primary_key: true
+  - name: name
+    data_type: TEXT
+  - name: location_x
+    data_type: DECIMAL(10)
+  - name: location_y
+    data_type: DECIMAL(10)
+  indexes:
+  - name
+
+- table_name: showings
+  columns:
+  - name: id
+    data_type: SERIAL
+    primary_key: true
+  - name: theatre_id
+    data_type: BIGINT
+  - name: movie_id
+    data_type: BIGINT
+  - name: date_time
+    data_type: TIMESTAMP
+  - name: total_capacity
+    data_type: INT
+  - name: seats_left
+    data_type: INT
+  indexes:
+  - theatre_id
+  - movie_id
+  - theatre_id, date_time
+
+- table_name: ticket_orders
+  columns:
+  - name: id
+    data_type: SERIAL
+    primary_key: true
+  - name: showing_id
+    data_type: BIGINT
+  - name: quantity
+    data_type: INT
+  - name: contact_name
+    data_type: TEXT
+  - name: location_x
+    data_type: DECIMAL(10)
+  - name: location_y
+    data_type: DECIMAL(10)
+  indexes:
+  - showing_id
+
+# The tables below are from the original IMDB dataset.
+
+- table_name: aka_name
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: BIGINT
+    name: person_id
+  - data_type: character varying
+    name: name
+  - data_type: character varying(3)
+    name: imdb_index
+  - data_type: character varying(11)
+    name: name_pcode_cf
+  - data_type: character varying(11)
+    name: name_pcode_nf
+  - data_type: character varying(11)
+    name: surname_pcode
+  - data_type: character varying(65)
+    name: md5sum
+  indexes:
+  - person_id
+  # NOTE: Primary key columns are automatically indexed. These indexes are
+  # secondary indexes. Note that all indexes are ordered. To create composite
+  # key indexes, use a comma when listing columns (e.g., "person_id, name").
+
+- table_name: aka_title
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: BIGINT
+    name: movie_id
+  - data_type: character varying
+    name: title
+  - data_type: character varying(4)
+    name: imdb_index
+  - data_type: BIGINT
+    name: kind_id
+  - data_type: BIGINT
+    name: production_year
+  - data_type: character varying(5)
+    name: phonetic_code
+  - data_type: BIGINT
+    name: episode_of_id
+  - data_type: BIGINT
+    name: season_nr
+  - data_type: BIGINT
+    name: episode_nr
+  - data_type: character varying(72)
+    name: note
+  - data_type: character varying(32)
+    name: md5sum
+  indexes:
+  - movie_id
+  - kind_id
+
+- table_name: cast_info
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: BIGINT
+    name: person_id
+  - data_type: BIGINT
+    name: movie_id
+  - data_type: BIGINT
+    name: person_role_id
+  - data_type: character varying
+    name: note
+  - data_type: BIGINT
+    name: nr_order
+  - data_type: BIGINT
+    name: role_id
+  indexes:
+  - person_id
+  - movie_id
+  - person_role_id
+
+- table_name: char_name
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: character varying
+    name: name
+  - data_type: character varying(2)
+    name: imdb_index
+  - data_type: BIGINT
+    name: imdb_id
+  - data_type: character varying(5)
+    name: name_pcode_nf
+  - data_type: character varying(5)
+    name: surname_pcode
+  - data_type: character varying(32)
+    name: md5sum
+  indexes:
+  - imdb_id
+
+- table_name: comp_cast_type
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: character varying(32)
+    name: kind
+
+- table_name: company_name
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: character varying
+    name: name
+  - data_type: character varying(6)
+    name: country_code
+  - data_type: BIGINT
+    name: imdb_id
+  - data_type: character varying(5)
+    name: name_pcode_nf
+  - data_type: character varying(5)
+    name: name_pcode_sf
+  - data_type: character varying(32)
+    name: md5sum
+  indexes:
+  - imdb_id
+
+- table_name: company_type
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: character varying(32)
+    name: kind
+
+- table_name: complete_cast
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: BIGINT
+    name: movie_id
+  - data_type: BIGINT
+    name: subject_id
+  - data_type: BIGINT
+    name: status_id
+  indexes:
+  - movie_id
+  - subject_id
+  - status_id
+
+- table_name: info_type
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: character varying(32)
+    name: info
+
+- table_name: keyword
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: character varying
+    name: keyword
+  - data_type: character varying(5)
+    name: phonetic_code
+
+- table_name: kind_type
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: character varying(15)
+    name: kind
+
+- table_name: link_type
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: character varying(32)
+    name: link
+
+- table_name: movie_companies
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: BIGINT
+    name: movie_id
+  - data_type: BIGINT
+    name: company_id
+  - data_type: BIGINT
+    name: company_type_id
+  - data_type: character varying
+    name: note
+  indexes:
+  - movie_id
+  - company_id
+  - company_type_id
+
+- table_name: movie_info_idx
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: BIGINT
+    name: movie_id
+  - data_type: BIGINT
+    name: info_type_id
+  - data_type: character varying
+    name: info
+  - data_type: character varying(1)
+    name: note
+  indexes:
+  - movie_id
+  - info_type_id
+
+- table_name: movie_keyword
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: BIGINT
+    name: movie_id
+  - data_type: BIGINT
+    name: keyword_id
+  indexes:
+  - movie_id
+  - keyword_id
+
+- table_name: movie_link
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: BIGINT
+    name: movie_id
+  - data_type: BIGINT
+    name: linked_movie_id
+  - data_type: BIGINT
+    name: link_type_id
+  indexes:
+  - movie_id
+  - linked_movie_id
+  - link_type_id
+
+- table_name: name
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: character varying
+    name: name
+  - data_type: character varying(9)
+    name: imdb_index
+  - data_type: BIGINT
+    name: imdb_id
+  - data_type: character varying(1)
+    name: gender
+  - data_type: character varying(5)
+    name: name_pcode_cf
+  - data_type: character varying(5)
+    name: name_pcode_nf
+  - data_type: character varying(5)
+    name: surname_pcode
+  - data_type: character varying(32)
+    name: md5sum
+  indexes:
+  - imdb_id
+
+- table_name: role_type
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: character varying(32)
+    name: role
+
+- table_name: title
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: character varying
+    name: title
+  - data_type: character varying(5)
+    name: imdb_index
+  - data_type: BIGINT
+    name: kind_id
+  - data_type: BIGINT
+    name: production_year
+  - data_type: BIGINT
+    name: imdb_id
+  - data_type: character varying(5)
+    name: phonetic_code
+  - data_type: BIGINT
+    name: episode_of_id
+  - data_type: BIGINT
+    name: season_nr
+  - data_type: BIGINT
+    name: episode_nr
+  - data_type: character varying(49)
+    name: series_years
+  - data_type: character varying(32)
+    name: md5sum
+  indexes:
+  - kind_id
+  - imdb_id
+  - episode_of_id
+
+- table_name: movie_info
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: BIGINT
+    name: movie_id
+  - data_type: BIGINT
+    name: info_type_id
+  - data_type: character varying
+    name: info
+  - data_type: character varying
+    name: note
+  indexes:
+  - movie_id
+  - info_type_id
+
+- table_name: person_info
+  columns:
+  - data_type: SERIAL
+    name: id
+    primary_key: true
+  - data_type: BIGINT
+    name: person_id
+  - data_type: BIGINT
+    name: info_type_id
+  - data_type: character varying
+    name: info
+  - data_type: character varying
+    name: note
+  indexes:
+  - person_id
+  - info_type_id

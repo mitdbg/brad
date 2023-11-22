@@ -27,3 +27,6 @@ class SystemEvent(enum.Enum):
     PostTransitionCompleted = "post_transition_completed"
 
     AuroraPrimaryFailover = "aurora_primary_failover"
+
+    # If this event occurs, we must redo the experiment.
+    WatchdogFired = "watchdog_fired"
