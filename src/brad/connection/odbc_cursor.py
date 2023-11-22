@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Iterable
 
 from .cursor import Cursor, Row
 
@@ -31,6 +31,9 @@ class OdbcCursor(Cursor):
 
     def execute_sync(self, query: str) -> None:
         self._impl.execute(query)
+
+    def executemany_sync(self, query: str, batch: Iterable[Any]) -> None:
+        self._impl.executemany(query, batch)
 
     def fetchone_sync(self) -> Optional[Row]:
         return self._impl.fetchone()

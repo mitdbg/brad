@@ -1,6 +1,6 @@
 import asyncio
 import redshift_connector
-from typing import Optional, List
+from typing import Any, Iterable, Optional, List
 
 from .cursor import Cursor, Row
 
@@ -35,6 +35,9 @@ class RedshiftCursor(Cursor):
 
     def execute_sync(self, query: str) -> None:
         self._impl.execute(query)
+
+    def executemany_sync(self, query: str, batch: Iterable[Any]) -> None:
+        raise RuntimeError("Not supported on Redshift.")
 
     def fetchone_sync(self) -> Optional[Row]:
         return self._impl.fetchone()
