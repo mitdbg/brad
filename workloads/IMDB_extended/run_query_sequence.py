@@ -16,10 +16,7 @@ from workload_utils.connect import connect_to_db
 from brad.config.engine import Engine
 from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
-from workloads.IMDB_extended.run_repeating_analytics import (
-    get_time_of_the_day_unsimulated,
-    time_in_minute_to_datetime_str,
-)
+
 
 logger = logging.getLogger(__name__)
 EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
@@ -86,7 +83,7 @@ def runner(
 
     try:
         print(
-            "timestamp,time_of_day,query_idx,run_time_s,engine",
+            "timestamp,query_idx,run_time_s,engine",
             file=file,
             flush=True,
         )
@@ -132,15 +129,6 @@ def runner(
             try:
                 # Get time stamp for logging.
                 now = datetime.now().astimezone(pytz.utc)
-                if args.time_scale_factor is not None:
-                    time_unsimulated = get_time_of_the_day_unsimulated(
-                        now, args.time_scale_factor
-                    )
-                    time_unsimulated_str = time_in_minute_to_datetime_str(
-                        time_unsimulated
-                    )
-                else:
-                    time_unsimulated_str = "xxx"
 
                 # Execute query.
                 start = time.time()
@@ -152,9 +140,8 @@ def runner(
                 if engine is not None:
                     engine_log = engine.value
                 print(
-                    "{},{},{},{},{}".format(
+                    "{},{},{},{}".format(
                         now,
-                        time_unsimulated_str,
                         qidx,
                         end - start,
                         engine_log,
