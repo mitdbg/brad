@@ -44,6 +44,7 @@ def register_admin_action(subparser) -> None:
     parser.add_argument(
         "--engines", nargs="+", default=["aurora", "redshift", "athena"]
     )
+    parser.add_argument("--take-action", action="store_true")
     parser.set_defaults(admin_action=alter_schema)
 
 
@@ -56,7 +57,7 @@ async def alter_schema_impl(args):
     current_blueprint = blueprint_mgr.get_blueprint()
 
     # 2. Load and validate the user-provided schema.
-    user = UserProvidedBlueprint.load_from_yaml_file(args.schema_file)
+    user = UserProvidedBlueprint.load_from_yaml_file(args.new_schema_file)
     user.validate()
 
     # 3. Get the bootstrapped blueprint.
@@ -83,7 +84,19 @@ async def alter_schema_impl(args):
         if table.name not in existing_tables
     }
 
-    # 6. Set up the new tables.
+    logger.info("Will create the following tables: %s", str(tables_to_create))
+    if not args.take_action:
+        logger.info("Set --take-action to make the schema changes.")
+        return
+
+    # 6. Install the required extensions.
+    if Engine.Aurora in engines_filter:
+        aurora = cxns.get_connection(Engine.Aurora)
+        cursor = aurora.cursor_sync()
+        cursor.execute_sync("CREATE EXTENSION IF NOT EXISTS vector")
+        cursor.commit_sync()
+
+    # 7. Set up the new tables.
     sql_gen = TableSqlGenerator(config, altered_blueprint)
 
     for table in altered_blueprint.tables():
@@ -112,7 +125,7 @@ async def alter_schema_impl(args):
                 logger.debug("Running on %s: %s", str(db_type), q)
                 cursor.execute_sync(q)
 
-    # 7. Update the extraction progress table.
+    # 8. Update the extraction progress table.
     if Engine.Aurora in engines_filter:
         for table_name in tables_to_create:
             queries, db_type = sql_gen.generate_extraction_progress_init(table_name)
@@ -129,14 +142,7 @@ async def alter_schema_impl(args):
     if Engine.Redshift in engines_filter:
         cxns.get_connection(Engine.Redshift).cursor_sync().commit_sync()
 
-    # 10. Install the required extensions (needed for data extraction).
-    if Engine.Aurora in engines_filter:
-        aurora = cxns.get_connection(Engine.Aurora)
-        cursor = aurora.cursor_sync()
-        cursor.execute_sync("CREATE EXTENSION IF NOT EXISTS vector")
-        cursor.commit_sync()
-
-    # 11. Persist the data blueprint.
+    # 10. Persist the data blueprint.
     if not args.skip_persisting_blueprint:
         merged_tables = current_blueprint.tables().copy()
         merged_table_locations = current_blueprint.table_locations().copy()
