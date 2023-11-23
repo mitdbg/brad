@@ -280,7 +280,10 @@ class BradDaemon:
         for fe in self._front_ends:
             fe.process.start()
 
-        if self._config.routing_policy == RoutingPolicy.ForestTableSelectivity:
+        if (
+            self._config.routing_policy == RoutingPolicy.ForestTableSelectivity
+            or self._config.routing_policy == RoutingPolicy.Default
+        ):
             logger.info("Setting up the cardinality estimator...")
             estimator = await PostgresEstimator.connect(self._schema_name, self._config)
             await estimator.analyze(
