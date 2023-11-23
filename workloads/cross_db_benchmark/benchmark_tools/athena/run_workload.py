@@ -36,6 +36,9 @@ def run_athena_workload(
     if not use_boto_client:
         db_conn = create_db_conn(database, db_name, None, None)
         boto_client = None
+        print(
+            "!!!! WARNING: This data collection will exclude data scanned statistics. !!!!"
+        )
     else:
         db_conn = None
         # NOTE: Using the boto client is preferred because it also collects data

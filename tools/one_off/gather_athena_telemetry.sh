@@ -1,10 +1,13 @@
 #! /bin/bash
 
+set -e
+
 SCRIPT_PATH=$(cd $(dirname $0) && pwd -P)
 cd $SCRIPT_PATH
 
 if [ -z $4 ]; then
   echo "Usage: $0 queries_json out_dir config_file schema_name"
+  exit 1
 fi
 
 queries_json=$1
@@ -15,9 +18,12 @@ schema_name=$4
 mkdir -p $out_dir/sql
 mkdir -p $out_dir/raw
 
-for epoch in "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22"; do
+for epoch in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22; do
     echo "Processing $epoch"
-    jq -r '.["epoch_'"$epoch"'"] | .[]' $queries_json > $out_dir/sql/epoch_${epoch}.sql
+
+    jq -r '.["epoch_'"$epoch"'"] | .[]' $queries_json > $out_dir/sql/epoch_${epoch}_orig.sql
+    # Need to fix the query: `movie_telemetry` should be `telemetry`
+    sed 's/movie_telemetry/telemetry/g' epoch_${epoch}_orig.sql > epoch_${epoch}.sql
 
     echo "Gathering data..."
     python ../../run_cost_model.py \
@@ -40,5 +46,4 @@ for epoch in "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22"; do
         --data-s3-path imdb_specialized_100g/telemetry/telemetry.csv \
         --times 1 \
         --schema-name $schema_name
-fi
-
+done
