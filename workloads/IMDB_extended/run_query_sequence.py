@@ -24,16 +24,13 @@ STARTUP_FAILED = "startup_failed"
 
 def runner(
     runner_idx: int,
-    num_runners: int,
     start_queue: mp.Queue,
     control_semaphore: mp.Semaphore,  # type: ignore
     args,
     queries: List[str],
 ) -> None:
     # Check args.
-    assert num_runners > runner_idx
-    assert args.avg_gap_s is not None
-    assert args.avg_gap_std_s is not None
+    assert args.num_clients > runner_idx
 
     def noop(_signal, _frame):
         pass
@@ -69,7 +66,7 @@ def runner(
         return
 
     # Query indexes the runner should execute.
-    runner_qidx = [i for i in range(len(queries)) if i % num_runners == runner_idx]
+    runner_qidx = [i for i in range(len(queries)) if i % args.num_clients == runner_idx]
 
     exec_count = 0
     file = open(
