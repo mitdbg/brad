@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 from .estimator import Estimator
 
 from brad.blueprint import Blueprint
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.strings import (
     base_table_name_from_source,
@@ -195,6 +196,10 @@ class PostgresEstimator(Estimator):
         table_counts = {}
 
         for table in self._blueprint.tables():
+            locations = self._blueprint.get_table_locations(table.name)
+            if Engine.Aurora not in locations:
+                logger.warning("Not fetching size of %s.", table.name)
+                continue
             query = f"SELECT COUNT(*) FROM {table.name}"
             logger.debug("PostgresEstimator running: %s", query)
             await self._cursor.execute(query)
