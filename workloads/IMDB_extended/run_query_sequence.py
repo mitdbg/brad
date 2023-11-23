@@ -103,6 +103,8 @@ def runner(
         start_queue.put_nowait("")
         control_semaphore.acquire()  # type: ignore
 
+        last_run_time_s = None
+
         for qidx in runner_qidx:
             # Note that `False` means to not block.
             should_exit_early = control_semaphore.acquire(False)  # type: ignore
@@ -114,11 +116,18 @@ def runner(
                 )
                 break
 
-            # Wait for some time. Wait times are normally distributed.
-            wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
-            if wait_for_s < 0.0:
+            # Wait for some time before issuing, if requested.
+            if args.avg_gap_s is not None:
+                wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
+            elif args.arrivals_per_s is not None:
+                wait_for_s = prng.expovariate(args.arrivals_per_s)
+                if last_run_time_s is not None:
+                    wait_for_s -= last_run_time_s
+            else:
                 wait_for_s = 0.0
-            time.sleep(wait_for_s)
+
+            if wait_for_s > 0.0:
+                time.sleep(wait_for_s)
 
             logger.debug("Executing qidx: %d", qidx)
             query = queries[qidx]
@@ -136,16 +145,18 @@ def runner(
                 engine_log = "xxx"
                 if engine is not None:
                     engine_log = engine.value
+                run_time_s = end - start
                 print(
                     "{},{},{},{}".format(
                         now,
                         qidx,
-                        end - start,
+                        run_time_s,
                         engine_log,
                     ),
                     file=file,
                     flush=True,
                 )
+                last_run_time_s = run_time_s
 
                 if exec_count % 20 == 0:
                     # To avoid data loss if this script crashes.
@@ -233,6 +244,9 @@ def main():
     parser.add_argument("--client-offset", type=int, default=0)
     parser.add_argument("--avg-gap-s", type=float)
     parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
+    # Set this to use an exponential distribution for the gap times.\
+    # This value is per-client.
+    parser.add_argument("--arrivals-per-s", type=float)
     parser.add_argument(
         "--brad-direct",
         action="store_true",
