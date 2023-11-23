@@ -5,7 +5,6 @@ import os
 import pathlib
 import random
 import sys
-import threading
 import signal
 import pytz
 import logging
@@ -19,8 +18,6 @@ from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 
 
 logger = logging.getLogger(__name__)
-EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
-ENGINE_NAMES = ["ATHENA", "AURORA", "REDSHIFT"]
 
 STARTUP_FAILED = "startup_failed"
 
@@ -67,7 +64,7 @@ def runner(
             disable_direct_redshift_result_cache=True,
         )
     except BradClientError as ex:
-        print(f"[Ad-hoc runner {runner_idx}] Failed to connect to BRAD:", str(ex))
+        print(f"[Seq runner {runner_idx}] Failed to connect to BRAD:", str(ex))
         start_queue.put_nowait(STARTUP_FAILED)
         return
 
@@ -76,7 +73,7 @@ def runner(
 
     exec_count = 0
     file = open(
-        out_dir / "ad_hoc_queries_{}.csv".format(runner_idx),
+        out_dir / "seq_queries_{}.csv".format(runner_idx),
         "w",
         encoding="UTF-8",
     )
@@ -99,7 +96,7 @@ def runner(
 
         # Signal that we're ready to start and wait for the controller.
         print(
-            f"Ad-hoc Runner {runner_idx} is ready to start running.",
+            f"Seq Runner {runner_idx} is ready to start running.",
             flush=True,
             file=sys.stderr,
         )
@@ -108,10 +105,10 @@ def runner(
 
         for qidx in runner_qidx:
             # Note that `False` means to not block.
-            should_exit = control_semaphore.acquire(False)  # type: ignore
-            if should_exit:
+            should_exit_early = control_semaphore.acquire(False)  # type: ignore
+            if should_exit_early:
                 print(
-                    f"Ad-hoc Runner {runner_idx} is exiting.",
+                    f"Seq Runner {runner_idx} is exiting early.",
                     file=sys.stderr,
                     flush=True,
                 )
@@ -123,7 +120,7 @@ def runner(
                 wait_for_s = 0.0
             time.sleep(wait_for_s)
 
-            logger.debug("Executing ad-hoc qidx: %d", qidx)
+            logger.debug("Executing qidx: %d", qidx)
             query = queries[qidx]
 
             try:
@@ -157,7 +154,7 @@ def runner(
                 exec_count += 1
                 if rand_backoff is not None:
                     print(
-                        f"[Ad-hoc Runner {runner_idx}] Continued after transient errors.",
+                        f"[Seq Runner {runner_idx}] Continued after transient errors.",
                         flush=True,
                         file=sys.stderr,
                     )
@@ -180,7 +177,7 @@ def runner(
                             max_delay_s=timedelta(minutes=1).total_seconds(),
                         )
                         print(
-                            f"[Ad-hoc Runner {runner_idx}] Backing off due to transient errors.",
+                            f"[Seq Runner {runner_idx}] Backing off due to transient errors.",
                             flush=True,
                             file=sys.stderr,
                         )
@@ -190,7 +187,7 @@ def runner(
                     wait_s = rand_backoff.wait_time_s()
                     if wait_s is None:
                         print(
-                            f"[Ad-hoc Runner {runner_idx}] Aborting benchmark. Too many transient errors.",
+                            f"[Seq Runner {runner_idx}] Aborting benchmark. Too many transient errors.",
                             flush=True,
                             file=sys.stderr,
                         )
@@ -199,7 +196,7 @@ def runner(
 
                 else:
                     print(
-                        "Unexpected ad-hoc query error:",
+                        "Unexpected seq query error:",
                         ex.message(),
                         flush=True,
                         file=sys.stderr,
@@ -209,7 +206,7 @@ def runner(
         os.fsync(file.fileno())
         file.close()
         database.close_sync()
-        print(f"Ad-hoc Runner {runner_idx} has exited.", flush=True, file=sys.stderr)
+        print(f"Seq runner {runner_idx} has exited.", flush=True, file=sys.stderr)
 
 
 def main():
@@ -229,18 +226,13 @@ def main():
         required=True,
         help="Path to a query sequence.",
     )
+    # Use these to slice the file, if needed.
     parser.add_argument("--query-sequence-offset", type=int, default=0)
-    parser.add_argument(
-        "--query-sequence-length",
-        type=int,
-        default=-1,
-        help="Default value (-1) means use the whole file.",
-    )
+    parser.add_argument("--query-sequence-length", type=int)
     parser.add_argument("--num-clients", type=int, default=1)
     parser.add_argument("--client-offset", type=int, default=0)
     parser.add_argument("--avg-gap-s", type=float)
     parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
-    parser.add_argument("--per-client-rate-per-query", type=float, default=0)
     parser.add_argument(
         "--brad-direct",
         action="store_true",
@@ -259,7 +251,6 @@ def main():
     parser.add_argument(
         "--engine", type=str, help="The engine to use, if connecting directly."
     )
-    parser.add_argument("--run-for-s", type=int, help="If set, run for this long.")
     args = parser.parse_args()
 
     with open(args.query_sequence_file, "r", encoding="UTF-8") as file:
@@ -269,8 +260,8 @@ def main():
         offset = args.query_sequence_offset
         seq_len = args.query_sequence_length
         query_seq = query_seq[offset:]
-        if args.query_sequence_length > -1:
-            query_seq = query_seq[: offset + seq_len]
+        if seq_len is not None:
+            query_seq = query_seq[:seq_len]
 
     # Our control protocol is as follows.
     # - Runner processes write to their `start_queue` when they have finished
@@ -303,7 +294,7 @@ def main():
         p.start()
         processes.append(p)
 
-    print("Ad-hoc: Waiting for startup...", flush=True)
+    print("Seq: Waiting for startup...", flush=True)
     one_startup_failed = False
     for i in range(args.num_clients):
         msg = start_queue[i].get()
@@ -327,48 +318,26 @@ def main():
     for i in range(args.num_clients):
         control_semaphore[i].release()
 
-    if args.run_for_s is not None:
-        print(
-            "Ad-hoc: Waiting for {} seconds...".format(args.run_for_s),
-            flush=True,
-            file=sys.stderr,
-        )
-        time.sleep(args.run_for_s)
-    else:
-        # Wait until requested to stop.
-        print(
-            "Ad-hoc queries running until requested to stop... (hit Ctrl-C)",
-            flush=True,
-            file=sys.stderr,
-        )
-        should_shutdown = threading.Event()
+    # Wait until requested to stop.
+    print(
+        "Seq queries running until completion. Hit Ctrl-C to stop early.",
+        flush=True,
+        file=sys.stderr,
+    )
 
-        def signal_handler(_signal, _frame):
-            should_shutdown.set()
+    def signal_handler(_signal, _frame):
+        for i in range(args.num_clients):
+            control_semaphore[i].release()
+            control_semaphore[i].release()
 
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
-        should_shutdown.wait()
-
-    print("Stopping all ad-hoc clients...", flush=True, file=sys.stderr)
-    for i in range(args.num_clients):
-        # Note that in most cases, one release will have already run. This is OK
-        # because downstream runners will not hang if there is a unconsumed
-        # semaphore value.
-        control_semaphore[i].release()
-        control_semaphore[i].release()
-
-    print("Waiting for the ad-hoc clients to complete...", flush=True, file=sys.stderr)
+    print("Waiting for the seq clients to complete...", flush=True, file=sys.stderr)
     for p in processes:
         p.join()
 
-    for idx, p in enumerate(processes):
-        print(
-            f"Ad-hoc Runner {idx} exit code:", p.exitcode, flush=True, file=sys.stderr
-        )
-
-    print("Done ad-hoc query sequence!", flush=True, file=sys.stderr)
+    print("Done query sequence!", flush=True, file=sys.stderr)
 
 
 if __name__ == "__main__":
