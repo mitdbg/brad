@@ -3,9 +3,11 @@ import mysql.connector
 import psycopg2
 import os, json, sys
 import time
+from datetime import datetime, timedelta
 import platform
 from types import SimpleNamespace
 import boto3
+import pandas as pd
 
 
 def load_schema_json(dataset):
@@ -139,6 +141,9 @@ class TiDBLoader:
         cur.execute("SET GLOBAL local_infile = 1;")
         self.conn.commit()
 
+    def fetch_metrics(self, start_time=None, end_time=None):
+        raise NotImplementedError
+
     def make_load_cmd(self, t, load_args) -> str:
         s3_path = f"s3://{self.s3_bucket}/imdb_extended/{t}/{t}.csv?access-key={self.access_key}&secret-access-key={self.secret_key}"
         load_args = load_args.tidb
@@ -266,6 +271,86 @@ class PostgresCompatibleLoader:
             cur = self.conn.cursor()
             cur.execute("CREATE EXTENSION IF NOT EXISTS aws_s3 CASCADE;")
             self.conn.commit()
+
+
+    def fetch_metrics(self, start_time=None, end_time=None):
+        if self.engine == "aurora":
+            return self.fetch_aurora_usage_metrics(start_time, end_time)
+        if self.engine == "redshift":
+            return self.fetch_redshift_usage_metrics(start_time, end_time)
+        raise NotImplementedError
+
+    def fetch_aurora_usage_metrics(self, start_time=None, end_time=None):
+        """Fetches aurora serverless compute units from cloudwatch."""
+        if start_time is None:
+            start_time = datetime.now() - timedelta(hours=1)
+            print(f"Start time: {start_time}")
+        if end_time is None:
+            end_time = datetime.now()
+        """Fetches aurora serverless compute units from cloudwatch."""
+        client = boto3.client("cloudwatch", region_name="us-east-1")
+        response = client.get_metric_data(
+            MetricDataQueries=[
+                {
+                    "Id": "m2",
+                    "MetricStat": {
+                        "Metric": {
+                            "Namespace": "AWS/RDS",
+                            "MetricName": "ServerlessDatabaseCapacity",
+                            "Dimensions": [
+                                {"Name": "DBClusterIdentifier", "Value": "bradbench"}
+                            ],
+                        },
+                        "Period": 60,
+                        "Stat": "Average",
+                    },
+                    "ReturnData": True,
+                },
+            ],
+            StartTime=start_time,
+            EndTime=end_time,
+            ScanBy="TimestampDescending",
+        )
+        timestamps = response["MetricDataResults"][0]["Timestamps"]
+        values = response["MetricDataResults"][0]["Values"]
+        df = pd.DataFrame({"timestamp": timestamps, "value": values})
+        return df
+
+
+    def fetch_redshift_usage_metrics(self, start_time=None, end_time=None):
+        """Fetches redshift compute units from cloudwatch."""
+        if start_time is None:
+            start_time = datetime.now() - timedelta(hours=1)
+            print(f"Start time: {start_time}")
+        if end_time is None:
+            end_time = datetime.now()
+        client = boto3.client("cloudwatch", region_name="us-east-1")
+        response = client.get_metric_data(
+            MetricDataQueries=[
+                {
+                    "Id": "m1",
+                    "MetricStat": {
+                        "Metric": {
+                            "Namespace": "AWS/Redshift-Serverless",
+                            "MetricName": "ComputeCapacity",
+                            "Dimensions": [
+                                {"Name": "Workgroup", "Value": "default-workgroup"}
+                            ],
+                        },
+                        "Period": 60,
+                        "Stat": "Average",
+                    },
+                    "ReturnData": True,
+                },
+            ],
+            StartTime=start_time,
+            EndTime=end_time,
+            ScanBy="TimestampDescending",
+        )
+        timestamps = response["MetricDataResults"][0]["Timestamps"]
+        values = response["MetricDataResults"][0]["Values"]
+        df = pd.DataFrame({"timestamp": timestamps, "value": values})
+        return df
 
 
     # def manual_unload(self, dataset, do_unload=True, specific_table=None, start_chunk=0, end_chunk=0):

@@ -63,6 +63,10 @@ class PyodbcDatabase(Database):
         except mysql.connector.errors.DatabaseError as e:
             print(f"Transient error: {e}.\nQuery: {query}", flush=True, file=sys.stderr)
             return []
+        except mysql.connector.errors.InterfaceError as e:
+            print(f"Transient error: {e}.\nQuery: {query}", flush=True, file=sys.stderr)
+            return []
+        
 
     def begin_sync(self) -> None:
         # Open a new cursor

@@ -17,28 +17,47 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir", default="imdb")
     parser.add_argument("--dataset", default="imdb_extended")
-    parser.add_argument("--force_load", default=False, action="store_true")
+    parser.add_argument("--load", default=False, action="store_true")
+    parser.add_argument("--force-load", default=False, action="store_true")
     parser.add_argument("--load_from", default="")
     parser.add_argument("--run_query", default=None)
     parser.add_argument("--redshift-stress", default=False, action="store_true")
     parser.add_argument("--tidb-stress", default=False, action="store_true")
     parser.add_argument("--tidb-comparison", default=False, action="store_true")
     parser.add_argument("--engine", default="")
+    parser.add_argument("--metrics", default=False, action="store_true")
     args = parser.parse_args()
     if args.redshift_stress:
         query_bank = "workloads/IMDB_100GB/ad_hoc/queries.sql"
         redshift_stress_test(query_bank, 64)
         sys.exit(0)
     if args.engine == "tidb":
-        # TIDB loaded manually
         loader = TiDBLoader()
     elif args.engine == "aurora" or args.engine == "redshift":
         loader = PostgresCompatibleLoader(engine=args.engine)
+    if args.load:
+        assert args.engine != "tidb", "TIDB can only be loaded manually"
         loader.load_database(
             dataset=args.dataset,
             force=args.force_load,
             load_from=args.load_from,
         )
+    if args.metrics:
+        # From November 9th 2023 at 16:14 UTC to one hour later.
+        from datetime import datetime, timedelta
+        start_time = datetime(year=2023, month=11, day=9, hour=16, minute=14)
+        end_time = start_time + timedelta(hours=1)
+        df = loader.fetch_metrics(start_time=start_time, end_time=end_time)
+        # Write to csv
+        start_time = df['timestamp'].min()
+        df['timestamp'] = (df['timestamp']-start_time).dt.total_seconds() // 60
+        if args.engine == "aurora":
+            df["cost"] = (0.16 * df["value"]) / 60 # $0.16 per hour.
+        elif args.engine == "redshift":
+            df["cost"] = (0.36 * df["value"]) / 60 # $0.36 per hour.
+        df.to_csv(f"expt_out/metrics_{args.engine}.csv", index=False)
+        print(f"Metrics:\n{df.head()}\n Mean Val: {df['value'].mean()}\n Mean Cost: {df['cost'].mean()}")
+        sys.exit(0)
     if args.run_query is not None:
         cur = loader.conn.cursor()
         print(f"Executing: {args.run_query}")
