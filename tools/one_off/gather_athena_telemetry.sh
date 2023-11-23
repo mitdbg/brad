@@ -20,10 +20,20 @@ mkdir -p $out_dir/raw
 
 for epoch in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22; do
     echo "Processing $epoch"
+    sql_file_orig=$out_dir/sql/epoch_${epoch}_orig.sql
+    sql_file_clean=$out_dir/sql/epoch_${epoch}.sql
 
-    jq -r '.["epoch_'"$epoch"'"] | .[]' $queries_json > $out_dir/sql/epoch_${epoch}_orig.sql
+    jq -r '.["epoch_'"$epoch"'"] | .[]' $queries_json > $sql_file_orig
+
     # Need to fix the query: `movie_telemetry` should be `telemetry`
-    sed 's/movie_telemetry/telemetry/g' epoch_${epoch}_orig.sql > epoch_${epoch}.sql
+    sed 's/movie_telemetry/telemetry/g' $sql_file_orig > $sql_file_clean
+
+    # Need to fix problematic SQL synatx.
+    sed -i 's/timestamp >/"timestamp" > timestamp/g' $sql_file_clean
+    sed -i 's/timestamp </"timestamp" < timestamp/g' $sql_file_clean
+    sed -i 's/timestamp <=/"timestamp" <= timestamp/g' $sql_file_clean
+    sed -i 's/timestamp >=/"timestamp" >= timestamp/g' $sql_file_clean
+    sed -i 's/timestamp =/"timestamp" = timestamp/g' $sql_file_clean
 
     echo "Gathering data..."
     python ../../run_cost_model.py \
