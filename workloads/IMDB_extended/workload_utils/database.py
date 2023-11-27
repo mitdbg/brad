@@ -1,5 +1,6 @@
 import pyodbc
 import mysql.connector
+import psycopg2
 import sys
 
 from typing import Tuple, Optional
@@ -34,6 +35,14 @@ class PyodbcDatabase(Database):
         self._engine = engine
         self._cursor = None
 
+    def should_fetch(self, query, cur) -> bool:
+        is_select = query.strip().lower().startswith("select")
+        has_rows = cur.rowcount is not None and cur.rowcount > 0
+        if self._engine == Engine.Aurora or self._engine == Engine.Redshift:
+            return is_select
+        else:
+            return is_select or has_rows
+
     def execute_sync(self, query: str) -> RowList:
         # print(f"Running Query: {query}")
         try:
@@ -46,10 +55,7 @@ class PyodbcDatabase(Database):
                 cursor = self._cursor
             # Exec
             cursor.execute(query)
-            if query.strip().lower().startswith("select") or (
-                cursor.rowcount is not None and cursor.rowcount > 0
-            ):
-                # print(f"Rows: {cursor.rowcount}. Q: {query}")
+            if self.should_fetch(query, cursor):
                 rows = cursor.fetchall()
             else:
                 rows = []
@@ -64,6 +70,13 @@ class PyodbcDatabase(Database):
             print(f"Transient error: {e}.\nQuery: {query}", flush=True, file=sys.stderr)
             return []
         except mysql.connector.errors.InterfaceError as e:
+            print(f"Transient error: {e}.\nQuery: {query}", flush=True, file=sys.stderr)
+            return []
+        except psycopg2.errors.DatabaseError as e:
+            print(f"Transient error: {e}.\nQuery: {query}", flush=True, file=sys.stderr)
+            return []
+        except psycopg2.errors.InterfaceError as e:
+            # Restart the connection.
             print(f"Transient error: {e}.\nQuery: {query}", flush=True, file=sys.stderr)
             return []
         

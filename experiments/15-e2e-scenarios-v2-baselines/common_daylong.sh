@@ -16,9 +16,7 @@ function graceful_shutdown() {
 function log_workload_point() {
   msg=$1
   now=$(date "+%Y-%m-%d %H:%M:%S")
-  msg="$now,$msg"
-  echo "$msg" >> $EXPT_OUT/points.log
-  echo "$msg"
+  echo "$now,$msg" >> $EXPT_OUT/points.log
 }
 
 function poll_file_for_event() {
@@ -70,15 +68,14 @@ function start_repeating_olap_runner() {
     --num-clients $ra_clients
     --query-indexes $query_indexes
     --query-bank-file $ra_query_bank_file
-    --avg-gap-s $ra_gap_s
-    --avg-gap-std-s $ra_gap_std_s
+    --time-scale-factor $time_scale_factor
+    --gap-dist-path $gap_dist_path
+    --query-frequency-path $query_frequency_path
+    --num-client-path $num_client_path
     --baseline $ANALYTICS_ENGINE
+    --run-for-s $total_second_phase_time_s
     --output-dir $results_dir
   )
-
-  if [[ ! -z $ra_query_frequency_path ]]; then
-    args+=(--query-frequency-path $ra_query_frequency_path)
-  fi
 
   >&2 echo "[Repeating Analytics] Running with $ra_clients..."
 
@@ -89,48 +86,20 @@ function start_repeating_olap_runner() {
   runner_pid=$!
 }
 
-function start_seq_olap_runner() {
-  local num_clients=$1
-  local gap_s=$2
-  local gap_std_s=$3
-  local results_name=$4
-
-  results_dir=$EXPT_OUT/$results_name
-  mkdir -p $results_dir
-
-  local args=(
-    --num-clients $num_clients
-    --query-sequence-file $seq_query_bank_file
-    --avg-gap-s $gap_s
-    --avg-gap-std-s $gap_std_s
-    --baseline $ANALYTICS_ENGINE
-    --output-dir $results_dir
-  )
-
-  if [[ ! -z $ra_query_frequency_path ]]; then
-    args+=(--query-frequency-path $ra_query_frequency_path)
-  fi
-
-  >&2 echo "[Seq Analytics] Running with $ra_clients..."
-
-  log_workload_point $results_name
-  python3 workloads/IMDB_extended/run_query_sequence.py "${args[@]}" &
-
-  # This is a special return value variable that we use.
-  runner_pid=$!
-}
-
 function start_txn_runner() {
   t_clients=$1
 
   >&2 echo "[Transactions] Running with $t_clients..."
-  results_dir=$EXPT_OUT/t_${t_clients}
+  results_dir=$EXPT_OUT/t_daylong_${t_clients}
   mkdir -p $results_dir
 
   log_workload_point "txn_${t_clients}"
   python3 workloads/IMDB_extended/run_transactions.py \
     --num-clients $t_clients \
+    --time-scale-factor $time_scale_factor \
+    --num-client-path $num_client_path \
     --output-dir $results_dir \
+    --run-for-s $total_second_phase_time_s \
     --baseline $TRANSACTION_ENGINE \
     &
 

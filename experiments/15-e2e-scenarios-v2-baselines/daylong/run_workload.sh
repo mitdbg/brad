@@ -1,11 +1,15 @@
 #! /bin/bash
 
 EXPT_OUT="expt_out"
-ANALYTICS_ENGINE="redshift"
-TRANSACTION_ENGINE="aurora"
-script_loc=$(cd $(dirname $0) && pwd -P)
+ANALYTICS_ENGINE="tidb"
+TRANSACTION_ENGINE="tidb"
+time_scale_factor=24
+gap_dist_path="workloads/IMDB_20GB/regular_test/gap_time_dist.npy"
+query_frequency_path="workloads/IMDB_100GB/regular_test/query_frequency.npy"
+num_client_path="workloads/IMDB_20GB/regular_test/num_client.pkl"
 total_second_phase_time_s=3600
-source $script_loc/../common.sh
+script_loc=$(cd $(dirname $0) && pwd -P)
+source $script_loc/../common_daylong.sh
 
 # TODO: This executor file should be adapted to run against the baselines too
 # (TiDB / Serverless Redshift + Aurora)
@@ -19,36 +23,28 @@ extract_named_arguments $@
 # Just fo testing.
 echo "Query indexes"
 echo $ra_query_indexes
-echo "rana Query Bank"
+echo "Query Bank"
 # Check file and exit if not exists
 ls $ra_query_bank_file || exit 1
-echo "Seq Query Bank"
-ls $seq_query_bank_file || exit 1
-
-# Start seq runner
-start_seq_olap_runner 1 30 5 "downseq"
-seq_pid=$runner_pid
-# For testing
-echo "Sleep for testing..."
-sleep 100
-graceful_shutdown $seq_pid
-exit 0
+ls $gap_dist_path || exit 1
+ls $query_frequency_path || exit 1
+ls $num_client_path || exit 1
 
 
 log_workload_point "clients_starting"
-start_repeating_olap_runner 8 15 5 $ra_query_indexes "ra_8"
+start_repeating_olap_runner 10 15 5 $ra_query_indexes "ra_daylong"
 rana_pid=$runner_pid
 
 start_txn_runner 4
 txn_pid=$runner_pid
 
 
-start_repeating_olap_runner 1 70 5 "61,71,75" "ra_1_special"
-rana2_pid=$runner_pid
-log_workload_point "clients_started"
+# start_repeating_olap_runner 10 70 5 "61,71,75" "ra_1_special"
+# rana2_pid=$runner_pid
+# log_workload_point "clients_started"
 
 function inner_cancel_experiment() {
-  cancel_experiment $rana_pid $txn_pid $rana2_pid
+  cancel_experiment $rana_pid $txn_pid
 }
 
 trap "inner_cancel_experiment" INT
@@ -77,5 +73,5 @@ log_workload_point "experiment_workload_done"
 
 # Shut down everything now.
 >&2 echo "Experiment done. Shutting down runners..."
-graceful_shutdown $rana_pid $txn_pid $rana2_pid $seq_pid
+graceful_shutdown $rana_pid $txn_pid
 log_workload_point "shutdown_complete"
