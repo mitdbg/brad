@@ -28,11 +28,6 @@ ls $seq_query_bank_file || exit 1
 # Start seq runner
 start_seq_olap_runner 1 30 5 "downseq"
 seq_pid=$runner_pid
-# For testing
-echo "Sleep for testing..."
-sleep 100
-graceful_shutdown $seq_pid
-exit 0
 
 
 log_workload_point "clients_starting"
