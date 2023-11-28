@@ -306,11 +306,11 @@ function extract_named_arguments() {
       schema_name=${phys_arg:14}
     fi
 
-    if [[ $dataset_type =~ --dataset-type=.+ ]]; then
+    if [[ $phys_arg =~ --dataset-type=.+ ]]; then
       dataset_type=${phys_arg:15}
     fi
 
-    if [[ $dataset_type =~ --query-sequence-file=.+ ]]; then
+    if [[ $phys_arg =~ --query-sequence-file=.+ ]]; then
       query_sequence_file=${phys_arg:22}
     fi
   done
