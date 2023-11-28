@@ -1,6 +1,5 @@
 import copy
 import json
-import os.path
 
 from tqdm import tqdm
 import argparse
@@ -243,6 +242,8 @@ def simulate_query_on_larger_scale(
             )
 
     if target_path is not None:
-        with open(target_path + f"_epoch_{target_scale}.json", "w") as f:
+        with open(
+            target_path + f"_epoch_{target_scale}.json", "w", encoding="UTF-8"
+        ) as f:
             json.dump(parsed_queries, f, default=dumper)
     return parsed_queries
