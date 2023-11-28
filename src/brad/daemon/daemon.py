@@ -164,10 +164,11 @@ class BradDaemon:
             # TODO: Actually call into the models. We avoid doing so for now to
             # avoid having to implement model loading, etc.
             std_dataset_path = self._temp_config.std_dataset_path()
-            if std_dataset_path is not None:
+            std_datasets = self._temp_config.std_datasets()
+            if len(std_datasets) > 0:
                 latency_scorer: AnalyticsLatencyScorer = (
                     PrecomputedPredictions.load_from_standard_dataset(
-                        dataset_path=std_dataset_path,
+                        [(dataset["name"], dataset["path"]) for dataset in std_datasets]
                     )
                 )
                 data_access_provider = (

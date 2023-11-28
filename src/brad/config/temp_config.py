@@ -1,6 +1,6 @@
 import pathlib
 import yaml
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from datetime import timedelta
 
 
@@ -41,12 +41,17 @@ class TempConfig:
     def penalty_threshold(self) -> float:
         return self._raw["comparator"]["penalty_threshold"]
 
+    def std_datasets(self) -> List[Dict[str, str]]:
+        if "std_datasets" not in self._raw:
+            return []
+        return self._raw["std_datasets"]
+
+    # The below configs are now deprecated.
+
     def std_dataset_path(self) -> Optional[pathlib.Path]:
         if "std_dataset_path" not in self._raw:
             return None
         return pathlib.Path(self._raw["std_dataset_path"])
-
-    # The below configs are now deprecated.
 
     def aurora_preds_path(self) -> pathlib.Path:
         return pathlib.Path(self._raw["aurora_preds_path"])
