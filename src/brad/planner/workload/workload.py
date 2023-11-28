@@ -85,7 +85,7 @@ class Workload:
         # relative to the query bank used to run a workload against BRAD.) This
         # is used to recover the predicted run times for plotting or analysis
         # purposes later on.
-        self._query_index_mapping: List[int] = []
+        self._query_debug_map: Dict[str, List[Tuple[int, int]]] = {}
 
         # Used for reweighing queries.
         # NOTE: Using these weights directly assumes a static routing decision
@@ -124,7 +124,6 @@ class Workload:
             self._predicted_athena_bytes_accessed = np.append(
                 self._predicted_athena_bytes_accessed, np.zeros((1,)), axis=0
             )
-        self._query_index_mapping.append(-1)
 
         self._analytical_query_arrival_counts = np.append(
             self._analytical_query_arrival_counts, np.zeros((1,)), axis=0
@@ -182,10 +181,12 @@ class Workload:
     ###
 
     def set_predicted_analytical_latencies(
-        self, predicted_latency: npt.NDArray, query_indices: List[int]
+        self,
+        predicted_latency: npt.NDArray,
+        debug_map: Dict[str, List[Tuple[int, int]]],
     ) -> None:
         self._predicted_analytical_latencies = predicted_latency
-        self._query_index_mapping = query_indices
+        self._query_debug_map = debug_map
 
     def get_predicted_analytical_latency(self, query_idx: int, engine: Engine) -> float:
         assert self._predicted_analytical_latencies is not None

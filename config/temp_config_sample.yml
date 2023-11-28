@@ -14,10 +14,16 @@ comparator:
   penalty_threshold: 0.8  # Only used by the `benefit_perf_ceiling` comparator
 
 # Use this instead of the individual paths below.
-std_dataset_path: workloads/IMDB_20GB/regular_test/
+std_datasets:
+  - name: regular
+    path: workloads/IMDB_100GB/regular_test/
+  - name: adhoc
+    path: workloads/IMDB_100GB/adhoc_test/
 
 # The configurations below are deprecated. Do not use them in new experiment
 # code (they don't need to be included either).
+
+std_dataset_path: workloads/IMDB_20GB/regular_test/
 
 aurora_preds_path: workloads/IMDB/OLAP_queries_new/pred_aurora_300.npy
 redshift_preds_path: workloads/IMDB/OLAP_queries_new/pred_redshift_300.npy
