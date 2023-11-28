@@ -2,9 +2,10 @@ import asyncio
 import logging
 import queue
 import os
+import pathlib
 import multiprocessing as mp
 import numpy as np
-from typing import Optional, List, Set
+from typing import Optional, List, Set, Tuple
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -163,18 +164,16 @@ class BradDaemon:
         if self._temp_config is not None:
             # TODO: Actually call into the models. We avoid doing so for now to
             # avoid having to implement model loading, etc.
-            std_dataset_path = self._temp_config.std_dataset_path()
             std_datasets = self._temp_config.std_datasets()
             if len(std_datasets) > 0:
+                datasets: List[Tuple[str, str | pathlib.Path]] = [
+                    (dataset["name"], dataset["path"]) for dataset in std_datasets
+                ]
                 latency_scorer: AnalyticsLatencyScorer = (
-                    PrecomputedPredictions.load_from_standard_dataset(
-                        [(dataset["name"], dataset["path"]) for dataset in std_datasets]
-                    )
+                    PrecomputedPredictions.load_from_standard_dataset(datasets)
                 )
-                data_access_provider = (
-                    PrecomputedDataAccessProvider.load_from_standard_dataset(
-                        dataset_path=std_dataset_path,
-                    )
+                data_access_provider: DataAccessProvider = (
+                    PrecomputedDataAccessProvider.load_from_standard_dataset(datasets)
                 )
             else:
                 latency_scorer = PrecomputedPredictions.load(
