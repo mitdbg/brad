@@ -1,4 +1,7 @@
+import copy
 import json
+import os.path
+
 from tqdm import tqdm
 import argparse
 from workloads.IMDB_extended.gen_telemetry_workload import generate_workload
@@ -8,6 +11,7 @@ from workloads.cross_db_benchmark.benchmark_tools.athena.database_connection imp
 from workloads.cross_db_benchmark.benchmark_tools.redshift.database_connection import (
     RedshiftDatabaseConnection,
 )
+from workloads.cross_db_benchmark.benchmark_tools.utils import dumper
 
 
 def reset_data_athena(conn):
@@ -204,3 +208,41 @@ if __name__ == "__main__":
         args.num_queries_per_template,
         args.save_path,
     )
+
+
+def simulate_query_on_larger_scale(
+    old_parsed_queries, current_scale, target_scale, target_path=None
+):
+    scale_factor = target_scale / current_scale
+    parsed_queries = copy.deepcopy(old_parsed_queries)
+    db_stats = parsed_queries["database_stats"]
+    for column_stats in db_stats["column_stats"]:
+        column_stats["table_size"] = int(column_stats["table_size"] * scale_factor)
+    for table_stats in db_stats["table_stats"]:
+        table_stats["reltuples"] = int(table_stats["reltuples"] * scale_factor)
+    parsed_queries["database_stats"] = db_stats
+    parsed_queries["sql_queries"] = old_parsed_queries["sql_queries"]
+    parsed_queries["run_kwargs"] = old_parsed_queries["run_kwargs"]
+    parsed_queries["skipped"] = old_parsed_queries["skipped"]
+    parsed_queries["parsed_plans"] = []
+
+    for q in parsed_queries["parsed_queries"]:
+        for table_num in q["scan_nodes"]:
+            scan_node_param = q["scan_nodes"][table_num]["plan_parameters"]
+            scan_node_param["est_card"] = int(
+                scan_node_param["est_card"] * scale_factor
+            )
+            scan_node_param["act_card"] = int(
+                scan_node_param["act_card"] * scale_factor
+            )
+            scan_node_param["est_children_card"] = int(
+                scan_node_param["est_children_card"] * scale_factor
+            )
+            scan_node_param["act_children_card"] = int(
+                scan_node_param["act_children_card"] * scale_factor
+            )
+
+    if target_path is not None:
+        with open(target_path + f"_epoch_{target_scale}.json", "w") as f:
+            json.dump(parsed_queries, f, default=dumper)
+    return parsed_queries

@@ -328,6 +328,7 @@ def create_query_dataloader(
     limit_runtime=None,
     loss_class_name=None,
     eval_on_test=False,
+    apply_constraint_on_test=False,
 ):
     """
     Creates dataloaders that batches query featurization to train the model in a distributed fashion.
@@ -376,13 +377,26 @@ def create_query_dataloader(
     if test_workload_run_paths is not None:
         test_loaders = []
         for p in test_workload_run_paths:
-            _, test_dataset, _, test_database_statistics = create_datasets(
-                [p],
-                False,
-                loss_class_name=loss_class_name,
-                val_ratio=0.0,
-                shuffle_before_split=False,
-            )
+            if apply_constraint_on_test:
+                _, test_dataset, _, test_database_statistics = create_datasets(
+                    [p],
+                    False,
+                    loss_class_name=loss_class_name,
+                    val_ratio=0.0,
+                    shuffle_before_split=False,
+                    limit_num_tables=limit_num_tables,
+                    limit_runtime=limit_runtime,
+                    lower_bound_num_tables=lower_bound_num_tables,
+                    lower_bound_runtime=lower_bound_runtime,
+                )
+            else:
+                _, test_dataset, _, test_database_statistics = create_datasets(
+                    [p],
+                    False,
+                    loss_class_name=loss_class_name,
+                    val_ratio=0.0,
+                    shuffle_before_split=False,
+                )
             # test dataset
             test_collate_fn = functools.partial(
                 query_collator,
@@ -443,6 +457,7 @@ def create_dataloader(
     loss_class_name=None,
     is_query=True,
     eval_on_test=False,
+    apply_constraint_on_test=False,
 ):
     if is_query:
         return create_query_dataloader(
@@ -464,6 +479,7 @@ def create_dataloader(
             limit_runtime,
             loss_class_name,
             eval_on_test,
+            apply_constraint_on_test,
         )
     else:
         return create_plan_dataloader(
