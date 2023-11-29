@@ -18,7 +18,7 @@ run_experiment(
 # Essentially the same as above.
 run_command(
   name="brad_100g_vector_debug",
-  run="./run_vector_workload.sh",
+  run="./run_vector_workload_debug.sh",
   options={
     # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
     "config-file": "config/config_specialized.yml",

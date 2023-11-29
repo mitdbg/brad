@@ -24,8 +24,8 @@ extract_named_arguments $@
 
 query_indices="62,64,65,66,69,72,73,74,91,59"
 
-# Should be removed eventually and we should rely on the blueprint.
-start_brad $config_file $planner_config_file
+export BRAD_IGNORE_BLUEPRINT=1
+start_brad_debug $config_file $planner_config_file
 log_workload_point "brad_start_initiated"
 sleep 30
 
