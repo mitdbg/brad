@@ -230,6 +230,35 @@ table_extract_bytes_per_row:
     movie_info: 29.57191
     person_info: 133.458044
 
+  imdb_specialized_100g:
+    telemetry: 20.0  # NOTE: Should impute a value here.
+    embeddings: 17811.219206467
+    homes: 20.55453
+    theatres: 34.102969696969694
+    showings: 46.73179
+    ticket_orders: 36.166392
+    aka_name: 81.795698
+    aka_title: 116.07618847379604
+    cast_info: 34.775924
+    char_name: 71.25104
+    comp_cast_type: 11.25
+    company_name: 78.345222
+    company_type: 23.0
+    complete_cast: 17.87376189982678
+    info_type: 17.061946902654867
+    keyword: 28.256227174480138
+    kind_type: 12.142857142857142
+    link_type: 14.5
+    movie_companies: 42.636226
+    movie_info_idx: 26.61975
+    movie_keyword: 19.482324
+    movie_link: 21.888322165549887
+    name: 78.670034
+    role_type: 13.333333333333334
+    title: 88.5209
+    movie_info: 29.57191
+    person_info: 133.458044
+
 
 ###
 ### [Deprecated]
