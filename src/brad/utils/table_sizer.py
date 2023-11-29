@@ -63,7 +63,7 @@ class TableSizer:
             cursor = conn.cursor_sync()
             await cursor.execute(query)
             row = cursor.fetchone_sync()
-            assert row is not None
+            assert row is not None, table_name
             result = int(row[0])
             if result < 0:
                 logger.warning(
@@ -80,7 +80,7 @@ class TableSizer:
         cursor = conn.cursor_sync()
         await cursor.execute(query)
         row = cursor.fetchone_sync()
-        assert row is not None
+        assert row is not None, table_name
         result = int(row[0])
         return result
 
