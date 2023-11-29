@@ -1,0 +1,2975 @@
+[
+  {
+    "query_index": 0,
+    "selectivity": {
+      "char_name": 0.4166347009033101,
+      "cast_info": 0.4166956642945448
+    },
+    "access_width": {
+      "char_name": 44,
+      "cast_info": 36
+    },
+    "access_methods": {
+      "char_name": [
+        "Parallel Seq Scan"
+      ],
+      "cast_info": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "char_name": 6541871,
+      "cast_info": 75514305
+    },
+    "access_width_pct": {
+      "char_name": 0.6027397260273972,
+      "cast_info": 0.5806451612903226
+    }
+  },
+  {
+    "query_index": 1,
+    "selectivity": {
+      "title": 0.13890042051772092,
+      "char_name": 0.8847768982902802,
+      "cast_info": 0.41700866209635357
+    },
+    "access_width": {
+      "title": 4,
+      "char_name": 4,
+      "cast_info": 16
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "char_name": [
+        "Index Only Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 1755918,
+      "char_name": 13892497,
+      "cast_info": 75571027
+    },
+    "access_width_pct": {
+      "title": 0.03361344537815126,
+      "char_name": 0.0547945205479452,
+      "cast_info": 0.25806451612903225
+    }
+  },
+  {
+    "query_index": 2,
+    "selectivity": {
+      "char_name": 0.4166347009033101,
+      "cast_info": 0.41700866209635357
+    },
+    "access_width": {
+      "char_name": 60,
+      "cast_info": 28
+    },
+    "access_methods": {
+      "char_name": [
+        "Parallel Seq Scan"
+      ],
+      "cast_info": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "char_name": 6541871,
+      "cast_info": 75571027
+    },
+    "access_width_pct": {
+      "char_name": 0.821917808219178,
+      "cast_info": 0.45161290322580644
+    }
+  },
+  {
+    "query_index": 3,
+    "selectivity": {
+      "title": 0.2544098987783153,
+      "char_name": 0.9999233203803793,
+      "cast_info": 0.4165568564297922
+    },
+    "access_width": {
+      "title": 61,
+      "char_name": 45,
+      "cast_info": 24
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "char_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 3216138,
+      "char_name": 15700491,
+      "cast_info": 75489150
+    },
+    "access_width_pct": {
+      "title": 0.5126050420168067,
+      "char_name": 0.6164383561643836,
+      "cast_info": 0.3870967741935484
+    }
+  },
+  {
+    "query_index": 4,
+    "selectivity": {
+      "title": 0.41670134065732395,
+      "char_name": 0.9959424762740583,
+      "cast_info": 0.41700866209635357
+    },
+    "access_width": {
+      "title": 80,
+      "char_name": 49,
+      "cast_info": 32
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "char_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 5267755,
+      "char_name": 15637985,
+      "cast_info": 75571027
+    },
+    "access_width_pct": {
+      "title": 0.6722689075630253,
+      "char_name": 0.6712328767123288,
+      "cast_info": 0.5161290322580645
+    }
+  },
+  {
+    "query_index": 5,
+    "selectivity": {
+      "title": 0.41670134065732395,
+      "cast_info": 0.41601835585712355
+    },
+    "access_width": {
+      "title": 70,
+      "cast_info": 44
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "cast_info": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 5267755,
+      "cast_info": 75391562
+    },
+    "access_width_pct": {
+      "title": 0.5882352941176471,
+      "cast_info": 0.7096774193548387
+    }
+  },
+  {
+    "query_index": 6,
+    "selectivity": {
+      "person_info": 1.0,
+      "name": 0.41665884821346943,
+      "aka_name": 0.4166498214331281
+    },
+    "access_width": {
+      "person_info": 34,
+      "name": 8,
+      "aka_name": 78
+    },
+    "access_methods": {
+      "person_info": [
+        "Index Scan"
+      ],
+      "name": [
+        "Parallel Index Scan"
+      ],
+      "aka_name": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "person_info": 14836054,
+      "name": 8682110,
+      "aka_name": 1877722
+    },
+    "access_width_pct": {
+      "person_info": 0.265625,
+      "name": 0.10256410256410256,
+      "aka_name": 0.8571428571428571
+    }
+  },
+  {
+    "query_index": 7,
+    "selectivity": {
+      "aka_name": 0.4050755372815898,
+      "char_name": 0.9999233203803793,
+      "cast_info": 0.41700866209635357
+    },
+    "access_width": {
+      "aka_name": 34,
+      "char_name": 68,
+      "cast_info": 20
+    },
+    "access_methods": {
+      "aka_name": [
+        "Parallel Seq Scan"
+      ],
+      "char_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "aka_name": 1825560,
+      "char_name": 15700491,
+      "cast_info": 75571027
+    },
+    "access_width_pct": {
+      "aka_name": 0.37362637362637363,
+      "char_name": 0.9315068493150684,
+      "cast_info": 0.3225806451612903
+    }
+  },
+  {
+    "query_index": 8,
+    "selectivity": {
+      "char_name": 0.9999233203803793,
+      "cast_info": 0.4135957764886019
+    },
+    "access_width": {
+      "char_name": 27,
+      "cast_info": 38
+    },
+    "access_methods": {
+      "char_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "char_name": 15700491,
+      "cast_info": 74952538
+    },
+    "access_width_pct": {
+      "char_name": 0.3698630136986301,
+      "cast_info": 0.6129032258064516
+    }
+  },
+  {
+    "query_index": 9,
+    "selectivity": {
+      "char_name": 0.9992367066103373,
+      "cast_info": 0.41463726312717925
+    },
+    "access_width": {
+      "char_name": 16,
+      "cast_info": 28
+    },
+    "access_methods": {
+      "char_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "char_name": 15689710,
+      "cast_info": 75141278
+    },
+    "access_width_pct": {
+      "char_name": 0.2191780821917808,
+      "cast_info": 0.45161290322580644
+    }
+  },
+  {
+    "query_index": 10,
+    "selectivity": {
+      "aka_name": 0.4166498214331281,
+      "cast_info": 1.0,
+      "char_name": 0.4166347009033101
+    },
+    "access_width": {
+      "aka_name": 34,
+      "cast_info": 32,
+      "char_name": 33
+    },
+    "access_methods": {
+      "aka_name": [
+        "Parallel Seq Scan"
+      ],
+      "cast_info": [
+        "Index Scan"
+      ],
+      "char_name": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "aka_name": 1877722,
+      "cast_info": 181370464,
+      "char_name": 6541871
+    },
+    "access_width_pct": {
+      "aka_name": 0.37362637362637363,
+      "cast_info": 0.5161290322580645,
+      "char_name": 0.4520547945205479
+    }
+  },
+  {
+    "query_index": 11,
+    "selectivity": {
+      "cast_info": 1.0,
+      "name": 4.799050555838033e-08,
+      "aka_name": 0.4166498214331281
+    },
+    "access_width": {
+      "cast_info": 38,
+      "name": 44,
+      "aka_name": 49
+    },
+    "access_methods": {
+      "cast_info": [
+        "Index Scan"
+      ],
+      "name": [
+        "Index Scan"
+      ],
+      "aka_name": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "cast_info": 181370464,
+      "name": 1,
+      "aka_name": 1877722
+    },
+    "access_width_pct": {
+      "cast_info": 0.6129032258064516,
+      "name": 0.5641025641025641,
+      "aka_name": 0.5384615384615384
+    }
+  },
+  {
+    "query_index": 12,
+    "selectivity": {
+      "title": 0.4151712288673233,
+      "char_name": 0.9999233203803793,
+      "cast_info": 0.41680755485600735
+    },
+    "access_width": {
+      "title": 46,
+      "char_name": 16,
+      "cast_info": 36
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "char_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 5248412,
+      "char_name": 15700491,
+      "cast_info": 75534582
+    },
+    "access_width_pct": {
+      "title": 0.3865546218487395,
+      "char_name": 0.2191780821917808,
+      "cast_info": 0.5806451612903226
+    }
+  },
+  {
+    "query_index": 13,
+    "selectivity": {
+      "cast_info": 1.0,
+      "char_name": 0.4166347009033101
+    },
+    "access_width": {
+      "cast_info": 58,
+      "char_name": 9
+    },
+    "access_methods": {
+      "cast_info": [
+        "Index Scan"
+      ],
+      "char_name": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "cast_info": 181370464,
+      "char_name": 6541871
+    },
+    "access_width_pct": {
+      "cast_info": 0.9354838709677419,
+      "char_name": 0.1232876712328767
+    }
+  },
+  {
+    "query_index": 14,
+    "selectivity": {
+      "char_name": 0.9927958733117667,
+      "cast_info": 0.20145966498938428
+    },
+    "access_width": {
+      "char_name": 45,
+      "cast_info": 46
+    },
+    "access_methods": {
+      "char_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "char_name": 15588578,
+      "cast_info": 36508867
+    },
+    "access_width_pct": {
+      "char_name": 0.6164383561643836,
+      "cast_info": 0.7419354838709677
+    }
+  },
+  {
+    "query_index": 15,
+    "selectivity": {
+      "aka_name": 0.406186546076244,
+      "char_name": 0.9991790058334467,
+      "cast_info": 0.4155359633492056
+    },
+    "access_width": {
+      "aka_name": 50,
+      "char_name": 21,
+      "cast_info": 24
+    },
+    "access_methods": {
+      "aka_name": [
+        "Parallel Seq Scan"
+      ],
+      "char_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "aka_name": 1830567,
+      "char_name": 15688804,
+      "cast_info": 75304142
+    },
+    "access_width_pct": {
+      "aka_name": 0.5494505494505495,
+      "char_name": 0.2876712328767123,
+      "cast_info": 0.3870967741935484
+    }
+  },
+  {
+    "query_index": 16,
+    "selectivity": {
+      "info_type": 1.0,
+      "title": 1.0,
+      "movie_info_idx": 1.0
+    },
+    "access_width": {
+      "info_type": 18,
+      "title": 63,
+      "movie_info_idx": 29
+    },
+    "access_methods": {
+      "info_type": [
+        "Seq Scan"
+      ],
+      "title": [
+        "Index Scan"
+      ],
+      "movie_info_idx": [
+        "Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "info_type": 113,
+      "title": 12642612,
+      "movie_info_idx": 6900185
+    },
+    "access_width_pct": {
+      "info_type": 1.0,
+      "title": 0.5294117647058824,
+      "movie_info_idx": 0.8787878787878788
+    }
+  },
+  {
+    "query_index": 17,
+    "selectivity": {
+      "title": 0.41670134065732395,
+      "char_name": 0.9950806584894178,
+      "cast_info": 0.41645643800312676
+    },
+    "access_width": {
+      "title": 43,
+      "char_name": 45,
+      "cast_info": 46
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "char_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 5267755,
+      "char_name": 15624453,
+      "cast_info": 75470952
+    },
+    "access_width_pct": {
+      "title": 0.36134453781512604,
+      "char_name": 0.6164383561643836,
+      "cast_info": 0.7419354838709677
+    }
+  },
+  {
+    "query_index": 18,
+    "selectivity": {
+      "person_info": 1.0,
+      "aka_name": 0.9921701283529134,
+      "name": 0.41665884821346943
+    },
+    "access_width": {
+      "person_info": 110,
+      "aka_name": 44,
+      "name": 56
+    },
+    "access_methods": {
+      "person_info": [
+        "Index Scan"
+      ],
+      "aka_name": [
+        "Index Scan"
+      ],
+      "name": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "person_info": 14836054,
+      "aka_name": 4471428,
+      "name": 8682110
+    },
+    "access_width_pct": {
+      "person_info": 0.859375,
+      "aka_name": 0.4835164835164835,
+      "name": 0.717948717948718
+    }
+  },
+  {
+    "query_index": 19,
+    "selectivity": {
+      "title": 0.41670134065732395,
+      "cast_info": 1.0,
+      "char_name": 0.4166347009033101
+    },
+    "access_width": {
+      "title": 60,
+      "cast_info": 20,
+      "char_name": 57
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "cast_info": [
+        "Index Scan"
+      ],
+      "char_name": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 5267755,
+      "cast_info": 181370464,
+      "char_name": 6541871
+    },
+    "access_width_pct": {
+      "title": 0.5042016806722689,
+      "cast_info": 0.3225806451612903,
+      "char_name": 0.7808219178082192
+    }
+  },
+  {
+    "query_index": 20,
+    "selectivity": {
+      "title": 0.413071329804233,
+      "cast_info": 0.4162512528851398
+    },
+    "access_width": {
+      "title": 32,
+      "cast_info": 46
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "cast_info": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 5221866,
+      "cast_info": 75433768
+    },
+    "access_width_pct": {
+      "title": 0.2689075630252101,
+      "cast_info": 0.7419354838709677
+    }
+  },
+  {
+    "query_index": 21,
+    "selectivity": {
+      "aka_name": 0.40389995817352553,
+      "name": 0.41499482542373817,
+      "cast_info": 0.4161986488153848
+    },
+    "access_width": {
+      "aka_name": 82,
+      "name": 20,
+      "cast_info": 42
+    },
+    "access_methods": {
+      "aka_name": [
+        "Parallel Seq Scan"
+      ],
+      "name": [
+        "Parallel Seq Scan"
+      ],
+      "cast_info": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "aka_name": 1820262,
+      "name": 8647436,
+      "cast_info": 75424235
+    },
+    "access_width_pct": {
+      "aka_name": 0.9010989010989011,
+      "name": 0.2564102564102564,
+      "cast_info": 0.6774193548387096
+    }
+  },
+  {
+    "query_index": 22,
+    "selectivity": {
+      "cast_info": 1.0,
+      "char_name": 0.4166347009033101
+    },
+    "access_width": {
+      "cast_info": 24,
+      "char_name": 49
+    },
+    "access_methods": {
+      "cast_info": [
+        "Index Scan"
+      ],
+      "char_name": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "cast_info": 181370464,
+      "char_name": 6541871
+    },
+    "access_width_pct": {
+      "cast_info": 0.3870967741935484,
+      "char_name": 0.6712328767123288
+    }
+  },
+  {
+    "query_index": 23,
+    "selectivity": {
+      "char_name": 0.9999233203803793,
+      "cast_info": 0.415061864549128
+    },
+    "access_width": {
+      "char_name": 24,
+      "cast_info": 24
+    },
+    "access_methods": {
+      "char_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "char_name": 15700491,
+      "cast_info": 75218225
+    },
+    "access_width_pct": {
+      "char_name": 0.3287671232876712,
+      "cast_info": 0.3870967741935484
+    }
+  },
+  {
+    "query_index": 24,
+    "selectivity": {
+      "title": 0.25445150756710405,
+      "char_name": 0.9935035039210734,
+      "cast_info": 0.41700866209635357
+    },
+    "access_width": {
+      "title": 86,
+      "char_name": 33,
+      "cast_info": 42
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "char_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 3216664,
+      "char_name": 15599689,
+      "cast_info": 75571027
+    },
+    "access_width_pct": {
+      "title": 0.7226890756302521,
+      "char_name": 0.4520547945205479,
+      "cast_info": 0.6774193548387096
+    }
+  },
+  {
+    "query_index": 25,
+    "selectivity": {
+      "link_type": 0.9444444444444444,
+      "title": 1.0,
+      "movie_link": 0.5334533453345335
+    },
+    "access_width": {
+      "link_type": 4,
+      "title": 14,
+      "movie_link": 16
+    },
+    "access_methods": {
+      "link_type": [
+        "Seq Scan"
+      ],
+      "title": [
+        "Index Scan"
+      ],
+      "movie_link": [
+        "Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "link_type": 17,
+      "title": 12642612,
+      "movie_link": 16002
+    },
+    "access_width_pct": {
+      "link_type": 0.25,
+      "title": 0.11764705882352941,
+      "movie_link": 0.5714285714285714
+    }
+  },
+  {
+    "query_index": 26,
+    "selectivity": {
+      "cast_info": 4.878002482263164e-06,
+      "aka_name": 0.0022612923160217585
+    },
+    "access_width": {
+      "cast_info": 24,
+      "aka_name": 0
+    },
+    "access_methods": {
+      "cast_info": [
+        "Index Scan"
+      ],
+      "aka_name": [
+        "Bitmap Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "cast_info": 884,
+      "aka_name": 10191
+    },
+    "access_width_pct": {
+      "cast_info": 0.3870967741935484,
+      "aka_name": 0.0
+    }
+  },
+  {
+    "query_index": 27,
+    "selectivity": {
+      "name": 4.799050555838033e-08,
+      "person_info": 0.0013504904739538625
+    },
+    "access_width": {
+      "name": 6,
+      "person_info": 16
+    },
+    "access_methods": {
+      "name": [
+        "Index Scan"
+      ],
+      "person_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "name": 1,
+      "person_info": 20012
+    },
+    "access_width_pct": {
+      "name": 0.07692307692307693,
+      "person_info": 0.125
+    }
+  },
+  {
+    "query_index": 28,
+    "selectivity": {
+      "kind_type": 0.14285714285714285,
+      "title": 0.001520935707301947
+    },
+    "access_width": {
+      "kind_type": 4,
+      "title": 74
+    },
+    "access_methods": {
+      "kind_type": [
+        "Seq Scan"
+      ],
+      "title": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "kind_type": 1,
+      "title": 19227
+    },
+    "access_width_pct": {
+      "kind_type": 0.2857142857142857,
+      "title": 0.6218487394957983
+    }
+  },
+  {
+    "query_index": 29,
+    "selectivity": {
+      "company_type": 0.75,
+      "movie_companies": 0.003491510001996835
+    },
+    "access_width": {
+      "company_type": 25,
+      "movie_companies": 12
+    },
+    "access_methods": {
+      "company_type": [
+        "Seq Scan"
+      ],
+      "movie_companies": [
+        "Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "company_type": 3,
+      "movie_companies": 45549
+    },
+    "access_width_pct": {
+      "company_type": 1.0,
+      "movie_companies": 0.23076923076923078
+    }
+  },
+  {
+    "query_index": 30,
+    "selectivity": {
+      "aka_name": 2.2189111137491498e-07,
+      "cast_info": 1.1146566758112659e-06,
+      "char_name": 1.3883851393113929e-05
+    },
+    "access_width": {
+      "aka_name": 8,
+      "cast_info": 16,
+      "char_name": 4
+    },
+    "access_methods": {
+      "aka_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Index Scan"
+      ],
+      "char_name": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "aka_name": 1,
+      "cast_info": 202,
+      "char_name": 218
+    },
+    "access_width_pct": {
+      "aka_name": 0.08791208791208792,
+      "cast_info": 0.25806451612903225,
+      "char_name": 0.0547945205479452
+    }
+  },
+  {
+    "query_index": 31,
+    "selectivity": {
+      "keyword": 0.5882388015204592,
+      "movie_keyword": 0.0010932529902098398
+    },
+    "access_width": {
+      "keyword": 20,
+      "movie_keyword": 16
+    },
+    "access_methods": {
+      "keyword": [
+        "Parallel Seq Scan"
+      ],
+      "movie_keyword": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "keyword": 78924,
+      "movie_keyword": 24729
+    },
+    "access_width_pct": {
+      "keyword": 0.8,
+      "movie_keyword": 0.8
+    }
+  },
+  {
+    "query_index": 32,
+    "selectivity": {
+      "info_type": 0.07079646017699115,
+      "movie_info_idx": 0.05265214288043419
+    },
+    "access_width": {
+      "info_type": 4,
+      "movie_info_idx": 16
+    },
+    "access_methods": {
+      "info_type": [
+        "Seq Scan"
+      ],
+      "movie_info_idx": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "info_type": 8,
+      "movie_info_idx": 363309
+    },
+    "access_width_pct": {
+      "info_type": 0.2222222222222222,
+      "movie_info_idx": 0.48484848484848486
+    }
+  },
+  {
+    "query_index": 33,
+    "selectivity": {
+      "name": 4.799050555838033e-08,
+      "person_info": 0.0017436524518298971
+    },
+    "access_width": {
+      "name": 6,
+      "person_info": 12
+    },
+    "access_methods": {
+      "name": [
+        "Index Scan"
+      ],
+      "person_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "name": 1,
+      "person_info": 25838
+    },
+    "access_width_pct": {
+      "name": 0.07692307692307693,
+      "person_info": 0.09375
+    }
+  },
+  {
+    "query_index": 34,
+    "selectivity": {
+      "name": 4.799050555838033e-08,
+      "person_info": 0.002132292999476324
+    },
+    "access_width": {
+      "name": 16,
+      "person_info": 114
+    },
+    "access_methods": {
+      "name": [
+        "Index Scan"
+      ],
+      "person_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "name": 1,
+      "person_info": 31597
+    },
+    "access_width_pct": {
+      "name": 0.20512820512820512,
+      "person_info": 0.890625
+    }
+  },
+  {
+    "query_index": 35,
+    "selectivity": {
+      "title": 7.910416119529552e-08,
+      "cast_info": 2.4003745246430728e-06,
+      "char_name": 1.146373050807572e-06
+    },
+    "access_width": {
+      "title": 4,
+      "cast_info": 16,
+      "char_name": 4
+    },
+    "access_methods": {
+      "title": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Index Scan"
+      ],
+      "char_name": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 1,
+      "cast_info": 435,
+      "char_name": 18
+    },
+    "access_width_pct": {
+      "title": 0.03361344537815126,
+      "cast_info": 0.25806451612903225,
+      "char_name": 0.0547945205479452
+    }
+  },
+  {
+    "query_index": 36,
+    "selectivity": {
+      "cast_info": 1.4115305825372367e-05,
+      "aka_name": 0.0016040508441292605
+    },
+    "access_width": {
+      "cast_info": 8,
+      "aka_name": 4
+    },
+    "access_methods": {
+      "cast_info": [
+        "Index Only Scan"
+      ],
+      "aka_name": [
+        "Parallel Bitmap Heap Scan"
+      ]
+    },
+    "est_cardinality": {
+      "cast_info": 2558,
+      "aka_name": 7229
+    },
+    "access_width_pct": {
+      "cast_info": 0.12903225806451613,
+      "aka_name": 0.04395604395604396
+    }
+  },
+  {
+    "query_index": 37,
+    "selectivity": {
+      "person_info": 7.288275593994461e-06,
+      "name": 0.0009272245578934664
+    },
+    "access_width": {
+      "person_info": 12,
+      "name": 38
+    },
+    "access_methods": {
+      "person_info": [
+        "Index Scan"
+      ],
+      "name": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "person_info": 108,
+      "name": 19321
+    },
+    "access_width_pct": {
+      "person_info": 0.09375,
+      "name": 0.48717948717948717
+    }
+  },
+  {
+    "query_index": 38,
+    "selectivity": {
+      "kind_type": 0.14285714285714285,
+      "title": 0.004562886226067036
+    },
+    "access_width": {
+      "kind_type": 4,
+      "title": 58
+    },
+    "access_methods": {
+      "kind_type": [
+        "Seq Scan"
+      ],
+      "title": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "kind_type": 1,
+      "title": 57682
+    },
+    "access_width_pct": {
+      "kind_type": 0.2857142857142857,
+      "title": 0.48739495798319327
+    }
+  },
+  {
+    "query_index": 39,
+    "selectivity": {
+      "link_type": 0.9444444444444444,
+      "movie_link": 1.0,
+      "title": 0.04630014017257364
+    },
+    "access_width": {
+      "link_type": 4,
+      "movie_link": 20,
+      "title": 4
+    },
+    "access_methods": {
+      "link_type": [
+        "Seq Scan"
+      ],
+      "movie_link": [
+        "Index Scan"
+      ],
+      "title": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "link_type": 17,
+      "movie_link": 29997,
+      "title": 585306
+    },
+    "access_width_pct": {
+      "link_type": 0.25,
+      "movie_link": 0.7142857142857143,
+      "title": 0.03361344537815126
+    }
+  },
+  {
+    "query_index": 40,
+    "selectivity": {
+      "keyword": 7.453230975627935e-06,
+      "title": 0.0025736538844889395,
+      "movie_keyword": 0.0010501046656336416
+    },
+    "access_width": {
+      "keyword": 25,
+      "title": 35,
+      "movie_keyword": 16
+    },
+    "access_methods": {
+      "keyword": [
+        "Index Scan"
+      ],
+      "title": [
+        "Bitmap Heap Scan"
+      ],
+      "movie_keyword": [
+        "Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "keyword": 1,
+      "title": 32535,
+      "movie_keyword": 23753
+    },
+    "access_width_pct": {
+      "keyword": 1.0,
+      "title": 0.29411764705882354,
+      "movie_keyword": 0.8
+    }
+  },
+  {
+    "query_index": 41,
+    "selectivity": {
+      "cast_info": 4.706941309242623e-06,
+      "aka_name": 0.0016324529063852496
+    },
+    "access_width": {
+      "cast_info": 24,
+      "aka_name": 0
+    },
+    "access_methods": {
+      "cast_info": [
+        "Index Scan"
+      ],
+      "aka_name": [
+        "Bitmap Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "cast_info": 853,
+      "aka_name": 7357
+    },
+    "access_width_pct": {
+      "cast_info": 0.3870967741935484,
+      "aka_name": 0.0
+    }
+  },
+  {
+    "query_index": 42,
+    "selectivity": {
+      "keyword": 0.18350599985093538,
+      "movie_keyword": 0.004759490089369199
+    },
+    "access_width": {
+      "keyword": 4,
+      "movie_keyword": 8
+    },
+    "access_methods": {
+      "keyword": [
+        "Parallel Index Only Scan"
+      ],
+      "movie_keyword": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "keyword": 24621,
+      "movie_keyword": 107658
+    },
+    "access_width_pct": {
+      "keyword": 0.16,
+      "movie_keyword": 0.4
+    }
+  },
+  {
+    "query_index": 43,
+    "selectivity": {
+      "cast_info": 1.5914207193265797e-05,
+      "char_name": 1.3883851393113929e-05
+    },
+    "access_width": {
+      "cast_info": 8,
+      "char_name": 4
+    },
+    "access_methods": {
+      "cast_info": [
+        "Index Scan"
+      ],
+      "char_name": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "cast_info": 2884,
+      "char_name": 218
+    },
+    "access_width_pct": {
+      "cast_info": 0.12903225806451613,
+      "char_name": 0.0547945205479452
+    }
+  },
+  {
+    "query_index": 44,
+    "selectivity": {
+      "keyword": 1.0,
+      "movie_keyword": 0.0008271569188736342
+    },
+    "access_width": {
+      "keyword": 9,
+      "movie_keyword": 8
+    },
+    "access_methods": {
+      "keyword": [
+        "Seq Scan"
+      ],
+      "movie_keyword": [
+        "Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "keyword": 134170,
+      "movie_keyword": 18710
+    },
+    "access_width_pct": {
+      "keyword": 0.36,
+      "movie_keyword": 0.4
+    }
+  },
+  {
+    "query_index": 45,
+    "selectivity": {
+      "link_type": 0.9444444444444444,
+      "movie_link": 1.0,
+      "title": 0.04630014017257364
+    },
+    "access_width": {
+      "link_type": 4,
+      "movie_link": 16,
+      "title": 4
+    },
+    "access_methods": {
+      "link_type": [
+        "Seq Scan"
+      ],
+      "movie_link": [
+        "Index Scan"
+      ],
+      "title": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "link_type": 17,
+      "movie_link": 29997,
+      "title": 585306
+    },
+    "access_width_pct": {
+      "link_type": 0.25,
+      "movie_link": 0.5714285714285714,
+      "title": 0.03361344537815126
+    }
+  },
+  {
+    "query_index": 46,
+    "selectivity": {
+      "link_type": 0.9444444444444444,
+      "movie_link": 0.8205153848718205,
+      "title": 0.13890042051772092
+    },
+    "access_width": {
+      "link_type": 4,
+      "movie_link": 24,
+      "title": 4
+    },
+    "access_methods": {
+      "link_type": [
+        "Seq Scan"
+      ],
+      "movie_link": [
+        "Index Scan"
+      ],
+      "title": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "link_type": 17,
+      "movie_link": 24613,
+      "title": 1755918
+    },
+    "access_width_pct": {
+      "link_type": 0.25,
+      "movie_link": 0.8571428571428571,
+      "title": 0.03361344537815126
+    }
+  },
+  {
+    "query_index": 47,
+    "selectivity": {
+      "info_type": 0.672566371681416,
+      "movie_info_idx": 0.002112989887937625
+    },
+    "access_width": {
+      "info_type": 4,
+      "movie_info_idx": 8
+    },
+    "access_methods": {
+      "info_type": [
+        "Seq Scan"
+      ],
+      "movie_info_idx": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "info_type": 76,
+      "movie_info_idx": 14580
+    },
+    "access_width_pct": {
+      "info_type": 0.2222222222222222,
+      "movie_info_idx": 0.24242424242424243
+    }
+  },
+  {
+    "query_index": 48,
+    "selectivity": {
+      "char_name": 0.0008486981819478725,
+      "cast_info": 2.4831460599755923e-07,
+      "title": 0.00023035131740070053
+    },
+    "access_width": {
+      "char_name": 41,
+      "cast_info": 58,
+      "title": 71
+    },
+    "access_methods": {
+      "char_name": [
+        "Parallel Index Scan"
+      ],
+      "cast_info": [
+        "Index Scan"
+      ],
+      "title": [
+        "Parallel Bitmap Heap Scan"
+      ]
+    },
+    "est_cardinality": {
+      "char_name": 13326,
+      "cast_info": 45,
+      "title": 2912
+    },
+    "access_width_pct": {
+      "char_name": 0.5616438356164384,
+      "cast_info": 0.9354838709677419,
+      "title": 0.5966386554621849
+    }
+  },
+  {
+    "query_index": 49,
+    "selectivity": {
+      "person_info": 7.288275593994461e-06,
+      "name": 0.0007541228043443885
+    },
+    "access_width": {
+      "person_info": 16,
+      "name": 4
+    },
+    "access_methods": {
+      "person_info": [
+        "Index Scan"
+      ],
+      "name": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "person_info": 108,
+      "name": 15714
+    },
+    "access_width_pct": {
+      "person_info": 0.125,
+      "name": 0.05128205128205128
+    }
+  },
+  {
+    "query_index": 50,
+    "selectivity": {
+      "company_type": 0.75,
+      "company_name": 0.37436307697545074,
+      "movie_companies": 0.0032495901889097855
+    },
+    "access_width": {
+      "company_type": 25,
+      "company_name": 4,
+      "movie_companies": 16
+    },
+    "access_methods": {
+      "company_type": [
+        "Seq Scan"
+      ],
+      "company_name": [
+        "Parallel Seq Scan"
+      ],
+      "movie_companies": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "company_type": 3,
+      "company_name": 439871,
+      "movie_companies": 42393
+    },
+    "access_width_pct": {
+      "company_type": 1.0,
+      "company_name": 0.05063291139240506,
+      "movie_companies": 0.3076923076923077
+    }
+  },
+  {
+    "query_index": 51,
+    "selectivity": {
+      "keyword": 0.35763583513453084,
+      "movie_keyword": 0.021508069311417286
+    },
+    "access_width": {
+      "keyword": 4,
+      "movie_keyword": 12
+    },
+    "access_methods": {
+      "keyword": [
+        "Parallel Seq Scan"
+      ],
+      "movie_keyword": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "keyword": 47984,
+      "movie_keyword": 486505
+    },
+    "access_width_pct": {
+      "keyword": 0.16,
+      "movie_keyword": 0.6
+    }
+  },
+  {
+    "query_index": 52,
+    "selectivity": {
+      "title": 0.41670134065732395,
+      "keyword": 0.18654691808899157,
+      "movie_keyword": 0.1797872646128477
+    },
+    "access_width": {
+      "title": 4,
+      "keyword": 4,
+      "movie_keyword": 16
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "keyword": [
+        "Parallel Index Only Scan"
+      ],
+      "movie_keyword": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 5267755,
+      "keyword": 25029,
+      "movie_keyword": 4066725
+    },
+    "access_width_pct": {
+      "title": 0.03361344537815126,
+      "keyword": 0.16,
+      "movie_keyword": 0.8
+    }
+  },
+  {
+    "query_index": 53,
+    "selectivity": {
+      "aka_name": 0.9999593939266184,
+      "name": 0.1364792869378722,
+      "person_info": 0.3822545335773556
+    },
+    "access_width": {
+      "aka_name": 8,
+      "name": 4,
+      "person_info": 8
+    },
+    "access_methods": {
+      "aka_name": [
+        "Index Only Scan"
+      ],
+      "name": [
+        "Index Only Scan"
+      ],
+      "person_info": [
+        "Parallel Index Only Scan"
+      ]
+    },
+    "est_cardinality": {
+      "aka_name": 4506532,
+      "name": 2843881,
+      "person_info": 5664370
+    },
+    "access_width_pct": {
+      "aka_name": 0.08791208791208792,
+      "name": 0.05128205128205128,
+      "person_info": 0.0625
+    }
+  },
+  {
+    "query_index": 54,
+    "selectivity": {
+      "title": 0.13890042051772092,
+      "movie_info": 0.0635184945523372
+    },
+    "access_width": {
+      "title": 4,
+      "movie_info": 20
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "movie_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 1755918,
+      "movie_info": 4711713
+    },
+    "access_width_pct": {
+      "title": 0.03361344537815126,
+      "movie_info": 0.24691358024691357
+    }
+  },
+  {
+    "query_index": 55,
+    "selectivity": {
+      "movie_info_idx": 0.4166672584390976,
+      "title": 0.10246686326687529
+    },
+    "access_width": {
+      "movie_info_idx": 16,
+      "title": 12
+    },
+    "access_methods": {
+      "movie_info_idx": [
+        "Parallel Seq Scan"
+      ],
+      "title": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "movie_info_idx": 2875077,
+      "title": 1295341
+    },
+    "access_width_pct": {
+      "movie_info_idx": 0.48484848484848486,
+      "title": 0.10084033613445378
+    }
+  },
+  {
+    "query_index": 56,
+    "selectivity": {
+      "movie_info_idx": 0.4166672584390976,
+      "title": 0.41670134065732395
+    },
+    "access_width": {
+      "movie_info_idx": 16,
+      "title": 62
+    },
+    "access_methods": {
+      "movie_info_idx": [
+        "Parallel Seq Scan"
+      ],
+      "title": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "movie_info_idx": 2875077,
+      "title": 5267755
+    },
+    "access_width_pct": {
+      "movie_info_idx": 0.48484848484848486,
+      "title": 0.5210084033613446
+    }
+  },
+  {
+    "query_index": 57,
+    "selectivity": {
+      "title": 0.41670134065732395,
+      "keyword": 0.5828873816799582,
+      "movie_keyword": 0.4166667919264887
+    },
+    "access_width": {
+      "title": 41,
+      "keyword": 4,
+      "movie_keyword": 20
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "keyword": [
+        "Parallel Seq Scan"
+      ],
+      "movie_keyword": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 5267755,
+      "keyword": 78206,
+      "movie_keyword": 9424857
+    },
+    "access_width_pct": {
+      "title": 0.3445378151260504,
+      "keyword": 0.16,
+      "movie_keyword": 1.0
+    }
+  },
+  {
+    "query_index": 58,
+    "selectivity": {
+      "company_type": 0.75,
+      "movie_companies": 0.20518579188687106
+    },
+    "access_width": {
+      "company_type": 25,
+      "movie_companies": 40
+    },
+    "access_methods": {
+      "company_type": [
+        "Seq Scan"
+      ],
+      "movie_companies": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "company_type": 3,
+      "movie_companies": 2676781
+    },
+    "access_width_pct": {
+      "company_type": 1.0,
+      "movie_companies": 0.7692307692307693
+    }
+  },
+  {
+    "query_index": 59,
+    "selectivity": {
+      "char_name": 0.021805543923761096,
+      "cast_info": 2.4831460599755923e-07,
+      "title": 0.026214802603476153
+    },
+    "access_width": {
+      "char_name": 4,
+      "cast_info": 16,
+      "title": 4
+    },
+    "access_methods": {
+      "char_name": [
+        "Parallel Index Only Scan"
+      ],
+      "cast_info": [
+        "Index Scan"
+      ],
+      "title": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "char_name": 342384,
+      "cast_info": 45,
+      "title": 331396
+    },
+    "access_width_pct": {
+      "char_name": 0.0547945205479452,
+      "cast_info": 0.25806451612903225,
+      "title": 0.03361344537815126
+    }
+  },
+  {
+    "query_index": 60,
+    "selectivity": {
+      "name": 0.41311383755837744,
+      "person_info": 0.4171653061885558
+    },
+    "access_width": {
+      "name": 59,
+      "person_info": 26
+    },
+    "access_methods": {
+      "name": [
+        "Parallel Seq Scan"
+      ],
+      "person_info": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "name": 8608241,
+      "person_info": 6181689
+    },
+    "access_width_pct": {
+      "name": 0.7564102564102564,
+      "person_info": 0.203125
+    }
+  },
+  {
+    "query_index": 61,
+    "selectivity": {
+      "keyword": 0.19751062085414026,
+      "title": 0.004573565287828401,
+      "movie_keyword": 0.056346583612036434
+    },
+    "access_width": {
+      "keyword": 4,
+      "title": 20,
+      "movie_keyword": 16
+    },
+    "access_methods": {
+      "keyword": [
+        "Parallel Index Only Scan"
+      ],
+      "title": [
+        "Parallel Index Scan"
+      ],
+      "movie_keyword": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "keyword": 26500,
+      "title": 57817,
+      "movie_keyword": 1274540
+    },
+    "access_width_pct": {
+      "keyword": 0.16,
+      "title": 0.16806722689075632,
+      "movie_keyword": 0.8
+    }
+  },
+  {
+    "query_index": 62,
+    "selectivity": {
+      "info_type": 1.0,
+      "title": 0.25444320163017853,
+      "movie_info_idx": 0.41360443756861237
+    },
+    "access_width": {
+      "info_type": 18,
+      "title": 47,
+      "movie_info_idx": 24
+    },
+    "access_methods": {
+      "info_type": [
+        "Seq Scan"
+      ],
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "movie_info_idx": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "info_type": 113,
+      "title": 3216559,
+      "movie_info_idx": 2853943
+    },
+    "access_width_pct": {
+      "info_type": 1.0,
+      "title": 0.3949579831932773,
+      "movie_info_idx": 0.7272727272727273
+    }
+  },
+  {
+    "query_index": 63,
+    "selectivity": {
+      "company_name": 0.41521721553892177,
+      "movie_companies": 0.4134239433926034
+    },
+    "access_width": {
+      "company_name": 4,
+      "movie_companies": 8
+    },
+    "access_methods": {
+      "company_name": [
+        "Parallel Seq Scan"
+      ],
+      "movie_companies": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "company_name": 487874,
+      "movie_companies": 5393382
+    },
+    "access_width_pct": {
+      "company_name": 0.05063291139240506,
+      "movie_companies": 0.15384615384615385
+    }
+  },
+  {
+    "query_index": 64,
+    "selectivity": {
+      "movie_keyword": 6.733083845240753e-05,
+      "keyword": 0.0022359692926883805
+    },
+    "access_width": {
+      "movie_keyword": 20,
+      "keyword": 4
+    },
+    "access_methods": {
+      "movie_keyword": [
+        "Bitmap Heap Scan"
+      ],
+      "keyword": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "movie_keyword": 1523,
+      "keyword": 300
+    },
+    "access_width_pct": {
+      "movie_keyword": 1.0,
+      "keyword": 0.16
+    }
+  },
+  {
+    "query_index": 65,
+    "selectivity": {
+      "keyword": 7.453230975627935e-06,
+      "movie_keyword": 5.349331223073744e-06,
+      "title": 0.00016200532212796523
+    },
+    "access_width": {
+      "keyword": 4,
+      "movie_keyword": 16,
+      "title": 4
+    },
+    "access_methods": {
+      "keyword": [
+        "Index Only Scan"
+      ],
+      "movie_keyword": [
+        "Index Scan"
+      ],
+      "title": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "keyword": 1,
+      "movie_keyword": 121,
+      "title": 2048
+    },
+    "access_width_pct": {
+      "keyword": 0.16,
+      "movie_keyword": 0.8,
+      "title": 0.03361344537815126
+    }
+  },
+  {
+    "query_index": 66,
+    "selectivity": {
+      "title": 0.41670134065732395,
+      "company_type": 1.0,
+      "movie_companies": 0.416057695882419
+    },
+    "access_width": {
+      "title": 61,
+      "company_type": 4,
+      "movie_companies": 52
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "company_type": [
+        "Seq Scan"
+      ],
+      "movie_companies": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 5267755,
+      "company_type": 4,
+      "movie_companies": 5427741
+    },
+    "access_width_pct": {
+      "title": 0.5126050420168067,
+      "company_type": 0.16,
+      "movie_companies": 1.0
+    }
+  },
+  {
+    "query_index": 67,
+    "selectivity": {
+      "title": 0.13890042051772092,
+      "movie_keyword": 0.3592987513069389
+    },
+    "access_width": {
+      "title": 4,
+      "movie_keyword": 8
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "movie_keyword": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 1755918,
+      "movie_keyword": 8127212
+    },
+    "access_width_pct": {
+      "title": 0.03361344537815126,
+      "movie_keyword": 0.4
+    }
+  },
+  {
+    "query_index": 68,
+    "selectivity": {
+      "info_type": 1.0,
+      "movie_info_idx": 0.4166672584390976,
+      "title": 0.254452298608716
+    },
+    "access_width": {
+      "info_type": 18,
+      "movie_info_idx": 20,
+      "title": 54
+    },
+    "access_methods": {
+      "info_type": [
+        "Seq Scan"
+      ],
+      "movie_info_idx": [
+        "Parallel Seq Scan"
+      ],
+      "title": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "info_type": 113,
+      "movie_info_idx": 2875077,
+      "title": 3216674
+    },
+    "access_width_pct": {
+      "info_type": 1.0,
+      "movie_info_idx": 0.6060606060606061,
+      "title": 0.453781512605042
+    }
+  },
+  {
+    "query_index": 69,
+    "selectivity": {
+      "keyword": 0.5882388015204592,
+      "title": 0.41670134065732395,
+      "movie_keyword": 0.4166667919264887
+    },
+    "access_width": {
+      "keyword": 9,
+      "title": 66,
+      "movie_keyword": 16
+    },
+    "access_methods": {
+      "keyword": [
+        "Parallel Seq Scan"
+      ],
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "movie_keyword": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "keyword": 78924,
+      "title": 5267755,
+      "movie_keyword": 9424857
+    },
+    "access_width_pct": {
+      "keyword": 0.36,
+      "title": 0.5546218487394958,
+      "movie_keyword": 0.8
+    }
+  },
+  {
+    "query_index": 70,
+    "selectivity": {
+      "name": 0.41665884821346943,
+      "person_info": 0.0795589513521101
+    },
+    "access_width": {
+      "name": 8,
+      "person_info": 12
+    },
+    "access_methods": {
+      "name": [
+        "Parallel Seq Scan"
+      ],
+      "person_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "name": 8682110,
+      "person_info": 1178930
+    },
+    "access_width_pct": {
+      "name": 0.10256410256410256,
+      "person_info": 0.09375
+    }
+  },
+  {
+    "query_index": 71,
+    "selectivity": {
+      "company_type": 1.0,
+      "company_name": 8.51074694570569e-07,
+      "movie_companies": 0.0010846531543668404
+    },
+    "access_width": {
+      "company_type": 25,
+      "company_name": 4,
+      "movie_companies": 16
+    },
+    "access_methods": {
+      "company_type": [
+        "Seq Scan"
+      ],
+      "company_name": [
+        "Index Only Scan"
+      ],
+      "movie_companies": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "company_type": 4,
+      "company_name": 1,
+      "movie_companies": 14150
+    },
+    "access_width_pct": {
+      "company_type": 1.0,
+      "company_name": 0.05063291139240506,
+      "movie_companies": 0.3076923076923077
+    }
+  },
+  {
+    "query_index": 72,
+    "selectivity": {
+      "aka_name": 0.948968816532663,
+      "cast_info": 0.06599359061375204
+    },
+    "access_width": {
+      "aka_name": 12,
+      "cast_info": 8
+    },
+    "access_methods": {
+      "aka_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Only Scan"
+      ]
+    },
+    "est_cardinality": {
+      "aka_name": 4276732,
+      "cast_info": 11959472
+    },
+    "access_width_pct": {
+      "aka_name": 0.13186813186813187,
+      "cast_info": 0.12903225806451613
+    }
+  },
+  {
+    "query_index": 73,
+    "selectivity": {
+      "title": 0.13890042051772092,
+      "movie_info_idx": 0.4166672584390976
+    },
+    "access_width": {
+      "title": 75,
+      "movie_info_idx": 20
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "movie_info_idx": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 1755918,
+      "movie_info_idx": 2875077
+    },
+    "access_width_pct": {
+      "title": 0.6302521008403361,
+      "movie_info_idx": 0.6060606060606061
+    }
+  },
+  {
+    "query_index": 74,
+    "selectivity": {
+      "title": 0.25444272700521137,
+      "movie_info_idx": 0.4166672584390976
+    },
+    "access_width": {
+      "title": 38,
+      "movie_info_idx": 20
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "movie_info_idx": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 3216553,
+      "movie_info_idx": 2875077
+    },
+    "access_width_pct": {
+      "title": 0.31932773109243695,
+      "movie_info_idx": 0.6060606060606061
+    }
+  },
+  {
+    "query_index": 75,
+    "selectivity": {
+      "movie_info": 1.8064509171108649e-06,
+      "title": 0.004932777283816238
+    },
+    "access_width": {
+      "movie_info": 8,
+      "title": 22
+    },
+    "access_methods": {
+      "movie_info": [
+        "Index Only Scan"
+      ],
+      "title": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "movie_info": 134,
+      "title": 62358
+    },
+    "access_width_pct": {
+      "movie_info": 0.09876543209876543,
+      "title": 0.18487394957983194
+    }
+  },
+  {
+    "query_index": 76,
+    "selectivity": {
+      "company_name": 0.07758396915705307,
+      "movie_companies": 0.03662095664875137
+    },
+    "access_width": {
+      "company_name": 4,
+      "movie_companies": 24
+    },
+    "access_methods": {
+      "company_name": [
+        "Parallel Index Only Scan"
+      ],
+      "movie_companies": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "company_name": 91160,
+      "movie_companies": 477744
+    },
+    "access_width_pct": {
+      "company_name": 0.05063291139240506,
+      "movie_companies": 0.46153846153846156
+    }
+  },
+  {
+    "query_index": 77,
+    "selectivity": {
+      "company_type": 0.75,
+      "movie_companies": 0.01590300824528032
+    },
+    "access_width": {
+      "company_type": 4,
+      "movie_companies": 12
+    },
+    "access_methods": {
+      "company_type": [
+        "Seq Scan"
+      ],
+      "movie_companies": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "company_type": 3,
+      "movie_companies": 207465
+    },
+    "access_width_pct": {
+      "company_type": 0.16,
+      "movie_companies": 0.23076923076923078
+    }
+  },
+  {
+    "query_index": 78,
+    "selectivity": {
+      "title": 7.910416119529552e-08,
+      "movie_info_idx": 0.13865300517740492,
+      "movie_info": 0.0005441326743831779
+    },
+    "access_width": {
+      "title": 52,
+      "movie_info_idx": 13,
+      "movie_info": 62
+    },
+    "access_methods": {
+      "title": [
+        "Index Scan"
+      ],
+      "movie_info_idx": [
+        "Parallel Seq Scan"
+      ],
+      "movie_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 1,
+      "movie_info_idx": 956730,
+      "movie_info": 40363
+    },
+    "access_width_pct": {
+      "title": 0.4369747899159664,
+      "movie_info_idx": 0.3939393939393939,
+      "movie_info": 0.7654320987654321
+    }
+  },
+  {
+    "query_index": 79,
+    "selectivity": {
+      "char_name": 6.368739171153179e-08,
+      "cast_info": 0.00021744634142088488
+    },
+    "access_width": {
+      "char_name": 53,
+      "cast_info": 28
+    },
+    "access_methods": {
+      "char_name": [
+        "Index Scan"
+      ],
+      "cast_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "char_name": 1,
+      "cast_info": 39406
+    },
+    "access_width_pct": {
+      "char_name": 0.726027397260274,
+      "cast_info": 0.45161290322580644
+    }
+  },
+  {
+    "query_index": 80,
+    "selectivity": {
+      "info_type": 0.7787610619469026,
+      "movie_info_idx": 0.06829406500559769
+    },
+    "access_width": {
+      "info_type": 4,
+      "movie_info_idx": 8
+    },
+    "access_methods": {
+      "info_type": [
+        "Seq Scan"
+      ],
+      "movie_info_idx": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "info_type": 88,
+      "movie_info_idx": 471241
+    },
+    "access_width_pct": {
+      "info_type": 0.2222222222222222,
+      "movie_info_idx": 0.24242424242424243
+    }
+  },
+  {
+    "query_index": 81,
+    "selectivity": {
+      "title": 0.41670134065732395,
+      "cast_info": 0.41700866209635357
+    },
+    "access_width": {
+      "title": 46,
+      "cast_info": 20
+    },
+    "access_methods": {
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "cast_info": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 5267755,
+      "cast_info": 75571027
+    },
+    "access_width_pct": {
+      "title": 0.3865546218487395,
+      "cast_info": 0.3225806451612903
+    }
+  },
+  {
+    "query_index": 82,
+    "selectivity": {
+      "movie_companies": 0.4160046513606648
+    },
+    "access_width": {
+      "movie_companies": 40
+    },
+    "access_methods": {
+      "movie_companies": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "movie_companies": 5427049
+    },
+    "access_width_pct": {
+      "movie_companies": 0.7692307692307693
+    }
+  },
+  {
+    "query_index": 83,
+    "selectivity": {
+      "info_type": 1.0,
+      "title": 1.0,
+      "movie_info_idx": 1.0
+    },
+    "access_width": {
+      "info_type": 4,
+      "title": 43,
+      "movie_info_idx": 24
+    },
+    "access_methods": {
+      "info_type": [
+        "Seq Scan"
+      ],
+      "title": [
+        "Index Scan"
+      ],
+      "movie_info_idx": [
+        "Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "info_type": 113,
+      "title": 12642612,
+      "movie_info_idx": 6900185
+    },
+    "access_width_pct": {
+      "info_type": 0.2222222222222222,
+      "title": 0.36134453781512604,
+      "movie_info_idx": 0.7272727272727273
+    }
+  },
+  {
+    "query_index": 84,
+    "selectivity": {
+      "aka_name": 0.14395318985114436,
+      "name": 0.011019195962270825
+    },
+    "access_width": {
+      "aka_name": 8,
+      "name": 6
+    },
+    "access_methods": {
+      "aka_name": [
+        "Index Only Scan"
+      ],
+      "name": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "aka_name": 648756,
+      "name": 229612
+    },
+    "access_width_pct": {
+      "aka_name": 0.08791208791208792,
+      "name": 0.07692307692307693
+    }
+  },
+  {
+    "query_index": 85,
+    "selectivity": {
+      "kind_type": 1.0,
+      "title": 0.41670134065732395
+    },
+    "access_width": {
+      "kind_type": 4,
+      "title": 49
+    },
+    "access_methods": {
+      "kind_type": [
+        "Seq Scan"
+      ],
+      "title": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "kind_type": 7,
+      "title": 5267755
+    },
+    "access_width_pct": {
+      "kind_type": 0.2857142857142857,
+      "title": 0.4117647058823529
+    }
+  },
+  {
+    "query_index": 86,
+    "selectivity": {
+      "title": 7.910416119529552e-08,
+      "movie_companies": 0.002607766806470665
+    },
+    "access_width": {
+      "title": 12,
+      "movie_companies": 16
+    },
+    "access_methods": {
+      "title": [
+        "Index Scan"
+      ],
+      "movie_companies": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 1,
+      "movie_companies": 34020
+    },
+    "access_width_pct": {
+      "title": 0.10084033613445378,
+      "movie_companies": 0.3076923076923077
+    }
+  },
+  {
+    "query_index": 87,
+    "selectivity": {
+      "company_name": 8.51074694570569e-07,
+      "movie_companies": 0.0006573074769396223
+    },
+    "access_width": {
+      "company_name": 4,
+      "movie_companies": 8
+    },
+    "access_methods": {
+      "company_name": [
+        "Index Only Scan"
+      ],
+      "movie_companies": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "company_name": 1,
+      "movie_companies": 8575
+    },
+    "access_width_pct": {
+      "company_name": 0.05063291139240506,
+      "movie_companies": 0.15384615384615385
+    }
+  },
+  {
+    "query_index": 88,
+    "selectivity": {
+      "company_type": 1.0,
+      "movie_companies": 0.031055344523018984
+    },
+    "access_width": {
+      "company_type": 4,
+      "movie_companies": 8
+    },
+    "access_methods": {
+      "company_type": [
+        "Seq Scan"
+      ],
+      "movie_companies": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "company_type": 4,
+      "movie_companies": 405137
+    },
+    "access_width_pct": {
+      "company_type": 0.16,
+      "movie_companies": 0.15384615384615385
+    }
+  },
+  {
+    "query_index": 89,
+    "selectivity": {
+      "keyword": 0.15294775285086085,
+      "movie_keyword": 0.03420150179158386
+    },
+    "access_width": {
+      "keyword": 4,
+      "movie_keyword": 12
+    },
+    "access_methods": {
+      "keyword": [
+        "Parallel Index Only Scan"
+      ],
+      "movie_keyword": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "keyword": 20521,
+      "movie_keyword": 773626
+    },
+    "access_width_pct": {
+      "keyword": 0.16,
+      "movie_keyword": 0.6
+    }
+  },
+  {
+    "query_index": 90,
+    "selectivity": {
+      "name": 4.799050555838033e-08,
+      "person_info": 0.0034964827321855648
+    },
+    "access_width": {
+      "name": 4,
+      "person_info": 16
+    },
+    "access_methods": {
+      "name": [
+        "Index Scan"
+      ],
+      "person_info": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "name": 1,
+      "person_info": 51812
+    },
+    "access_width_pct": {
+      "name": 0.05128205128205128,
+      "person_info": 0.125
+    }
+  },
+  {
+    "query_index": 91,
+    "selectivity": {
+      "company_name": 0.41666659574377546,
+      "title": 0.41670134065732395,
+      "movie_companies": 0.4137257299274969
+    },
+    "access_width": {
+      "company_name": 69,
+      "title": 66,
+      "movie_companies": 16
+    },
+    "access_methods": {
+      "company_name": [
+        "Parallel Seq Scan"
+      ],
+      "title": [
+        "Parallel Seq Scan"
+      ],
+      "movie_companies": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "company_name": 489577,
+      "title": 5267755,
+      "movie_companies": 5397319
+    },
+    "access_width_pct": {
+      "company_name": 0.8734177215189873,
+      "title": 0.5546218487394958,
+      "movie_companies": 0.3076923076923077
+    }
+  },
+  {
+    "query_index": 92,
+    "selectivity": {
+      "movie_info_idx": 0.031159209730188004,
+      "info_type": 0.008849557522123894
+    },
+    "access_width": {
+      "movie_info_idx": 20,
+      "info_type": 4
+    },
+    "access_methods": {
+      "movie_info_idx": [
+        "Index Scan"
+      ],
+      "info_type": [
+        "Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "movie_info_idx": 215004,
+      "info_type": 1
+    },
+    "access_width_pct": {
+      "movie_info_idx": 0.6060606060606061,
+      "info_type": 0.2222222222222222
+    }
+  },
+  {
+    "query_index": 93,
+    "selectivity": {
+      "movie_companies": 1.3337784371719451e-05,
+      "company_name": 0.002537904739209437
+    },
+    "access_width": {
+      "movie_companies": 44,
+      "company_name": 0
+    },
+    "access_methods": {
+      "movie_companies": [
+        "Index Scan"
+      ],
+      "company_name": [
+        "Bitmap Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "movie_companies": 174,
+      "company_name": 2982
+    },
+    "access_width_pct": {
+      "movie_companies": 0.8461538461538461,
+      "company_name": 0.0
+    }
+  },
+  {
+    "query_index": 94,
+    "selectivity": {
+      "keyword": 0.43990459864351195,
+      "movie_keyword": 0.026499658482779354
+    },
+    "access_width": {
+      "keyword": 4,
+      "movie_keyword": 16
+    },
+    "access_methods": {
+      "keyword": [
+        "Parallel Seq Scan"
+      ],
+      "movie_keyword": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "keyword": 59022,
+      "movie_keyword": 599413
+    },
+    "access_width_pct": {
+      "keyword": 0.16,
+      "movie_keyword": 0.8
+    }
+  },
+  {
+    "query_index": 95,
+    "selectivity": {
+      "company_name": 0.41666659574377546,
+      "movie_companies": 0.0021362684635370653
+    },
+    "access_width": {
+      "company_name": 61,
+      "movie_companies": 20
+    },
+    "access_methods": {
+      "company_name": [
+        "Parallel Seq Scan"
+      ],
+      "movie_companies": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "company_name": 489577,
+      "movie_companies": 27869
+    },
+    "access_width_pct": {
+      "company_name": 0.7721518987341772,
+      "movie_companies": 0.38461538461538464
+    }
+  },
+  {
+    "query_index": 96,
+    "selectivity": {
+      "info_type": 0.9911504424778761,
+      "movie_info_idx": 0.012646345926009123
+    },
+    "access_width": {
+      "info_type": 4,
+      "movie_info_idx": 16
+    },
+    "access_methods": {
+      "info_type": [
+        "Seq Scan"
+      ],
+      "movie_info_idx": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "info_type": 112,
+      "movie_info_idx": 87262
+    },
+    "access_width_pct": {
+      "info_type": 0.2222222222222222,
+      "movie_info_idx": 0.48484848484848486
+    }
+  },
+  {
+    "query_index": 97,
+    "selectivity": {
+      "title": 7.910416119529552e-08,
+      "movie_info_idx": 0.009251214643106877
+    },
+    "access_width": {
+      "title": 6,
+      "movie_info_idx": 8
+    },
+    "access_methods": {
+      "title": [
+        "Index Scan"
+      ],
+      "movie_info_idx": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 1,
+      "movie_info_idx": 63835
+    },
+    "access_width_pct": {
+      "title": 0.05042016806722689,
+      "movie_info_idx": 0.24242424242424243
+    }
+  },
+  {
+    "query_index": 98,
+    "selectivity": {
+      "title": 7.910416119529552e-08,
+      "info_type": 0.008849557522123894,
+      "movie_info_idx": 0.4166672584390976
+    },
+    "access_width": {
+      "title": 22,
+      "info_type": 4,
+      "movie_info_idx": 29
+    },
+    "access_methods": {
+      "title": [
+        "Index Scan"
+      ],
+      "info_type": [
+        "Seq Scan"
+      ],
+      "movie_info_idx": [
+        "Parallel Seq Scan"
+      ]
+    },
+    "est_cardinality": {
+      "title": 1,
+      "info_type": 1,
+      "movie_info_idx": 2875077
+    },
+    "access_width_pct": {
+      "title": 0.18487394957983194,
+      "info_type": 0.2222222222222222,
+      "movie_info_idx": 0.8787878787878788
+    }
+  },
+  {
+    "query_index": 99,
+    "selectivity": {
+      "link_type": 0.9444444444444444,
+      "movie_link": 0.7135380204687135,
+      "title": 0.13890042051772092
+    },
+    "access_width": {
+      "link_type": 4,
+      "movie_link": 16,
+      "title": 12
+    },
+    "access_methods": {
+      "link_type": [
+        "Seq Scan"
+      ],
+      "movie_link": [
+        "Index Scan"
+      ],
+      "title": [
+        "Parallel Index Scan"
+      ]
+    },
+    "est_cardinality": {
+      "link_type": 17,
+      "movie_link": 21404,
+      "title": 1755918
+    },
+    "access_width_pct": {
+      "link_type": 0.25,
+      "movie_link": 0.5714285714285714,
+      "title": 0.10084033613445378
+    }
+  }
+]
