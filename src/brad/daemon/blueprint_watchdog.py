@@ -33,7 +33,7 @@ class BlueprintWatchdog:
         # Embedding table should not leave Aurora.
         try:
             embedding_locations = blueprint.get_table_locations("embeddings")
-            if embedding_locations != [Engine.Aurora]:
+            if Engine.Aurora not in embedding_locations:
                 if self._event_logger is not None:
                     self._event_logger.log(
                         SystemEvent.WatchdogFired,
