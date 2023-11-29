@@ -370,6 +370,16 @@ aurora_txns:
     b_p50: 0.0008631267119199038
     b_p90: 0.002251814818009734
 
+  imdb_specialized_100g:
+    # Used for "load translation"
+    C_1: 0.00282164
+    C_2: 0.00108688
+
+    # Used for latency.
+    K: 1.0811012983322144
+    b_p50: 0.0008631267119199038
+    b_p90: 0.002251814818009734
+
 
 aurora_scaling:
   # [coef1(load)^2(resource ratio)^2 + coef2(load)^2 + coef3(resource ratio)^2 + coef4] * base
