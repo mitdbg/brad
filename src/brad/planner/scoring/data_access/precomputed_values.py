@@ -145,11 +145,15 @@ class PrecomputedDataAccessProvider(DataAccessProvider):
             if "<=>" in q.raw_query:
                 special_vector_queries.append(wqi)
         applied_athena[special_vector_queries] = 0.0
+        applied_aurora[special_vector_queries] = 0.0
 
         # Check for unmatched queries.
         num_unmatched_athena = np.isnan(applied_athena).sum()
         if num_unmatched_athena > 0:
-            raise RuntimeError("Unmatched queries: " + num_unmatched_athena)
+            raise RuntimeError("Unmatched Athena queries: " + num_unmatched_athena)
+        num_unmatched_aurora = np.isnan(applied_aurora).sum()
+        if num_unmatched_aurora > 0:
+            raise RuntimeError("Unmatched Aurora queries: " + num_unmatched_aurora)
 
         workload.set_predicted_data_access_statistics(
             aurora_pages=applied_aurora,
