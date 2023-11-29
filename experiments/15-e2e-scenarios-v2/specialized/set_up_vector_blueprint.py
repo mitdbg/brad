@@ -122,6 +122,8 @@ def main():
         new_placement[table.name] = [Engine.Aurora, Engine.Athena]
         if table.name == "telemetry":
             new_placement[table.name] = [Engine.Athena]
+        if table.name == "embeddings":
+            new_placement[table.name] = [Engine.Aurora]
     enum_blueprint.set_table_locations(new_placement)
 
     # 6. Transition to the new blueprint.
