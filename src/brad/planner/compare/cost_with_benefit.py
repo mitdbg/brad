@@ -64,10 +64,10 @@ def best_cost_under_perf_ceilings_with_benefit_horizon(
             penalty_multiplier,
         )
         right_score = _compute_scalar_score(
-            left.get_transition_time_s(),
-            left.get_transition_cost(),
+            right.get_transition_time_s(),
+            right.get_transition_cost(),
             curr_hourly_cost,
-            left.get_operational_monetary_cost(),
+            right.get_operational_monetary_cost(),
             benefit_horizon,
             penalty_multiplier,
         )
@@ -75,6 +75,8 @@ def best_cost_under_perf_ceilings_with_benefit_horizon(
         # For debugging purposes.
         left.set_memoized_value("benefit_penalty_multiplier", penalty_multiplier)
         right.set_memoized_value("benefit_penalty_multiplier", penalty_multiplier)
+        left.set_memoized_value("cost_score", left_score)
+        right.set_memoized_value("cost_score", right_score)
 
         return left_score < right_score
 
