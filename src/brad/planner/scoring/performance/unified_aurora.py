@@ -40,11 +40,14 @@ class AuroraProvisioningScore:
         query_factor = cls.query_movement_factor(
             base_query_run_times, query_arrival_counts, ctx
         )
-        txn_cpu_denorm, ana_node_load = cls.predict_loads(
+        txn_cpu_denorm, ana_node_cpu_denorm = cls.predict_loads(
             curr_prov, next_prov, query_factor, ctx
         )
         scaled_rt = cls.predict_query_latency_load_resources(
-            base_query_run_times, next_prov, ana_node_load, ctx
+            base_query_run_times,
+            next_prov,
+            ana_node_cpu_denorm / aurora_num_cpus(next_prov),
+            ctx,
         )
         scaled_txn_lats = cls.predict_txn_latency(
             ctx.metrics.aurora_writer_cpu_avg / 100.0 * aurora_num_cpus(curr_prov),
@@ -61,7 +64,7 @@ class AuroraProvisioningScore:
                 if query_factor is not None
                 else 0.0,
                 "aurora_txn_cpu_denorm": txn_cpu_denorm,
-                "aurora_ana_node_load": ana_node_load,
+                "aurora_ana_cpu_denorm": ana_node_cpu_denorm,
             },
         )
 
@@ -85,13 +88,12 @@ class AuroraProvisioningScore:
         # Output:
         # - "CPU denorm" value on `next_prov` on the writer node, for use for
         #   transaction scaling
-        # - "load denorm" value on `next_prov` on one node that will be used for
+        # - "CPU denorm" value on `next_prov` on one node that will be used for
         #   analytics scaling
 
         current_has_replicas = curr_prov.num_nodes() > 1
         next_has_replicas = next_prov.num_nodes() > 1
 
-        curr_writer_load = ctx.metrics.aurora_writer_load_minute_avg
         curr_writer_cpu_util = ctx.metrics.aurora_writer_cpu_avg / 100
         curr_writer_cpu_util_denorm = curr_writer_cpu_util * aurora_num_cpus(curr_prov)
 
@@ -127,12 +129,12 @@ class AuroraProvisioningScore:
                     )
                     return (
                         curr_writer_cpu_util_denorm + initialized_load,
-                        curr_writer_load + initialized_load,
+                        curr_writer_cpu_util_denorm + initialized_load,
                     )
                 else:
                     return (
                         curr_writer_cpu_util_denorm * query_factor_clean,
-                        curr_writer_load * query_factor_clean,
+                        curr_writer_cpu_util_denorm * query_factor_clean,
                     )
             else:
                 # No replicas -> Yes replicas
@@ -151,16 +153,13 @@ class AuroraProvisioningScore:
                 else:
                     return (
                         curr_writer_cpu_util_denorm,
-                        (curr_writer_load * query_factor_clean)
+                        (curr_writer_cpu_util_denorm * query_factor_clean)
                         / (next_prov.num_nodes() - 1),
                     )
 
         else:
             # We currently have read replicas.
             curr_num_read_replicas = curr_prov.num_nodes() - 1
-            total_reader_load = (
-                ctx.metrics.aurora_reader_load_minute_avg * curr_num_read_replicas
-            )
             total_reader_cpu_denorm = (
                 (ctx.metrics.aurora_reader_cpu_avg / 100)
                 * aurora_num_cpus(curr_prov)
@@ -181,13 +180,14 @@ class AuroraProvisioningScore:
                     # Special case.
                     return (
                         curr_writer_cpu_util_denorm + initialized_load,
-                        curr_writer_load + initialized_load,
+                        (curr_writer_cpu_util_denorm + initialized_load),
                     )
                 else:
                     return (
                         curr_writer_cpu_util_denorm
                         + (total_reader_cpu_denorm * query_factor_clean),
-                        curr_writer_load + (total_reader_load * query_factor_clean),
+                        curr_writer_cpu_util_denorm
+                        + (total_reader_cpu_denorm * query_factor_clean),
                     )
 
             else:
@@ -201,7 +201,7 @@ class AuroraProvisioningScore:
                 else:
                     return (
                         curr_writer_cpu_util_denorm,
-                        total_reader_load
+                        total_reader_cpu_denorm
                         * query_factor_clean
                         / (next_prov.num_nodes() - 1),
                     )
