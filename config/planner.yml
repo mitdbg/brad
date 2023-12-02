@@ -382,6 +382,7 @@ aurora_txns:
 
 
 aurora_scaling:
+  # [Deprecated]
   # [coef1(load)^2(resource ratio)^2 + coef2(load)^2 + coef3(resource ratio)^2 + coef4] * base
   coef1: 0.2454489
   coef2: 0.00841046
@@ -396,6 +397,17 @@ redshift_scaling:
   coef2: 0.00370447
   coef3: 0.49948713
   coef4: 0.36256359
+
+
+aurora_scaling_new:
+  # Wait time (from queuing theory)
+  # alpha * avg_query_time * (u / (1 - u)) + base
+  alpha: 0.0464553
+
+  # Resources
+  # [coef1 (s/d) + coef2] * base
+  coef1: 0.75851053
+  coef2: 0.5486482
 
 use_io_optimized_aurora: true
 use_recorded_routing_if_available: true
