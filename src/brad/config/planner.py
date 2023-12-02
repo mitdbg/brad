@@ -21,6 +21,9 @@ class PlannerConfig:
     def __init__(self, raw: Dict[str, Any]):
         self._raw = raw
 
+        self._aurora_new_scaling_coefs: Optional[npt.NDArray] = None
+
+        # Deprecated
         self._aurora_scaling_coefs: Optional[npt.NDArray] = None
         self._redshift_scaling_coefs: Optional[npt.NDArray] = None
 
@@ -210,6 +213,15 @@ class PlannerConfig:
 
     def aurora_txn_coefs(self, schema_name: str) -> Dict[str, float]:
         return self._raw["aurora_txns"][schema_name]
+
+    def aurora_new_scaling_coefs(self) -> npt.NDArray:
+        if self._aurora_new_scaling_coefs is None:
+            coefs = self._raw["aurora_scaling_new"]
+            self._aurora_new_scaling_coefs = np.array([coefs["coef1"], coefs["coef2"]])
+        return self._aurora_new_scaling_coefs
+
+    def aurora_new_scaling_alpha(self) -> float:
+        return self._raw["aurora_scaling_new"]["alpha"]
 
     ###
     ### Unified Redshift scaling

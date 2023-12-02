@@ -227,6 +227,35 @@ class AuroraProvisioningScore:
     def predict_query_latency_load_resources(
         base_predicted_latency: npt.NDArray,
         to_prov: Provisioning,
+        cpu_util: float,
+        ctx: "ScoringContext",
+    ) -> npt.NDArray:
+        # 1. Compute each query's expected run time on the given provisioning.
+        resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(to_prov)
+        basis = np.array([resource_factor, 1.0])
+        coefs = ctx.planner_config.aurora_new_scaling_coefs()
+        coefs = np.multiply(coefs, basis)
+        num_coefs = coefs.shape[0]
+        lat_vals = np.expand_dims(base_predicted_latency, axis=1)
+        lat_vals = np.repeat(lat_vals, num_coefs, axis=1)
+        alone_predicted_latency = np.dot(lat_vals, coefs)
+
+        # 2. Compute the impact of system load.
+        mean_service_time = alone_predicted_latency.mean()
+        denom = max(1e-3, 1.0 - cpu_util)  # Want to avoid division by 0.
+        wait_sf = cpu_util / denom
+        mean_wait_time = (
+            mean_service_time * wait_sf * ctx.planner_config.aurora_new_scaling_alpha()
+        )
+
+        # Predicted running time is the query's execution time alone plus the
+        # expected wait time (due to system load)
+        return alone_predicted_latency + mean_wait_time
+
+    @staticmethod
+    def predict_query_latency_load_resources_legacy(
+        base_predicted_latency: npt.NDArray,
+        to_prov: Provisioning,
         overall_load: float,
         ctx: "ScoringContext",
     ) -> npt.NDArray:
