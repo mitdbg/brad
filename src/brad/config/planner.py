@@ -238,7 +238,9 @@ class PlannerConfig:
     def redshift_new_scaling_coefs(self) -> npt.NDArray:
         if self._redshift_new_scaling_coefs is None:
             coefs = self._raw["redshift_scaling_new"]
-            self._redshift_new_scaling_coefs = np.array([coefs["coef1"], coefs["coef2"]])
+            self._redshift_new_scaling_coefs = np.array(
+                [coefs["coef1"], coefs["coef2"]]
+            )
         return self._redshift_new_scaling_coefs
 
     def redshift_new_scaling_alpha(self) -> float:

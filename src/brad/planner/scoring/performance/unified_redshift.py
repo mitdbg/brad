@@ -172,11 +172,15 @@ class RedshiftProvisioningScore:
 
         # 2. Compute the impact of system load.
         mean_service_time = alone_predicted_latency.mean()
-        cpu_util = overall_cpu_denorm / (redshift_num_cpus(to_prov) * to_prov.num_nodes())
+        cpu_util = overall_cpu_denorm / (
+            redshift_num_cpus(to_prov) * to_prov.num_nodes()
+        )
         denom = max(1e-3, 1.0 - cpu_util)  # Want to avoid division by 0.
         wait_sf = cpu_util / denom
         mean_wait_time = (
-            mean_service_time * wait_sf * ctx.planner_config.redshift_new_scaling_alpha()
+            mean_service_time
+            * wait_sf
+            * ctx.planner_config.redshift_new_scaling_alpha()
         )
 
         # Predicted running time is the query's execution time alone plus the
