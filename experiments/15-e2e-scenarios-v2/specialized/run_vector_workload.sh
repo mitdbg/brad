@@ -34,7 +34,7 @@ log_workload_point "clients_starting"
 start_repeating_olap_runner 8 5 5 $query_indices "ra_8"
 rana_pid=$runner_pid
 
-start_sequence_runner 2 8 5 "ra_vector" 4
+start_other_repeating_runner 2 8 5 "ra_vector" 8
 other_pid=$runner_pid
 
 start_txn_runner 4  # Implicit: --dataset-type
@@ -49,7 +49,7 @@ trap "inner_cancel_experiment" INT
 trap "inner_cancel_experiment" TERM
 
 sleep $((5 * 60))  # Wait for 5 mins.
-start_repeating_olap_runner 4 5 5 $heavier_queries "ra_4_heavy"
+start_repeating_olap_runner 4 5 5 $heavier_queries "ra_4_heavy" 10
 heavy_pid=$runner_pid
 
 sleep $((55 * 60))  # Wait for 55 mins.
