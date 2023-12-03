@@ -64,6 +64,13 @@ function start_repeating_olap_runner() {
   results_dir=$EXPT_OUT/$results_name
   mkdir -p $results_dir
 
+  # If result name contains "vector", use $TRANSACTOR_ENGINE, otherwise use $ANALYTICS_ENGINE
+  if [[ $results_name == *"vector"* ]]; then
+    engine=$TRANSACTOR_ENGINE
+  else
+    engine=$ANALYTICS_ENGINE
+  fi
+
   local args=(
     --num-clients $ra_clients
     --query-indexes $query_indexes
@@ -72,7 +79,7 @@ function start_repeating_olap_runner() {
     --gap-dist-path $gap_dist_path
     --query-frequency-path $query_frequency_path
     --num-client-path $num_client_path
-    --baseline $ANALYTICS_ENGINE
+    --baseline $engine
     --run-for-s $total_second_phase_time_s
     --output-dir $results_dir
   )

@@ -66,13 +66,23 @@ function start_repeating_olap_runner() {
   results_dir=$EXPT_OUT/$results_name
   mkdir -p $results_dir
 
+  # If result name contains "vec", use $VECTOR_ENGINE, otherwise use $ANALYTICS_ENGINE
+  if [[ $results_name == *"vec"* ]]; then
+    engine=$VECTOR_ENGINE
+    bank_file=$vector_query_bank_file
+  else
+    engine=$ANALYTICS_ENGINE
+    bank_file=$ra_query_bank_file
+  fi
+
+
   local args=(
     --num-clients $ra_clients
-    --query-indexes $query_indexes
-    --query-bank-file $ra_query_bank_file
+    --query-indexes "$query_indexes"
+    --query-bank-file $bank_file
     --avg-gap-s $ra_gap_s
     --avg-gap-std-s $ra_gap_std_s
-    --baseline $ANALYTICS_ENGINE
+    --baseline $engine
     --output-dir $results_dir
   )
 
@@ -107,11 +117,7 @@ function start_seq_olap_runner() {
     --output-dir $results_dir
   )
 
-  if [[ ! -z $ra_query_frequency_path ]]; then
-    args+=(--query-frequency-path $ra_query_frequency_path)
-  fi
-
-  >&2 echo "[Seq Analytics] Running with $ra_clients..."
+  >&2 echo "[Seq Analytics] Running with $num_clients..."
 
   log_workload_point $results_name
   python3 workloads/IMDB_extended/run_query_sequence.py "${args[@]}" &

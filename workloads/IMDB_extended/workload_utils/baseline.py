@@ -8,6 +8,7 @@ import platform
 from types import SimpleNamespace
 import boto3
 import pandas as pd
+import numpy as np
 
 
 def load_schema_json(dataset):
@@ -84,6 +85,11 @@ def make_postgres_compatible_conn(engine="redshift"):
     if engine == "redshift":
         cur = conn.cursor()
         cur.execute("SET enable_result_cache_for_session = off;")
+        conn.commit()
+    # Add vector extension.
+    if engine == "aurora":
+        cur = conn.cursor()
+        cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
         conn.commit()
     return conn
 
@@ -353,6 +359,56 @@ class PostgresCompatibleLoader:
         return df
 
 
+    def load_embeddings(self, embeddings_file, BATCH_SIZE = 100):
+        embeddings_schema = """
+CREATE TABLE IF NOT EXISTS embeddings (
+    id SERIAL,
+    movie_id BIGINT,
+    embedding vector(1536)
+);
+"""
+        embeddings = np.load(embeddings_file)
+        cursor = self.conn.cursor()
+        cursor.execute("DROP TABLE IF EXISTS embeddings")
+        cursor.execute(embeddings_schema)
+        print(f"Created embeddings table!")
+        # Get the ids.
+        cursor.execute("SELECT DISTINCT id FROM aka_title")
+        movie_id_rows = cursor.fetchall()
+        all_movie_ids = [row[0] for row in movie_id_rows]
+
+        total_batches = embeddings.shape[0] // BATCH_SIZE
+        if embeddings.shape[0] % BATCH_SIZE != 0:
+            total_batches += 1
+
+        # Insert batches
+        batch = 0
+        while batch * BATCH_SIZE < embeddings.shape[0]:
+            np_embeddings_batch = embeddings[batch * BATCH_SIZE : (batch + 1) * BATCH_SIZE]
+            movie_ids_batch = all_movie_ids[batch * BATCH_SIZE : (batch + 1) * BATCH_SIZE]
+
+            insert_batch = [
+                (
+                    id,
+                    str(list(e)),
+                )
+                for id, e in zip(movie_ids_batch, np_embeddings_batch)
+            ]
+
+
+            stmt = "INSERT INTO embeddings (movie_id, embedding) VALUES "
+            values_str = ",".join(r"(%s, %s)" for _ in insert_batch)
+            values = [x for tup in insert_batch for x in tup]
+            stmt = stmt + values_str
+
+            print(f"Loading batch {batch} of {total_batches}...")
+            cursor.execute(stmt, values)
+
+            batch += 1
+
+        self.conn.commit()
+
+
     # def manual_unload(self, dataset, do_unload=True, specific_table=None, start_chunk=0, end_chunk=0):
     #     # Manual unload for use by TiDB.
     #     schema = load_schema_json(dataset)
@@ -568,9 +624,10 @@ class PostgresCompatibleLoader:
 
 
 if __name__ == "__main__":
-    baseline = TiDBLoader()
+    baseline = PostgresCompatibleLoader(engine="aurora")
+    baseline.load_embeddings("aka_titles_embeddings.npy")
     # baseline.manual_unload("imdb_extended", do_unload=False, start_chunk=-1, end_chunk=-1)
-    baseline.manual_count_all("imdb_extended")
+    # baseline.manual_count_all("imdb_extended")
     # import sys
 
     # if len(sys.argv) > 1 and sys.argv[1] == "reset":

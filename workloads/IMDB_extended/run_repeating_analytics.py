@@ -559,7 +559,7 @@ def main():
     else:
         num_client_trace = None
 
-    if args.query_indexes is None:
+    if args.query_indexes is None or args.query_indexes == "":
         queries = list(range(len(query_bank)))
     else:
         queries = list(map(int, args.query_indexes.split(",")))
