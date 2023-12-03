@@ -54,7 +54,7 @@ class RedshiftProvisioningScore:
                 },
             )
         else:
-            scaled_rt = cls.scale_load_resources(
+            scaled_rt = cls.predict_query_latency_load_resources(
                 base_query_run_times, next_prov, predicted_cpu_denorm, ctx
             )
             return cls(
@@ -152,7 +152,39 @@ class RedshiftProvisioningScore:
         return total_next_latency / norm_factor
 
     @staticmethod
-    def scale_load_resources(
+    def predict_query_latency_load_resources(
+        base_predicted_latency: npt.NDArray,
+        to_prov: Provisioning,
+        overall_cpu_denorm: float,
+        ctx: "ScoringContext",
+    ) -> npt.NDArray:
+        # 1. Compute each query's expected run time on the given provisioning.
+        resource_factor = _REDSHIFT_BASE_RESOURCE_VALUE / (
+            redshift_num_cpus(to_prov) * to_prov.num_nodes()
+        )
+        basis = np.array([resource_factor, 1.0])
+        coefs = ctx.planner_config.redshift_new_scaling_coefs()
+        coefs = np.multiply(coefs, basis)
+        num_coefs = coefs.shape[0]
+        lat_vals = np.expand_dims(base_predicted_latency, axis=1)
+        lat_vals = np.repeat(lat_vals, num_coefs, axis=1)
+        alone_predicted_latency = np.dot(lat_vals, coefs)
+
+        # 2. Compute the impact of system load.
+        mean_service_time = alone_predicted_latency.mean()
+        cpu_util = overall_cpu_denorm / (redshift_num_cpus(to_prov) * to_prov.num_nodes())
+        denom = max(1e-3, 1.0 - cpu_util)  # Want to avoid division by 0.
+        wait_sf = cpu_util / denom
+        mean_wait_time = (
+            mean_service_time * wait_sf * ctx.planner_config.redshift_new_scaling_alpha()
+        )
+
+        # Predicted running time is the query's execution time alone plus the
+        # expected wait time (due to system load).
+        return alone_predicted_latency + mean_wait_time
+
+    @staticmethod
+    def scale_load_resources_legacy(
         base_predicted_latency: npt.NDArray,
         to_prov: Provisioning,
         overall_cpu_denorm: float,

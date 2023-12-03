@@ -22,6 +22,7 @@ class PlannerConfig:
         self._raw = raw
 
         self._aurora_new_scaling_coefs: Optional[npt.NDArray] = None
+        self._redshift_new_scaling_coefs: Optional[npt.NDArray] = None
 
         # Deprecated
         self._aurora_scaling_coefs: Optional[npt.NDArray] = None
@@ -233,6 +234,15 @@ class PlannerConfig:
                 [coefs["coef1"], coefs["coef2"], coefs["coef3"], coefs["coef4"]]
             )
         return self._redshift_scaling_coefs
+
+    def redshift_new_scaling_coefs(self) -> npt.NDArray:
+        if self._redshift_new_scaling_coefs is None:
+            coefs = self._raw["redshift_scaling_new"]
+            self._redshift_new_scaling_coefs = np.array([coefs["coef1"], coefs["coef2"]])
+        return self._redshift_new_scaling_coefs
+
+    def redshift_new_scaling_alpha(self) -> float:
+        return self._raw["redshift_scaling_new"]["alpha"]
 
     def use_io_optimized_aurora(self) -> bool:
         if "use_io_optimized_aurora" not in self._raw:
