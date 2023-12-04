@@ -79,12 +79,13 @@ def test_single_node() -> None:
     assert ana_cpu_denorm == pytest.approx(8.0)
 
     # Scale up with a 0.5x increase (i.e., a decrease) in the analytical
-    # workload. We stay conservative here and do not modify the loads.
+    # workload. We stay conservative here and use a fixed lower bound on the
+    # query factor.
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
         curr_prov, next_prov, 0.5, ctx
     )
-    assert txn_cpu_denorm == pytest.approx(4.0)
-    assert ana_cpu_denorm == pytest.approx(4.0)
+    assert txn_cpu_denorm == pytest.approx(4.0 * (1 - 0.25))
+    assert ana_cpu_denorm == pytest.approx(4.0 * (1 - 0.25))
 
     # No queries executed previously. But now we are executing queries on
     # Aurora.
@@ -135,7 +136,7 @@ def test_single_to_multi() -> None:
         curr_prov, next_prov, 0.5, ctx
     )
     assert txn_cpu_denorm == pytest.approx(4.0)
-    assert ana_cpu_denorm == pytest.approx(4.0)
+    assert ana_cpu_denorm == pytest.approx(4.0 * (1 - 0.25))
 
     # 2 replicas.
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
@@ -189,8 +190,8 @@ def test_multi_to_single() -> None:
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
         curr_prov, next_prov, 0.5, ctx
     )
-    assert txn_cpu_denorm == pytest.approx(3.0)
-    assert ana_cpu_denorm == pytest.approx(3.0)
+    assert txn_cpu_denorm == pytest.approx(2.0 + (1 - 0.25))
+    assert ana_cpu_denorm == pytest.approx(2.0 + (1 - 0.25))
 
     # Multiple replicas (2) down to one node.
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
@@ -248,7 +249,7 @@ def test_multi_to_multi() -> None:
         curr_prov, next_prov, 0.5, ctx
     )
     assert txn_cpu_denorm == pytest.approx(2.0)
-    assert ana_cpu_denorm == pytest.approx(0.5)  # Stay conservative.
+    assert ana_cpu_denorm == pytest.approx(0.5 * (1 - 0.25))  # Stay conservative.
 
     # Decrease the number of replicas (2 to 1).
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(

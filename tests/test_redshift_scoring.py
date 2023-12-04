@@ -101,7 +101,7 @@ def test_on_to_on() -> None:
     cpu_denorm = RedshiftProvisioningScore.predict_cpu_denorm(
         curr_prov, next_prov, 0.5, ctx
     )
-    assert cpu_denorm == pytest.approx(2.0)
+    assert cpu_denorm == pytest.approx(2.0 * (1 - 0.25))
 
     # Scale down, no movement.
     smaller_prov = Provisioning("dc2.large", 1)
@@ -120,7 +120,7 @@ def test_on_to_on() -> None:
     cpu_denorm = RedshiftProvisioningScore.predict_cpu_denorm(
         curr_prov, smaller_prov, 0.5, ctx
     )
-    assert cpu_denorm == pytest.approx(2.0)
+    assert cpu_denorm == pytest.approx(2.0 * (1 - 0.25))
 
     # Special case (no queries executed before, but now there are queries).
     ctx.current_query_locations[Engine.Redshift].append(0)

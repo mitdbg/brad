@@ -58,10 +58,13 @@ def main():
         "--aurora-queries",
         type=str,
         help="Comma separated list of indices.",
-        default="62,64,65,66,69,72,73,74,91,59",
+        default="65,69,73,14,54,59,75",
     )
     parser.add_argument(
-        "--redshift-queries", type=str, help="Comma separated list of indices."
+        "--redshift-queries",
+        type=str,
+        help="Comma separated list of indices.",
+        default="62,64,66,72,74,91,59,60,71",
     )
     args = parser.parse_args()
     set_up_logging(debug_mode=True)
@@ -113,16 +116,16 @@ def main():
     enum_blueprint.set_routing_policy(replaced_policy)
 
     # Ensure the provisioning is as expected.
-    enum_blueprint.set_aurora_provisioning(Provisioning("db.r6g.xlarge", 2))
-    enum_blueprint.set_redshift_provisioning(Provisioning("dc2.large", 0))
+    enum_blueprint.set_aurora_provisioning(Provisioning("db.r6g.2xlarge", 2))
+    enum_blueprint.set_redshift_provisioning(Provisioning("dc2.large", 2))
 
     # 6. Adjust the placement.
     new_placement = {}
     for table in blueprint.tables():
-        new_placement[table.name] = [Engine.Aurora, Engine.Athena]
+        new_placement[table.name] = [Engine.Aurora, Engine.Athena, Engine.Redshift]
         if table.name == "telemetry":
             new_placement[table.name] = [Engine.Athena]
-        if table.name == "embeddings":
+        if table.name == "embeddings" or table.name == "title":
             new_placement[table.name] = [Engine.Aurora, Engine.Athena]
     enum_blueprint.set_table_locations(new_placement)
 

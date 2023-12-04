@@ -14,6 +14,8 @@ from brad.planner.scoring.provisioning import (
     compute_aurora_hourly_operational_cost,
     compute_redshift_hourly_operational_cost,
 )
+from brad.planner.scoring.performance.unified_aurora import AuroraProvisioningScore
+from brad.planner.scoring.performance.unified_redshift import RedshiftProvisioningScore
 
 logger = logging.getLogger(__name__)
 
@@ -130,15 +132,28 @@ class ScoringContext:
                 )
             )
 
-            # N.B. Using the actual recorded run times is slightly problematic
-            # here. We use this normalization factor as a part of predicting a
-            # query's execution time on a different blueprint. We need to use
-            # query execution times on the same provisioning (and system load)
-            # as the recorded run times. Scaling the recorded run times to a
-            # base provisioning or vice-versa is difficult to do accurately
-            # without having this normalization factor.
+            # 2. Adjust to the provisioning if needed.
+            if engine == Engine.Aurora:
+                adjusted_latencies = (
+                    AuroraProvisioningScore.predict_query_latency_resources(
+                        predicted_base_latencies,
+                        self.current_blueprint.aurora_provisioning(),
+                        self,
+                    )
+                )
+            elif engine == Engine.Redshift:
+                adjusted_latencies = (
+                    RedshiftProvisioningScore.predict_query_latency_resources(
+                        predicted_base_latencies,
+                        self.current_blueprint.redshift_provisioning(),
+                        self,
+                    )
+                )
+            elif engine == Engine.Athena:
+                # No provisioning.
+                adjusted_latencies = predicted_base_latencies
 
-            # 2. Extract query weights (based on arrival frequency) and scale
+            # 3. Extract query weights (based on arrival frequency) and scale
             # the run times.
             query_weights = self.current_workload.get_arrival_counts_batch(
                 self.current_query_locations[engine]
@@ -146,5 +161,5 @@ class ScoringContext:
             assert query_weights.shape == predicted_base_latencies.shape
 
             self.engine_latency_norm_factor[engine] = np.dot(
-                predicted_base_latencies, query_weights
+                adjusted_latencies, query_weights
             )
