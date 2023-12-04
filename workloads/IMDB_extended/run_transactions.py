@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import pathlib
+import pickle
 import random
 import signal
 import sys
@@ -17,6 +18,7 @@ from brad.config.file import ConfigFile
 from brad.grpc_client import BradClientError
 from brad.provisioning.directory import Directory
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
+from brad.utils.time_periods import universal_now
 from workload_utils.connect import connect_to_db
 from workload_utils.transaction_worker import TransactionWorker
 
@@ -279,10 +281,44 @@ def main():
         help="This controls the range of reads the transaction worker performs, "
         "depending on the dataset size.",
     )
+    # These three arguments are used for the day long experiment.
+    parser.add_argument(
+        "--num-client-path",
+        type=str,
+        default=None,
+        help="Path to the distribution of number of clients for each period of a day",
+    )
+    parser.add_argument(
+        "--num-client-multiplier",
+        type=int,
+        default=2,
+        help="The multiplier to the number of clients for each period of a day",
+    )
+    parser.add_argument(
+        "--time-scale-factor",
+        type=int,
+        default=100,
+        help="trace 1s of simulation as X seconds in real-time to match the num-concurrent-query",
+    )
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)
     parser.add_argument("--num-front-ends", type=int, default=1)
     args = parser.parse_args()
+
+    if (
+        args.num_client_path is not None
+        and os.path.exists(args.num_client_path)
+        and args.time_scale_factor is not None
+    ):
+        # we can only set the num_concurrent_query trace in presence of time_scale_factor
+        with open(args.num_client_path, "rb") as f:
+            num_client_trace = pickle.load(f)
+        print(
+            "[T] Preparing to run a time varying workload", flush=True, file=sys.stderr
+        )
+    else:
+        num_client_trace = None
+        print("[T] Preparing to run a steady workload", flush=True, file=sys.stderr)
 
     mgr = mp.Manager()
     start_queue = [mgr.Queue() for _ in range(args.num_clients)]
@@ -328,25 +364,89 @@ def main():
         print("Transactional client abort complete.", file=sys.stderr, flush=True)
         return
 
-    print(
-        "Telling {} clients to start.".format(args.num_clients),
-        file=sys.stderr,
-        flush=True,
-    )
-    for idx in range(args.num_clients):
-        control_semaphore[idx].release()
+    if num_client_trace is not None:
+        assert args.time_scale_factor is not None, "Need to set --time-scale-factor"
+        assert args.run_for_s is not None, "Need to set --run-for-s"
+        print("[T] Telling client no. 0 to start.", flush=True, file=sys.stderr)
+        execute_start_time = universal_now()
+        control_semaphore[0].release()
+        num_running_client = 1
 
-    if args.run_for_s is not None:
+        finished_one_day = True
+        curr_day_start_time = datetime.now().astimezone(pytz.utc)
+        for time_of_day in num_client_trace:
+            if time_of_day == 0:
+                continue
+            # at this time_of_day start/shut-down more clients
+            time_in_s = time_of_day / args.time_scale_factor
+            now = datetime.now().astimezone(pytz.utc)
+            curr_time_in_s = (now - curr_day_start_time).total_seconds()
+            total_exec_time_in_s = (now - execute_start_time).total_seconds()
+            if args.run_for_s <= total_exec_time_in_s:
+                finished_one_day = False
+                break
+            if args.run_for_s - total_exec_time_in_s <= (time_in_s - curr_time_in_s):
+                wait_time = args.run_for_s - total_exec_time_in_s
+                if wait_time > 0:
+                    time.sleep(wait_time)
+                finished_one_day = False
+                break
+            time.sleep(time_in_s - curr_time_in_s)
+            num_client_required = min(num_client_trace[time_of_day], args.num_clients)
+            if num_client_required > num_running_client:
+                # starting additional clients
+                for add_client in range(num_running_client, num_client_required):
+                    print(
+                        "[T] Telling client no. {} to start.".format(add_client),
+                        flush=True,
+                        file=sys.stderr,
+                    )
+                    control_semaphore[add_client].release()
+                    num_running_client += 1
+            elif num_running_client > num_client_required:
+                # shutting down clients
+                for delete_client in range(num_running_client, num_client_required, -1):
+                    print(
+                        "[T] Telling client no. {} to stop.".format(delete_client - 1),
+                        flush=True,
+                        file=sys.stderr,
+                    )
+                    control_semaphore[delete_client - 1].release()
+                    num_running_client -= 1
+        now = datetime.now().astimezone(pytz.utc)
+        total_exec_time_in_s = (now - execute_start_time).total_seconds()
+        if finished_one_day:
+            print(
+                f"[T] Finished executing one day of workload in {total_exec_time_in_s}s, will ignore the rest of "
+                f"pre-set execution time {args.run_for_s}s",
+                flush=True,
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"[T] Executed ended but unable to finish executing the trace of a full day within {args.run_for_s}s"
+            )
+
+    else:
         print(
-            "Letting the experiment run for {} seconds...".format(args.run_for_s),
+            "[T] Telling all {} clients to start.".format(args.num_clients),
+            file=sys.stderr,
+            flush=True,
+        )
+        for idx in range(args.num_clients):
+            control_semaphore[idx].release()
+
+    if args.run_for_s is not None and num_client_trace is None:
+        print(
+            "[T] Letting the experiment run for {} seconds...".format(args.run_for_s),
             flush=True,
             file=sys.stderr,
         )
         time.sleep(args.run_for_s)
 
-    else:
+    elif num_client_trace is None:
         print(
-            "Waiting until requested to stop... (hit Ctrl-C)",
+            "[T] Waiting until requested to stop... (hit Ctrl-C)",
             flush=True,
             file=sys.stderr,
         )
@@ -360,14 +460,18 @@ def main():
 
         should_shutdown.wait()
 
-    print("Stopping clients...", flush=True, file=sys.stderr)
+    print("[T] Stopping clients...", flush=True, file=sys.stderr)
     for idx in range(args.num_clients):
+        # Note that in most cases, one release will have already run. This is OK
+        # because downstream runners will not hang if there is a unconsumed
+        # semaphore value.
+        control_semaphore[idx].release()
         control_semaphore[idx].release()
 
-    print("Waiting for clients to terminate...", flush=True, file=sys.stderr)
+    print("[T] Waiting for clients to terminate...", flush=True, file=sys.stderr)
     for c in clients:
         c.join()
-    print("Done transactions!", flush=True, file=sys.stderr)
+    print("[T] Done transactions!", flush=True, file=sys.stderr)
 
 
 if __name__ == "__main__":

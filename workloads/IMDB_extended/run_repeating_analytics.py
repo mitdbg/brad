@@ -678,8 +678,9 @@ def main():
     )  # pylint: disable=global-statement
 
     if num_client_trace is not None:
-        assert args.time_scale_factor is not None, "need to set args.time_scale_factor"
-        print("Telling client no.{} to start.".format(0), flush=True)
+        assert args.time_scale_factor is not None, "Need to set --time-scale-factor"
+        assert args.run_for_s is not None, "Need to set --run-for-s"
+        print("Telling client no. 0 to start.", flush=True)
         control_semaphore[0].release()
         num_running_client = 1
 
@@ -708,7 +709,7 @@ def main():
                 # starting additional clients
                 for add_client in range(num_running_client, num_client_required):
                     print(
-                        "Telling client no.{} to start.".format(add_client), flush=True
+                        "Telling client no. {} to start.".format(add_client), flush=True
                     )
                     control_semaphore[add_client].release()
                     num_running_client += 1
@@ -716,7 +717,7 @@ def main():
                 # shutting down clients
                 for delete_client in range(num_running_client, num_client_required, -1):
                     print(
-                        "Telling client no.{} to stop.".format(delete_client - 1),
+                        "Telling client no. {} to stop.".format(delete_client - 1),
                         flush=True,
                     )
                     control_semaphore[delete_client - 1].release()
@@ -738,7 +739,7 @@ def main():
         for i in range(args.num_clients):
             control_semaphore[i].release()
 
-    if args.run_for_s and num_client_trace is None:
+    if args.run_for_s is not None and num_client_trace is None:
         print(
             "Waiting for {} seconds...".format(args.run_for_s),
             flush=True,
