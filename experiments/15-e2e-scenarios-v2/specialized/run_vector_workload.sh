@@ -48,12 +48,12 @@ function inner_cancel_experiment() {
 trap "inner_cancel_experiment" INT
 trap "inner_cancel_experiment" TERM
 
-sleep $((5 * 60))  # Wait for 5 mins.
+sleep $((16 * 60))  # Wait for 16 mins.
 start_repeating_olap_runner 4 5 5 $heavier_queries "ra_4_heavy" 10
 heavy_pid=$runner_pid
 log_workload_point "heavier_queries_started"
 
-sleep $((55 * 60))  # Wait for 55 mins.
+sleep $((60 * 60))  # Wait for 60 mins.
 log_workload_point "experiment_done"
 
 # Shut down everything now.

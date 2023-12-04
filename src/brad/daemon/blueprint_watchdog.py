@@ -16,20 +16,6 @@ class BlueprintWatchdog:
         self._event_logger = event_logger
 
     def reject_blueprint(self, blueprint: Blueprint) -> bool:
-        # Telemetry table should not go onto Aurora.
-        try:
-            telemetry_locations = blueprint.get_table_locations("telemetry")
-            if Engine.Aurora in telemetry_locations:
-                if self._event_logger is not None:
-                    self._event_logger.log(
-                        SystemEvent.WatchdogFired,
-                        f"telemetry_placed_on_aurora: {str(telemetry_locations)}",
-                    )
-                return True
-        except ValueError:
-            # Indicates the table is not used in this schema - no problem.
-            pass
-
         # Embedding table should not leave Aurora.
         try:
             embedding_locations = blueprint.get_table_locations("embeddings")
