@@ -230,6 +230,9 @@ class AuroraProvisioningScore:
         cpu_util: float,
         ctx: "ScoringContext",
     ) -> npt.NDArray:
+        if base_predicted_latency.shape[0] == 0:
+            return base_predicted_latency
+
         # 1. Compute each query's expected run time on the given provisioning.
         resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(to_prov)
         basis = np.array([resource_factor, 1.0])

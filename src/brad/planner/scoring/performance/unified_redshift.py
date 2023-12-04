@@ -158,6 +158,9 @@ class RedshiftProvisioningScore:
         overall_cpu_denorm: float,
         ctx: "ScoringContext",
     ) -> npt.NDArray:
+        if base_predicted_latency.shape[0] == 0:
+            return base_predicted_latency
+
         # 1. Compute each query's expected run time on the given provisioning.
         resource_factor = _REDSHIFT_BASE_RESOURCE_VALUE / (
             redshift_num_cpus(to_prov) * to_prov.num_nodes()
