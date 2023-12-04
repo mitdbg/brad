@@ -126,16 +126,22 @@ class RedshiftProvisioningScore:
                 * curr_prov.num_nodes()
             )
 
-            # We stay conservative here.
-            if query_factor is not None and query_factor > 1.0:
-                adjusted_cpu_denorm = query_factor * curr_cpu_util_denorm
-            else:
-                adjusted_cpu_denorm = curr_cpu_util_denorm
+            # We stay conservative here. See `AuroraProvisioningScore`.
+            query_factor_clean = 1.0
+            if query_factor is not None:
+                if query_factor >= 1.0:
+                    query_factor_clean = query_factor
+                else:
+                    min_query_factor = (
+                        1.0 - ctx.planner_config.redshift_initialize_load_fraction()
+                    )
+                    query_factor_clean = max(min_query_factor, query_factor)
 
-            return adjusted_cpu_denorm
+            return query_factor_clean * curr_cpu_util_denorm
 
-    @staticmethod
+    @classmethod
     def query_movement_factor(
+        cls,
         base_query_run_times: npt.NDArray,
         query_arrival_counts: npt.NDArray,
         ctx: "ScoringContext",
@@ -146,13 +152,17 @@ class RedshiftProvisioningScore:
             # Special case. We cannot reweigh the queries because nothing in the
             # current workload ran on Redshift (it could have been off).
             return None
+        curr_query_run_times = cls.predict_query_latency_resources(
+            base_query_run_times, ctx.current_blueprint.redshift_provisioning(), ctx
+        )
         norm_factor = ctx.engine_latency_norm_factor[Engine.Redshift]
         assert norm_factor != 0.0
-        total_next_latency = np.dot(base_query_run_times, query_arrival_counts)
+        total_next_latency = np.dot(curr_query_run_times, query_arrival_counts)
         return total_next_latency / norm_factor
 
-    @staticmethod
+    @classmethod
     def predict_query_latency_load_resources(
+        cls,
         base_predicted_latency: npt.NDArray,
         to_prov: Provisioning,
         overall_cpu_denorm: float,
@@ -161,20 +171,13 @@ class RedshiftProvisioningScore:
         if base_predicted_latency.shape[0] == 0:
             return base_predicted_latency
 
-        # 1. Compute each query's expected run time on the given provisioning.
-        resource_factor = _REDSHIFT_BASE_RESOURCE_VALUE / (
-            redshift_num_cpus(to_prov) * to_prov.num_nodes()
+        # 1. Compute the impact of the provisioning.
+        prov_predicted_latency = cls.predict_query_latency_resources(
+            base_predicted_latency, to_prov, ctx
         )
-        basis = np.array([resource_factor, 1.0])
-        coefs = ctx.planner_config.redshift_new_scaling_coefs()
-        coefs = np.multiply(coefs, basis)
-        num_coefs = coefs.shape[0]
-        lat_vals = np.expand_dims(base_predicted_latency, axis=1)
-        lat_vals = np.repeat(lat_vals, num_coefs, axis=1)
-        alone_predicted_latency = np.dot(lat_vals, coefs)
 
         # 2. Compute the impact of system load.
-        mean_service_time = alone_predicted_latency.mean()
+        mean_service_time = prov_predicted_latency.mean()
         cpu_util = overall_cpu_denorm / (
             redshift_num_cpus(to_prov) * to_prov.num_nodes()
         )
@@ -188,7 +191,27 @@ class RedshiftProvisioningScore:
 
         # Predicted running time is the query's execution time alone plus the
         # expected wait time (due to system load).
-        return alone_predicted_latency + mean_wait_time
+        return prov_predicted_latency + mean_wait_time
+
+    @staticmethod
+    def predict_query_latency_resources(
+        base_predicted_latency: npt.NDArray,
+        to_prov: Provisioning,
+        ctx: "ScoringContext",
+    ) -> npt.NDArray:
+        if base_predicted_latency.shape[0] == 0:
+            return base_predicted_latency
+
+        resource_factor = _REDSHIFT_BASE_RESOURCE_VALUE / (
+            redshift_num_cpus(to_prov) * to_prov.num_nodes()
+        )
+        basis = np.array([resource_factor, 1.0])
+        coefs = ctx.planner_config.redshift_new_scaling_coefs()
+        coefs = np.multiply(coefs, basis)
+        num_coefs = coefs.shape[0]
+        lat_vals = np.expand_dims(base_predicted_latency, axis=1)
+        lat_vals = np.repeat(lat_vals, num_coefs, axis=1)
+        return np.dot(lat_vals, coefs)
 
     @staticmethod
     def scale_load_resources_legacy(

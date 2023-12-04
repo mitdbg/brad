@@ -99,10 +99,17 @@ class AuroraProvisioningScore:
 
         # We take a very conservative approach to query movement. If new queries
         # are added onto Aurora, we increase the load. But if queries are
-        # removed, we do not decrease the load.
+        # removed, we only decrease the load if we are using replicas. This
+        # ensures we do not mix transactional and analytical load.
         query_factor_clean = 1.0
-        if query_factor is not None and query_factor > 1.0:
-            query_factor_clean = query_factor
+        if query_factor is not None:
+            if query_factor >= 1.0:
+                query_factor_clean = query_factor
+            else:
+                min_query_factor = (
+                    1.0 - ctx.planner_config.aurora_initialize_load_fraction()
+                )
+                query_factor_clean = max(min_query_factor, query_factor)
 
         # This is true iff we did not run any queries on Aurora with the current
         # blueprint and are now going to run queries on Aurora on the next
@@ -206,8 +213,9 @@ class AuroraProvisioningScore:
                         / (next_prov.num_nodes() - 1),
                     )
 
-    @staticmethod
+    @classmethod
     def query_movement_factor(
+        cls,
         base_query_run_times: npt.NDArray,
         query_arrival_counts: npt.NDArray,
         ctx: "ScoringContext",
@@ -218,13 +226,17 @@ class AuroraProvisioningScore:
             # Special case. We cannot reweigh the queries because nothing in the
             # current workload ran on Aurora.
             return None
+        curr_query_run_times = cls.predict_query_latency_resources(
+            base_query_run_times, ctx.current_blueprint.aurora_provisioning(), ctx
+        )
         norm_factor = ctx.engine_latency_norm_factor[Engine.Aurora]
         assert norm_factor != 0.0
-        total_next_latency = np.dot(base_query_run_times, query_arrival_counts)
+        total_next_latency = np.dot(curr_query_run_times, query_arrival_counts)
         return total_next_latency / norm_factor
 
-    @staticmethod
+    @classmethod
     def predict_query_latency_load_resources(
+        cls,
         base_predicted_latency: npt.NDArray,
         to_prov: Provisioning,
         cpu_util: float,
@@ -233,18 +245,11 @@ class AuroraProvisioningScore:
         if base_predicted_latency.shape[0] == 0:
             return base_predicted_latency
 
-        # 1. Compute each query's expected run time on the given provisioning.
-        resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(to_prov)
-        basis = np.array([resource_factor, 1.0])
-        coefs = ctx.planner_config.aurora_new_scaling_coefs()
-        coefs = np.multiply(coefs, basis)
-        num_coefs = coefs.shape[0]
-        lat_vals = np.expand_dims(base_predicted_latency, axis=1)
-        lat_vals = np.repeat(lat_vals, num_coefs, axis=1)
-        alone_predicted_latency = np.dot(lat_vals, coefs)
+        prov_predicted_latency = cls.predict_query_latency_resources(
+            base_predicted_latency, to_prov, ctx
+        )
 
-        # 2. Compute the impact of system load.
-        mean_service_time = alone_predicted_latency.mean()
+        mean_service_time = prov_predicted_latency.mean()
         denom = max(1e-3, 1.0 - cpu_util)  # Want to avoid division by 0.
         wait_sf = cpu_util / denom
         mean_wait_time = (
@@ -253,7 +258,25 @@ class AuroraProvisioningScore:
 
         # Predicted running time is the query's execution time alone plus the
         # expected wait time (due to system load)
-        return alone_predicted_latency + mean_wait_time
+        return prov_predicted_latency + mean_wait_time
+
+    @staticmethod
+    def predict_query_latency_resources(
+        base_predicted_latency: npt.NDArray,
+        to_prov: Provisioning,
+        ctx: "ScoringContext",
+    ) -> npt.NDArray:
+        if base_predicted_latency.shape[0] == 0:
+            return base_predicted_latency
+
+        resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(to_prov)
+        basis = np.array([resource_factor, 1.0])
+        coefs = ctx.planner_config.aurora_new_scaling_coefs()
+        coefs = np.multiply(coefs, basis)
+        num_coefs = coefs.shape[0]
+        lat_vals = np.expand_dims(base_predicted_latency, axis=1)
+        lat_vals = np.repeat(lat_vals, num_coefs, axis=1)
+        return np.dot(lat_vals, coefs)
 
     @staticmethod
     def predict_query_latency_load_resources_legacy(
