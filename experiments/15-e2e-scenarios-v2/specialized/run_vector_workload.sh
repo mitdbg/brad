@@ -54,7 +54,7 @@ function inner_cancel_experiment() {
 trap "inner_cancel_experiment" INT
 trap "inner_cancel_experiment" TERM
 
-sleep $((60 * 60))  # Wait for 60 mins.
+sleep $((2 * 60 * 60))  # Wait for 2 hours.
 log_workload_point "experiment_done"
 
 # Shut down everything now.
