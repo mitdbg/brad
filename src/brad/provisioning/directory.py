@@ -272,6 +272,27 @@ class AuroraInstanceMetadata:
     def status(self) -> RdsStatus:
         return self._status
 
+    def is_replica(self) -> bool:
+        return "-replica-" in self._instance_id
+
+    def version_and_offset(self) -> Tuple[int, int]:
+        """
+        Returns the blueprint version that was responsible for first creating
+        this instance. Also includes the instance offset. This offset is always
+        0 for the primary instance.
+        """
+        # This assumes that instances are named using our special format.
+        #   <cluster_id>-<role>-<index>-<bp version>
+        # Note that `<index>` is missing from primary instances.
+        parts = self._instance_id.split("-")
+        role = parts[1]
+        bp_version = int(parts[-1])
+        if role == "primary":
+            offset = 0
+        else:
+            offset = int(parts[-2])
+        return bp_version, offset
+
     def __lt__(self, other: "AuroraInstanceMetadata") -> bool:
         return self.instance_id() < other.instance_id()
 
