@@ -30,6 +30,7 @@ from brad.data_sync.operators.unload_to_s3 import UnloadToS3
 from brad.front_end.engine_connections import EngineConnections
 from brad.provisioning.rds import RdsProvisioningManager
 from brad.provisioning.redshift import RedshiftProvisioningManager
+from brad.utils.assertions import nonsilent_assert
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,9 @@ class TransitionOrchestrator:
             self._refresh_transition_metadata()
             return
 
+        nonsilent_assert(self._curr_blueprint is not None)
+        nonsilent_assert(self._next_blueprint is not None)
+        nonsilent_assert(self._next_version is not None)
         assert self._curr_blueprint is not None
         assert self._next_blueprint is not None
         assert self._next_version is not None
@@ -212,6 +216,8 @@ class TransitionOrchestrator:
             await self._blueprint_mgr.update_transition_state(TransitionState.Stable)
             return
 
+        nonsilent_assert(self._curr_blueprint is not None)
+        nonsilent_assert(self._next_blueprint is not None)
         assert self._curr_blueprint is not None
         assert self._next_blueprint is not None
 
@@ -261,8 +267,11 @@ class TransitionOrchestrator:
             self._next_version = None
             return
 
+        nonsilent_assert(self._tm.next_blueprint is not None)
+        nonsilent_assert(self._tm.next_version is not None)
         assert self._tm.next_blueprint is not None
         assert self._tm.next_version is not None
+
         self._diff = BlueprintDiff.of(self._tm.curr_blueprint, self._tm.next_blueprint)
         self._curr_blueprint = self._tm.curr_blueprint
         self._next_blueprint = self._tm.next_blueprint
@@ -342,9 +351,10 @@ class TransitionOrchestrator:
                 for reader_metadata in existing_readers:
                     created_version, offset = reader_metadata.version_and_offset()
                     if offset == 0:
-                        assert created_version != next_version
+                        nonsilent_assert(created_version != next_version)
                         replica_to_replace = reader_metadata
                         break
+                nonsilent_assert(replica_to_replace is not None)
                 assert replica_to_replace is not None
 
                 existing_replica_id = replica_to_replace.instance_id()
@@ -474,6 +484,7 @@ class TransitionOrchestrator:
             dt = DropTables(tables_to_drop, Engine.Aurora)
             await dt.execute(ctx)
 
+            nonsilent_assert(self._cxns is not None)
             assert self._cxns is not None
             self._cxns.get_connection(Engine.Aurora).cursor_sync().commit_sync()
 
@@ -563,6 +574,7 @@ class TransitionOrchestrator:
             d = DropTables(to_drop, Engine.Redshift)
             ctx = self._new_execution_context()
             await d.execute(ctx)
+            nonsilent_assert(self._cxns is not None)
             assert self._cxns is not None
             self._cxns.get_connection(Engine.Redshift).cursor_sync().commit_sync()
 
@@ -614,6 +626,7 @@ class TransitionOrchestrator:
         await d.execute(ctx)
 
     async def _unload_table(self, table_name: str, s3_path: str) -> None:
+        nonsilent_assert(self._curr_blueprint is not None)
         assert self._curr_blueprint is not None
         curr_locations = self._curr_blueprint.get_table_locations(table_name)
 
@@ -677,10 +690,12 @@ class TransitionOrchestrator:
                     aurora_columns=comma_separated_column_names(columns),
                 )
                 await l.execute(ctx)
+            nonsilent_assert(self._cxns is not None)
             assert self._cxns is not None
             self._cxns.get_connection(Engine.Aurora).cursor_sync().commit_sync()
 
             # Ensure that extract table is set up correctly for later syncs.
+            nonsilent_assert(self._curr_blueprint is not None)
             assert self._curr_blueprint is not None
             table = self._curr_blueprint.get_table(table_name)
             q = "SELECT MAX({}) FROM {}".format(
@@ -702,6 +717,7 @@ class TransitionOrchestrator:
         elif e == Engine.Redshift:
             l = LoadFromS3(table_name, s3_path_prefix, e, delimiter=",", header_rows=1)
             await l.execute(ctx)
+            nonsilent_assert(self._cxns is not None)
             assert self._cxns is not None
             self._cxns.get_connection(Engine.Redshift).cursor_sync().commit_sync()
         elif e == Engine.Athena:
@@ -711,6 +727,7 @@ class TransitionOrchestrator:
         logger.debug(f"In transition: table {table_name} loaded to {e}.")
 
     def _new_execution_context(self) -> ExecutionContext:
+        nonsilent_assert(self._cxns is not None)
         assert self._cxns is not None
         return ExecutionContext(
             aurora=self._cxns.get_connection(Engine.Aurora),
