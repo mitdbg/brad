@@ -336,8 +336,21 @@ class TransitionOrchestrator:
                 # Special case: The current blueprint only has one read replica
                 # and we need to modify it to transition to the next blueprint.
                 existing_readers = self._blueprint_mgr.get_directory().aurora_readers()
-                assert len(existing_readers) == 1
-                existing_replica_id = existing_readers[0].instance_id()
+
+                # Find the first replica.
+                replica_to_replace = None
+                for reader_metadata in existing_readers:
+                    created_version, offset = reader_metadata.version_and_offset()
+                    if offset == 0:
+                        assert created_version != next_version
+                        replica_to_replace = reader_metadata
+                        break
+                assert replica_to_replace is not None
+
+                existing_replica_id = replica_to_replace.instance_id()
+                logger.debug(
+                    "Will create a new replica to replace %s", existing_replica_id
+                )
 
                 new_replica_id = _AURORA_REPLICA_FORMAT.format(
                     cluster_id=self._config.aurora_cluster_id,
@@ -361,11 +374,20 @@ class TransitionOrchestrator:
             else:
                 # Modify replicas one-by-one. At most one reader replica is down
                 # at any time, but we consider this acceptable.
-                for idx, replica in enumerate(
-                    self._blueprint_mgr.get_directory().aurora_readers()
-                ):
-                    if idx >= replicas_to_modify:
-                        break
+                for replica in self._blueprint_mgr.get_directory().aurora_readers():
+                    created_version, offset = replica.version_and_offset()
+                    if created_version == next_version:
+                        logger.debug(
+                            "Not modifying %s because it is a new replica.",
+                            replica.instance_id(),
+                        )
+                        continue
+                    if offset >= replicas_to_modify:
+                        logger.debug(
+                            "Not modifying %s because it is beyond the replicas we need to modify.",
+                            replica.instance_id(),
+                        )
+                        continue
 
                     logger.debug(
                         "Changing instance %s to %s",
