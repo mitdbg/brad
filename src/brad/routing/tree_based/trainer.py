@@ -1,4 +1,6 @@
+import logging
 import pathlib
+from collections import namedtuple
 
 import numpy as np
 import numpy.typing as npt
@@ -16,8 +18,11 @@ from brad.data_stats.estimator import Estimator
 from brad.query_rep import QueryRep
 from brad.routing.policy import RoutingPolicy
 
+logger = logging.getLogger(__name__)
+
 
 ModelQuality = Dict[str, Dict[str, float]]
+DatasetPath = namedtuple("DatasetPath", ["name", "data_dir", "use_preds"])
 
 
 class ForestTrainer:
@@ -83,14 +88,39 @@ class ForestTrainer:
         return cls(policy, bp.tables, raw_queries, stacked)
 
     @classmethod
-    def load_from_standard_dataset(
+    def load_from_standard_datasets(
         cls,
         policy: RoutingPolicy,
         schema_file: str | pathlib.Path,
-        dataset_path: str | pathlib.Path,
+        datasets: List[DatasetPath],
     ) -> "ForestTrainer":
         bp = UserProvidedBlueprint.load_from_yaml_file(schema_file)
+        loaded_datasets = []
+        for dataset_path in datasets:
+            logger.info(
+                "Loading dataset %s. Using predictions to bootstrap? %s",
+                dataset_path.name,
+                dataset_path.use_preds,
+            )
+            loaded = cls.load_single_standard_dataset(
+                dataset_path=dataset_path.data_dir,
+                use_preds=dataset_path.use_preds,
+            )
+            loaded_datasets.append(loaded)
 
+        # Concatenate the queries and run times.
+        queries_concat: List[str] = []
+        for lds in loaded_datasets:
+            queries_concat.extend(lds[0])
+        run_times_concat = np.concatenate([ds[1] for ds in loaded_datasets])
+        return cls(policy, bp.tables, queries_concat, run_times_concat)
+
+    @classmethod
+    def load_single_standard_dataset(
+        cls,
+        dataset_path: str | pathlib.Path,
+        use_preds: bool,
+    ) -> Tuple[List[str], npt.NDArray]:
         if isinstance(dataset_path, pathlib.Path):
             dsp = dataset_path
         else:
@@ -105,14 +135,17 @@ class ForestTrainer:
                 else:
                     raw_queries.append(clean + ";")
 
-        run_times = np.load(dsp / "run_time_s-athena-aurora-redshift.npy")
+        if use_preds:
+            run_times = np.load(dsp / "pred-run_time_s-athena-aurora-redshift.npy")
+        else:
+            run_times = np.load(dsp / "run_time_s-athena-aurora-redshift.npy")
 
         # Reorder the engine dimension.
         stacked = np.stack(
             [run_times[:, 1], run_times[:, 2], run_times[:, 0]], axis=cls.m
         )
 
-        return cls(policy, bp.tables, raw_queries, stacked)
+        return raw_queries, stacked
 
     def train(
         self,

@@ -1,15 +1,14 @@
 #! /bin/bash
 
-if [ -z $4 ]; then
-  >&2 echo "Usage: $0 <instance> <config_path> <schema name> <cluster id>"
+if [ -z $3 ]; then
+  >&2 echo "Usage: $0 <config_path> <schema name> <cluster id>"
   >&2 echo "The config path should be relative to the redshift/ subdirectory."
   exit 1
 fi
 
-instance=$1
-export BRAD_CONFIG=$2
-export BRAD_SCHEMA=$3
-cluster_identifier=$4
+export BRAD_CONFIG=$1
+export BRAD_SCHEMA=$2
+cluster_identifier=$3
 
 function run_warm_up() {
   >&2 echo "Running warm up..."
@@ -42,22 +41,43 @@ function sync_redshift_resize() {
       if [[ $cluster_status == "available" ]]; then
           break
       fi
-      >&2 echo "Waiting for resize to complete..."
+      >&2 echo "Waiting for resize to complete (--> $target_instance_type $target_node_count)..."
       sleep 10
   done
 }
 
->&2 echo "$instance 2x"
-sync_redshift_resize $instance 2
-run_warm_up
-cond run "//redshift:${instance}-2-${BRAD_SCHEMA}"
+#>&2 echo "dc2_large 1x"
+# sync_redshift_resize dc2_large 1
+#sleep 30
+#run_warm_up
+#cond run "//redshift:dc2_large-1-${BRAD_SCHEMA}"
 
->&2 echo "$instance 4x"
-sync_redshift_resize $instance 4
-run_warm_up
-cond run "//redshift:${instance}-4-${BRAD_SCHEMA}"
+#>&2 echo "dc2_large 16x"
+#sync_redshift_resize dc2_large 16
+#sleep 30
+#run_warm_up
+#cond run "//redshift:dc2_large-16-${BRAD_SCHEMA}"
 
->&2 echo "$instance 8x"
-sync_redshift_resize $instance 8
+>&2 echo "ra3_xlplus 8x"
+sync_redshift_resize ra3_xlplus 8
+sleep 30
 run_warm_up
-cond run "//redshift:${instance}-8-${BRAD_SCHEMA}"
+cond run "//redshift:ra3_xlplus-8-${BRAD_SCHEMA}"
+
+>&2 echo "ra3_xlplus 4x"
+sync_redshift_resize ra3_xlplus 4
+sleep 30
+run_warm_up
+cond run "//redshift:ra3_xlplus-4-${BRAD_SCHEMA}"
+
+>&2 echo "ra3_xlplus 2x"
+sync_redshift_resize ra3_xlplus 2
+sleep 30
+run_warm_up
+cond run "//redshift:ra3_xlplus-2-${BRAD_SCHEMA}"
+
+>&2 echo "ra3_xlplus 1x"
+sync_redshift_resize ra3_xlplus 1
+sleep 30
+run_warm_up
+cond run "//redshift:ra3_xlplus-1-${BRAD_SCHEMA}"

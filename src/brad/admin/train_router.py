@@ -10,7 +10,7 @@ from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.forest_policy import ForestPolicy
-from brad.routing.tree_based.trainer import ForestTrainer
+from brad.routing.tree_based.trainer import ForestTrainer, DatasetPath
 from brad.blueprint.manager import BlueprintManager
 
 logger = logging.getLogger(__name__)
@@ -115,10 +115,12 @@ def train_router(args):
     policy = RoutingPolicy.from_str(args.policy)
 
     if args.std_dataset_path is not None:
-        trainer = ForestTrainer.load_from_standard_dataset(
+        trainer = ForestTrainer.load_from_standard_datasets(
             policy=policy,
             schema_file=args.schema_file,
-            dataset_path=args.std_dataset_path,
+            datasets=[
+                DatasetPath("main", args.std_dataset_path, use_preds=False),
+            ],
         )
     else:
         assert args.data_queries is not None

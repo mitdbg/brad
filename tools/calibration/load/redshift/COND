@@ -91,7 +91,7 @@ for instance in INSTANCE_TYPES:
               "engine": "redshift",
             },
           )
-          for clients, query_idx in product(NUM_CLIENTS, range(NUM_QUERIES))
+          for clients, query_idx in product([1], range(NUM_QUERIES))
         ],
       )
 
