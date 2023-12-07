@@ -1,5 +1,6 @@
 import logging
 import pathlib
+from tqdm import tqdm
 from collections import namedtuple
 
 import numpy as np
@@ -266,7 +267,8 @@ class ForestTrainer:
 
     def _compute_selectivity_features(self, estimator: Estimator) -> None:
         f_table_selectivity = []
-        for q in self._valid_queries:
+        logger.info("Computing table selectivity features...")
+        for q in tqdm(self._valid_queries):
             features = np.zeros(len(self._table_order))
             access_infos = estimator.get_access_info_sync(q)
 
@@ -280,6 +282,7 @@ class ForestTrainer:
 
     def _compute_presence_features(self) -> None:
         f_table_presence = []
+        logger.info("Computing table presence features...")
         for q in self._valid_queries:
             features = np.zeros(len(self._table_order))
             for t in q.tables():
@@ -294,7 +297,8 @@ class ForestTrainer:
 
     def _compute_cardinality_features(self, estimator: Estimator) -> None:
         f_table_cardinality = []
-        for q in self._valid_queries:
+        logger.info("Computing table cardinality features...")
+        for q in tqdm(self._valid_queries):
             features = np.zeros(len(self._table_order))
             access_infos = estimator.get_access_info_sync(q)
 
@@ -340,6 +344,8 @@ class ForestTrainer:
             features = self._f_table_presence
         elif self._policy == RoutingPolicy.ForestTableSelectivity:
             features = self._f_table_selectivity
+        elif self._policy == RoutingPolicy.ForestTableCardinality:
+            features = self._f_table_cardinality
         else:
             assert False
 

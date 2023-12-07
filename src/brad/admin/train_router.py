@@ -152,7 +152,10 @@ def train_router(args):
             athena_run_times=args.data_athena_rt,
         )
 
-    if policy == RoutingPolicy.ForestTableSelectivity:
+    if (
+        policy == RoutingPolicy.ForestTableSelectivity
+        or policy == RoutingPolicy.ForestTableCardinality
+    ):
         asset_mgr = AssetManager(config)
         mgr = BlueprintManager(config, asset_mgr, schema_name)
         mgr.load_sync()
