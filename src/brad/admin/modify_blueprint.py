@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import logging
+import time
 from typing import Optional
 
 from brad.asset_manager import AssetManager
@@ -22,6 +23,9 @@ from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.forest_policy import ForestPolicy
 from brad.routing.rule_based import RuleBased
+from brad.routing.context import RoutingContext
+from brad.query_rep import QueryRep
+from brad.data_stats.postgres_estimator import PostgresEstimator
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +146,7 @@ def register_admin_action(subparser) -> None:
         help="Set to abort an in-progress transition. "
         "Only do this if you know what you are doing!",
     )
+    parser.add_argument("--queries-file", type=str)
     parser.set_defaults(admin_action=modify_blueprint)
 
 
@@ -239,6 +244,26 @@ def modify_blueprint(args) -> None:
     blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
     blueprint_mgr.load_sync()
     blueprint = blueprint_mgr.get_blueprint()
+
+    with open(args.queries_file) as file:
+        queries = [line.strip() for line in file]
+
+    qr = QueryRep(queries[0])
+    pge = asyncio.run(PostgresEstimator.connect(args.schema_name, config))
+    rctx = RoutingContext()
+    rctx.estimator = pge
+    rp = blueprint.get_routing_policy()
+    iters = 1000
+
+    start = time.time()
+    for _ in range(iters):
+        _ = rp.definite_policy.engine_for_sync(qr, rctx)
+    end = time.time()
+    rt = end - start
+    pq = rt / iters
+    print("Total run time:", rt)
+    print("Per query:", pq)
+    return
 
     if args.fetch_only:
         print(blueprint)

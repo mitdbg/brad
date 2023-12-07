@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import numpy as np
 import pathlib
+import time
 
 from typing import List
 from brad.config.engine import Engine
@@ -42,7 +43,18 @@ def main():
     model = TrainedModel.load(
         engine, args.model_file, args.model_stats_file, args.database_stats_file
     )
-    predictions = model.predict(queries, conn)
+    print("starting")
+    queries = [queries[0]]  # Measure overhead of a batch of one
+    iters = 1_000
+    start = time.time()
+    for _ in range(iters):
+        predictions = model.predict(queries, conn)
+    end = time.time()
+    tt = end - start
+    pq = tt / iters
+    print("Total time:", tt)
+    print("Per query:", pq)
+    return
 
     if args.undo_log and args.undo_mega:
         print("WARNING: Both --undo-log and --undo-mega used.")
