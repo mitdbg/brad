@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import yaml
+from typing import List
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -35,9 +36,11 @@ def register_admin_action(subparser) -> None:
         help="Path to the schema definition file.",
     )
     parser.add_argument(
-        "--std-dataset-path",
+        "--std-dataset-paths",
         type=str,
-        help="Path to a standard dataset to use for training.",
+        nargs="+",
+        help="Path to standard datasets to use for training. "
+        "Format: '<name>:<path>'.",
     )
     parser.add_argument(
         "--data-queries",
@@ -87,7 +90,7 @@ def register_admin_action(subparser) -> None:
     parser.add_argument(
         "--policy",
         type=str,
-        default=RoutingPolicy.ForestTableSelectivity.value,
+        default=RoutingPolicy.ForestTableCardinality.value,
         help="The type of query router to train. Only the forest-based models "
         "are trainable.",
     )
@@ -108,19 +111,32 @@ async def set_up_estimator(
     return estimator
 
 
+def parse_std_datasets(raw_inputs: List[str]) -> List[DatasetPath]:
+    dataset_paths = []
+    for inp in raw_inputs:
+        name, data_path = inp.split(":")
+        if "regular" in name or "repeating" in name:
+            use_preds = False
+        else:
+            use_preds = True
+        dataset_paths.append(DatasetPath(name, data_path, use_preds))
+    return dataset_paths
+
+
 # This method is called by `brad.exec.admin.main`.
 def train_router(args):
     schema_name = extract_schema_name(args.schema_file)
     config = ConfigFile.load(args.config_file)
     policy = RoutingPolicy.from_str(args.policy)
 
-    if args.std_dataset_path is not None:
+    if args.std_dataset_paths is not None:
+        datasets = parse_std_datasets(args.std_dataset_paths)
+        for ds in datasets:
+            logger.info("Loaded dataset: %s", ds)
         trainer = ForestTrainer.load_from_standard_datasets(
             policy=policy,
             schema_file=args.schema_file,
-            datasets=[
-                DatasetPath("main", args.std_dataset_path, use_preds=False),
-            ],
+            datasets=datasets,
         )
     else:
         assert args.data_queries is not None

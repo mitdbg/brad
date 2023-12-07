@@ -61,6 +61,7 @@ class ForestTrainer:
         self._table_order: List[str] = []
         self._f_table_presence = np.array([])
         self._f_table_selectivity = np.array([])
+        self._f_table_cardinality = np.array([])
 
         self._preprocess_training_data()
 
@@ -257,6 +258,9 @@ class ForestTrainer:
         elif self._policy == RoutingPolicy.ForestTableSelectivity:
             assert estimator is not None
             self._compute_selectivity_features(estimator)
+        elif self._policy == RoutingPolicy.ForestTableCardinality:
+            assert estimator is not None
+            self._compute_cardinality_features(estimator)
         else:
             raise RuntimeError("Unsupported routing policy: {}".format(self._policy))
 
@@ -287,6 +291,20 @@ class ForestTrainer:
             f_table_presence.append(features)
 
         self._f_table_presence = np.array(f_table_presence)
+
+    def _compute_cardinality_features(self, estimator: Estimator) -> None:
+        f_table_cardinality = []
+        for q in self._valid_queries:
+            features = np.zeros(len(self._table_order))
+            access_infos = estimator.get_access_info_sync(q)
+
+            for ai in access_infos:
+                tidx = self._table_order.index(ai.table_name)
+                features[tidx] = max(features[tidx], ai.cardinality)
+
+            f_table_cardinality.append(features)
+
+        self._f_table_cardinality = np.array(f_table_cardinality)
 
     def _compute_routing_quality(
         self, predictions: npt.NDArray, query_indices: npt.NDArray
