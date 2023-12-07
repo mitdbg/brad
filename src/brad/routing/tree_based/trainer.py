@@ -188,6 +188,8 @@ class ForestTrainer:
             input_features = self._f_table_presence
         elif self._policy == RoutingPolicy.ForestTableSelectivity:
             input_features = self._f_table_selectivity
+        elif self._policy == RoutingPolicy.ForestTableCardinality:
+            input_features = self._f_table_cardinality
         else:
             assert False
 
