@@ -89,5 +89,14 @@ class ModelWrap:
                     pass
             return one_hot_table_presence
 
+        elif self._policy == RoutingPolicy.ForestTableCardinality:
+            assert estimator is not None
+            table_selectivity = np.zeros(len(self._table_order))
+            access_infos = await estimator.get_access_info(query)
+            for ai in access_infos:
+                tidx = self._table_order.index(ai.table_name)
+                table_selectivity[tidx] = max(table_selectivity[tidx], ai.cardinality)
+            return table_selectivity
+
         else:
             assert False
