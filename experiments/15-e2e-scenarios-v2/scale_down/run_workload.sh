@@ -13,8 +13,6 @@ source ../common.sh
 # --query-indexes
 extract_named_arguments $@
 
-# Should be removed eventually and we should rely on the blueprint.
-export BRAD_INITIAL_ROUTE_REDSHIFT_ONLY=1
 start_brad $config_file $planner_config_file
 log_workload_point "brad_start_initiated"
 sleep 30
@@ -26,8 +24,6 @@ rana_pid=$runner_pid
 start_txn_runner 4  # Implicit: --dataset-type
 txn_pid=$runner_pid
 
-# start_repeating_olap_runner 1 70 5 "61,71,75" "ra_1_special"
-# rana2_pid=$runner_pid
 log_workload_point "clients_started"
 
 function inner_cancel_experiment() {

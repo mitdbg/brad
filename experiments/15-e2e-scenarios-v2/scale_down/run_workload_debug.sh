@@ -18,8 +18,6 @@ trap "cancel_experiment" TERM
 
 # Useful for testing out blueprint planning without executing the transition.
 export BRAD_IGNORE_BLUEPRINT=1
-# Should be removed eventually and we should rely on the blueprint.
-export BRAD_INITIAL_ROUTE_REDSHIFT_ONLY=1
 start_brad_debug $config_file $planner_config_file
 sleep 10
 
