@@ -101,6 +101,10 @@ files.
   configuration. This should be set to the ARN of the `rds-monitoring-role`
   found in your AWS IAM console.
 - (08/15/2023) Add `front_end_query_latency_buffer_size` to your `config.yml`.
+- (12/08/2023) The configuration scheme has changed. See
+  `physical_config_sample.yml` for details. Keep private credentials in your
+  physical config. You can use `system_config.yml` as the default system
+  configuration.
 
 
 ### Generate IMDB workload
