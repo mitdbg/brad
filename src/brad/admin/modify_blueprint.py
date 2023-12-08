@@ -48,16 +48,22 @@ def register_admin_action(subparser) -> None:
         "Only use this tool if you know what you are doing!",
     )
     parser.add_argument(
-        "--config-file",
+        "--physical-config-file",
         type=str,
         required=True,
-        help="Path to BRAD's configuration file.",
+        help="Path to BRAD's physical configuration file.",
+    )
+    parser.add_argument(
+        "--system-config-file",
+        type=str,
+        required=True,
+        help="Path to BRAD's system configuration file.",
     )
     parser.add_argument(
         "--schema-name",
         type=str,
         required=True,
-        help="The name of the schema to drop.",
+        help="The name of the schema to modify.",
     )
     parser.add_argument(
         "--fetch-only",
@@ -103,10 +109,11 @@ def register_admin_action(subparser) -> None:
             "always_aurora",
             "always_athena",
             "df_selectivity",
+            "df_cardinality",
             "rule_based",
         ],
         help="Sets the serialized routing policy to a preconfigured default: "
-        "{always_redshift, always_aurora, always_athena, df_selectivity, rule_based}",
+        "{always_redshift, always_aurora, always_athena, df_selectivity, df_cardinality, rule_based}",
     )
     parser.add_argument(
         "--keep-indefinite-policies",
@@ -232,7 +239,9 @@ async def run_transition(
 # This method is called by `brad.exec.admin.main`.
 def modify_blueprint(args) -> None:
     # 1. Load the config.
-    config = ConfigFile.load(args.config_file)
+    config = ConfigFile.load_from_new_configs(
+        phys_config=args.physical_config_file, system_config=args.system_config_file
+    )
 
     # 2. Load the existing blueprint.
     assets = AssetManager(config)
@@ -321,6 +330,12 @@ def modify_blueprint(args) -> None:
             )
         elif args.set_routing_policy == "rule_based":
             definite_policy = RuleBased()
+        elif args.set_routing_policy == "df_cardinality":
+            definite_policy = asyncio.run(
+                ForestPolicy.from_assets(
+                    args.schema_name, RoutingPolicy.ForestTableCardinality, assets
+                )
+            )
         else:
             raise RuntimeError(
                 f"Unknown routing policy preset: {args.set_routing_policy}"
