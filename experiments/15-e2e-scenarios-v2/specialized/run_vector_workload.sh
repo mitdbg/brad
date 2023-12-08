@@ -32,7 +32,7 @@ query_indices="62,64,65,66,69,72,73,74,91,59"
 heavier_queries="14,54,60,71,75"
 all_queries="${query_indices},${heavier_queries}"
 
-start_brad $config_file $planner_config_file
+start_brad $system_config_file $physical_config_file
 log_workload_point "brad_start_initiated"
 sleep 30
 

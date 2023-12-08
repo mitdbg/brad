@@ -1,0 +1,146 @@
+# This file contains configurations that are used by BRAD. These are default
+# values and should be customized for specific situations.
+
+# BRAD's front end servers will listen for client connections on this interface
+# and port. If `num_front_ends` is greater than one, subsequent front ends will
+# listen on successive ports (e.g., 6584, 6585, etc.).
+front_end_interface: "0.0.0.0"
+front_end_port: 6583
+num_front_ends: 16
+
+# Logging paths. If the value is in ALL_CAPS (with underscores), it is
+# interpreted as an environment variable (BRAD will log to the path stored in
+# the environment variable).
+
+# Where BRAD's daemon process will write its logs.
+daemon_log_file: COND_OUT
+
+# Where BRAD's front end processes will write their logs.
+front_end_log_path: COND_OUT
+
+# Where BRAD's blueprint planner will write debug logs.
+planner_log_path: COND_OUT
+
+# Where BRAD's metrics loggers will write their logs.
+metrics_log_path: COND_OUT
+
+# Probability that each transactional query will be logged.
+txn_log_prob: 0.01
+
+# Set to a non-zero value enable automatic data syncing. When this is set to 0,
+# automatic syncing is disabled.
+data_sync_period_seconds: 0
+
+# BRAD's front end servers will report their metrics at regular intervals.
+front_end_metrics_reporting_period_seconds: 30
+front_end_query_latency_buffer_size: 100
+
+# `default` means to use the policy encoded in the blueprint. Other values will
+# override the blueprint.
+routing_policy: default
+
+# Whether to disable table movement for benchmark purposes (i.e., keep all
+# tables on all engines.)
+disable_table_movement: true
+
+# Epoch length for metrics and forecasting. This is the granularity at which
+# metrics/forecasting will be performed.
+epoch_length:
+  weeks: 0
+  days: 0
+  hours: 0
+  minutes: 1
+
+# Blueprint planning strategy.
+strategy: query_based_beam
+
+# Used to specify the period of time over which to use data for planning.
+# Currrently, this is a "look behind" window for the workload.
+planning_window:
+  weeks: 0
+  days: 0
+  hours: 1
+  minutes: 0
+
+# Used to aggregate metrics collected in the planning window.
+metrics_agg:
+  method: ewm         # 'mean' is another option
+  alpha: 0.86466472   # 1 - 1 / e^2
+
+# Used during planning.
+reinterpret_second_as: 1
+
+# The query distribution must change by at least this much for a new blueprint
+# to be accepted.
+query_dist_change_frac: 0.1
+
+# The search bound for the provisioning.
+max_provisioning_multiplier: 2.5
+
+# Flag options for blueprint planning.
+use_io_optimized_aurora: true
+use_recorded_routing_if_available: true
+ensure_tables_together_on_one_engine: true
+
+# Loads used to prime the system when no information is available.
+aurora_initialize_load_fraction: 0.25
+redshift_initialize_load_fraction: 0.25
+
+# Blueprint planning performance ceilings.
+query_latency_p90_ceiling_s: 30.0
+txn_latency_p90_ceiling_s: 0.030
+
+# Used for ordering blueprints during planning.
+comparator:
+  type: benefit_perf_ceiling  # or `perf_ceiling`
+
+  benefit_horizon:  # Only used by the `benefit_perf_ceiling` comparator
+    weeks: 0
+    days: 0
+    hours: 1
+    minutes: 30
+
+  penalty_threshold: 0.8  # Only used by the `benefit_perf_ceiling` comparator
+
+# Used for precomputed predictions.
+std_datasets:
+  - name: regular
+    path: workloads/IMDB_100GB/regular_test/
+  - name: adhoc
+    path: workloads/IMDB_100GB/adhoc_test/
+
+# Blueprint planning trigger configs.
+
+triggers:
+  enabled: true
+  check_period_s: 90  # Triggers are checked every X seconds.
+  check_period_offset_s: 360  # Wait 6 mins before starting.
+
+  elapsed_time:
+    disabled: true
+    multiplier: 60  # Multiplier over `planning_window`.
+
+  redshift_cpu:
+    lo: 15
+    hi: 85
+    sustained_epochs: 3
+
+  aurora_cpu:
+    lo: 15
+    hi: 85
+    sustained_epochs: 3
+
+  variable_costs:
+    disabled: true
+    threshold: 1.0
+
+  query_latency_ceiling:
+    ceiling_s: 30.0
+    sustained_epochs: 3
+
+  txn_latency_ceiling:
+    ceiling_s: 0.030
+    sustained_epochs: 3
+
+  recent_change:
+    delay_epochs: 5

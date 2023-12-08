@@ -39,10 +39,16 @@ async def run_transition(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config-file",
+        "--system-config-file",
         type=str,
         required=True,
-        help="Path to BRAD's configuration file.",
+        help="Path to BRAD's system configuration file.",
+    )
+    parser.add_argument(
+        "--physical-config-file",
+        type=str,
+        required=True,
+        help="Path to BRAD's physical configuration file.",
     )
     parser.add_argument(
         "--schema-name",
