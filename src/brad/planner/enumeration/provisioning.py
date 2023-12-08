@@ -73,10 +73,6 @@ class ProvisioningEnumerator:
             ):
                 candidate.set_num_nodes(num_nodes)
 
-                if id(self._instances) == id(_REDSHIFT_INSTANCES) and num_nodes == 1:
-                    # TODO: Temporarily avoid single node instances.
-                    continue
-
                 if (
                     abs(self._compute_distance(base_provisioning_value, candidate))
                     <= max_distance
