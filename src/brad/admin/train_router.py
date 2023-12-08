@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import yaml
+from typing import List
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -10,7 +11,7 @@ from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.forest_policy import ForestPolicy
-from brad.routing.tree_based.trainer import ForestTrainer
+from brad.routing.tree_based.trainer import ForestTrainer, DatasetPath
 from brad.blueprint.manager import BlueprintManager
 
 logger = logging.getLogger(__name__)
@@ -35,9 +36,11 @@ def register_admin_action(subparser) -> None:
         help="Path to the schema definition file.",
     )
     parser.add_argument(
-        "--std-dataset-path",
+        "--std-dataset-paths",
         type=str,
-        help="Path to a standard dataset to use for training.",
+        nargs="+",
+        help="Path to standard datasets to use for training. "
+        "Format: '<name>:<path>'.",
     )
     parser.add_argument(
         "--data-queries",
@@ -87,7 +90,7 @@ def register_admin_action(subparser) -> None:
     parser.add_argument(
         "--policy",
         type=str,
-        default=RoutingPolicy.ForestTableSelectivity.value,
+        default=RoutingPolicy.ForestTableCardinality.value,
         help="The type of query router to train. Only the forest-based models "
         "are trainable.",
     )
@@ -108,17 +111,32 @@ async def set_up_estimator(
     return estimator
 
 
+def parse_std_datasets(raw_inputs: List[str]) -> List[DatasetPath]:
+    dataset_paths = []
+    for inp in raw_inputs:
+        name, data_path = inp.split(":")
+        if "regular" in name or "repeating" in name:
+            use_preds = False
+        else:
+            use_preds = True
+        dataset_paths.append(DatasetPath(name, data_path, use_preds))
+    return dataset_paths
+
+
 # This method is called by `brad.exec.admin.main`.
 def train_router(args):
     schema_name = extract_schema_name(args.schema_file)
     config = ConfigFile.load(args.config_file)
     policy = RoutingPolicy.from_str(args.policy)
 
-    if args.std_dataset_path is not None:
-        trainer = ForestTrainer.load_from_standard_dataset(
+    if args.std_dataset_paths is not None:
+        datasets = parse_std_datasets(args.std_dataset_paths)
+        for ds in datasets:
+            logger.info("Loaded dataset: %s", ds)
+        trainer = ForestTrainer.load_from_standard_datasets(
             policy=policy,
             schema_file=args.schema_file,
-            dataset_path=args.std_dataset_path,
+            datasets=datasets,
         )
     else:
         assert args.data_queries is not None
@@ -134,7 +152,10 @@ def train_router(args):
             athena_run_times=args.data_athena_rt,
         )
 
-    if policy == RoutingPolicy.ForestTableSelectivity:
+    if (
+        policy == RoutingPolicy.ForestTableSelectivity
+        or policy == RoutingPolicy.ForestTableCardinality
+    ):
         asset_mgr = AssetManager(config)
         mgr = BlueprintManager(config, asset_mgr, schema_name)
         mgr.load_sync()

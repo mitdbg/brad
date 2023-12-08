@@ -14,6 +14,7 @@ class RoutingPolicy(str, enum.Enum):
     RuleBased = "rule_based"
     ForestTablePresence = "df_table_presence"
     ForestTableSelectivity = "df_table_selectivity"
+    ForestTableCardinality = "df_table_cardinality"
 
     @staticmethod
     def from_str(candidate: str) -> "RoutingPolicy":
@@ -31,5 +32,7 @@ class RoutingPolicy(str, enum.Enum):
             return RoutingPolicy.ForestTablePresence
         elif candidate == RoutingPolicy.ForestTableSelectivity.value:
             return RoutingPolicy.ForestTableSelectivity
+        elif candidate == RoutingPolicy.ForestTableCardinality.value:
+            return RoutingPolicy.ForestTableCardinality
         else:
             raise ValueError("Unrecognized policy {}".format(candidate))
