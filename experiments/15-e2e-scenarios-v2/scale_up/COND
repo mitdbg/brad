@@ -1,43 +1,12 @@
 include("../common.cond")
 
-# Legacy workload.
-run_experiment(
-  name="brad_100g",
-  run="./run_workload.sh",
-  options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_large_100.yml",
-    "planner-config-file": "config/planner.yml",
-    "schema-name": "imdb_extended_100g",
-    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "num-front-ends": 28,
-    "dataset-type": "100gb",
-  },
-)
-
-# Legacy workload.
-run_experiment(
-  name="brad_100g_2",
-  run="./run_workload_2.sh",
-  options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_large_100.yml",
-    "planner-config-file": "config/planner.yml",
-    "schema-name": "imdb_extended_100g",
-    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "num-front-ends": 28,
-    "dataset-type": "100gb",
-  },
-)
-
 # Used to test out different sub-scenarios.
 run_command(
   name="brad_100g_debug",
   run="./run_workload_debug.sh",
   options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_large_100.yml",
-    "planner-config-file": "config/planner.yml",
+    "system-config-file": "scale_up_config.yml",
+    "physical-config-file": "config/physical_config_100gb.yml",
     "schema-name": "imdb_extended_100g",
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "num-front-ends": 28,
@@ -50,9 +19,8 @@ run_experiment(
   name="brad_100g_txn_up",
   run="./run_workload_txn_up.sh",
   options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_large_100.yml",
-    "planner-config-file": "config/planner.yml",
+    "system-config-file": "scale_up_config.yml",
+    "physical-config-file": "config/physical_config_100gb.yml",
     "schema-name": "imdb_extended_100g",
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "num-front-ends": 28,
@@ -65,9 +33,8 @@ run_experiment(
   name="brad_100g_ana_up",
   run="./run_workload_ana_up.sh",
   options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_large_100.yml",
-    "planner-config-file": "config/planner.yml",
+    "system-config-file": "scale_up_config.yml",
+    "physical-config-file": "config/physical_config_100gb.yml",
     "schema-name": "imdb_extended_100g",
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "num-front-ends": 28,
@@ -80,9 +47,8 @@ run_command(
   name="brad_100g_warmup",
   run="./run_overall_warmup.sh",
   options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_large_100.yml",
-    "planner-config-file": "config/planner.yml",
+    "system-config-file": "scale_up_config.yml",
+    "physical-config-file": "config/physical_config_100gb.yml",
     "schema-name": "imdb_extended_100g",
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "num-front-ends": 28,
@@ -95,9 +61,8 @@ run_experiment(
   name="brad_100g_txn_ana_up",
   run="./run_workload_txn_ana_up.sh",
   options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_large_100.yml",
-    "planner-config-file": "config/planner.yml",
+    "system-config-file": "scale_up_config.yml",
+    "physical-config-file": "config/physical_config_100gb.yml",
     "schema-name": "imdb_extended_100g",
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "num-front-ends": 28,

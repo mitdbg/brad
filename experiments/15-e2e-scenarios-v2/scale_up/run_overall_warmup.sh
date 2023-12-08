@@ -7,9 +7,8 @@ initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
 heavier_queries="58,61,62,64,69,73,74,51,57,60"
 
 # Arguments:
-# --config-file
-# --planner-config-file
-# --query-indexes
+# --system-config-file
+# --physical-config-file
 extract_named_arguments $@
 
 function inner_cancel_experiment() {
@@ -22,7 +21,7 @@ trap "inner_cancel_experiment" TERM
 # Used just to warm up the systems.
 
 export BRAD_IGNORE_BLUEPRINT=1
-start_brad_debug $config_file $planner_config_file
+start_brad_debug $system_config_file $physical_config_file
 sleep 30
 
 start_repeating_olap_runner 1 5 5 $initial_queries "ra_8"

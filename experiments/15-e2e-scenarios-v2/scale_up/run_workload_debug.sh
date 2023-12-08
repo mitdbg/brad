@@ -17,8 +17,8 @@ initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
 heavier_queries="58,61,62,64,69,73,74,51,57,60"
 
 # Arguments:
-# --config-file
-# --planner-config-file
+# --system-config-file
+# --physical-config-file
 # --query-indexes
 extract_named_arguments $@
 
@@ -30,7 +30,7 @@ trap "inner_cancel_experiment" INT
 trap "inner_cancel_experiment" TERM
 
 export BRAD_IGNORE_BLUEPRINT=1
-start_brad_debug $config_file $planner_config_file
+start_brad_debug $system_config_file $physical_config_file
 log_workload_point "brad_start_initiated"
 sleep 30
 

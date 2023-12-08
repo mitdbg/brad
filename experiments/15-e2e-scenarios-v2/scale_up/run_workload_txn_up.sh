@@ -18,8 +18,8 @@ initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
 heavier_queries="58,61,62,64,69,73,74,51,57,60"
 
 # Arguments:
-# --config-file
-# --planner-config-file
+# --physical-config-file
+# --system-config-file
 # --query-indexes
 extract_named_arguments $@
 
@@ -47,7 +47,7 @@ function inner_cancel_experiment() {
 trap "inner_cancel_experiment" INT
 trap "inner_cancel_experiment" TERM
 
-start_brad $config_file $planner_config_file
+start_brad $system_config_file $physical_config_file
 log_workload_point "brad_start_initiated"
 sleep 30
 
