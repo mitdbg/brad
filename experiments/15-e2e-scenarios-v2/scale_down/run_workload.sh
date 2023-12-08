@@ -8,12 +8,12 @@ source ../common.sh
 # (TiDB / Serverless Redshift + Aurora)
 
 # Arguments:
-# --config-file
-# --planner-config-file
+# --system-config-file
+# --physical-config-file
 # --query-indexes
 extract_named_arguments $@
 
-start_brad $config_file $planner_config_file
+start_brad $system_config_file $physical_config_file
 log_workload_point "brad_start_initiated"
 sleep 30
 

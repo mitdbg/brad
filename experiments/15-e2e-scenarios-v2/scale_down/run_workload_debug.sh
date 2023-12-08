@@ -8,8 +8,8 @@ source ../common.sh
 # (TiDB / Serverless Redshift + Aurora)
 
 # Arguments:
-# --config-file
-# --planner-config-file
+# --system-config-file
+# --physical-config-file
 # --query-indexes
 extract_named_arguments $@
 
@@ -18,7 +18,7 @@ trap "cancel_experiment" TERM
 
 # Useful for testing out blueprint planning without executing the transition.
 export BRAD_IGNORE_BLUEPRINT=1
-start_brad_debug $config_file $planner_config_file
+start_brad_debug $system_config_file $physical_config_file
 sleep 10
 
 start_repeating_olap_runner 8 15 5 $ra_query_indexes "ra_8"
