@@ -78,6 +78,9 @@ reinterpret_second_as: 1
 # to be accepted.
 query_dist_change_frac: 0.1
 
+# The search bound for the provisioning.
+max_provisioning_multiplier: 2.5
+
 # Flag options for blueprint planning.
 use_io_optimized_aurora: true
 use_recorded_routing_if_available: true

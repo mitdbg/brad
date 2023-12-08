@@ -200,3 +200,164 @@ redshift_scaling_new:
   alpha: 0.730064
   coef1: 0.89125617
   coef2: 0.1139099
+
+
+###
+### The configs below are deprecated.
+###
+
+###
+### Beam planning constants.
+###
+
+beam_size: 100
+max_feasible_cpu: 85
+
+###
+### Neighborhood blueprint planning constants.
+###
+
+max_num_table_moves: 3
+
+# Used by the "sampled_neighborhood" strategy
+sample_set_size: 100000
+
+
+###
+### [Deprecated]
+### Performance metrics scaling modifiers.
+### (Used by neighborhood planning.)
+###
+
+dataset_scaling:
+  redshift_CPUUtilization_Average: 1.0
+  redshift_ReadIOPS_Average: 1.0
+  aurora_WRITER_CPUUtilization_Average: 1.0
+  aurora_WRITER_ReadIOPS_Average: 1.0
+  aurora_WRITER_WriteIOPS_Average: 1.0
+  athena_TotalExecutionTime_Sum: 1.0
+
+redshift_resource_scaling:
+  redshift_CPUUtilization_Average: 1.0
+  redshift_ReadIOPS_Average: 1.0
+
+aurora_resource_scaling:
+  aurora_WRITER_CPUUtilization_Average: 1.0
+  aurora_WRITER_ReadIOPS_Average: 1.0
+  aurora_WRITER_WriteIOPS_Average: 1.0
+
+# [Deprecated]
+# Legacy Aurora scan cost estimator.
+# $0.000025 per MB scanned.
+aurora_usd_per_mb_scanned: 0.000025
+
+###
+### [Deprecated]
+### Query latency scaling modifiers (across provisionings).
+###
+
+aurora_alpha: 0.97066455
+aurora_gamma: 0.722149076
+
+redshift_alpha: 0.7857837
+redshift_gamma: 0.635405229
+
+
+###
+### [Deprecated]
+### Load factor scaling modifiers.
+###
+
+redshift_load_factor:
+  resource_alpha: 0.753694931989888
+  # p = [alpha * base * gamma * CPU] + [(1 - gamma) * base]
+  cpu_alpha: 0.04322972
+  cpu_gamma: 0.500017
+
+  # Legacy factors.
+  cpu_to_load_alpha: 0.7861541
+  min_scaling_cpu: 30
+
+# [Deprecated]
+aurora_load_factor:
+  # Proportionality factor for cross-provisioning CPU changes.
+  resource_alpha: 1.0
+
+  # Proportionality factor for the load metric's effect on query latency.
+  # p = alpha * base * load
+  load_alpha: 0.53865956
+
+  # Legacy factors.
+  cpu_to_load_alpha: 0.8761541
+  min_scaling_cpu: 30
+
+
+###
+### Transactional workload modifiers.
+###
+
+aurora_txns:
+  # [Deprecated]
+  # N.B. These values are for the initial IMDB "bulk insert" transactions
+  client_thpt_to_load: 0.06493011
+  client_thpt_to_cpu_denorm: 0.04584762
+  # We used the number of CPUs as the "resource score".
+  # Should be a bit more precise.
+  prov_to_peak_cpu_denorm: 0.56730588
+
+  # [Deprecated]
+  # N.B. These values are for the IMDB-extended transactions.
+  client_thpt_to_cpu_denorm: 0.0015366357203185784
+  client_thpt_to_load: 0.0037392906617191367
+  # We used the number of CPUs as the "resource score".
+  # Should be a bit more precise.
+  prov_to_peak_cpu_denorm: 0.6800294117647058
+
+  imdb_extended_20g:
+    # Used for "load translation"
+    C_1: 0.00282164
+    C_2: 0.00108688
+
+    # Used for latency.
+    K: 1.0194002389907837
+    b_p50: 0.005365931428968906
+    b_p90: 0.005891922861337662  # TODO: Update
+
+  imdb_extended_100g:
+    # Used for "load translation"
+    C_1: 0.00282164
+    C_2: 0.00108688
+
+    # Used for latency.
+    K: 1.0811012983322144
+    b_p50: 0.0008631267119199038
+    b_p90: 0.002251814818009734
+
+  imdb_specialized_100g:
+    # Used for "load translation"
+    C_1: 0.00282164
+    C_2: 0.00108688
+
+    # Used for latency.
+    K: 1.0811012983322144
+    b_p50: 0.0008631267119199038
+    b_p90: 0.002251814818009734
+
+
+aurora_scaling:
+  # [Deprecated]
+  # [coef1(load)^2(resource ratio)^2 + coef2(load)^2 + coef3(resource ratio)^2 + coef4] * base
+  coef1: 0.2454489
+  coef2: 0.00841046
+  coef3: 0.27845245
+  coef4: 0.56823644
+
+redshift_scaling:
+  # [Deprecated]
+  # Same model as above.
+  # [coef1(load)^2(resource ratio)^2 + coef2(load)^2 + coef3(resource ratio)^2 + coef4] * base
+  # Load is denormalized CPU usage.
+  coef1: 0.63933825
+  coef2: 0.00370447
+  coef3: 0.49948713
+  coef4: 0.36256359
