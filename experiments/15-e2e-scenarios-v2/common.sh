@@ -1,26 +1,28 @@
 function start_brad() {
-  config_file=$1
+  system_config_file=$1
+  physical_config_file=$2
+  curr_dir=$(pwd)
 
   pushd ../../../
   brad daemon \
-    --config-file $config_file \
+    --physical-config-file $physical_config_file \
+    --system-config-file $curr_dir/$system_config_file \
     --schema-name $schema_name \
-    --planner-config-file $planner_config_file \
-    --temp-config-file config/temp_config.yml \
     &
   brad_pid=$!
   popd
 }
 
 function start_brad_debug() {
-  config_file=$1
+  system_config_file=$1
+  physical_config_file=$2
+  curr_dir=$(pwd)
 
   pushd ../../../
   brad daemon \
-    --config-file $config_file \
+    --physical-config-file $physical_config_file \
+    --system-config-file $curr_dir/$system_config_file \
     --schema-name $schema_name \
-    --planner-config-file $planner_config_file \
-    --temp-config-file config/temp_config.yml \
     --debug \
     &
   brad_pid=$!
@@ -290,12 +292,12 @@ function extract_named_arguments() {
       run_for_s=${phys_arg:12}
     fi
 
-    if [[ $phys_arg =~ --config-file=.+ ]]; then
-      config_file=${phys_arg:14}
+    if [[ $phys_arg =~ --physical-config-file=.+ ]]; then
+      physical_config_file=${phys_arg:23}
     fi
 
-    if [[ $phys_arg =~ --planner-config-file=.+ ]]; then
-      planner_config_file=${phys_arg:22}
+    if [[ $phys_arg =~ --system-config-file=.+ ]]; then
+      system_config_file=${phys_arg:21}
     fi
 
     if [[ $phys_arg =~ --skip-replan=.+ ]]; then

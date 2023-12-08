@@ -9,7 +9,7 @@ extract_named_arguments $@
 query_indices="62,64,65,66,69,72,73,74,91,59"
 
 export BRAD_IGNORE_BLUEPRINT=1
-start_brad_debug $config_file $planner_config_file
+start_brad_debug $system_config_file $physical_config_file
 sleep 30
 
 start_other_repeating_runner 1 5 5 "ra_vector" 1

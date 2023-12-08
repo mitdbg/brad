@@ -24,10 +24,16 @@ def register_admin_action(subparser) -> None:
         "Only use this tool if you know what you are doing!",
     )
     parser.add_argument(
-        "--config-file",
+        "--physical-config-file",
         type=str,
         required=True,
-        help="Path to BRAD's configuration file.",
+        help="Path to BRAD's physical configuration file.",
+    )
+    parser.add_argument(
+        "--system-config-file",
+        type=str,
+        required=True,
+        help="Path to BRAD's system configuration file.",
     )
     parser.add_argument(
         "--schema-file",
@@ -126,7 +132,9 @@ def parse_std_datasets(raw_inputs: List[str]) -> List[DatasetPath]:
 # This method is called by `brad.exec.admin.main`.
 def train_router(args):
     schema_name = extract_schema_name(args.schema_file)
-    config = ConfigFile.load(args.config_file)
+    config = ConfigFile.load_from_new_configs(
+        phys_config=args.physical_config_file, system_config=args.system_config_file
+    )
     policy = RoutingPolicy.from_str(args.policy)
 
     if args.std_dataset_paths is not None:

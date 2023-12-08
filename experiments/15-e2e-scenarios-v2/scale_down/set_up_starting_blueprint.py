@@ -39,10 +39,16 @@ async def run_transition(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config-file",
+        "--system-config-file",
         type=str,
         required=True,
-        help="Path to BRAD's configuration file.",
+        help="Path to BRAD's system configuration file.",
+    )
+    parser.add_argument(
+        "--physical-config-file",
+        type=str,
+        required=True,
+        help="Path to BRAD's physical configuration file.",
     )
     parser.add_argument(
         "--schema-name",
@@ -69,7 +75,9 @@ def main():
     set_up_logging(debug_mode=True)
 
     # 1. Load the config.
-    config = ConfigFile.load(args.config_file)
+    config = ConfigFile.load_from_new_configs(
+        phys_config=args.physical_config_file, system_config=args.system_config_file
+    )
 
     # 2. Load the existing blueprint.
     assets = AssetManager(config)

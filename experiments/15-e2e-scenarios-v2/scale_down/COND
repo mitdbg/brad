@@ -43,11 +43,9 @@ run_experiment(
   name="brad_100g",
   run="./run_workload.sh",
   options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_large_100.yml",
-    "planner-config-file": "config/planner.yml",
+    "system-config-file": "scale_down_config.yml",
+    "physical-config-file": "config/physical_config_100gb.yml",
     "schema-name": "imdb_extended_100g",
-    # TODO: Select regular query indexes
     "ra-query-indexes": ",".join(map(str, aurora_alt)),
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "num-front-ends": 8,
@@ -59,9 +57,8 @@ run_command(
   name="brad_100g_debug",
   run="./run_workload_debug.sh",
   options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_large_100.yml",
-    "planner-config-file": "config/planner.yml",
+    "system-config-file": "scale_down_config.yml",
+    "physical-config-file": "config/physical_config_100gb.yml",
     "schema-name": "imdb_extended_100g",
     "ra-query-indexes": ",".join(map(str, aurora_alt)),
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,

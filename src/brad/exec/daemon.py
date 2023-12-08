@@ -17,27 +17,22 @@ def register_command(subparsers):
         help="Start the BRAD daemon.",
     )
     parser.add_argument(
-        "--config-file",
+        "--physical-config-file",
         type=str,
         required=True,
-        help="Path to BRAD's configuration file.",
+        help="Path to BRAD's physical configuration file.",
+    )
+    parser.add_argument(
+        "--system-config-file",
+        type=str,
+        required=True,
+        help="Path to BRAD's system configuration file.",
     )
     parser.add_argument(
         "--schema-name",
         type=str,
         required=True,
         help="The name of the schema to run against.",
-    )
-    parser.add_argument(
-        "--planner-config-file",
-        type=str,
-        required=True,
-        help="Path to the blueprint planner's configuration file.",
-    )
-    parser.add_argument(
-        "--temp-config-file",
-        type=str,
-        help="Path to the temporary configuration file.",
     )
     parser.add_argument(
         "--debug",
@@ -78,11 +73,11 @@ def main(args):
     # descriptors!).
     mp.set_start_method("spawn")
 
-    config = ConfigFile.load(args.config_file)
-    temp_config = (
-        TempConfig.load_from_file(args.temp_config_file)
-        if args.temp_config_file is not None
-        else None
+    config = ConfigFile.load_from_new_configs(
+        phys_config=args.physical_config_file, system_config=args.system_config_file
+    )
+    temp_config = TempConfig.load_from_new_configs(
+        system_config=args.system_config_file
     )
 
     log_path = config.daemon_log_path
@@ -107,7 +102,7 @@ def main(args):
             config,
             temp_config,
             args.schema_name,
-            args.planner_config_file,
+            args.system_config_file,
             args.debug,
         )
         event_loop.create_task(daemon.run_forever())

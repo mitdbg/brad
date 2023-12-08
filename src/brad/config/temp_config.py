@@ -10,6 +10,11 @@ class TempConfig:
     """
 
     @classmethod
+    def load_from_new_configs(cls, system_config: str) -> "TempConfig":
+        with open(system_config, "r", encoding="UTF-8") as file:
+            return cls(yaml.load(file, Loader=yaml.Loader))
+
+    @classmethod
     def load_from_file(cls, file_path: str | pathlib.Path) -> "TempConfig":
         with open(file_path, "r", encoding="UTF-8") as file:
             return cls(yaml.load(file, Loader=yaml.Loader))

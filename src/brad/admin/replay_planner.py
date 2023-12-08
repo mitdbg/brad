@@ -19,10 +19,16 @@ def register_admin_action(subparser) -> None:
         help="Replay a recorded blueprint planning run for debugging.",
     )
     parser.add_argument(
-        "--config-file",
+        "--system-config-file",
         type=str,
         required=True,
-        help="Path to BRAD's configuration file.",
+        help="Path to BRAD's system configuration file.",
+    )
+    parser.add_argument(
+        "--physical-config-file",
+        type=str,
+        required=True,
+        help="Path to BRAD's physical configuration file.",
     )
     parser.add_argument(
         "--schema-name",
@@ -56,7 +62,9 @@ class _EstimatorProvider(EstimatorProvider):
 
 
 async def replay_planner_impl(args) -> None:
-    config = ConfigFile.load(args.config_file)
+    config = ConfigFile.load_from_new_configs(
+        phys_config=args.physical_config_file, system_config=args.system_config_file
+    )
     assets = AssetManager(config)
     blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
     await blueprint_mgr.load()

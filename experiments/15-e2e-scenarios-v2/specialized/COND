@@ -4,9 +4,8 @@ run_experiment(
   name="brad_100g_vector",
   run="./run_vector_workload.sh",
   options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_specialized.yml",
-    "planner-config-file": "config/planner.yml",
+    "system-config-file": "specialized_config.yml",
+    "physical-config-file": "config/physical_config_specialized.yml",
     "schema-name": "imdb_specialized_100g",
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "other-query-bank-file": "vector.sql",
@@ -20,9 +19,8 @@ run_command(
   name="brad_100g_vector_debug",
   run="./run_vector_workload_debug.sh",
   options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_specialized.yml",
-    "planner-config-file": "config/planner.yml",
+    "system-config-file": "specialized_config.yml",
+    "physical-config-file": "config/physical_config_specialized.yml",
     "schema-name": "imdb_specialized_100g",
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "other-query-bank-file": "vector.sql",
@@ -36,9 +34,8 @@ run_command(
   name="brad_100g_vector_warmup",
   run="./run_vector_warmup.sh",
   options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_specialized.yml",
-    "planner-config-file": "config/planner.yml",
+    "system-config-file": "specialized_config.yml",
+    "physical-config-file": "config/physical_config_specialized.yml",
     "schema-name": "imdb_specialized_100g",
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "other-query-bank-file": "vector.sql",

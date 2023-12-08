@@ -83,14 +83,16 @@ class BradDaemon:
         config: ConfigFile,
         temp_config: Optional[TempConfig],
         schema_name: str,
-        path_to_planner_config: str,
+        path_to_system_config: str,
         debug_mode: bool,
     ):
         self._config = config
         self._temp_config = temp_config
         self._schema_name = schema_name
-        self._path_to_planner_config = path_to_planner_config
-        self._planner_config = PlannerConfig.load(path_to_planner_config)
+        self._path_to_system_config = path_to_system_config
+        self._planner_config = PlannerConfig.load_from_new_configs(
+            system_config=path_to_system_config
+        )
         self._debug_mode = debug_mode
 
         self._assets = AssetManager(self._config)
@@ -266,7 +268,7 @@ class BradDaemon:
                     fe_index,
                     self._config,
                     self._schema_name,
-                    self._path_to_planner_config,
+                    self._path_to_system_config,
                     self._debug_mode,
                     input_queue,
                     output_queue,

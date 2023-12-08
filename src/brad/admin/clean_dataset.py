@@ -31,10 +31,16 @@ def register_admin_action(subparser) -> None:
         help="Used to remove rows inserted by the transactions.",
     )
     parser.add_argument(
-        "--config-file",
+        "--physical-config-file",
         type=str,
         required=True,
-        help="Path to BRAD's configuration file.",
+        help="Path to BRAD's physical configuration file.",
+    )
+    parser.add_argument(
+        "--system-config-file",
+        type=str,
+        required=True,
+        help="Path to BRAD's system configuration file.",
     )
     parser.add_argument(
         "--schema-name",
@@ -68,7 +74,9 @@ async def clean_dataset_impl(args) -> None:
     # Run the deletion.
     # Clear the shadow tables.
     # Commit.
-    config = ConfigFile.load(args.config_file)
+    config = ConfigFile.load_from_new_configs(
+        phys_config=args.physical_config_file, system_config=args.system_config_file
+    )
     assets = AssetManager(config)
     blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
     await blueprint_mgr.load()
