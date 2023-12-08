@@ -250,6 +250,7 @@ def modify_blueprint(args) -> None:
 
     qr = QueryRep(queries[0])
     pge = asyncio.run(PostgresEstimator.connect(args.schema_name, config))
+    asyncio.run(pge.analyze(blueprint))
     rctx = RoutingContext()
     rctx.estimator = pge
     rp = blueprint.get_routing_policy()
