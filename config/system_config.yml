@@ -66,6 +66,11 @@ planning_window:
   hours: 1
   minutes: 0
 
+# Used to aggregate metrics collected in the planning window.
+metrics_agg:
+  method: ewm         # 'mean' is another option
+  alpha: 0.86466472   # 1 - 1 / e^2
+
 # Used during planning.
 reinterpret_second_as: 1
 
@@ -104,3 +109,39 @@ std_datasets:
     path: workloads/IMDB_100GB/regular_test/
   - name: adhoc
     path: workloads/IMDB_100GB/adhoc_test/
+
+# Blueprint planning trigger configs.
+
+triggers:
+  enabled: true
+  check_period_s: 90  # Triggers are checked every X seconds.
+  check_period_offset_s: 360  # Wait 6 mins before starting.
+
+  elapsed_time:
+    disabled: true
+    multiplier: 60  # Multiplier over `planning_window`.
+
+  redshift_cpu:
+    lo: 15
+    hi: 85
+    sustained_epochs: 3
+
+  aurora_cpu:
+    lo: 15
+    hi: 85
+    sustained_epochs: 3
+
+  variable_costs:
+    disabled: true
+    threshold: 1.0
+
+  query_latency_ceiling:
+    ceiling_s: 30.0
+    sustained_epochs: 3
+
+  txn_latency_ceiling:
+    ceiling_s: 0.030
+    sustained_epochs: 3
+
+  recent_change:
+    delay_epochs: 5
