@@ -63,7 +63,7 @@ class BradFrontEnd(BradInterface):
         fe_index: int,
         config: ConfigFile,
         schema_name: str,
-        path_to_planner_config: str,
+        path_to_system_config: str,
         debug_mode: bool,
         input_queue: mp.Queue,
         output_queue: mp.Queue,
@@ -85,7 +85,7 @@ class BradFrontEnd(BradInterface):
         self._blueprint_mgr = BlueprintManager(
             self._config, self._assets, self._schema_name
         )
-        self._path_to_planner_config = path_to_planner_config
+        self._path_to_system_config = path_to_system_config
         self._monitor: Optional[Monitor] = None
 
         # Set up query logger

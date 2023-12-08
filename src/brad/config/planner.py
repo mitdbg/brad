@@ -1,9 +1,11 @@
 import yaml
 import numpy as np
 import numpy.typing as npt
+import importlib.resources as pkg_resources
 from datetime import timedelta
 from typing import Dict, Optional, Any
 from brad.planner.strategy import PlanningStrategy
+import brad.planner as brad_planner
 
 
 class PlannerConfig:
@@ -11,6 +13,20 @@ class PlannerConfig:
     Configuration constants used by the blueprint planners. Some constants are
     shared across planning strategies, some are specific to a strategy.
     """
+
+    @classmethod
+    def load_from_new_configs(cls, system_config: str) -> "PlannerConfig":
+        with open(system_config, "r", encoding="UTF-8") as file:
+            system_config_dict = yaml.load(file, Loader=yaml.Loader)
+        with pkg_resources.files(brad_planner).joinpath("constants.yml").open(
+            "r"
+        ) as data:
+            system_constants_dict = yaml.load(data, Loader=yaml.Loader)
+
+        merged = {}
+        merged.update(system_config_dict)
+        merged.update(system_constants_dict)
+        return cls(merged)
 
     @classmethod
     def load(cls, path: str) -> "PlannerConfig":

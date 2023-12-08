@@ -14,6 +14,29 @@ logger = logging.getLogger(__name__)
 
 class ConfigFile:
     @classmethod
+    def load_from_new_configs(
+        cls, phys_config: str, system_config: str
+    ) -> "ConfigFile":
+        # Note that this implementation is designed to support backward
+        # compatibility (to minimize the invasiveness). We have split our
+        # configs into a physical configuration and system configuration.
+        #
+        # The physical configuration represents deployment-specific configs and
+        # credentials and are not meant to be checked in (e.g., for
+        # experiments). The system configuration is meant for shared BRAD
+        # configurations.
+
+        with open(phys_config, "r", encoding="UTF-8") as file:
+            phys_config_dict = yaml.load(file, Loader=yaml.Loader)
+        with open(system_config, "r", encoding="UTF-8") as file:
+            system_config_dict = yaml.load(file, Loader=yaml.Loader)
+
+        merged = {}
+        merged.update(phys_config_dict)
+        merged.update(system_config_dict)
+        return cls(merged)
+
+    @classmethod
     def load(cls, file_path: str) -> "ConfigFile":
         with open(file_path, "r", encoding="UTF-8") as file:
             raw = yaml.load(file, Loader=yaml.Loader)
