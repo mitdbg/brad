@@ -74,7 +74,7 @@ def main(args):
     mp.set_start_method("spawn")
 
     config = ConfigFile.load_from_new_configs(
-        phys_config=args.phys_config_file, system_config=args.system_config_file
+        phys_config=args.physical_config_file, system_config=args.system_config_file
     )
     temp_config = TempConfig.load_from_new_configs(
         system_config=args.system_config_file
@@ -102,7 +102,7 @@ def main(args):
             config,
             temp_config,
             args.schema_name,
-            args.planner_config_file,
+            args.system_config_file,
             args.debug,
         )
         event_loop.create_task(daemon.run_forever())
