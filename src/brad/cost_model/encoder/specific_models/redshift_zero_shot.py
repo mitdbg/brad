@@ -82,9 +82,9 @@ class RedshiftNativeCostModel:
                 or len(q["runtimes"]) == 0
             ):
                 continue
-            runtimes = q["runtimes"]
-            if np.mean(runtimes) > min_query_runtime:
-                label.append(np.mean(runtimes))
+            runtime = np.mean(q["runtimes"][1:])
+            if runtime > min_query_runtime:
+                label.append(runtime)
             else:
                 continue
 
@@ -118,12 +118,13 @@ class RedshiftNativeCostModel:
         qerror = np.maximum(label / pred, pred / label)
         for i in [50, 95, 99]:
             print(f"{i} percentile is {np.percentile(qerror, i)}")
-        return pred / 1000
+        return pred
 
     def train_and_test(
         self,
         raw,
-        min_query_runtime=100,
+        test_raw=None,
+        min_query_runtime=0.1,
         test_query=None,
         min_num_tables=None,
         max_num_tables=None,
@@ -131,6 +132,10 @@ class RedshiftNativeCostModel:
         train_feature, train_label, test_feature, test_label = self.parse_raw(
             raw, min_query_runtime, test_query, min_num_tables, max_num_tables
         )
+        if test_raw is not None:
+            test_feature, test_label, _, _ = self.parse_raw(
+                test_raw, min_query_runtime, test_query, min_num_tables, max_num_tables
+            )
         train_feature = np.asarray(train_feature).reshape(-1, 1)
         train_label = np.asarray(train_label)
         model = LinearRegression()

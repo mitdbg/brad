@@ -174,6 +174,7 @@ class AuroraNativeCostModel:
     def train_and_test(
         self,
         raw,
+        test_raw=None,
         min_query_runtime=100,
         test_query=None,
         min_num_tables=None,
@@ -182,6 +183,10 @@ class AuroraNativeCostModel:
         train_feature, train_label, test_feature, test_label = self.parse_raw(
             raw, min_query_runtime, test_query, min_num_tables, max_num_tables
         )
+        if test_raw is not None:
+            test_feature, test_label, _, _ = self.parse_raw(
+                test_raw, min_query_runtime, test_query, min_num_tables, max_num_tables
+            )
         train_feature = np.asarray(train_feature).reshape(-1, 1)
         train_label = np.asarray(train_label)
         model = LinearRegression()
