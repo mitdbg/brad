@@ -120,6 +120,24 @@ class ScoringContext:
                 # queries (the engine could be off).
                 continue
 
+            if (
+                engine == Engine.Redshift
+                and self.current_blueprint.redshift_provisioning().num_nodes() == 0
+            ):
+                # Avoid having an entry for engines that are off. The check
+                # above might pass if we are using a long planning window and
+                # queries executed on Redshift in the past.
+                continue
+
+            if (
+                engine == Engine.Aurora
+                and self.current_blueprint.aurora_provisioning().num_nodes() == 0
+            ):
+                # Avoid having an entry for engines that are off. The check
+                # above might pass if we are using a long planning window and
+                # queries executed on Aurora in the past.
+                continue
+
             all_queries = self.current_workload.analytical_queries()
             relevant_queries = []
             for qidx in self.current_query_locations[engine]:
