@@ -123,6 +123,8 @@ def runner(
         prng.shuffle(query_order_main)
         query_order = query_order_main.copy()
 
+        first_run = True
+
         # Signal that we're ready to start and wait for the controller.
         print(
             f"Runner {runner_idx} is ready to start running.",
@@ -149,11 +151,20 @@ def runner(
                 ]
                 time.sleep(wait_for_s)
             elif args.avg_gap_s is not None:
-                # Wait times are normally distributed if execution_gap_dist is not provided.
-                wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
-                if wait_for_s < 0.0:
-                    wait_for_s = 0.0
-                time.sleep(wait_for_s)
+                if first_run:
+                    # We wait a uniformly random amount of time at the beginning
+                    # to stagger queries across all the clients that will run
+                    # (e.g., to avoid having all clients issue queries at the
+                    # same time).
+                    first_run = False
+                    wait_for_s = prng.uniform(0.0, args.avg_gap_s)
+                    time.sleep(wait_for_s)
+                else:
+                    # Wait times are normally distributed if execution_gap_dist is not provided.
+                    wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
+                    if wait_for_s < 0.0:
+                        wait_for_s = 0.0
+                    time.sleep(wait_for_s)
 
             if query_frequency is not None:
                 qidx = prng.choices(queries, list(query_frequency))[0]

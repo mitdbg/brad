@@ -53,7 +53,6 @@ from brad.planner.scoring.performance.precomputed_predictions import (
     PrecomputedPredictions,
 )
 from brad.planner.triggers.provider import ConfigDefinedTriggers
-from brad.planner.triggers.recent_change import RecentChange
 from brad.planner.triggers.trigger import Trigger
 from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
@@ -436,7 +435,7 @@ class BradDaemon:
             self._transition_task = asyncio.create_task(self._run_transition_part_one())
 
     def _should_skip_blueprint(
-        self, blueprint: Blueprint, score: Score, trigger: Optional[Trigger]
+        self, blueprint: Blueprint, score: Score, _trigger: Optional[Trigger]
     ) -> bool:
         """
         This is called whenever the planner chooses a new blueprint. The purpose
@@ -466,25 +465,6 @@ class BradDaemon:
             # Do not skip - we are currently missing the score of the active
             # blueprint, so there is nothing to compare to.
             return False
-
-        if trigger is not None and isinstance(trigger, RecentChange):
-            # TODO(geoffxy): This should eventually be removed. The right
-            # solution is doing a comparison during blueprint planning.  Added
-            # temporarily on November 2, 2023.
-            current_cost = (
-                current_score.provisioning_cost
-                + current_score.workload_scan_cost
-                + current_score.storage_cost
-            )
-            next_cost = (
-                score.provisioning_cost + score.workload_scan_cost + score.storage_cost
-            )
-
-            if next_cost > current_cost:
-                logger.info(
-                    "Skipping a RecentChange triggered blueprint because a higher-cost blueprint was selected."
-                )
-                return True
 
         if diff.aurora_diff() is not None or diff.redshift_diff() is not None:
             return False
