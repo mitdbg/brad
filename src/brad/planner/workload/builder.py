@@ -278,7 +278,7 @@ class WorkloadBuilder:
         """
         Deduplication is by exact string match only.
         """
-        deduped: Dict[str, List[Optional[Tuple[Engine, float]]]] = {}
+        deduped: Dict[str, List[Optional[Tuple[Engine, float, datetime]]]] = {}
         for q, engine, run_time_s, epoch_start in queries:
             if q in deduped:
                 deduped[q].append(
