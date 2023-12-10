@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from collections import Counter
 from typing import Dict, List, Tuple, Optional
 from brad.blueprint import Blueprint
@@ -25,7 +26,7 @@ class Query(QueryRep):
         self,
         sql_query: str,
         arrival_count: float = 1.0,
-        past_executions: Optional[List[Tuple[Engine, float]]] = None,
+        past_executions: Optional[List[Tuple[Engine, float, datetime]]] = None,
     ):
         super().__init__(sql_query)
         self._arrival_count = arrival_count
@@ -42,7 +43,7 @@ class Query(QueryRep):
     def copy_as_query_rep(self) -> QueryRep:
         return QueryRep(self.raw_query)
 
-    def past_executions(self) -> Optional[List[Tuple[Engine, float]]]:
+    def past_executions(self) -> Optional[List[Tuple[Engine, float, datetime]]]:
         """
         Retrieve any information about past executions of this query.
         """
@@ -126,10 +127,31 @@ class Query(QueryRep):
         # MB, so we divide by 1000 twice.
         self._data_accessed_mb[for_engine] = total_storage_bytes // 1000 // 1000
 
-    def primary_execution_location(self) -> Optional[Engine]:
+    def most_common_execution_location(self) -> Optional[Engine]:
+        # NOTE: This may capture routing decisions made in a previous blueprint
+        # if your planning window spans multiple previous blueprints. Depending
+        # on your needs, `most_recent_execution_location()` might be better.
         if self._past_executions is None or len(self._past_executions) == 0:
             return None
 
         counter = Counter([execution[0] for execution in self._past_executions])
         most_common, _ = counter.most_common(1)[0]
         return most_common
+
+    def most_recent_execution_location(self) -> Optional[Engine]:
+        if self._past_executions is None or len(self._past_executions) == 0:
+            return None
+
+        latest_epoch = None
+        latest_idx = None
+
+        for idx, execution in enumerate(self._past_executions):
+            if latest_epoch is None:
+                latest_epoch = execution[2]
+                latest_idx = idx
+            elif execution[2] > latest_epoch:
+                latest_epoch = execution[2]
+                latest_idx = idx
+
+        assert latest_idx is not None
+        return self._past_executions[latest_idx][0]

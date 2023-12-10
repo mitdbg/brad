@@ -69,7 +69,7 @@ class ScoringContext:
         all_queries = self.current_workload.analytical_queries()
         for qidx, query in enumerate(all_queries):
             if use_recorded_routing_if_available:
-                maybe_eng = query.primary_execution_location()
+                maybe_eng = query.most_recent_execution_location()
                 if maybe_eng is not None:
                     self.current_query_locations[maybe_eng].append(qidx)
                     continue

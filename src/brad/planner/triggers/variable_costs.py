@@ -129,7 +129,7 @@ class VariableCosts(Trigger):
         await router.run_setup_for_standalone(self._estimator_provider.get_estimator())
 
         for idx, q in enumerate(workload.analytical_queries()):
-            maybe_engine = q.primary_execution_location()
+            maybe_engine = q.most_recent_execution_location()
             if maybe_engine is None:
                 engine = await router.engine_for(q)
             else:
