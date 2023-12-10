@@ -112,7 +112,7 @@ def main():
     enum_blueprint = EnumeratedBlueprint(blueprint)
     definite_policy = asyncio.run(
         ForestPolicy.from_assets(
-            args.schema_name, RoutingPolicy.ForestTableSelectivity, assets
+            args.schema_name, RoutingPolicy.ForestTableCardinality, assets
         )
     )
     replaced_policy = FullRoutingPolicy(
