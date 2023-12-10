@@ -14,7 +14,7 @@ def set_global_plt_configs(
         inner_font_dirs = [pathlib.Path(font_dir) for font_dir in font_dirs]
 
     configs: Dict[str, Any] = {
-        "font.size": 14,
+        "font.size": 16,
         "pdf.fonttype": 42,  # Ensures type 1 fonts, apparently.
     }
 
