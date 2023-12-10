@@ -30,16 +30,5 @@ class BlueprintWatchdog:
             # Indicates the table is not used in this schema - no problem.
             pass
 
-        # Temporary: Avoid use of Redshift dc2.large(1)
-        if (
-            blueprint.redshift_provisioning().instance_type() == "dc2.large"
-            and blueprint.redshift_provisioning().num_nodes() == 1
-        ):
-            if self._event_logger is not None:
-                self._event_logger.log(
-                    SystemEvent.WatchdogFired, "Chose Redshift dc2.large(1)"
-                )
-            return True
-
         # All ok.
         return False
