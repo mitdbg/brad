@@ -188,7 +188,7 @@ class BlueprintCandidate(ComparableBlueprint):
             nxt = cur | placement_bitmap
             self.table_placements[table_name] = nxt
             if nxt != cur:
-                changed_tables.append(table_name)
+                changed_tables.append((table_name, nxt, cur))
                 changed = True
 
             # If we added the table to Athena or Aurora, we need to take into
@@ -308,7 +308,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
     def add_transactional_tables(self, ctx: ScoringContext) -> None:
         referenced_tables = set()
-        newly_added = set()
+        newly_added = []
 
         # Make sure that tables referenced in transactions are present on
         # Aurora.
@@ -322,26 +322,26 @@ class BlueprintCandidate(ComparableBlueprint):
                 referenced_tables.add(tbl)
 
                 if ((~orig) & self.table_placements[tbl]) != 0:
-                    newly_added.add(tbl)
+                    newly_added.append((tbl, self.table_placements[tbl], orig))
 
-        for tbl in newly_added:
+        for tbl, _, _ in newly_added:
             # Aurora only charges for 1 copy of the data.
             self.storage_cost += compute_single_aurora_table_cost(tbl, ctx)
 
         # If we made a change to the table placement, see if it corresponds to a
         # table score change.
-        self._update_movement_score(referenced_tables, ctx)
+        self._update_movement_score(newly_added, ctx)
 
     def _update_movement_score(
-        self, relevant_tables: Iterable[str], ctx: ScoringContext
+        self, relevant_tables: Iterable[Tuple[str, int, int]], ctx: ScoringContext
     ) -> None:
-        for tbl in relevant_tables:
-            cur = ctx.current_blueprint.table_locations_bitmap()[tbl]
-            nxt = self.table_placements[tbl]
-            if ((~cur) & nxt) == 0:
-                continue
-
-            result = compute_single_table_movement_time_and_cost(tbl, cur, nxt, ctx)
+        for tbl, nxt, cur in relevant_tables:
+            # This is important to only count the movement penalty once (the
+            # first time the table is moved over).
+            adjusted_curr = cur | (ctx.current_blueprint.table_locations_bitmap()[tbl])
+            result = compute_single_table_movement_time_and_cost(
+                tbl, adjusted_curr, nxt, ctx
+            )
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
 
