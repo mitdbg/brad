@@ -37,7 +37,7 @@ class AuroraProvisioningScore:
         Computes all of the Aurora provisioning-dependent scoring components in one
         place.
         """
-        debug_dict = {}
+        debug_dict: Dict[str, Any] = {}
         query_factor = cls.query_movement_factor(
             base_query_run_times, query_arrival_counts, ctx
         )
@@ -111,9 +111,7 @@ class AuroraProvisioningScore:
             if query_factor >= 1.0:
                 query_factor_clean = query_factor
             else:
-                min_query_factor = (
-                    1.0 - ctx.planner_config.aurora_initialize_load_fraction()
-                )
+                min_query_factor = ctx.planner_config.aurora_min_load_removal_fraction()
                 query_factor_clean = max(min_query_factor, query_factor)
 
         # This is true iff we did not run any queries on Aurora with the current
@@ -129,18 +127,20 @@ class AuroraProvisioningScore:
         if not current_has_replicas:
             # We estimate the fraction of the current writer load that belongs
             # to the transactional workload vs. the query workload.
+            min_load_removal = ctx.planner_config.aurora_min_load_removal_fraction()
             pred_txn_cpu_denorm = cls.predict_txn_cpu_denorm(
                 ctx.metrics.txn_completions_per_s, ctx
             )
             pred_txn_frac = pred_txn_cpu_denorm / curr_writer_cpu_util_denorm
-            pred_txn_frac = max(0.8, pred_txn_frac)
+            pred_txn_frac = max(min_load_removal, pred_txn_frac)
             pred_txn_frac = min(1.0, pred_txn_frac)
             pred_ana_frac = 1.0 - pred_txn_frac
-            pred_ana_frac = max(0.8, pred_ana_frac)
+            pred_ana_frac = max(min_load_removal, pred_ana_frac)
             pred_ana_frac = min(1.0, pred_ana_frac)
-            debug_dict["aurora_pred_txn_frac"] = pred_txn_frac
-            debug_dict["aurora_pred_ana_frac"] = pred_ana_frac
-            debug_dict["aurora_pred_txn_cpu_denorm"] = pred_txn_cpu_denorm
+            if debug_dict is not None:
+                debug_dict["aurora_pred_txn_frac"] = pred_txn_frac
+                debug_dict["aurora_pred_ana_frac"] = pred_ana_frac
+                debug_dict["aurora_pred_txn_cpu_denorm"] = pred_txn_cpu_denorm
 
             if not next_has_replicas:
                 # No replicas -> No replicas

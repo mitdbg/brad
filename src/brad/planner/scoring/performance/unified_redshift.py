@@ -133,7 +133,7 @@ class RedshiftProvisioningScore:
                     query_factor_clean = query_factor
                 else:
                     min_query_factor = (
-                        1.0 - ctx.planner_config.redshift_initialize_load_fraction()
+                        ctx.planner_config.redshift_min_load_removal_fraction()
                     )
                     query_factor_clean = max(min_query_factor, query_factor)
 
