@@ -76,7 +76,9 @@ def main():
     set_up_logging(debug_mode=True)
 
     # 1. Load the config.
-    config = ConfigFile.load(args.config_file)
+    config = ConfigFile.load_from_new_configs(
+        phys_config=args.physical_config_file, system_config=args.system_config_file
+    )
 
     # 2. Load the existing blueprint.
     assets = AssetManager(config)
