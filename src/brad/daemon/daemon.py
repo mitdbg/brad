@@ -196,6 +196,7 @@ class BradDaemon:
                         self._temp_config.txn_latency_p90_ceiling_s(),
                         self._temp_config.benefit_horizon(),
                         self._temp_config.penalty_threshold(),
+                        self._temp_config.penalty_power(),
                     )
                 )
             else:
