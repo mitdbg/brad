@@ -81,8 +81,9 @@ def test_single_node() -> None:
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
         True, curr_prov, next_prov, 2.0, ctx
     )
-    assert txn_cpu_denorm == pytest.approx(8.0)
-    assert ana_cpu_denorm == pytest.approx(8.0)
+    # This is due to how we separate transactional and analytical workloads.
+    assert txn_cpu_denorm == pytest.approx(5.0)
+    assert ana_cpu_denorm == pytest.approx(5.0)
 
     # Scale up with a 0.5x increase (i.e., a decrease) in the analytical
     # workload. We stay conservative here and use a fixed lower bound on the
@@ -90,8 +91,8 @@ def test_single_node() -> None:
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
         True, curr_prov, next_prov, 0.5, ctx
     )
-    assert txn_cpu_denorm == pytest.approx(4.0 * (1 - 0.25))
-    assert ana_cpu_denorm == pytest.approx(4.0 * (1 - 0.25))
+    assert txn_cpu_denorm == pytest.approx(3.75)
+    assert ana_cpu_denorm == pytest.approx(3.75)
 
     # No queries executed previously. But now we are executing queries on
     # Aurora.
@@ -119,38 +120,33 @@ def test_single_to_multi() -> None:
     )
 
     # Scale up with no change in workload.
-    # We are conservative here and assume the same load is replicated across
-    # both nodes.
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
         True, curr_prov, next_prov, 1.0, ctx
     )
-    assert txn_cpu_denorm == pytest.approx(4.0)
-    assert ana_cpu_denorm == pytest.approx(4.0)
+    assert txn_cpu_denorm == pytest.approx(3.0)
+    assert ana_cpu_denorm == pytest.approx(3.0)
 
     # Scale up with 2x more load.
-    # Transaction load should be unchanged because we move analytics to a
-    # replica.
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
         True, curr_prov, next_prov, 2.0, ctx
     )
-    assert txn_cpu_denorm == pytest.approx(4.0)
-    assert ana_cpu_denorm == pytest.approx(8.0)
+    assert txn_cpu_denorm == pytest.approx(3.0)
+    assert ana_cpu_denorm == pytest.approx(6.0)
 
     # Scale up with 0.5x more load.
-    # We leave the loads unchanged because we are conservative.
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
         True, curr_prov, next_prov, 0.5, ctx
     )
-    assert txn_cpu_denorm == pytest.approx(4.0)
-    assert ana_cpu_denorm == pytest.approx(4.0 * (1 - 0.25))
+    assert txn_cpu_denorm == pytest.approx(3.0)
+    assert ana_cpu_denorm == pytest.approx(3.0 * 0.75)
 
     # 2 replicas.
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
         True, curr_prov, Provisioning("db.r6g.xlarge", 3), 1.0, ctx
     )
-    assert txn_cpu_denorm == pytest.approx(4.0)
+    assert txn_cpu_denorm == pytest.approx(3.0)
     # Should assume analytical load is split across the replicas.
-    assert ana_cpu_denorm == pytest.approx(2.0)
+    assert ana_cpu_denorm == pytest.approx(1.5)
 
     # No queries executed previously. But now we are executing queries on
     # Aurora.
@@ -196,8 +192,8 @@ def test_multi_to_single() -> None:
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
         True, curr_prov, next_prov, 0.5, ctx
     )
-    assert txn_cpu_denorm == pytest.approx(2.0 + (1 - 0.25))
-    assert ana_cpu_denorm == pytest.approx(2.0 + (1 - 0.25))
+    assert txn_cpu_denorm == pytest.approx(2.0 + 0.75)
+    assert ana_cpu_denorm == pytest.approx(2.0 + 0.75)
 
     # Multiple replicas (2) down to one node.
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
@@ -255,7 +251,7 @@ def test_multi_to_multi() -> None:
         True, curr_prov, next_prov, 0.5, ctx
     )
     assert txn_cpu_denorm == pytest.approx(2.0)
-    assert ana_cpu_denorm == pytest.approx(0.5 * (1 - 0.25))  # Stay conservative.
+    assert ana_cpu_denorm == pytest.approx(0.5 * 0.75)  # Stay conservative.
 
     # Decrease the number of replicas (2 to 1).
     txn_cpu_denorm, ana_cpu_denorm = AuroraProvisioningScore.predict_loads(
