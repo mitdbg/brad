@@ -1,4 +1,5 @@
 import yaml
+import logging
 import numpy as np
 import numpy.typing as npt
 import importlib.resources as pkg_resources
@@ -6,6 +7,8 @@ from datetime import timedelta
 from typing import Dict, Optional, Any
 from brad.planner.strategy import PlanningStrategy
 import brad.planner as brad_planner
+
+logger = logging.getLogger(__name__)
 
 
 class PlannerConfig:
@@ -286,3 +289,17 @@ class PlannerConfig:
 
     def metrics_agg(self) -> Dict[str, Any]:
         return self._raw["metrics_agg"]
+
+    def aurora_min_load_removal_fraction(self) -> float:
+        try:
+            return self._raw["aurora_min_load_removal_fraction"]
+        except KeyError:
+            logger.warning("Using default Aurora min load removal fraction: 0.75")
+            return 0.75
+
+    def redshift_min_load_removal_fraction(self) -> float:
+        try:
+            return self._raw["redshift_min_load_removal_fraction"]
+        except KeyError:
+            logger.warning("Using default Redshift min load removal fraction: 0.75")
+            return 0.75

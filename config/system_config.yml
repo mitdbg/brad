@@ -90,6 +90,11 @@ ensure_tables_together_on_one_engine: true
 aurora_initialize_load_fraction: 0.25
 redshift_initialize_load_fraction: 0.25
 
+# BRAD will not reduce predicted load lower than these values. Raise these
+# values to be more conservative against mispredictions.
+aurora_min_load_removal_fraction: 0.8
+redshift_min_load_removal_fraction: 0.8
+
 # Blueprint planning performance ceilings.
 query_latency_p90_ceiling_s: 30.0
 txn_latency_p90_ceiling_s: 0.030
