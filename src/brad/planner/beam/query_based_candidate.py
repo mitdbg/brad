@@ -217,7 +217,9 @@ class BlueprintCandidate(ComparableBlueprint):
                 self.table_placements[table_name] |= engine_bitvalue
 
                 if orig != self.table_placements[table_name]:
-                    table_diffs.append((table_name, self.table_placements[table_name]))
+                    table_diffs.append(
+                        (table_name, self.table_placements[table_name], orig),
+                    )
 
             except KeyError:
                 # Some of the tables returned are not tables but names of CTEs.
@@ -256,22 +258,23 @@ class BlueprintCandidate(ComparableBlueprint):
             )
 
         # Storage costs and table movement that this query imposes.
-        for name, next_placement in table_diffs:
+        for name, next_placement, before in table_diffs:
             # If we added a table to Athena or Aurora, we need to take into
             # account its storage costs.
-            if (next_placement & EngineBitmapValues[Engine.Athena]) != 0:
+            if (next_placement & (~before) & EngineBitmapValues[Engine.Athena]) != 0:
                 # We added the table to Athena.
                 self.storage_cost += compute_single_athena_table_cost(name, ctx)
 
-            if (next_placement & EngineBitmapValues[Engine.Aurora]) != 0:
+            if (next_placement & (~before) & EngineBitmapValues[Engine.Aurora]) != 0:
                 # Added table to Aurora.
                 # You only pay for 1 copy of the table on Aurora, regardless of
                 # how many read replicas you have.
                 self.storage_cost += compute_single_aurora_table_cost(name, ctx)
 
             curr = ctx.current_blueprint.table_locations_bitmap()[name]
-            if ((~curr) & next_placement) == 0:
-                # This table was already present on the engine.
+            if ((~curr) & (~before) & next_placement) == 0:
+                # This table was already present on the engine or we have
+                # already accounted for its transition score.
                 continue
 
             result = compute_single_table_movement_time_and_cost(
