@@ -46,6 +46,13 @@ class TempConfig:
     def penalty_threshold(self) -> float:
         return self._raw["comparator"]["penalty_threshold"]
 
+    def penalty_power(self) -> float:
+        comparator_config = self._raw["comparator"]
+        if "penalty_power" in comparator_config:
+            return comparator_config["penalty_power"]
+        else:
+            return 1.0
+
     def std_datasets(self) -> List[Dict[str, str]]:
         if "std_datasets" not in self._raw:
             return []
