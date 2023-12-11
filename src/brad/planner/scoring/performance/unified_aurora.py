@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 import numpy.typing as npt
-from typing import Dict, TYPE_CHECKING, Optional, Tuple
+from typing import Dict, TYPE_CHECKING, Optional, Tuple, Any
 
 from brad.config.engine import Engine
 from brad.blueprint.provisioning import Provisioning
@@ -37,11 +37,13 @@ class AuroraProvisioningScore:
         Computes all of the Aurora provisioning-dependent scoring components in one
         place.
         """
+        debug_dict = {}
         query_factor = cls.query_movement_factor(
             base_query_run_times, query_arrival_counts, ctx
         )
+        has_queries = base_query_run_times.shape[0] > 0
         txn_cpu_denorm, ana_node_cpu_denorm = cls.predict_loads(
-            curr_prov, next_prov, query_factor, ctx
+            has_queries, curr_prov, next_prov, query_factor, ctx, debug_dict
         )
         scaled_rt = cls.predict_query_latency_load_resources(
             base_query_run_times,
@@ -65,16 +67,19 @@ class AuroraProvisioningScore:
                 else np.nan,
                 "aurora_txn_cpu_denorm": txn_cpu_denorm,
                 "aurora_ana_cpu_denorm": ana_node_cpu_denorm,
+                **debug_dict,
             },
         )
 
     @classmethod
     def predict_loads(
         cls,
+        has_queries: bool,
         curr_prov: Provisioning,
         next_prov: Provisioning,
         query_factor: Optional[float],
         ctx: "ScoringContext",
+        debug_dict: Optional[Dict[str, Any]] = None,
     ) -> Tuple[float, float]:
         # Load is computed using the following principles:
         #
@@ -114,9 +119,7 @@ class AuroraProvisioningScore:
         # This is true iff we did not run any queries on Aurora with the current
         # blueprint and are now going to run queries on Aurora on the next
         # blueprint.
-        adding_ana_first_time = (
-            query_factor is None and len(ctx.current_query_locations[Engine.Aurora]) > 0
-        )
+        adding_ana_first_time = query_factor is None and has_queries
 
         # 4 cases:
         # - No replicas -> No replicas
@@ -124,6 +127,21 @@ class AuroraProvisioningScore:
         # - Yes replicas -> No replicas
         # - Yes replicas -> Yes replicas
         if not current_has_replicas:
+            # We estimate the fraction of the current writer load that belongs
+            # to the transactional workload vs. the query workload.
+            pred_txn_cpu_denorm = cls.predict_txn_cpu_denorm(
+                ctx.metrics.txn_completions_per_s, ctx
+            )
+            pred_txn_frac = pred_txn_cpu_denorm / curr_writer_cpu_util_denorm
+            pred_txn_frac = max(0.8, pred_txn_frac)
+            pred_txn_frac = min(1.0, pred_txn_frac)
+            pred_ana_frac = 1.0 - pred_txn_frac
+            pred_ana_frac = max(0.8, pred_ana_frac)
+            pred_ana_frac = min(1.0, pred_ana_frac)
+            debug_dict["aurora_pred_txn_frac"] = pred_txn_frac
+            debug_dict["aurora_pred_ana_frac"] = pred_ana_frac
+            debug_dict["aurora_pred_txn_cpu_denorm"] = pred_txn_cpu_denorm
+
             if not next_has_replicas:
                 # No replicas -> No replicas
                 if adding_ana_first_time:
@@ -139,10 +157,13 @@ class AuroraProvisioningScore:
                         curr_writer_cpu_util_denorm + initialized_load,
                     )
                 else:
-                    return (
-                        curr_writer_cpu_util_denorm * query_factor_clean,
-                        curr_writer_cpu_util_denorm * query_factor_clean,
+                    final_denorm = (
+                        curr_writer_cpu_util_denorm * pred_txn_frac
+                        + curr_writer_cpu_util_denorm
+                        * (1.0 - pred_txn_frac)
+                        * query_factor_clean
                     )
+                    return (final_denorm, final_denorm)
             else:
                 # No replicas -> Yes replicas
                 if adding_ana_first_time:
@@ -158,9 +179,16 @@ class AuroraProvisioningScore:
                         initialized_load / (next_prov.num_nodes() - 1),
                     )
                 else:
+                    # Here we need to separate the load imposed by the
+                    # transactions and the load imposed by the other queries.
+                    # Transactions remain on Aurora.
                     return (
-                        curr_writer_cpu_util_denorm,
-                        (curr_writer_cpu_util_denorm * query_factor_clean)
+                        curr_writer_cpu_util_denorm * pred_txn_frac,
+                        (
+                            curr_writer_cpu_util_denorm
+                            * pred_ana_frac
+                            * query_factor_clean
+                        )
                         / (next_prov.num_nodes() - 1),
                     )
 
@@ -342,6 +370,11 @@ class AuroraProvisioningScore:
         pred_dest[~np.isfinite(observed_lats)] = np.nan
 
         return pred_dest
+
+    @staticmethod
+    def predict_txn_cpu_denorm(completions_per_s: float, ctx: "ScoringContext"):
+        model = ctx.planner_config.aurora_txn_coefs(ctx.schema_name)
+        return completions_per_s * model["C_1"]
 
     def copy(self) -> "AuroraProvisioningScore":
         return AuroraProvisioningScore(
