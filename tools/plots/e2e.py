@@ -1,5 +1,5 @@
 import pathlib
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import pandas as pd
 
@@ -102,18 +102,111 @@ class RecordedRun:
         if "run_time_s" not in olap.columns:
             olap = olap.rename(columns={"run_time": "run_time_s"})
 
-        return cls(txn_thpt, olap, oltp_stats, events, oltp_ind_lats)
+        return cls(oltp_ind_lats, olap, oltp_stats, txn_thpt, events)
 
     def __init__(
         self,
-        txn_thpt: Optional[pd.DataFrame],
+        txn_lats: pd.DataFrame,
         olap_latency: pd.DataFrame,
         txn_stats: pd.DataFrame,
+        txn_thpt: Optional[pd.DataFrame],
         events: Optional[pd.DataFrame],
-        txn_lats: pd.DataFrame,
     ) -> None:
-        self.txn_thpt = txn_thpt
+        self.txn_lats = txn_lats
         self.olap_latency = olap_latency
         self.txn_stats = txn_stats
+        self.txn_thpt = txn_thpt
         self.events = events
-        self.txn_lats = txn_lats
+
+        self._txn_lat_p90: Optional[pd.DataFrame] = None
+        self._ana_lat_p90: Optional[pd.DataFrame] = None
+        self._timestamp_offsets: Optional[Tuple[pd.Timestamp, pd.Timestamp]] = None
+        self._blueprint_intervals: Optional[List[Tuple[float, float]]] = None
+
+    @property
+    def is_brad(self) -> bool:
+        # We only record daemon events on BRAD.
+        return self.events is not None
+
+    @property
+    def txn_lat_p90(self) -> pd.DataFrame:
+        if self._txn_lat_p90 is not None:
+            return self._txn_lat_p90
+        self._txn_lat_p90 = self._agg_txn_lats(0.9)
+        return self._txn_lat_p90
+
+    @property
+    def ana_lat_p90(self) -> pd.DataFrame:
+        if self._ana_lat_p90 is not None:
+            return self._ana_lat_p90
+        self._ana_lat_p90 = self._agg_ana_lats(0.9)
+        return self._ana_lat_p90
+
+    @property
+    def timestamp_offsets(self) -> Tuple[pd.Timestamp, pd.Timestamp]:
+        if self._timestamp_offsets is not None:
+            return self._timestamp_offsets
+        self._timestamp_offsets = self._compute_timestamp_offsets()
+        return self._timestamp_offsets
+
+    @property
+    def blueprint_intervals(self) -> List[Tuple[float, float]]:
+        if self._blueprint_intervals is not None:
+            return self._blueprint_intervals
+        self._blueprint_intervals = self._compute_blueprint_intervals()
+        return self._blueprint_intervals
+
+    def _agg_txn_lats(self, quantile: float) -> pd.DataFrame:
+        ts = pd.to_datetime(self.txn_lats["timestamp"])
+        il = self.txn_lats[["num_clients", "run_time_s"]]
+        return (
+            il.groupby([ts.dt.hour, ts.dt.minute])
+            .quantile(quantile)
+            .reset_index(drop=True)
+        )
+
+    def _agg_ana_lats(self, quantile: float) -> pd.DataFrame:
+        ts = pd.to_datetime(self.olap_latency["timestamp"])
+        il = self.olap_latency[["query_idx", "run_time_s"]]
+        return (
+            il.groupby([ts.dt.hour, ts.dt.minute])
+            .quantile(quantile)
+            .reset_index(drop=True)
+        )
+
+    def _compute_timestamp_offsets(self) -> Tuple[pd.Timestamp, pd.Timestamp]:
+        if self.txn_thpt is not None:
+            rel = self.txn_thpt.loc[self.txn_thpt["txn_end_per_s"] > 0]
+            start_ts = rel.iloc[0]["timestamp"]
+            end_ts = rel.iloc[-1]["timestamp"]
+        else:
+            print("Using txn latency to establish timestamp offset")
+            start_ts = self.txn_lats.iloc[0]["timestamp"]
+            end_ts = self.txn_lats.iloc[-1]["timestamp"]
+
+        return pd.to_datetime(start_ts).tz_localize(None), pd.to_datetime(
+            end_ts
+        ).ts.localize(None)
+
+    def _compute_blueprint_intervals(self) -> List[Tuple[float, float]]:
+        if self.events is None:
+            return []
+        start_ts, end_ts = self.timestamp_offsets
+
+        rel = self.events[self.events["event"] == "post_transition_completed"]
+        rel = rel.sort_values(by=["timestamp"], ascending=True, ignore_index=True)
+        rel["offset"] = rel["timestamp"] - start_ts
+        rel["offset_minute"] = rel["offset"].dt.total_seconds() / 60.0
+
+        last_offset = None
+        intervals = []
+        for offset_minute in rel["offset_minute"]:
+            if last_offset is None:
+                intervals.append((0.0, offset_minute))
+            else:
+                intervals.append((last_offset, offset_minute))
+            last_offset = offset_minute
+        if last_offset is not None:
+            end_offset_minute = (end_ts - start_ts).dt.total_seconds() / 60.0
+            intervals.append((last_offset, end_offset_minute))
+        return intervals
