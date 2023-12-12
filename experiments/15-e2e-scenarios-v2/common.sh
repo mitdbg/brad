@@ -167,6 +167,8 @@ function start_txn_runner() {
   local args=(
     --num-clients $t_clients
     --num-front-ends $num_front_ends
+    --scale-factor $txn_scale_factor
+    --dataset-type $dataset_type
   )
 
   if [[ ! -z $client_offset ]]; then
@@ -314,6 +316,10 @@ function extract_named_arguments() {
 
     if [[ $phys_arg =~ --query-sequence-file=.+ ]]; then
       query_sequence_file=${phys_arg:22}
+    fi
+
+    if [[ $phys_arg =~ --txn-scale-factor=.+ ]]; then
+      txn_scale_factor=${phys_arg:19}
     fi
   done
 }
