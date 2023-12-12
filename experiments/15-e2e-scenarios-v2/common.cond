@@ -2,3 +2,6 @@
 IMDB_20GB_REGULAR_QUERY_BANK = "../../../workloads/IMDB_20GB/regular_test/queries.sql"
 IMDB_100GB_REGULAR_QUERY_BANK = "../../../workloads/IMDB_100GB/regular_test/queries.sql"
 IMDB_100GB_REGULAR_QUERY_FREQS = "../../../workloads/IMDB_100GB/regular_test/query_frequency.npy"
+
+IMDB_20GB_SF = 6
+IMDB_100GB_SF = 33
