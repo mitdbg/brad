@@ -84,9 +84,15 @@ async def clean_dataset_impl(args) -> None:
 
     engines = {Engine.from_str(engine_str) for engine_str in args.engines}
     if blueprint.aurora_provisioning().num_nodes() == 0:
-        engines.remove(Engine.Aurora)
+        try:
+            engines.remove(Engine.Aurora)
+        except KeyError:
+            pass
     if blueprint.redshift_provisioning().num_nodes() == 0:
-        engines.remove(Engine.Redshift)
+        try:
+            engines.remove(Engine.Redshift)
+        except KeyError:
+            pass
 
     conns = await EngineConnections.connect(
         config,

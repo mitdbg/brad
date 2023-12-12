@@ -32,6 +32,14 @@ class PlannerConfig:
         return cls(merged)
 
     @classmethod
+    def load_only_constants(cls) -> "PlannerConfig":
+        with pkg_resources.files(brad_planner).joinpath("constants.yml").open(
+            "r"
+        ) as data:
+            system_constants_dict = yaml.load(data, Loader=yaml.Loader)
+        return cls(system_constants_dict)
+
+    @classmethod
     def load(cls, path: str) -> "PlannerConfig":
         with open(path, "r", encoding="UTF-8") as file:
             raw = yaml.load(file, Loader=yaml.Loader)
