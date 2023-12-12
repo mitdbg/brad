@@ -16,8 +16,8 @@ sleep 30
 
 log_workload_point "clients_starting"
 
-clients_multiplier=5
-time_scale_factor=1
+clients_multiplier=1
+time_scale_factor=12  # Runs for 2 hours
 
 # Repeating analytics.
 start_snowset_repeating_olap_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "ra"
@@ -42,7 +42,7 @@ function inner_cancel_experiment() {
 trap "inner_cancel_experiment" INT
 trap "inner_cancel_experiment" TERM
 
-sleep $((24 * 60 * 60 + 5 * 60))  # Wait for 24 hours and 5 minutes.
+sleep $((2 * 60 * 60 + 5 * 60))  # Wait for 2 hours and 5 minutes.
 log_workload_point "experiment_done"
 
 # Shut down everything now.
