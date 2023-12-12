@@ -138,6 +138,34 @@ function start_repeating_olap_runner() {
   runner_pid=$!
 }
 
+function start_snowset_repeating_olap_runner() {
+  local ra_clients=$1
+  local time_scale_factor=$2
+  local client_multiplier=$3
+  local results_name=$4
+
+  local args=(
+    --num-clients $ra_clients
+    --num-front-ends $num_front_ends
+    --query-bank-file $ra_query_bank_file
+    --query-frequency-path $snowset_query_frequency_path
+    --num-client-path $snowset_client_dist_path
+    --gap-dist-path $snowset_gap_dist_path
+    --time-scale-factor $time_scale_factor
+    --num-client-multiplier $client_multiplier
+  )
+
+  >&2 echo "[Snowset Repeating Analytics] Running with up to $ra_clients. Time scale factor $time_scale_factor"
+  results_dir=$COND_OUT/$results_name
+  mkdir -p $results_dir
+
+  log_workload_point $results_name
+  COND_OUT=$results_dir python3.11 ../../../workloads/IMDB_extended/run_repeating_analytics.py "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
 function run_repeating_olap_warmup() {
   # NOTE: This is blocking.
   local ra_clients=$1
@@ -172,6 +200,32 @@ function start_txn_runner() {
   if [[ ! -z $client_offset ]]; then
     args+=(--client-offset $client_offset)
   fi
+
+  log_workload_point "txn_${t_clients}"
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions.py \
+    "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
+function start_snowset_txn_runner() {
+  local t_clients=$1
+  local time_scale_factor=$2
+  local client_multiplier=$3
+  local results_name=$4
+
+  >&2 echo "[Snowset Transactions] Running with $t_clients..."
+  results_dir=$COND_OUT/${results_name}
+  mkdir -p $results_dir
+
+  local args=(
+    --num-clients $t_clients
+    --num-front-ends $num_front_ends
+    --num-client-path $snowset_client_dist_path
+    --time-scale-factor $time_scale_factor
+    --num-client-multiplier $client_multiplier
+  )
 
   log_workload_point "txn_${t_clients}"
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions.py \
@@ -280,10 +334,6 @@ function extract_named_arguments() {
       ra_gap_std_s=${phys_arg:15}
     fi
 
-    if [[ $phys_arg =~ --ra-query-frequency-path=.+ ]]; then
-      ra_query_frequency_path=${phys_arg:26}
-    fi
-
     if [[ $phys_arg =~ --num-front-ends=.+ ]]; then
       num_front_ends=${phys_arg:17}
     fi
@@ -314,6 +364,18 @@ function extract_named_arguments() {
 
     if [[ $phys_arg =~ --query-sequence-file=.+ ]]; then
       query_sequence_file=${phys_arg:22}
+    fi
+
+    if [[ $phys_arg =~ --snowset-query-frequency-path=.+ ]]; then
+      snowset_query_frequency_path=${phys_arg:31}
+    fi
+
+    if [[ $phys_arg =~ --snowset-client-dist-path=.+ ]]; then
+      snowset_client_dist_path=${phys_arg:27}
+    fi
+
+    if [[ $phys_arg =~ --snowset-gap-dist-path=.+ ]]; then
+      snowset_gap_dist_path=${phys_arg:24}
     fi
   done
 }

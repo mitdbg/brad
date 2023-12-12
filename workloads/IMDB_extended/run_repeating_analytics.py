@@ -507,12 +507,6 @@ def main():
         help="path to the frequency to draw each query in query bank",
     )
     parser.add_argument(
-        "--num-query-path",
-        type=str,
-        default=None,
-        help="Path to the distribution of number of queries for each period of a day",
-    )
-    parser.add_argument(
         "--num-client-path",
         type=str,
         default=None,
