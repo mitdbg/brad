@@ -140,7 +140,7 @@ def _query_p90_ceiling(
 
 
 def _transition_under_benefit_horizon(
-    left: ComparableBlueprint, right: ComparableBlueprint, payoff_period: timedelta
+    left: ComparableBlueprint, right: ComparableBlueprint, benefit_horizon: timedelta
 ) -> Optional[bool]:
     left_tr_s = left.get_transition_time_s()
     right_tr_s = right.get_transition_time_s()
@@ -148,13 +148,13 @@ def _transition_under_benefit_horizon(
     # If either are above the payoff period, return the blueprint that does
     # better on transition time.
     if (
-        left_tr_s > payoff_period.total_seconds()
-        and right_tr_s > payoff_period.total_seconds()
+        left_tr_s >= benefit_horizon.total_seconds()
+        and right_tr_s >= benefit_horizon.total_seconds()
     ):
         return left_tr_s < right_tr_s
-    elif left_tr_s > payoff_period.total_seconds():
+    elif left_tr_s >= benefit_horizon.total_seconds():
         return False
-    elif right_tr_s > payoff_period.total_seconds():
+    elif right_tr_s >= benefit_horizon.total_seconds():
         return True
 
     return None
