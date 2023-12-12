@@ -18,6 +18,7 @@ class RecordedRun:
         if (base / "brad_metrics_front_end.log").exists():
             txn_thpt = pd.read_csv(base / "brad_metrics_front_end.log")
             txn_thpt["timestamp"] = pd.to_datetime(txn_thpt["timestamp"])
+            txn_thpt["timestamp"] = txn_thpt["timestamp"].dt.tz_localize(None)
         else:
             txn_thpt = None
 
@@ -49,6 +50,7 @@ class RecordedRun:
                     inner / "repeating_olap_batch_{}.csv".format(c)
                 )
                 olap_inner["timestamp"] = pd.to_datetime(olap_inner["timestamp"])
+                olap_inner["timestamp"] = olap_inner["timestamp"].dt.tz_localize(None)
                 olap_inner.insert(0, "num_clients", clients)
                 all_olap.append(olap_inner)
 
@@ -57,6 +59,7 @@ class RecordedRun:
         if (base / "brad_daemon_events.csv").exists():
             events = pd.read_csv(base / "brad_daemon_events.csv")
             events["timestamp"] = pd.to_datetime(events["timestamp"])
+            events["timestamp"] = events["timestamp"].dt.tz_localize(None)
         else:
             events = None
 
@@ -207,7 +210,7 @@ class RecordedRun:
                 intervals.append((last_offset, offset_minute))
             last_offset = offset_minute
         if last_offset is not None:
-            end_offset_minute = (end_ts - start_ts).dt.total_seconds() / 60.0
+            end_offset_minute = (end_ts - start_ts).total_seconds() / 60.0
             intervals.append((last_offset, end_offset_minute))
         return intervals
 
@@ -221,7 +224,7 @@ class RecordedRun:
         olap = olap_lats.copy()
         olap["timestamp"] = pd.to_datetime(olap["timestamp"]).dt.tz_localize(None)
         olap["offset"] = olap["timestamp"] - start_ts
-        olap["offset_min"] = olap["offset"].dt.total_seconds() / 60
+        olap["offset_minute"] = olap["offset"].dt.total_seconds() / 60
 
         rel_bytes = bytes_scanned[olap_lats["query_idx"], 0]
         rel_mb = rel_bytes / 1000 / 1000
@@ -314,7 +317,7 @@ def _load_blueprints(
         time = time.split(".")[0]
         comb = "_".join([date, time])
         timestamp = datetime.strptime(comb, "%Y-%m-%d_%H-%M-%S")
-        timestamp = timestamp.replace(tzinfo=pytz.utc)
+        timestamp = timestamp.replace(tzinfo=None)
 
         with open(filepath, "rb") as file:
             bps = pickle.load(file)
