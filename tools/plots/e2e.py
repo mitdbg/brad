@@ -1,5 +1,4 @@
 import pathlib
-import pytz
 import pickle
 import numpy as np
 import pandas as pd
@@ -68,7 +67,20 @@ class RecordedRun:
 
         blueprints = _load_blueprints(base)
 
-        return cls(oltp_ind_lats, olap, oltp_stats, txn_thpt, events, blueprints)
+        if (base / "cost_metrics.csv").exists():
+            baseline_costs = _load_process_costs(base / "cost_metrics.csv")
+        else:
+            baseline_costs = None
+
+        return cls(
+            oltp_ind_lats,
+            olap,
+            oltp_stats,
+            txn_thpt,
+            events,
+            blueprints,
+            baseline_costs,
+        )
 
     def __init__(
         self,
@@ -78,6 +90,7 @@ class RecordedRun:
         txn_thpt: Optional[pd.DataFrame],
         events: Optional[pd.DataFrame],
         blueprints: List[Tuple[datetime, ComparableBlueprint]],
+        baseline_costs: Optional[pd.DataFrame],
     ) -> None:
         self.txn_lats = txn_lats
         self.olap_lats = olap_lats
@@ -85,6 +98,7 @@ class RecordedRun:
         self.txn_thpt = txn_thpt
         self.events = events
         self.blueprints = blueprints
+        self.baseline_costs = baseline_costs
 
         self._txn_lat_p90: Optional[pd.DataFrame] = None
         self._ana_lat_p90: Optional[pd.DataFrame] = None
@@ -333,3 +347,18 @@ def _load_blueprints(
     data = [load_blueprint(file) for file in relevant]
     data.sort(key=lambda d: d[0])
     return data
+
+
+def _load_process_costs(cost_file: pathlib.Path) -> pd.DataFrame:
+    df = pd.read_csv(cost_file)
+    aurora = df[df["engine"] == "Aurora"][["timestamp", "cost"]]
+    redshift = df[df["engine"] == "Redshift"][["timestamp", "cost"]]
+    comb = pd.merge(
+        aurora, redshift, how="outer", on="timestamp", suffixes=("_aurora", "_redshift")
+    )
+    comb = comb.sort_values(by=["timestamp"], ascending=True, ignore_index=True)
+    comb = comb.fillna(0.0)
+    comb["total_cost_per_minute"] = comb["cost_aurora"] + comb["cost_redshift"]
+    # 30 days in a month.
+    comb["total_cost_per_month"] = comb["total_cost_per_minute"] * 60 * 24 * 30
+    return comb
