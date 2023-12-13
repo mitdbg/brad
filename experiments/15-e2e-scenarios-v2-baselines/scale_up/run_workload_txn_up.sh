@@ -65,8 +65,5 @@ sleep $((35 * 60))  # 47 mins total; 57 mins cumulative
 # Shut down everything now.
 log_workload_point "experiment_workload_done"
 >&2 echo "Experiment done. Shutting down runners..."
-
-echo "Sleeping for 60 seconds for testing."
-sleep 60
 graceful_shutdown $rana_pid $txn_pid
 log_workload_point "shutdown_complete"

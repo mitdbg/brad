@@ -45,7 +45,7 @@ def main():
     if args.metrics:
         # From November 9th 2023 at 16:14 UTC to one hour later.
         from datetime import datetime, timedelta
-        start_time = datetime(year=2023, month=12, day=3, hour=15, minute=12)
+        start_time = datetime(year=2023, month=12, day=8, hour=20, minute=32)
         end_time = start_time + timedelta(hours=1)
         df = loader.fetch_metrics(start_time=start_time, end_time=end_time)
         # Write to csv

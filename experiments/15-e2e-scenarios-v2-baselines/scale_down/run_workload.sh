@@ -25,9 +25,9 @@ ls $ra_query_bank_file || exit 1
 echo "Seq Query Bank"
 ls $seq_query_bank_file || exit 1
 
-# Start seq runner
-start_seq_olap_runner 1 30 5 "downseq"
-seq_pid=$runner_pid
+# # Start seq runner
+# start_seq_olap_runner 1 30 5 "downseq"
+# seq_pid=$runner_pid
 
 
 log_workload_point "clients_starting"
@@ -72,5 +72,5 @@ log_workload_point "experiment_workload_done"
 
 # Shut down everything now.
 >&2 echo "Experiment done. Shutting down runners..."
-graceful_shutdown $rana_pid $txn_pid $rana2_pid $seq_pid
+graceful_shutdown $rana_pid $txn_pid $rana2_pid
 log_workload_point "shutdown_complete"

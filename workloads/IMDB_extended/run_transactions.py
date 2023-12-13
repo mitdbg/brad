@@ -43,7 +43,8 @@ def runner(
 
     if args.baseline is not None and args.baseline != "":
         # Hack.
-        dataset_type = "100gb"
+        # TODO: Reset to 100gb.
+        dataset_type = "original"
     else:
         dataset_type = "original"
     worker = TransactionWorker(
@@ -244,7 +245,7 @@ def main():
     parser.add_argument(
         "--scale-factor",
         type=int,
-        default=6,
+        default=1,
         help="The scale factor used to generate the dataset.",
     )
     parser.add_argument(

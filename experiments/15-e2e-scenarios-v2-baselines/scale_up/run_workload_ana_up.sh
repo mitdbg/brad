@@ -36,19 +36,14 @@ function rana_sweep_offset4() {
   local gap_minute=$2
   local keep_last=$3
   local query_indices=$4
+  local gap_time_s=$5
 
   for ra_clients in $sweep; do
-    start_repeating_olap_runner $ra_clients 15 5 $query_indices "ra_sweep_${ra_clients}" 4
+    start_repeating_olap_runner $ra_clients $gap_time_s 1 $query_indices "ra_sweep_${ra_clients}" 4
     sweep_rana_pid=$runner_pid
 
     sleep $(($gap_minute * 60))
     if [[ -z $keep_last ]] || [[ $ra_clients != $keep_last ]]; then
-      kill -INT $sweep_rana_pid
-      wait $sweep_rana_pid
-    fi
-    # If last, sleep 1 hour, then kill.
-    if [[ $ra_clients == $keep_last ]]; then
-      sleep $((60 * 60))
       kill -INT $sweep_rana_pid
       wait $sweep_rana_pid
     fi
@@ -81,19 +76,24 @@ sleep $((10 * 60))
 
 # Scale up to 28 analytical clients in total (24 heavy).
 log_workload_point "start_increase_rana_heavy_4_to_24"
-rana_sweep_offset4 "4 8 12 16 20 24" 3 24 $heavier_queries
+rana_sweep_offset4 "4 8 12 16 20 24" 3 24 $heavier_queries 15
 log_workload_point "hold_rana_heavy_24"
+sleep $((30 * 60))  # 18 + 30 mins; 48 mins cumulative
 
+log_workload_point "switching_to_heavy"
+kill -INT $sweep_rana_pid
+wait $sweep_rana_pid
+log_workload_point "increasing_rana_heavy_24_to_56"
 
-# Run with 56 analytical clients for 1 hour.
-log_workload_point "rana_heavy_56"
-start_repeating_olap_runner 52 15 5 $initial_queries "ra_heavy_56"
-heavy_rana_pid=$runner_pid
-sleep $((60 * 60))
+# Scale up to 60 analytical clients in total (56 heavy).
+# We also increase the issue frequency to 3 seconds.
+rana_sweep_offset4 "24 32 40 48 56" 5 56 $heavier_queries 3
+log_workload_point "hold_rana_heavy_56"
+sleep $((60 * 60))  # 25 + 60 mins; 133 mins cumulative
 
 log_workload_point "experiment_workload_done"
 
 # Shut down everything now.
 >&2 echo "Experiment done. Shutting down runners..."
-graceful_shutdown $rana_pid $heavy_rana_pid $txn_pid
+graceful_shutdown $rana_pid $sweep_rana_pid $txn_pid
 log_workload_point "shutdown_complete"

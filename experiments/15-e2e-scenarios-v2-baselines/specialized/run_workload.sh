@@ -1,4 +1,4 @@
-x#! /bin/bash
+#! /bin/bash
 
 EXPT_OUT="expt_out"
 ANALYTICS_ENGINE="redshift"

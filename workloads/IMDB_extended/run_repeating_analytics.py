@@ -118,7 +118,7 @@ def runner(
             # Signal that we're ready to start and wait for the controller.
             start_queue.put_nowait("")
             _ = stop_queue.get()
-
+            # loop_idx = 0
             while True:
                 if execution_gap_dist is not None:
                     now = datetime.now().astimezone(pytz.utc)
@@ -146,6 +146,8 @@ def runner(
                 logger.debug("Executing qidx: %d", qidx)
                 query = query_bank[qidx]
 
+                # loop_idx += 1
+                # try_start_time = time.time()
                 try:
                     engine = None
                     now = datetime.now().astimezone(pytz.utc)
@@ -168,6 +170,11 @@ def runner(
                     else:
                         engine_name = engine
                     end = time.time()
+                    # if engine_name == "tidb":
+                    #     duration = end-start
+                    #     print(f"Worker {runner_idx}. Loop Idx {loop_idx}. Query {qidx} took {duration}s.")
+                        
+
                     print(
                         "{},{},{},{},{},{}".format(
                             now,
@@ -184,6 +191,9 @@ def runner(
 
                 except BradClientError as ex:
                     if ex.is_transient():
+                        # duration = time.time() - try_start_time
+                        # print(f"Worker {runner_idx}. Loop Idx {loop_idx}. Query {qidx} failed after {duration}s.")
+
                         print(
                             "Transient query error:",
                             ex.message(),
