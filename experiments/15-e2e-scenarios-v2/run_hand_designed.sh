@@ -9,6 +9,8 @@
 if [ ! -z $1 ]; then
   shutdown_after=1
   echo "Will shutdown after this script completes."
+else
+  echo "Not shutting down after this script completes."
 fi
 
 function scale_down() {
