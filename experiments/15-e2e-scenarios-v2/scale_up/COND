@@ -1,17 +1,21 @@
 include("../common.cond")
 
+COMMON_CONFIGS = {
+  "physical-config-file": "config/physical_config_100gb.yml",
+  "schema-name": "imdb_extended_100g",
+  "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+  "txn-scale-factor": IMDB_100GB_SF,
+  "num-front-ends": 28,
+  "dataset-type": "100gb",
+}
+
 # Used to test out different sub-scenarios.
 run_command(
   name="brad_100g_debug",
   run="./run_workload_debug.sh",
   options={
     "system-config-file": "scale_up_config.yml",
-    "physical-config-file": "config/physical_config_100gb.yml",
-    "schema-name": "imdb_extended_100g",
-    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "txn-scale-factor": IMDB_100GB_SF,
-    "num-front-ends": 28,
-    "dataset-type": "100gb",
+    **COMMON_CONFIGS,
   },
 )
 
@@ -21,12 +25,7 @@ run_experiment(
   run="./run_workload_txn_up.sh",
   options={
     "system-config-file": "scale_up_config.yml",
-    "physical-config-file": "config/physical_config_100gb.yml",
-    "schema-name": "imdb_extended_100g",
-    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "txn-scale-factor": IMDB_100GB_SF,
-    "num-front-ends": 28,
-    "dataset-type": "100gb",
+    **COMMON_CONFIGS,
   },
 )
 
@@ -36,12 +35,7 @@ run_experiment(
   run="./run_workload_ana_up.sh",
   options={
     "system-config-file": "scale_up_config.yml",
-    "physical-config-file": "config/physical_config_100gb.yml",
-    "schema-name": "imdb_extended_100g",
-    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "txn-scale-factor": IMDB_100GB_SF,
-    "num-front-ends": 28,
-    "dataset-type": "100gb",
+    **COMMON_CONFIGS,
   },
 )
 
@@ -51,12 +45,7 @@ run_experiment(
   options={
     # Note the different config.
     "system-config-file": "scale_up_hand_designed.yml",
-    "physical-config-file": "config/physical_config_100gb.yml",
-    "schema-name": "imdb_extended_100g",
-    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "txn-scale-factor": IMDB_100GB_SF,
-    "num-front-ends": 28,
-    "dataset-type": "100gb",
+    **COMMON_CONFIGS,
   },
 )
 
@@ -66,12 +55,7 @@ run_experiment(
   options={
     # Note the different config.
     "system-config-file": "scale_up_hand_designed.yml",
-    "physical-config-file": "config/physical_config_100gb.yml",
-    "schema-name": "imdb_extended_100g",
-    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "txn-scale-factor": IMDB_100GB_SF,
-    "num-front-ends": 28,
-    "dataset-type": "100gb",
+    **COMMON_CONFIGS,
   },
 )
 
@@ -81,12 +65,7 @@ run_command(
   run="./run_overall_warmup.sh",
   options={
     "system-config-file": "scale_up_config.yml",
-    "physical-config-file": "config/physical_config_100gb.yml",
-    "schema-name": "imdb_extended_100g",
-    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "txn-scale-factor": IMDB_100GB_SF,
-    "num-front-ends": 28,
-    "dataset-type": "100gb",
+    **COMMON_CONFIGS,
   },
 )
 
@@ -97,11 +76,6 @@ run_experiment(
   run="./run_workload_txn_ana_up.sh",
   options={
     "system-config-file": "scale_up_config.yml",
-    "physical-config-file": "config/physical_config_100gb.yml",
-    "schema-name": "imdb_extended_100g",
-    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "txn-scale-factor": IMDB_100GB_SF,
-    "num-front-ends": 28,
-    "dataset-type": "100gb",
+    **COMMON_CONFIGS,
   },
 )
