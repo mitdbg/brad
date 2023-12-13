@@ -159,7 +159,7 @@ class RecordedRun:
             print()
 
     def _agg_txn_lats(self, quantile: float) -> pd.DataFrame:
-        ts = pd.to_datetime(self.txn_lats["timestamp"])
+        ts = pd.to_datetime(self.txn_lats["timestamp"], format="mixed")
         il = self.txn_lats[["num_clients", "run_time_s"]]
         return (
             il.groupby([ts.dt.hour, ts.dt.minute])
