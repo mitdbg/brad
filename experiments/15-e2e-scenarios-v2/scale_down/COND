@@ -68,3 +68,19 @@ run_command(
     "dataset-type": "100gb",
   },
 )
+
+run_experiment(
+  name="hand_designed_100g",
+  run="./run_workload.sh",
+  options={
+    # Note the different config.
+    "system-config-file": "scale_down_hand_designed.yml",
+    "physical-config-file": "config/physical_config_100gb.yml",
+    "schema-name": "imdb_extended_100g",
+    "ra-query-indexes": ",".join(map(str, aurora_alt)),
+    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+    "txn-scale-factor": IMDB_100GB_SF,
+    "num-front-ends": 8,
+    "dataset-type": "100gb",
+  },
+)

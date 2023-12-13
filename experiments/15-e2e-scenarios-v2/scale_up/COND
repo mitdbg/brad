@@ -45,6 +45,36 @@ run_experiment(
   },
 )
 
+run_experiment(
+  name="hand_designed_100g_txn_up",
+  run="./run_workload_txn_up.sh",
+  options={
+    # Note the different config.
+    "system-config-file": "scale_up_hand_designed.yml",
+    "physical-config-file": "config/physical_config_100gb.yml",
+    "schema-name": "imdb_extended_100g",
+    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+    "txn-scale-factor": IMDB_100GB_SF,
+    "num-front-ends": 28,
+    "dataset-type": "100gb",
+  },
+)
+
+run_experiment(
+  name="hand_designed_100g_ana_up",
+  run="./run_workload_ana_up.sh",
+  options={
+    # Note the different config.
+    "system-config-file": "scale_up_hand_designed.yml",
+    "physical-config-file": "config/physical_config_100gb.yml",
+    "schema-name": "imdb_extended_100g",
+    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+    "txn-scale-factor": IMDB_100GB_SF,
+    "num-front-ends": 28,
+    "dataset-type": "100gb",
+  },
+)
+
 # Run this first to warm up the DB.
 run_command(
   name="brad_100g_warmup",
@@ -61,6 +91,7 @@ run_command(
 )
 
 # Combined halves of the scale up.
+# Note that this is unused.
 run_experiment(
   name="brad_100g_txn_ana_up",
   run="./run_workload_txn_ana_up.sh",

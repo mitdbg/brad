@@ -15,6 +15,22 @@ run_experiment(
   },
 )
 
+run_experiment(
+  name="hand_designed_100g_vector",
+  run="./run_vector_workload.sh",
+  options={
+    # Note the different config.
+    "system-config-file": "specialized_hand_designed.yml",
+    "physical-config-file": "config/physical_config_specialized.yml",
+    "schema-name": "imdb_specialized_100g",
+    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+    "txn-scale-factor": IMDB_100GB_SF,
+    "other-query-bank-file": "vector.sql",
+    "num-front-ends": 16,
+    "dataset-type": "100gb",
+  },
+)
+
 # Essentially the same as above.
 run_command(
   name="brad_100g_vector_debug",
