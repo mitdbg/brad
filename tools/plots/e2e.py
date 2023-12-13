@@ -1,9 +1,12 @@
 import pathlib
 import pickle
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.figure as plt_fig
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Literal
 
 from brad.config.planner import PlannerConfig
 from brad.planner.compare.blueprint import ComparableBlueprint
@@ -104,6 +107,7 @@ class RecordedRun:
         self._ana_lat_p90: Optional[pd.DataFrame] = None
         self._timestamp_offsets: Optional[Tuple[pd.Timestamp, pd.Timestamp]] = None
         self._blueprint_intervals: Optional[List[Tuple[float, float]]] = None
+        self._events_with_offset: Optional[pd.DataFrame] = None
 
     @property
     def is_brad(self) -> bool:
@@ -137,6 +141,22 @@ class RecordedRun:
             return self._blueprint_intervals
         self._blueprint_intervals = self._compute_blueprint_intervals()
         return self._blueprint_intervals
+
+    @property
+    def events_with_offset(self) -> Optional[pd.DataFrame]:
+        if self._events_with_offset is not None:
+            return self._events_with_offset
+        if self.events is None:
+            return None
+        self._events_with_offset = self.events.copy()
+        start_ts, _ = self.timestamp_offsets
+        self._events_with_offset["offset"] = (
+            self._events_with_offset["timestamp"] - start_ts
+        )
+        self._events_with_offset["offset_minute"] = (
+            self._events_with_offset["offset"].dt.total_seconds() / 60.0
+        )
+        return self._events_with_offset
 
     def print_routing_breakdowns(self) -> None:
         olap_offsets = self.olap_lats.copy()
@@ -274,6 +294,65 @@ class RecordedRun:
             print(f"Region {idx} {str((offset_min, offset_max))}:")
             print("Monthly scan cost:", region_costs)
             print()
+
+
+def get_e2e_axes(
+    size: Literal["small", "large"], txn_ceiling_ms=30.0, ana_ceiling_s=30.0
+) -> Tuple[plt_fig.Figure, plt.Axes, plt.Axes, plt.Axes]:
+    fig, (txn_ax, ana_ax, cst_ax) = plt.subplots(
+        nrows=3,
+        ncols=1,
+        sharex=True,
+        figsize=(7, 5) if size == "small" else (10, 6),
+        gridspec_kw={"height_ratios": [2, 2, 1], "wspace": 0.002},
+        # This option is problematic when also using `align_ylabels()`.
+        # Use `savefig("...", bbox_inches="tight")` instead.
+        # tight_layout=True,
+    )
+    fig.align_ylabels()
+
+    # Transaction Latency ceiling
+    txn_ax.axhspan(ymin=0, ymax=txn_ceiling_ms, color="#000", alpha=0.05)
+    txn_ax.axhline(y=txn_ceiling_ms, color="#000", alpha=0.5, lw=1.5)
+
+    # OLAP Latency ceiling
+    ana_ax.axhspan(ymin=-5, ymax=ana_ceiling_s, color="#000", alpha=0.05)
+    ana_ax.axhline(y=ana_ceiling_s, color="#000", alpha=0.5, lw=1.5)
+
+    cst_ax.set_ylabel("Monthly\nCost ($)")
+    cst_ax.set_xlabel("Time Elapsed (minutes)")
+    txn_ax.set_ylabel("Transaction\nLatency (ms)")
+    ana_ax.set_ylabel("Analytics\nLatency (s)")
+
+    return fig, txn_ax, ana_ax, cst_ax
+
+
+def plot_brad_event(
+    axes: List[plt.Axes], events: pd.DataFrame, event_name: str, linestyle: str
+) -> None:
+    rel = events[events["event"] == event_name]
+    for ts in rel["offset_minute"]:
+        for ax in axes:
+            ax.axvline(x=ts, color="#333", linestyle=linestyle, linewidth=1.5)
+
+
+def assemble_brad_cost_data(
+    hourly_cost_per_region: List[float], regions: List[Tuple[float, float]]
+) -> Tuple[npt.NDArray, npt.NDArray]:
+    assert len(hourly_cost_per_region) == len(regions)
+    x_segments = []
+    val_segments = []
+
+    for hourly_cost, (start, end) in zip(hourly_cost_per_region, regions):
+        xs = np.linspace(start, end)
+        vals = np.ones_like(xs)
+        vals *= hourly_cost * 24 * 30
+        x_segments.append(xs)
+        val_segments.append(vals)
+
+    xs_full = np.concatenate(x_segments)
+    vals_full = np.concatenate(val_segments)
+    return xs_full, vals_full
 
 
 def _load_txn_data(
