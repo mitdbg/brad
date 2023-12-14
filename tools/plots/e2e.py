@@ -5,8 +5,9 @@ import numpy.typing as npt
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.figure as plt_fig
+from matplotlib.gridspec import GridSpec
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, List, Literal
+from typing import Optional, Tuple, List, Literal, Callable
 
 from brad.config.planner import PlannerConfig
 from brad.planner.compare.blueprint import ComparableBlueprint
@@ -297,19 +298,28 @@ class RecordedRun:
 
 
 def get_e2e_axes(
-    size: Literal["small", "large"], txn_ceiling_ms=30.0, ana_ceiling_s=30.0
+    size: Literal["small", "large"],
+    txn_ceiling_ms=30.0,
+    ana_ceiling_s=30.0,
+    custom_subplots: Optional[
+        Callable[[GridSpec], Tuple[plt.Axes, plt.Axes, plt.Axes]]
+    ] = None,
 ) -> Tuple[plt_fig.Figure, plt.Axes, plt.Axes, plt.Axes]:
-    fig, (txn_ax, ana_ax, cst_ax) = plt.subplots(
-        nrows=3,
-        ncols=1,
-        sharex=True,
+    fig = plt.figure(
         figsize=(7, 5) if size == "small" else (10, 6),
-        gridspec_kw={"height_ratios": [2, 2, 1], "wspace": 0.002},
         # This option is problematic when also using `align_ylabels()`.
         # Use `savefig("...", bbox_inches="tight")` instead.
         # tight_layout=True,
     )
-    fig.align_ylabels()
+    grid = GridSpec(nrows=3, ncols=1, height_ratios=[2, 2, 1], hspace=0.45)
+
+    if custom_subplots is not None:
+        txn_ax, ana_ax, cst_ax = custom_subplots(grid)
+    else:
+        txn_ax = plt.subplot(grid[0, 0])
+        ana_ax = plt.subplot(grid[1, 0], sharex=txn_ax)
+        cst_ax = plt.subplot(grid[2, 0], sharex=ana_ax)
+        fig.align_ylabels()
 
     # Transaction Latency ceiling
     txn_ax.axhspan(ymin=0, ymax=txn_ceiling_ms, color="#000", alpha=0.05)
