@@ -5,6 +5,7 @@ import random
 import time
 import os
 import multiprocessing as mp
+import botocore.exceptions
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import timedelta
 from ddsketch import DDSketch
@@ -254,7 +255,7 @@ class BradFrontEnd(BradInterface):
             except ConnectionFailed:
                 if rand_backoff is None:
                     rand_backoff = RandomizedExponentialBackoff(
-                        max_retries=10, base_delay_s=0.5, max_delay_s=10.0
+                        max_retries=20, base_delay_s=0.5, max_delay_s=10.0
                     )
                 time_to_wait = rand_backoff.wait_time_s()
                 if time_to_wait is None:
@@ -267,7 +268,12 @@ class BradFrontEnd(BradInterface):
                 # Defensively refresh the blueprint and directory before
                 # retrying. Maybe we are getting outdated endpoint information
                 # from AWS.
-                await self._blueprint_mgr.load()
+                try:
+                    await self._blueprint_mgr.load()
+                except botocore.exceptions.ClientError:
+                    logger.exception(
+                        "Ignoring boto exception when refreshing the directory."
+                    )
 
     async def end_session(self, session_id: SessionId) -> None:
         await self._sessions.end_session(session_id)
