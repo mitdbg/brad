@@ -278,15 +278,16 @@ class AuroraProvisioningScore:
         )
 
         mean_service_time = prov_predicted_latency.mean()
-        denom = max(1e-3, 1.0 - cpu_util)  # Want to avoid division by 0.
-        wait_sf = cpu_util / denom
-        mean_wait_time = (
-            mean_service_time * wait_sf * ctx.planner_config.aurora_new_scaling_alpha()
-        )
-
+        # Predicted p90 latency (p90 wait time + query run time)
+        # w = -1/mu * 1/(1-rho) * log(1/rho (1 - percentile))
+        eps = 1e-3
+        cpu_util = max(eps, cpu_util)
+        cpu_util = min(1.0 - eps, cpu_util)
+        lf = np.log(1.0 / cpu_util * 0.1)
+        wait_time = mean_service_time * (-1.0 / (1.0 - cpu_util)) * lf
         # Predicted running time is the query's execution time alone plus the
         # expected wait time (due to system load)
-        return prov_predicted_latency + mean_wait_time
+        return prov_predicted_latency + wait_time
 
     @staticmethod
     def predict_query_latency_resources(

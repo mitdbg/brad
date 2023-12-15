@@ -110,8 +110,8 @@ def best_cost_under_perf_ceilings(
                 return True
 
         # Query latency ceilings.
-        left_lat = _get_or_compute_p90_latency(left)
-        right_lat = _get_or_compute_p90_latency(right)
+        left_lat = _get_or_compute_max_latency(left)
+        right_lat = _get_or_compute_max_latency(right)
 
         if left_lat > max_query_p90_latency_s and right_lat > max_query_p90_latency_s:
             # Both are above the latency ceiling.

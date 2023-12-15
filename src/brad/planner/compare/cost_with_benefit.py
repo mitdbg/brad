@@ -86,14 +86,16 @@ def best_cost_under_perf_ceilings_with_benefit_horizon(
 
 
 def _get_or_compute_query_p90_latency(bp: ComparableBlueprint) -> float:
-    stored = bp.get_memoized_value("query_p90_latency")
+    stored = bp.get_memoized_value("query_max_p90_latency")
     if stored is not None:
         return stored
     else:
         p90_lat = np.quantile(
             bp.get_predicted_analytical_latencies(), 0.9, method="lower"
         )
-        bp.set_memoized_value("query_p90_latency", p90_lat)
+        # These predicted latencies are p90 latencies.
+        p90_lat = np.max(bp.get_predicted_analytical_latencies())
+        bp.set_memoized_value("query_max_p90_latency", p90_lat)
         return p90_lat
 
 
