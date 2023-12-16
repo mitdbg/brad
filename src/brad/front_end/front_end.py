@@ -4,8 +4,10 @@ import logging
 import random
 import time
 import os
+import ssl
 import multiprocessing as mp
 import botocore.exceptions
+import redshift_connector.error as redshift_errors
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import timedelta
 from ddsketch import DDSketch
@@ -358,6 +360,8 @@ class BradFrontEnd(BradInterface):
                 pyodbc.ProgrammingError,
                 pyodbc.Error,
                 pyodbc.OperationalError,
+                redshift_errors.InterfaceError,
+                ssl.SSLEOFError,
             ) as ex:
                 is_transient_error = False
                 if connection.is_connection_lost_error(ex):
