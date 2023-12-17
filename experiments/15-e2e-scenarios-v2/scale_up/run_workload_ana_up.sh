@@ -93,7 +93,7 @@ log_workload_point "increasing_rana_heavy_24_to_56"
 # We also increase the issue frequency to 3 seconds.
 rana_sweep_offset4 "32 40 48 56" 5 56 $heavier_queries 3 1
 log_workload_point "hold_rana_heavy_56"
-sleep $((60 * 60))  # 20 + 60 mins; 128 mins cumulative
+sleep $((90 * 60))  # 20 + 90 mins; 158 mins cumulative
 
 log_workload_point "experiment_workload_done"
 
