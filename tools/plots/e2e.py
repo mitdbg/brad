@@ -47,7 +47,11 @@ class RecordedRun:
             if inner.name == "ra_vector":
                 clients = 2
             else:
-                clients = int(inner.name.split("_")[1])
+                name_parts = inner.name.split("_")
+                if name_parts[1] == "sweep":
+                    clients = int(name_parts[2])
+                else:
+                    clients = int(name_parts[1])
             for c in range(clients):
                 olap_inner = pd.read_csv(
                     inner / "repeating_olap_batch_{}.csv".format(c)
@@ -158,6 +162,12 @@ class RecordedRun:
             self._events_with_offset["offset"].dt.total_seconds() / 60.0
         )
         return self._events_with_offset
+
+    def txn_lat_p90_rolling(self, window_mins=5) -> pd.DataFrame:
+        return self.txn_lat_p90.rolling(window_mins, min_periods=1).mean()
+
+    def ana_lat_p90_rolling(self, window_mins=5) -> pd.DataFrame:
+        return self.ana_lat_p90.rolling(window_mins, min_periods=1).mean()
 
     def print_routing_breakdowns(self) -> None:
         olap_offsets = self.olap_lats.copy()

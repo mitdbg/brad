@@ -16,15 +16,22 @@ class QueryLatencyCeiling(Trigger):
         latency_ceiling_s: float,
         sustained_epochs: int,
         epoch_length: timedelta,
+        observe_bp_delay: timedelta,
         lookahead_epochs: Optional[int] = None,
     ) -> None:
-        super().__init__(epoch_length)
+        super().__init__(epoch_length, observe_bp_delay)
         self._monitor = monitor
         self._latency_ceiling_s = latency_ceiling_s
         self._sustained_epochs = sustained_epochs
         self._lookahead_epochs = lookahead_epochs
 
     async def should_replan(self) -> bool:
+        if not self._passed_delays_since_cutoff():
+            logger.debug(
+                "Skippping query latency ceiling trigger because we have not passed the delay cutoff."
+            )
+            return False
+
         past = self._monitor.front_end_metrics().read_k_most_recent(
             k=self._sustained_epochs,
             metric_ids=[FrontEndMetric.QueryLatencySecondP90.value],
