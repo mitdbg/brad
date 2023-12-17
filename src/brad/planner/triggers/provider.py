@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 from brad.config.file import ConfigFile
@@ -53,6 +53,9 @@ class ConfigDefinedTriggers(TriggerProvider):
             return []
 
         planning_window = self._planner_config.planning_window()
+        observe_bp_delay = timedelta(
+            minutes=trigger_config["observe_new_blueprint_mins"]
+        )
         trigger_list: List[Trigger] = []
 
         et_config = trigger_config["elapsed_time"]
@@ -61,6 +64,7 @@ class ConfigDefinedTriggers(TriggerProvider):
                 ElapsedTimeTrigger(
                     planning_window * et_config["multiplier"],
                     epoch_length=self._config.epoch_length,
+                    observe_bp_delay=observe_bp_delay,
                 )
             )
 
@@ -68,7 +72,10 @@ class ConfigDefinedTriggers(TriggerProvider):
         if "disabled" not in aurora_cpu:
             trigger_list.append(
                 AuroraCpuUtilization(
-                    self._monitor, epoch_length=self._config.epoch_length, **aurora_cpu
+                    self._monitor,
+                    epoch_length=self._config.epoch_length,
+                    observe_bp_delay=observe_bp_delay,
+                    **aurora_cpu
                 )
             )
 
@@ -78,6 +85,7 @@ class ConfigDefinedTriggers(TriggerProvider):
                 RedshiftCpuUtilization(
                     self._monitor,
                     epoch_length=self._config.epoch_length,
+                    observe_bp_delay=observe_bp_delay,
                     **redshift_cpu
                 )
             )
@@ -94,6 +102,7 @@ class ConfigDefinedTriggers(TriggerProvider):
                     var_costs["threshold"],
                     self._config.epoch_length,
                     self._startup_timestamp,
+                    observe_bp_delay,
                 )
             )
 
@@ -105,6 +114,7 @@ class ConfigDefinedTriggers(TriggerProvider):
                     latency_ceiling["ceiling_s"],
                     latency_ceiling["sustained_epochs"],
                     self._config.epoch_length,
+                    observe_bp_delay=observe_bp_delay,
                 )
             )
 
@@ -116,6 +126,7 @@ class ConfigDefinedTriggers(TriggerProvider):
                     latency_ceiling["ceiling_s"],
                     latency_ceiling["sustained_epochs"],
                     self._config.epoch_length,
+                    observe_bp_delay=observe_bp_delay,
                 )
             )
 
@@ -126,6 +137,7 @@ class ConfigDefinedTriggers(TriggerProvider):
                     self._planner_config,
                     self._config.epoch_length,
                     recent_change["delay_epochs"],
+                    observe_bp_delay=observe_bp_delay,
                 )
             )
 

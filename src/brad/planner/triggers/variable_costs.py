@@ -36,6 +36,7 @@ class VariableCosts(Trigger):
         threshold_frac: float,
         epoch_length: timedelta,
         startup_timestamp: datetime,
+        observe_bp_delay: timedelta,
     ) -> None:
         """
         This will trigger a replan if the current variable costs (currently,
@@ -45,7 +46,7 @@ class VariableCosts(Trigger):
         For example, if `threshold_frac` is 0.2, then replanning is triggered if
         the estimated cost is +/- 20% of the previously estimated cost.
         """
-        super().__init__(epoch_length)
+        super().__init__(epoch_length, observe_bp_delay)
         self._config = config
         self._planner_config = planner_config
         self._monitor = monitor
@@ -60,6 +61,12 @@ class VariableCosts(Trigger):
             # should be.
             logger.debug(
                 "VariableCosts trigger not running because there is no reference point."
+            )
+            return False
+
+        if not self._passed_delays_since_cutoff():
+            logger.debug(
+                "Skippping variable costs trigger because we have not passed the delay cutoff."
             )
             return False
 
