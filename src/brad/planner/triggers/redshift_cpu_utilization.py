@@ -16,10 +16,11 @@ class RedshiftCpuUtilization(Trigger):
         lo: float,
         hi: float,
         epoch_length: timedelta,
+        observe_bp_delay: timedelta,
         sustained_epochs: int = 1,
         lookahead_epochs: Optional[int] = None,
     ) -> None:
-        super().__init__(epoch_length)
+        super().__init__(epoch_length, observe_bp_delay)
         self._monitor = monitor
         self._impl = MetricsThresholds(lo, hi, sustained_epochs)
         self._sustained_epochs = sustained_epochs
@@ -35,6 +36,12 @@ class RedshiftCpuUtilization(Trigger):
         if self._current_blueprint.redshift_provisioning().num_nodes() == 0:
             logger.debug(
                 "Redshift is off, so the Redshift CPU utilization trigger is inactive."
+            )
+            return False
+
+        if not self._passed_delays_since_cutoff():
+            logger.debug(
+                "Skippping Redshift CPU utilization trigger because we have not passed the delay cutoff."
             )
             return False
 
