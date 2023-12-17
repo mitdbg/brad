@@ -91,9 +91,9 @@ log_workload_point "increasing_rana_heavy_24_to_56"
 
 # Scale up to 60 analytical clients in total (56 heavy).
 # We also increase the issue frequency to 3 seconds.
-rana_sweep_offset4 "24 32 40 48 56" 5 56 $heavier_queries 3 1
+rana_sweep_offset4 "32 40 48 56" 5 56 $heavier_queries 3 1
 log_workload_point "hold_rana_heavy_56"
-sleep $((60 * 60))  # 25 + 60 mins; 133 mins cumulative
+sleep $((60 * 60))  # 20 + 60 mins; 128 mins cumulative
 
 log_workload_point "experiment_workload_done"
 
