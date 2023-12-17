@@ -61,7 +61,14 @@ class RedshiftProvisioningManager:
         self, cluster_id: str
     ) -> Provisioning:
         def do_resume():
-            self._redshift.resume_cluster(ClusterIdentifier=cluster_id)
+            try:
+                self._redshift.resume_cluster(ClusterIdentifier=cluster_id)
+            except Exception as ex:
+                message = repr(ex)
+                if "InvalidClusterState" in message:
+                    logger.info("Proceeding past Redshift resume error: %s", message)
+                else:
+                    raise
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, do_resume)
