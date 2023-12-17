@@ -36,6 +36,7 @@ from brad.front_end.brad_interface import BradInterface
 from brad.front_end.errors import QueryError
 from brad.front_end.grpc import BradGrpc
 from brad.front_end.session import SessionManager, SessionId, Session
+from brad.provisioning.directory import Directory
 from brad.query_rep import QueryRep
 from brad.routing.abstract_policy import AbstractRoutingPolicy
 from brad.routing.always_one import AlwaysOneRouter
@@ -68,6 +69,7 @@ class BradFrontEnd(BradInterface):
         schema_name: str,
         path_to_system_config: str,
         debug_mode: bool,
+        initial_directory: Directory,
         input_queue: mp.Queue,
         output_queue: mp.Queue,
     ):
@@ -86,7 +88,12 @@ class BradFrontEnd(BradInterface):
 
         self._assets = AssetManager(self._config)
         self._blueprint_mgr = BlueprintManager(
-            self._config, self._assets, self._schema_name
+            self._config,
+            self._assets,
+            self._schema_name,
+            # This is provided by the daemon. We want to avoid hitting the AWS
+            # cluster metadata APIs when starting up the front end(s).
+            initial_directory=initial_directory,
         )
         self._path_to_system_config = path_to_system_config
         self._monitor: Optional[Monitor] = None
@@ -167,7 +174,8 @@ class BradFrontEnd(BradInterface):
             logger.debug("BRAD front end _run_teardown() complete.")
 
     async def _run_setup(self) -> None:
-        await self._blueprint_mgr.load()
+        # The directory will have been populated by the daemon.
+        await self._blueprint_mgr.load(skip_directory_refresh=True)
         logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
 
         if self._monitor is not None:
@@ -531,7 +539,9 @@ class BradFrontEnd(BradInterface):
                     message.version,
                 )
                 # This refreshes any cached state that depends on the old blueprint.
-                await self._run_blueprint_update(message.version)
+                await self._run_blueprint_update(
+                    message.version, message.updated_directory
+                )
                 self._route_redshift_only = False
                 # Tell the daemon that we have updated.
                 self._output_queue.put(
@@ -614,8 +624,11 @@ class BradFrontEnd(BradInterface):
             # files are uploaded.
             await self._qhandler.refresh()
 
-    async def _run_blueprint_update(self, version: int) -> None:
-        await self._blueprint_mgr.load()
+    async def _run_blueprint_update(
+        self, version: int, updated_directory: Directory
+    ) -> None:
+        await self._blueprint_mgr.load(skip_directory_refresh=True)
+        self._blueprint_mgr.get_directory().update_to_directory(updated_directory)
         active_version = self._blueprint_mgr.get_active_blueprint_version()
         if version != active_version:
             logger.error(

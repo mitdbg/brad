@@ -1,6 +1,7 @@
 from ddsketch import DDSketch
 from ddsketch.pb.proto import DDSketchProto, pb as ddspb
 
+from brad.provisioning.directory import Directory
 from brad.row_list import RowList
 
 
@@ -21,9 +22,12 @@ class NewBlueprint(IpcMessage):
     blueprint.
     """
 
-    def __init__(self, fe_index: int, version: int) -> None:
+    def __init__(
+        self, fe_index: int, version: int, updated_directory: Directory
+    ) -> None:
         super().__init__(fe_index)
         self.version = version
+        self.updated_directory = updated_directory
 
 
 class NewBlueprintAck(IpcMessage):

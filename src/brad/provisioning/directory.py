@@ -86,6 +86,19 @@ class Directory:
             aws_secret_access_key=self._config.aws_access_key_secret,
         )
 
+    def update_to_directory(self, other: "Directory") -> None:
+        # pylint: disable=protected-access
+        """
+        Sets the metadata in this directory to the metadata in the provided
+        directory. This is used to avoid calling the AWS metadata APIs directly
+        if the metadata has already been retrieved.
+        """
+        self._aurora_writer = other._aurora_writer
+        self._aurora_readers = other._aurora_readers
+        self._redshift_cluster = other._redshift_cluster
+        self._aurora_writer_endpoint = other._aurora_writer_endpoint
+        self._aurora_reader_endpoint = other._aurora_reader_endpoint
+
     def aurora_writer(self) -> "AuroraInstanceMetadata":
         assert self._aurora_writer is not None
         return self._aurora_writer

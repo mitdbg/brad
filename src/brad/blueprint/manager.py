@@ -23,7 +23,11 @@ class BlueprintManager:
     """
 
     def __init__(
-        self, config: ConfigFile, assets: AssetManager, schema_name: str
+        self,
+        config: ConfigFile,
+        assets: AssetManager,
+        schema_name: str,
+        initial_directory: Optional[Directory] = None,
     ) -> None:
         self._assets = assets
         self._schema_name = schema_name
@@ -32,7 +36,9 @@ class BlueprintManager:
         self._current_blueprint_score: Optional[Score] = None
         self._next_blueprint: Optional[Blueprint] = None
         self._next_blueprint_score: Optional[Score] = None
-        self._directory = Directory(config)
+        self._directory = (
+            Directory(config) if initial_directory is None else initial_directory
+        )
 
     @staticmethod
     def initialize_schema(
@@ -56,7 +62,7 @@ class BlueprintManager:
             versioning.serialize(),
         )
 
-    async def load(self) -> None:
+    async def load(self, skip_directory_refresh: bool = False) -> None:
         """
         Loads the persisted version of the blueprint from S3.
         """
@@ -85,7 +91,8 @@ class BlueprintManager:
         self._next_blueprint = next_blueprint
         self._next_blueprint_score = next_score
 
-        await self._directory.refresh()
+        if not skip_directory_refresh:
+            await self._directory.refresh()
         logger.debug("Loaded %s", self._versioning)
 
     def load_sync(self) -> None:
