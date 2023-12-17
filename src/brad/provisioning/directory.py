@@ -1,11 +1,13 @@
 import asyncio
 import boto3
 import logging
+import botocore.exceptions
 from typing import Any, Dict, List, Optional, Tuple
 
 from .rds_status import RdsStatus
 from .redshift_status import RedshiftAvailabilityStatus
 from brad.config.file import ConfigFile
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +121,26 @@ class Directory:
         return self._aurora_reader_endpoint
 
     async def refresh(self) -> None:
+        # The AWS APIs may throttle us. We wrap the call with our own randomized
+        # back off increase the likelihood that this call succeeds.
+        backoff = None
+        while True:
+            try:
+                await self.refresh_impl()
+                return
+            except botocore.exceptions.ClientError as ex:
+                if backoff is None:
+                    backoff = RandomizedExponentialBackoff(
+                        max_retries=100, base_delay_s=0.1, max_delay_s=5.0
+                    )
+                wait_time_s = backoff.wait_time_s()
+                if wait_time_s is None:
+                    raise RuntimeError(
+                        "Failed to refresh the directory (exceeded maximum retries)."
+                    ) from ex
+                await asyncio.sleep(wait_time_s)
+
+    async def refresh_impl(self) -> None:
         (
             aurora_writer,
             aurora_readers,

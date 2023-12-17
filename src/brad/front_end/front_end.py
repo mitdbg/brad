@@ -6,7 +6,6 @@ import time
 import os
 import ssl
 import multiprocessing as mp
-import botocore.exceptions
 import redshift_connector.error as redshift_errors
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import timedelta
@@ -278,12 +277,7 @@ class BradFrontEnd(BradInterface):
                 # Defensively refresh the blueprint and directory before
                 # retrying. Maybe we are getting outdated endpoint information
                 # from AWS.
-                try:
-                    await self._blueprint_mgr.load()
-                except botocore.exceptions.ClientError:
-                    logger.exception(
-                        "Ignoring boto exception when refreshing the directory."
-                    )
+                await self._blueprint_mgr.load()
 
     async def end_session(self, session_id: SessionId) -> None:
         await self._sessions.end_session(session_id)
