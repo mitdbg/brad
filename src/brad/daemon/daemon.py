@@ -270,6 +270,7 @@ class BradDaemon:
                     self._schema_name,
                     self._path_to_system_config,
                     self._debug_mode,
+                    self._blueprint_mgr.get_directory(),
                     input_queue,
                     output_queue,
                 ),
@@ -609,96 +610,119 @@ class BradDaemon:
             return []
 
     async def _run_transition_part_one(self) -> None:
-        assert self._transition_orchestrator is not None
-        tm = self._blueprint_mgr.get_transition_metadata()
-        transitioning_to_version = tm.next_version
+        try:
+            assert self._transition_orchestrator is not None
+            tm = self._blueprint_mgr.get_transition_metadata()
+            transitioning_to_version = tm.next_version
 
-        if self._system_event_logger is not None:
-            next_blueprint = tm.next_blueprint
-            assert next_blueprint is not None
-            next_aurora = str(next_blueprint.aurora_provisioning())
-            next_redshift = str(next_blueprint.redshift_provisioning())
+            if self._system_event_logger is not None:
+                next_blueprint = tm.next_blueprint
+                assert next_blueprint is not None
+                next_aurora = str(next_blueprint.aurora_provisioning())
+                next_redshift = str(next_blueprint.redshift_provisioning())
 
-            self._system_event_logger.log(
-                SystemEvent.PreTransitionStarted,
-                f"version={transitioning_to_version};"
-                f"aurora={next_aurora};"
-                f"redshift={next_redshift}",
+                self._system_event_logger.log(
+                    SystemEvent.PreTransitionStarted,
+                    f"version={transitioning_to_version};"
+                    f"aurora={next_aurora};"
+                    f"redshift={next_redshift}",
+                )
+
+            def update_monitor_sources():
+                self._monitor.update_metrics_sources()
+
+            await self._transition_orchestrator.run_prepare_then_transition(
+                update_monitor_sources
             )
 
-        def update_monitor_sources():
+            # Switch to the transitioned state.
+            tm = self._blueprint_mgr.get_transition_metadata()
+            assert (
+                tm.state == TransitionState.TransitionedPreCleanUp
+            ), "Incorrect transition state."
+            assert tm.next_version is not None, "Missing next version."
+
+            directory = self._blueprint_mgr.get_directory()
+            logger.info(
+                "Switched to new directory during blueprint transition: %s", directory
+            )
             self._monitor.update_metrics_sources()
 
-        await self._transition_orchestrator.run_prepare_then_transition(
-            update_monitor_sources
-        )
+            await self._data_sync_executor.update_connections()
 
-        # Switch to the transitioned state.
-        tm = self._blueprint_mgr.get_transition_metadata()
-        assert (
-            tm.state == TransitionState.TransitionedPreCleanUp
-        ), "Incorrect transition state."
-        assert tm.next_version is not None, "Missing next version."
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.PreTransitionCompleted,
+                    "version={}".format(transitioning_to_version),
+                )
 
-        directory = self._blueprint_mgr.get_directory()
-        logger.info(
-            "Switched to new directory during blueprint transition: %s", directory
-        )
-        self._monitor.update_metrics_sources()
-
-        await self._data_sync_executor.update_connections()
-
-        if self._system_event_logger is not None:
-            self._system_event_logger.log(
-                SystemEvent.PreTransitionCompleted,
-                "version={}".format(transitioning_to_version),
+            # Inform all front ends about the new blueprint.
+            logger.debug(
+                "Notifying %d front ends about the new blueprint.",
+                len(self._front_ends),
             )
+            self._transition_orchestrator.set_waiting_for_front_ends(
+                len(self._front_ends)
+            )
+            for fe in self._front_ends:
+                fe.input_queue.put(
+                    NewBlueprint(
+                        fe.fe_index,
+                        tm.next_version,
+                        self._blueprint_mgr.get_directory(),
+                    )
+                )
 
-        # Inform all front ends about the new blueprint.
-        logger.debug(
-            "Notifying %d front ends about the new blueprint.", len(self._front_ends)
-        )
-        self._transition_orchestrator.set_waiting_for_front_ends(len(self._front_ends))
-        for fe in self._front_ends:
-            fe.input_queue.put(NewBlueprint(fe.fe_index, tm.next_version))
+            self._transition_task = None
 
-        self._transition_task = None
-
-        # We finish the transition after all front ends acknowledge that they
-        # have transitioned to the new blueprint.
+            # We finish the transition after all front ends acknowledge that they
+            # have transitioned to the new blueprint.
+        except:  # pylint: disable=bare-except
+            # Because this runs as a background asyncio task, we log any errors
+            # that occur so that failures are not silent.
+            logger.exception(
+                "Transition part one failed due to an unexpected exception."
+            )
 
     async def _run_transition_part_two(self) -> None:
-        assert self._transition_orchestrator is not None
-        tm = self._blueprint_mgr.get_transition_metadata()
-        transitioning_to_version = tm.next_version
-        if self._system_event_logger is not None:
-            self._system_event_logger.log(
-                SystemEvent.PostTransitionStarted,
-                "version={}".format(transitioning_to_version),
+        try:
+            assert self._transition_orchestrator is not None
+            tm = self._blueprint_mgr.get_transition_metadata()
+            transitioning_to_version = tm.next_version
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.PostTransitionStarted,
+                    "version={}".format(transitioning_to_version),
+                )
+
+            await self._transition_orchestrator.run_clean_up_after_transition()
+            if self._planner is not None:
+                self._planner.update_blueprint(
+                    self._blueprint_mgr.get_blueprint(),
+                    self._blueprint_mgr.get_active_score(),
+                )
+
+            # Done.
+            tm = self._blueprint_mgr.get_transition_metadata()
+            assert (
+                tm.state == TransitionState.Stable
+            ), "Incorrect transition state after completion."
+            if self._planner is not None:
+                self._planner.set_disable_triggers(disable=False)
+            logger.info(
+                "Completed the transition to blueprint version %d", tm.curr_version
             )
+            self._transition_task = None
+            self._transition_orchestrator = None
 
-        await self._transition_orchestrator.run_clean_up_after_transition()
-        if self._planner is not None:
-            self._planner.update_blueprint(
-                self._blueprint_mgr.get_blueprint(),
-                self._blueprint_mgr.get_active_score(),
-            )
-
-        # Done.
-        tm = self._blueprint_mgr.get_transition_metadata()
-        assert (
-            tm.state == TransitionState.Stable
-        ), "Incorrect transition state after completion."
-        if self._planner is not None:
-            self._planner.set_disable_triggers(disable=False)
-        logger.info("Completed the transition to blueprint version %d", tm.curr_version)
-        self._transition_task = None
-        self._transition_orchestrator = None
-
-        if self._system_event_logger is not None:
-            self._system_event_logger.log(
-                SystemEvent.PostTransitionCompleted,
-                "version={}".format(transitioning_to_version),
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.PostTransitionCompleted,
+                    "version={}".format(transitioning_to_version),
+                )
+        except:  # pylint: disable=bare-except
+            logger.exception(
+                "Transition part two failed due to an unexpected exception."
             )
 
 
