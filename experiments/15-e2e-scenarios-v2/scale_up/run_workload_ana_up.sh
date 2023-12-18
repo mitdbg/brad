@@ -72,28 +72,17 @@ rana_pid=$runner_pid
 log_workload_point "started_rana_4_$rana_pid"
 sleep 2
 
-# Start with 8 transactional clients; hold for 10 minutes to stabilize.
+# Start with 4 transactional clients; hold for 10 minutes to stabilize.
 log_workload_point "start_txn_4"
 start_txn_runner 4
 txn_pid=$runner_pid
-sleep $((10 * 60))
-
-# Scale up to 28 analytical clients in total (24 heavy).
-log_workload_point "start_increase_rana_heavy_4_to_24"
-rana_sweep_offset4 "4 8 12 16 20 24" 3 24 $heavier_queries 15 5
-log_workload_point "hold_rana_heavy_24"
-sleep $((30 * 60))  # 18 + 30 mins; 48 mins cumulative
-
-log_workload_point "switching_to_heavy"
-kill -INT $sweep_rana_pid
-wait $sweep_rana_pid
-log_workload_point "increasing_rana_heavy_24_to_56"
+sleep $((10 * 60)) # 10 mins cumulative
 
 # Scale up to 60 analytical clients in total (56 heavy).
-# We also increase the issue frequency to 3 seconds.
-rana_sweep_offset4 "32 40 48 56" 5 56 $heavier_queries 3 1
+log_workload_point "start_increase_rana_heavy_4_to_56"
+rana_sweep_offset4 "4 8 12 16 20 24 32 40 48 56" 5 56 $heavier_queries 3 1
 log_workload_point "hold_rana_heavy_56"
-sleep $((90 * 60))  # 20 + 90 mins; 158 mins cumulative
+sleep $((120 * 60))  # 50 + 120 mins; 180 mins cumulative
 
 log_workload_point "experiment_workload_done"
 
