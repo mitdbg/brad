@@ -38,3 +38,18 @@ class CachedLocationPolicy(AbstractRoutingPolicy):
             return [self._query_map[query_rep]]
         except KeyError:
             return []
+
+    def __repr__(self) -> str:
+        # Summarize the cached routing state.
+        routing_count: Dict[Engine, int] = {
+            Engine.Aurora: 0,
+            Engine.Redshift: 0,
+            Engine.Athena: 0,
+        }
+        for engine in self._query_map.values():
+            routing_count[engine] += 1
+        return (
+            f"CachedLocations(Aurora={routing_count[Engine.Aurora]}, "
+            f"Redshift={routing_count[Engine.Redshift]}, "
+            f"Athena={routing_count[Engine.Athena]})"
+        )
