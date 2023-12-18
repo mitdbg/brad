@@ -13,6 +13,9 @@ class AbstractRoutingPolicy:
     def name(self) -> str:
         raise NotImplementedError
 
+    def __repr__(self) -> str:
+        return self.name()
+
     async def engine_for(
         self, query_rep: QueryRep, ctx: RoutingContext
     ) -> List[Engine]:

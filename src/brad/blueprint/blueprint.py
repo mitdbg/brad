@@ -123,11 +123,12 @@ class Blueprint:
             )
         )
         routing_policy = self.get_routing_policy()
-        indefinite_policies = (
-            f"Indefinite routing policies:  {len(routing_policy.indefinite_policies)}"
+        indef_policy_string = "\n    - ".join(
+            [str(policy) for policy in routing_policy.indefinite_policies]
         )
+        indefinite_policies = f"Indefinite routing policies:  {indef_policy_string}"
         definite_policy = (
-            f"Definite routing policy:      {routing_policy.definite_policy.name()}"
+            f"Definite routing policy:      {routing_policy.definite_policy}"
         )
         return "\n  ".join(
             [
