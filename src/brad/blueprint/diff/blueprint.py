@@ -32,20 +32,29 @@ class BlueprintDiff:
             old.redshift_provisioning(), new.redshift_provisioning()
         )
 
-        if len(table_diffs) == 0 and aurora_diff is None and redshift_diff is None:
+        has_routing_diff = old.get_routing_policy() != new.get_routing_policy()
+
+        if (
+            len(table_diffs) == 0
+            and aurora_diff is None
+            and redshift_diff is None
+            and (not has_routing_diff)
+        ):
             return None
 
-        return cls(table_diffs, aurora_diff, redshift_diff)
+        return cls(table_diffs, aurora_diff, redshift_diff, has_routing_diff)
 
     def __init__(
         self,
         table_diffs: List[TableDiff],
         aurora_diff: Optional[ProvisioningDiff],
         redshift_diff: Optional[ProvisioningDiff],
+        has_routing_diff: bool,
     ) -> None:
         self._table_diffs = table_diffs
         self._aurora_diff = aurora_diff
         self._redshift_diff = redshift_diff
+        self._has_routing_diff = has_routing_diff
 
     def aurora_diff(self) -> Optional[ProvisioningDiff]:
         return self._aurora_diff
@@ -55,3 +64,6 @@ class BlueprintDiff:
 
     def table_diffs(self) -> List[TableDiff]:
         return self._table_diffs
+
+    def has_routing_diff(self) -> bool:
+        return self._has_routing_diff

@@ -53,3 +53,8 @@ class CachedLocationPolicy(AbstractRoutingPolicy):
             f"Redshift={routing_count[Engine.Redshift]}, "
             f"Athena={routing_count[Engine.Athena]})"
         )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, CachedLocationPolicy):
+            return False
+        return self._query_map == other._query_map
