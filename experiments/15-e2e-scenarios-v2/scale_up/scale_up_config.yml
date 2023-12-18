@@ -121,7 +121,7 @@ triggers:
   enabled: true
   check_period_s: 90  # Triggers are checked every X seconds.
   check_period_offset_s: 360  # Wait 6 mins before starting.
-  observe_new_blueprint_mins: 3
+  observe_new_blueprint_mins: 10
 
   elapsed_time:
     disabled: true
