@@ -1,4 +1,5 @@
 import random
+import numpy as np
 import logging
 from datetime import datetime, timedelta
 from typing import List, Tuple, Any
@@ -26,9 +27,15 @@ class TransactionWorker:
         seed: int,
         scale_factor: int,
         dataset_type: str = "original",
+        use_zipfian_ids: bool = False,
+        zipfian_alpha: float = 1.1,
     ) -> None:
         self.worker_id = worker_id
         self.prng = random.Random(seed)
+        self.use_zipfian_ids = use_zipfian_ids
+        if use_zipfian_ids:
+            self.zprng = np.random.default_rng(seed)
+            self.zipfian_alpha = zipfian_alpha
 
         self.min_movie_id = MIN_MOVIE_ID
         if dataset_type == "original":
@@ -64,7 +71,11 @@ class TransactionWorker:
         """
 
         # 1. Select a random movie id.
-        movie_id = self.prng.randint(self.min_movie_id, self.max_movie_id)
+        movie_id = (
+            self.zprng.zipf(self.zipfian_alpha)
+            if self.use_zipfian_ids
+            else self.prng.randint(self.min_movie_id, self.max_movie_id)
+        )
 
         try:
             # Start the transaction.
@@ -114,10 +125,18 @@ class TransactionWorker:
         - Insert into showing
         """
         # 1. Select a random theatre id.
-        theatre_id = self.prng.randint(self.min_theatre_id, self.max_theatre_id)
+        theatre_id = (
+            self.zprng.zipf(self.zipfian_alpha)
+            if self.use_zipfian_ids
+            else self.prng.randint(self.min_theatre_id, self.max_theatre_id)
+        )
 
         # 2. Select a random movie id.
-        movie_id = self.prng.randint(self.min_movie_id, self.max_movie_id)
+        movie_id = (
+            self.zprng.zipf(self.zipfian_alpha)
+            if self.use_zipfian_ids
+            else self.prng.randint(self.min_movie_id, self.max_movie_id)
+        )
 
         showings_to_add = self.prng.randint(*self.showings_to_add)
 
@@ -167,7 +186,11 @@ class TransactionWorker:
         """
 
         # 1. Select a random theatre number.
-        theatre_num = self.prng.randint(self.min_theatre_id, self.max_theatre_id)
+        theatre_num = (
+            self.zprng.zipf(self.zipfian_alpha)
+            if self.use_zipfian_ids
+            else self.prng.randint(self.min_theatre_id, self.max_theatre_id)
+        )
 
         try:
             # Start the transaction.
