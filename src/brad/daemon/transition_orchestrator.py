@@ -544,18 +544,23 @@ class TransitionOrchestrator:
         # Resizes are OK because Redshift maintains read-availability during the
         # resize.
         is_classic = self._redshift.must_use_classic_resize(old, new)
-        if is_classic:
+        resize_completed = False
+        if not is_classic:
+            logger.debug(
+                "Running Redshift elastic resize. Old: %s, New: %s", str(old), str(new)
+            )
+            resize_completed = await self._redshift.elastic_resize(
+                self._config.redshift_cluster_id, new, wait_until_available=True
+            )
+
+        # Sometimes the elastic resize will not be supported even though it
+        # should be (according to the docs). This lets us fall back to a classic
+        # resize, which should always be supported.
+        if is_classic or not resize_completed:
             logger.debug(
                 "Running Redshift classic resize. Old: %s, New: %s", str(old), str(new)
             )
             await self._redshift.classic_resize(
-                self._config.redshift_cluster_id, new, wait_until_available=True
-            )
-        else:
-            logger.debug(
-                "Running Redshift elastic resize. Old: %s, New: %s", str(old), str(new)
-            )
-            await self._redshift.elastic_resize(
                 self._config.redshift_cluster_id, new, wait_until_available=True
             )
 
