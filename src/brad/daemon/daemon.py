@@ -11,6 +11,7 @@ from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
 from brad.blueprint.diff.blueprint import BlueprintDiff
 from brad.blueprint.manager import BlueprintManager
+from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.state import TransitionState
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
@@ -39,6 +40,7 @@ from brad.planner.compare.provider import (
     PerformanceCeilingComparatorProvider,
     BenefitPerformanceCeilingComparatorProvider,
 )
+from brad.planner.enumeration.blueprint import EnumeratedBlueprint
 from brad.planner.estimator import EstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
 from brad.planner.metrics import WindowedMetricsFromMonitor
@@ -605,6 +607,33 @@ class BradDaemon:
             except Exception as ex:
                 logger.exception("Encountered exception when running the planner.")
                 return [(str(ex),)]
+
+        elif command.startswith("BRAD_MODIFY_REDSHIFT"):
+            parts = command.split(" ")
+            if len(parts) <= 1:
+                return [("Nothing to modify.",)]
+
+            new_num_nodes = int(parts[2])
+            logger.info("Setting Redshift to dc2.large(%d)", new_num_nodes)
+
+            curr_blueprint = self._blueprint_mgr.get_blueprint()
+            ebp = EnumeratedBlueprint(curr_blueprint)
+            ebp.set_redshift_provisioning(Provisioning("dc2.large", new_num_nodes))
+            new_blueprint = ebp.to_blueprint()
+            new_version = await self._blueprint_mgr.start_transition(
+                new_blueprint, new_score=None
+            )
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.NewBlueprintAccepted, "version={}".format(new_version)
+                )
+            if self._planner is not None:
+                self._planner.set_disable_triggers(disable=True)
+            self._transition_orchestrator = TransitionOrchestrator(
+                self._config, self._blueprint_mgr, self._system_event_logger
+            )
+            self._transition_task = asyncio.create_task(self._run_transition_part_one())
+            return [("Transition in progress.",)]
 
         else:
             logger.warning("Received unknown internal command: %s", command)
