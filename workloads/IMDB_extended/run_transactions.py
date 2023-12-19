@@ -42,7 +42,12 @@ def runner(
     signal.signal(signal.SIGINT, noop_handler)
 
     worker = TransactionWorker(
-        worker_idx, args.seed ^ worker_idx, args.scale_factor, args.dataset_type
+        worker_idx,
+        args.seed ^ worker_idx,
+        args.scale_factor,
+        args.dataset_type,
+        args.use_zipfian_ids,
+        args.zipfian_alpha,
     )
 
     txn_prng = random.Random(~(args.seed ^ worker_idx))
@@ -280,6 +285,20 @@ def main():
         default="original",
         help="This controls the range of reads the transaction worker performs, "
         "depending on the dataset size.",
+    )
+    parser.add_argument(
+        "--use-zipfian-ids",
+        type=bool,
+        default=False,
+        help="Whether the transaction worker should draw movie and theatre IDs "
+        "from a Zipfian distribution.",
+    )
+    parser.add_argument(
+        "--zipfian-alpha",
+        type=float,
+        default=1.1,
+        help="The alpha parameter for the Zipfian distribution. Only used if "
+        "--use-zipfian-ids is `True`. Must be strictly greater than 1. ",
     )
     # These three arguments are used for the day long experiment.
     parser.add_argument(
