@@ -154,6 +154,7 @@ class BradDaemon:
     async def _run_setup(self) -> None:
         await self._blueprint_mgr.load()
         logger.info("Current blueprint: %s", self._blueprint_mgr.get_blueprint())
+        logger.info("Current directory: %s", self._blueprint_mgr.get_directory())
 
         # Initialize the monitor.
         self._monitor.set_up_metrics_sources()

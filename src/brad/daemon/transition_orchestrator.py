@@ -118,14 +118,9 @@ class TransitionOrchestrator:
                     self._next_blueprint.redshift_provisioning()
                 )
                 # Here we switch the directory over to/from the preset cluster.
-                if preset_cluster_id is not None:
-                    self._blueprint_mgr.get_directory().set_override_redshift_cluster_id(
-                        preset_cluster_id
-                    )
-                else:
-                    self._blueprint_mgr.get_directory().set_override_redshift_cluster_id(
-                        None
-                    )
+                self._blueprint_mgr.get_directory().set_override_redshift_cluster_id(
+                    preset_cluster_id
+                )
                 await self._blueprint_mgr.refresh_directory()
                 if on_instance_identity_change is not None:
                     # The Redshift cluster may have changed.
