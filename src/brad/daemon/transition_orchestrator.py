@@ -110,6 +110,27 @@ class TransitionOrchestrator:
 
         if self._config.disable_table_movement:
             logger.debug("Table movement during transitions is disabled.")
+
+            # Note that we only use preset Redshift clusters when table movement
+            # is disabled.
+            if self._config.use_preset_redshift_clusters and redshift_diff is not None:
+                preset_cluster_id = self._config.get_preset_redshift_cluster_id(
+                    self._next_blueprint.redshift_provisioning()
+                )
+                # Here we switch the directory over to/from the preset cluster.
+                if preset_cluster_id is not None:
+                    self._blueprint_mgr.get_directory().set_override_redshift_cluster_id(
+                        preset_cluster_id
+                    )
+                else:
+                    self._blueprint_mgr.get_directory().set_override_redshift_cluster_id(
+                        None
+                    )
+                await self._blueprint_mgr.refresh_directory()
+                if on_instance_identity_change is not None:
+                    # The Redshift cluster may have changed.
+                    on_instance_identity_change()
+
             await self._run_prepare_then_transition_cleanup()
             return
 
@@ -180,9 +201,7 @@ class TransitionOrchestrator:
 
         await self._run_prepare_then_transition_cleanup()
 
-    async def _run_prepare_then_transition_cleanup(
-        self,
-    ) -> None:
+    async def _run_prepare_then_transition_cleanup(self) -> None:
         logger.debug("Pre-transition steps complete.")
 
         await self._blueprint_mgr.update_transition_state(

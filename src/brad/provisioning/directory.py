@@ -37,6 +37,7 @@ class Directory:
             aws_secret_access_key=self._config.aws_access_key_secret,
         )
 
+        self._overridden_redshift_cluster_id: Optional[str] = None
         self._aurora_writer: Optional["AuroraInstanceMetadata"] = None
         self._aurora_readers: List["AuroraInstanceMetadata"] = []
         self._redshift_cluster: Optional["RedshiftClusterMetadata"] = None
@@ -56,6 +57,7 @@ class Directory:
                 "",
                 "[Redshift]",
                 repr(self._redshift_cluster),
+                "Cluster ID override: {}".format(self._overridden_redshift_cluster_id),
             ]
         )
 
@@ -67,6 +69,7 @@ class Directory:
             "redshift_cluster": self._redshift_cluster,
             "aurora_writer_endpoint": self._aurora_writer_endpoint,
             "aurora_reader_endpoint": self._aurora_reader_endpoint,
+            "overridden_redshift_cluster_id": self._overridden_redshift_cluster_id,
         }
 
     def __setstate__(self, d: Dict[Any, Any]) -> None:
@@ -76,6 +79,7 @@ class Directory:
         self._redshift_cluster = d["redshift_cluster"]
         self._aurora_writer_endpoint = d["aurora_writer_endpoint"]
         self._aurora_reader_endpoint = d["aurora_reader_endpoint"]
+        self._overridden_redshift_cluster_id = d["overridden_redshift_cluster_id"]
 
         self._rds = boto3.client(
             "rds",
@@ -100,6 +104,11 @@ class Directory:
         self._redshift_cluster = other._redshift_cluster
         self._aurora_writer_endpoint = other._aurora_writer_endpoint
         self._aurora_reader_endpoint = other._aurora_reader_endpoint
+        self._overridden_redshift_cluster_id = other._overridden_redshift_cluster_id
+
+    def set_override_redshift_cluster_id(self, cluster_id: Optional[str]) -> None:
+        # This is used to switch to a preset Redshift cluster.
+        self._overridden_redshift_cluster_id = cluster_id
 
     def aurora_writer(self) -> "AuroraInstanceMetadata":
         assert self._aurora_writer is not None
@@ -234,9 +243,14 @@ class Directory:
         return AuroraInstanceMetadata(**kwargs)
 
     async def _refresh_redshift(self) -> "RedshiftClusterMetadata":
+        redshift_cluster_id = (
+            self._overridden_redshift_cluster_id
+            if self._overridden_redshift_cluster_id is not None
+            else self._config.redshift_cluster_id
+        )
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
-            None, self._call_describe_redshift_cluster
+            None, self._call_describe_redshift_cluster, redshift_cluster_id
         )
 
         cluster = response["Clusters"][0]
@@ -249,7 +263,7 @@ class Directory:
                 cluster["ClusterAvailabilityStatus"]
             ),
         }
-        return RedshiftClusterMetadata(**kwargs)
+        return RedshiftClusterMetadata(cluster_id=redshift_cluster_id, **kwargs)
 
     def _call_describe_aurora_cluster(self) -> Dict[Any, Any]:
         return self._rds.describe_db_clusters(
@@ -261,10 +275,8 @@ class Directory:
             DBInstanceIdentifier=instance_id,
         )
 
-    def _call_describe_redshift_cluster(self) -> Dict[Any, Any]:
-        return self._redshift.describe_clusters(
-            ClusterIdentifier=self._config.redshift_cluster_id
-        )
+    def _call_describe_redshift_cluster(self, cluster_id: str) -> Dict[Any, Any]:
+        return self._redshift.describe_clusters(ClusterIdentifier=cluster_id)
 
 
 class AuroraInstanceMetadata:
@@ -335,12 +347,14 @@ class AuroraInstanceMetadata:
 class RedshiftClusterMetadata:
     def __init__(
         self,
+        cluster_id: str,
         endpoint_address: str,
         endpoint_port: int,
         instance_type: str,
         num_nodes: int,
         availability_status: RedshiftAvailabilityStatus,
     ) -> None:
+        self._cluster_id = cluster_id
         self._endpoint_address = endpoint_address
         self._endpoint_port = endpoint_port
         self._instance_type = instance_type
@@ -351,6 +365,7 @@ class RedshiftClusterMetadata:
         return "\n".join(
             [
                 "RedshiftClusterMetadata",
+                "  Cluster ID: {}".format(self._cluster_id),
                 "  Endpoint: {}:{}".format(
                     self._endpoint_address, str(self._endpoint_port)
                 ),
