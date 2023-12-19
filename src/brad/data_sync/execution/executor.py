@@ -64,7 +64,9 @@ class DataSyncExecutor:
         if blueprint.redshift_provisioning().num_nodes() > 0:
             expected_engines.add(Engine.Redshift)
 
-        await self._engines.add_connections(self._config, directory, expected_engines)
+        await self._engines.add_and_refresh_connections(
+            self._config, directory, expected_engines
+        )
         await self._engines.remove_connections(
             expected_engines,
             # We do not need to connect to the read replicas.

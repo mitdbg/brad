@@ -144,7 +144,7 @@ class SessionManager:
         await asyncio.gather(*end_tasks)
         self._sessions.clear()
 
-    async def add_connections(self) -> None:
+    async def add_and_refresh_connections(self) -> None:
         """
         Used during blueprint transitions to add connections to newly started
         engines.
@@ -159,7 +159,7 @@ class SessionManager:
             expected_engines.add(Engine.Redshift)
 
         for session in self._sessions.values():
-            await session.engines.add_connections(
+            await session.engines.add_and_refresh_connections(
                 self._config, directory, expected_engines
             )
 

@@ -637,7 +637,7 @@ class BradFrontEnd(BradInterface):
         logger.debug("Loaded new directory: %s", directory)
         if self._monitor is not None:
             self._monitor.update_metrics_sources()
-        await self._sessions.add_connections()
+        await self._sessions.add_and_refresh_connections()
         assert self._router is not None
         self._router.update_blueprint(blueprint)
         # NOTE: This will cause any pending queries on the to-be-removed
