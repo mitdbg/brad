@@ -4,12 +4,12 @@ from typing import Awaitable, List
 
 from brad.asset_manager import AssetManager
 from brad.blueprint.manager import BlueprintManager
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.provisioning.directory import Directory
 from brad.provisioning.rds import RdsProvisioningManager
 from brad.provisioning.rds_status import RdsStatus
 from brad.provisioning.redshift import RedshiftProvisioningManager
-from brad.provisioning.redshift_status import RedshiftAvailabilityStatus
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,6 @@ async def control_impl(args) -> None:
     await directory.refresh()
 
     rds = RdsProvisioningManager(config)
-    redshift = RedshiftProvisioningManager(config)
 
     if args.action == "resume":
         futures: List[Awaitable] = []
@@ -77,20 +76,25 @@ async def control_impl(args) -> None:
                 )
 
         if blueprint.redshift_provisioning().num_nodes() > 0:
-            if (
-                directory.redshift_cluster().availability_status()
-                != RedshiftAvailabilityStatus.Paused
-            ):
-                logger.warning(
-                    "Redshift cluster %s is not paused. Not issuing a resume command.",
-                    config.redshift_cluster_id,
+            redshift = RedshiftProvisioningManager(config)
+            futures.append(
+                redshift.resume_and_fetch_existing_provisioning(
+                    config.redshift_cluster_id
                 )
-            else:
-                futures.append(
-                    redshift.resume_and_fetch_existing_provisioning(
-                        config.redshift_cluster_id
+            )
+
+        if config.use_preset_redshift_clusters:
+            conn_config = config.get_connection_details(Engine.Redshift)
+            if "presets" in conn_config:
+                for preset in conn_config["presets"]:
+                    redshift = RedshiftProvisioningManager(config)
+                    logger.info("Resuming Redshift preset: %s", preset["cluster_id"])
+                    futures.append(
+                        redshift.resume_and_fetch_existing_provisioning(
+                            preset["cluster_id"]
+                        )
                     )
-                )
+
         # Will block and wait until the engines are ready to accept requests.
         await asyncio.gather(*futures)
 
@@ -99,8 +103,17 @@ async def control_impl(args) -> None:
         if blueprint.aurora_provisioning().num_nodes() > 0:
             futures.append(rds.pause_cluster(config.aurora_cluster_id))
         if blueprint.redshift_provisioning().num_nodes() > 0:
+            redshift = RedshiftProvisioningManager(config)
             futures.append(redshift.pause_cluster(config.redshift_cluster_id))
-        # This will not wait until the shutdown is complete.
+        if config.use_preset_redshift_clusters:
+            conn_config = config.get_connection_details(Engine.Redshift)
+            if "presets" in conn_config:
+                for preset in conn_config["presets"]:
+                    redshift = RedshiftProvisioningManager(config)
+                    logger.info("Pausing Redshift preset: %s", preset["cluster_id"])
+                    futures.append(redshift.pause_cluster(preset["cluster_id"]))
+
+        # N.B. This will not wait until the shutdown is complete.
         await asyncio.gather(*futures)
 
     else:
