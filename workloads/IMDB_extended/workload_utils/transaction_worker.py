@@ -57,6 +57,15 @@ class TransactionWorker:
         self.loc_max = 1e6
         self.showing_years = 2
 
+    def _sample_id(self, min_id: int, max_id: int) -> int:
+        sampled = (
+            self.zprng.zipf(self.zipfian_alpha) - 1 + min_id
+            if self.use_zipfian_ids
+            else self.prng.randint(min_id, max_id)
+        )
+
+        return min(max_id, sampled)
+
     def edit_movie_note(self, db: Database) -> bool:
         """
         Represents editing the "misc info" for a specific movie.
@@ -71,11 +80,7 @@ class TransactionWorker:
         """
 
         # 1. Select a random movie id.
-        movie_id = (
-            self.zprng.zipf(self.zipfian_alpha)
-            if self.use_zipfian_ids
-            else self.prng.randint(self.min_movie_id, self.max_movie_id)
-        )
+        movie_id = self._sample_id(self.min_movie_id, self.max_movie_id)
 
         try:
             # Start the transaction.
@@ -125,18 +130,10 @@ class TransactionWorker:
         - Insert into showing
         """
         # 1. Select a random theatre id.
-        theatre_id = (
-            self.zprng.zipf(self.zipfian_alpha)
-            if self.use_zipfian_ids
-            else self.prng.randint(self.min_theatre_id, self.max_theatre_id)
-        )
+        theatre_id = self._sample_id(self.min_theatre_id, self.max_theatre_id)
 
         # 2. Select a random movie id.
-        movie_id = (
-            self.zprng.zipf(self.zipfian_alpha)
-            if self.use_zipfian_ids
-            else self.prng.randint(self.min_movie_id, self.max_movie_id)
-        )
+        movie_id = self._sample_id(self.min_movie_id, self.max_movie_id)
 
         showings_to_add = self.prng.randint(*self.showings_to_add)
 
@@ -186,11 +183,7 @@ class TransactionWorker:
         """
 
         # 1. Select a random theatre number.
-        theatre_num = (
-            self.zprng.zipf(self.zipfian_alpha)
-            if self.use_zipfian_ids
-            else self.prng.randint(self.min_theatre_id, self.max_theatre_id)
-        )
+        theatre_num = self._sample_id(self.min_theatre_id, self.max_theatre_id)
 
         try:
             # Start the transaction.
