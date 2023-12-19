@@ -110,6 +110,9 @@ class Directory:
         # This is used to switch to a preset Redshift cluster.
         self._overridden_redshift_cluster_id = cluster_id
 
+    def get_override_redshift_cluster_id(self) -> Optional[str]:
+        return self._overridden_redshift_cluster_id
+
     def aurora_writer(self) -> "AuroraInstanceMetadata":
         assert self._aurora_writer is not None
         return self._aurora_writer
