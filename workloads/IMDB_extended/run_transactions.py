@@ -288,8 +288,7 @@ def main():
     )
     parser.add_argument(
         "--use-zipfian-ids",
-        type=bool,
-        default=False,
+        action="store_true",
         help="Whether the transaction worker should draw movie and theatre IDs "
         "from a Zipfian distribution.",
     )
