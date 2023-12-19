@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any
 from datetime import timedelta
 
 from brad.blueprint.blueprint import Blueprint
+from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
 from brad.routing.policy import RoutingPolicy
 
@@ -191,7 +192,12 @@ class ConfigFile:
     @property
     def use_preset_redshift_clusters(self) -> bool:
         try:
-            return self._raw["use_preset_redshift_clusters"]
+            # We require that table movement is also disabled. Otherwise we need
+            # to keep track of the table state on each preset cluster.
+            return (
+                self._raw["use_preset_redshift_clusters"]
+                and self.disable_table_movement
+            )
         except KeyError:
             return False
 
@@ -202,16 +208,33 @@ class ConfigFile:
         """
         conn_config = self.get_connection_details(Engine.Redshift)
         if self.use_preset_redshift_clusters and "presets" in conn_config:
+            candidate = self.get_preset_redshift_cluster_id(
+                blueprint.redshift_provisioning()
+            )
+            if candidate is not None:
+                return candidate
+        return conn_config["cluster_id"]
+
+    def get_preset_redshift_cluster_id(
+        self, provisioning: Provisioning
+    ) -> Optional[str]:
+        """
+        If a preset cluster is available for the given provisioning, this method
+        returns its cluster ID. Note that this does not check if preset use is
+        disabled.
+        """
+        conn_config = self.get_connection_details(Engine.Redshift)
+        if "presets" not in conn_config:
+            return None
+        for preset in conn_config["presets"]:
             # Check if any of the preset clusters match the given Redshift
             # provisioning.
-            redshift_prov = blueprint.redshift_provisioning()
-            for preset in conn_config["presets"]:
-                if (
-                    preset["instance_type"] == redshift_prov.instance_type()
-                    and preset["num_nodes"] == redshift_prov.num_nodes()
-                ):
-                    return preset["cluster_id"]
-        return conn_config["cluster_id"]
+            if (
+                preset["instance_type"] == provisioning.instance_type()
+                and preset["num_nodes"] == provisioning.num_nodes()
+            ):
+                return preset["cluster_id"]
+        return None
 
     def get_connection_details(self, engine: Engine) -> Dict[str, Any]:
         """

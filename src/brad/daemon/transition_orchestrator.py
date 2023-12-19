@@ -522,24 +522,40 @@ class TransitionOrchestrator:
             # Nothing to do.
             return
 
-        # Handle special cases: Starting up from 0 or going to 0.
+        # Handle special case: Preset clusters.
+        if self._config.use_preset_redshift_clusters:
+            candidate_cluster = self._config.get_preset_redshift_cluster_id(new)
+            if candidate_cluster is not None:
+                logger.info(
+                    "Will use preset cluster %s with the requested new provisioning %s.",
+                    candidate_cluster,
+                    new,
+                )
+                return
+
+        # Handle special case: Going to 0.
         if diff.new_num_nodes() == 0:
             # This is handled post-transition.
             return
 
-        if old.num_nodes() == 0:
-            logger.debug(
-                "Resuming Redshift cluster %s", self._config.redshift_cluster_id
-            )
-            existing = await self._redshift.resume_and_fetch_existing_provisioning(
-                self._config.redshift_cluster_id
-            )
-            if existing == new:
-                return
+        logger.info(
+            "Using original Redshift cluster: %s", self._config.redshift_cluster_id
+        )
+        # We always resume the cluster and fetch its provisioning to make sure
+        # we stay in sync with what the actual provisioning is. This is
+        # important when we switch from a preset cluster. The resume will be a
+        # no-op if the cluster is already running.
+        logger.debug("Resuming Redshift cluster %s", self._config.redshift_cluster_id)
+        existing = await self._redshift.resume_and_fetch_existing_provisioning(
+            self._config.redshift_cluster_id
+        )
+        if existing == new:
+            return
 
-            # We shut down clusters by pausing them. On restart, they resume
-            # with their old provisioning.
-            old = existing
+        # We shut down clusters by pausing them. On restart, they resume
+        # with their old provisioning. This is also needed if we are switching
+        # away from a preset cluster.
+        old = existing
 
         # Resizes are OK because Redshift maintains read-availability during the
         # resize.
