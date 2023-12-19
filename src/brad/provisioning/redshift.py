@@ -77,7 +77,11 @@ class RedshiftProvisioningManager:
                 # Unclear if there is a better way to check for specific errors.
                 if "InvalidClusterState" in message:
                     # This may happen if the cluster is already running.
-                    logger.info("Proceeding past Redshift resume error: %s", message)
+                    logger.info(
+                        "Proceeding past Redshift resume error for %s: %s",
+                        cluster_id,
+                        message,
+                    )
                 else:
                     raise
 

@@ -77,6 +77,9 @@ async def control_impl(args) -> None:
 
         if blueprint.redshift_provisioning().num_nodes() > 0:
             redshift = RedshiftProvisioningManager(config)
+            logger.info(
+                "Resuming Redshift main cluster: %s", config.redshift_cluster_id
+            )
             futures.append(
                 redshift.resume_and_fetch_existing_provisioning(
                     config.redshift_cluster_id

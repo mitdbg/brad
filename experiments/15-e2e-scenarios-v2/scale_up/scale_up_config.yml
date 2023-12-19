@@ -95,6 +95,10 @@ redshift_min_load_removal_fraction: 0.8
 query_latency_p90_ceiling_s: 30.0
 txn_latency_p90_ceiling_s: 0.030
 
+# If set to true, BRAD will attempt to use the specified preset Redshift
+# clusters instead of resizing the main Redshift cluster.
+use_preset_redshift_clusters: true
+
 # Used for ordering blueprints during planning.
 comparator:
   type: benefit_perf_ceiling  # or `perf_ceiling`
