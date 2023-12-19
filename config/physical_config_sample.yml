@@ -48,6 +48,16 @@ redshift:
   password: abc123
   s3_iam_role: arn:aws:iam::...
 
+  # Use these configs to specify preset Redshift cluster sizes. These are
+  # optional; leave them out if you want BRAD to run resizes.
+  presets:
+  - cluster_id: redshift-brad-1
+    instance_type: dc2.large
+    num_nodes: 1
+  - cluster_id: redshift-brad-2
+    instance_type: dc2.large
+    num_nodes: 2
+
 sidecar_db:
   odbc_driver: Postgres
   host: aurora-sidecar.us-east-1.rds.amazonaws.com

@@ -6,6 +6,7 @@ import yaml
 from typing import Optional, Dict, Any
 from datetime import timedelta
 
+from brad.blueprint.blueprint import Blueprint
 from brad.config.engine import Engine
 from brad.routing.policy import RoutingPolicy
 
@@ -187,7 +188,32 @@ class ConfigFile:
             # Table movement disabled by default.
             return True
 
-    def get_connection_details(self, engine: Engine) -> Dict[str, str]:
+    @property
+    def use_preset_redshift_clusters(self) -> bool:
+        try:
+            return self._raw["use_preset_redshift_clusters"]
+        except KeyError:
+            return False
+
+    def redshift_cluster_id_for_blueprint(self, blueprint: Blueprint) -> str:
+        """
+        Resolves the Redshift cluster ID to use for the given blueprint. This
+        method helps with switching to preset clusters, if available.
+        """
+        conn_config = self.get_connection_details(Engine.Redshift)
+        if self.use_preset_redshift_clusters and "presets" in conn_config:
+            # Check if any of the preset clusters match the given Redshift
+            # provisioning.
+            redshift_prov = blueprint.redshift_provisioning()
+            for preset in conn_config["presets"]:
+                if (
+                    preset["instance_type"] == redshift_prov.instance_type()
+                    and preset["num_nodes"] == redshift_prov.num_nodes()
+                ):
+                    return preset["cluster_id"]
+        return conn_config["cluster_id"]
+
+    def get_connection_details(self, engine: Engine) -> Dict[str, Any]:
         """
         Returns the raw configuration details provided for an engine.
         """
