@@ -39,6 +39,7 @@ class BlueprintManager:
         self._directory = (
             Directory(config) if initial_directory is None else initial_directory
         )
+        self._config = config
 
     @staticmethod
     def initialize_schema(
@@ -92,6 +93,16 @@ class BlueprintManager:
         self._next_blueprint_score = next_score
 
         if not skip_directory_refresh:
+            # Ensure the Redshift cluster ID is overridden.
+            if self._config.use_preset_redshift_clusters:
+                preset_redshift_cluster_id = (
+                    self._config.get_preset_redshift_cluster_id(
+                        self._current_blueprint.redshift_provisioning()
+                    )
+                )
+                self._directory.set_override_redshift_cluster_id(
+                    preset_redshift_cluster_id
+                )
             await self._directory.refresh()
         logger.debug("Loaded %s", self._versioning)
 

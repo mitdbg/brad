@@ -142,16 +142,19 @@ class EngineConnections:
     def schema_name(self) -> Optional[str]:
         return self._schema_name
 
-    async def add_connections(
+    async def add_and_refresh_connections(
         self, config: ConfigFile, directory: Directory, expected_engines: Set[Engine]
     ) -> None:
         """
         Adds connections to engines that are in `expected_engines` but not
-        currently connected to.
+        currently connected to. This will also reconnect to Redshift because we
+        may change the underlying physical endpoint.
         """
         for engine in expected_engines:
-            if engine in self._connection_map:
+            if engine in self._connection_map and engine != Engine.Redshift:
                 continue
+            # We force reconnect to Redshift because we may be changing to a
+            # different physical endpoint.
             self._connection_map[engine] = await ConnectionFactory.connect_to(
                 engine, self._schema_name, config, directory, self._autocommit
             )

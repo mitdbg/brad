@@ -10,6 +10,7 @@ from .metrics_def import MetricDef
 from .metrics_source import MetricsSourceWithForecasting
 from .metrics_logger import MetricsLogger
 from .cloudwatch import CloudWatchClient
+from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.utils.time_periods import impute_old_missing_metrics, universal_now
@@ -22,26 +23,39 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
     def __init__(
         self,
         config: ConfigFile,
+        blueprint_mgr: BlueprintManager,
         forecasting_method: str,
         forecasting_window_size: int,
     ) -> None:
         self._config = config
+        self._blueprint_mgr = blueprint_mgr
         self._metric_defs = self._load_metric_defs()
         self._values = pd.DataFrame(
             columns=CloudWatchClient.metric_names(self._metric_defs)
         )
-        self._cw_client = CloudWatchClient(
-            Engine.Redshift,
-            self._config.redshift_cluster_id,
-            instance_identifier=None,
-            config=self._config,
-        )
+        self.update_clients()
         self._logger = MetricsLogger.create_from_config(
             self._config, "brad_metrics_redshift.log"
         )
 
         super().__init__(
             self._config.epoch_length, forecasting_method, forecasting_window_size
+        )
+
+    def update_clients(self) -> None:
+        overriden_id = (
+            self._blueprint_mgr.get_directory().get_override_redshift_cluster_id()
+        )
+        redshift_cluster_id = (
+            overriden_id
+            if overriden_id is not None
+            else self._config.redshift_cluster_id
+        )
+        self._cw_client = CloudWatchClient(
+            Engine.Redshift,
+            redshift_cluster_id,
+            instance_identifier=None,
+            config=self._config,
         )
 
     async def fetch_latest(self) -> None:
