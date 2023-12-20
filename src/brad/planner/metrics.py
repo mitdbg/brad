@@ -306,10 +306,21 @@ class WindowedMetricsFromMonitor(MetricsProvider):
             )
 
         if len(series) == 0:
+            logger.warning(
+                "No values to aggregate for Redshift CPU. Using default: %.2f",
+                default_value,
+            )
             return default_value
         else:
             relevant = series.iloc[-num_epochs:]
             num_values = len(relevant)
+            if num_values == 0:
+                logger.warning(
+                    "No values to aggregate after adjusting epochs for Redshift CPU. "
+                    "Using default: %.2f",
+                    default_value,
+                )
+                return default_value
             # TODO: This should be configurable.
             window = max([val for val in [5, 3, 1] if val > num_values])
             logger.info(
