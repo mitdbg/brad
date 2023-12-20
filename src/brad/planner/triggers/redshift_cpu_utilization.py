@@ -70,4 +70,4 @@ class RedshiftCpuUtilization(Trigger):
         )
 
 
-_UTILIZATION_METRIC = "CPUUtilization_Average"
+_UTILIZATION_METRIC = "CPUUtilization_Maximum"

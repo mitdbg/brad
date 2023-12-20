@@ -154,7 +154,7 @@ class WindowedMetricsFromMonitor(MetricsProvider):
             )
 
         agg_cfg = self._planner_config.metrics_agg()
-        redshift_cpu = self._aggregate_possibly_missing(
+        redshift_cpu = self._aggregate_redshift_cpu(
             redshift.loc[redshift.index <= most_recent_common, _REDSHIFT_METRICS[0]],
             num_epochs=aggregate_epochs,
             default_value=0.0,
@@ -289,6 +289,39 @@ class WindowedMetricsFromMonitor(MetricsProvider):
             elif agg_cfg["method"] == "ewm":
                 alpha = agg_cfg["alpha"]
                 return relevant.ewm(alpha=alpha).mean().iloc[-1]
+            else:
+                raise AssertionError()
+
+    def _aggregate_redshift_cpu(
+        self,
+        series: pd.Series,
+        num_epochs: int,
+        default_value: int | float,
+        agg_cfg: AggCfg,
+        name: Optional[str] = None,
+    ) -> int | float:
+        if name is not None and len(series) == 0:
+            logger.warning(
+                "Using default metric value %s for %s", str(default_value), name
+            )
+
+        if len(series) == 0:
+            return default_value
+        else:
+            relevant = series.iloc[-num_epochs:]
+            num_values = len(relevant)
+            # TODO: This should be configurable.
+            window = max([val for val in [5, 3, 1] if val > num_values])
+            logger.info(
+                "Using a rolling window of %d and selecting p99 to smoothen Redshift CPU values.",
+                window,
+            )
+            smooth = relevant.rolling(window).quantile(0.99)
+            if agg_cfg["method"] == "mean":
+                return smooth.mean()
+            elif agg_cfg["method"] == "ewm":
+                alpha = agg_cfg["alpha"]
+                return smooth.ewm(alpha=alpha).mean().iloc[-1]
             else:
                 raise AssertionError()
 

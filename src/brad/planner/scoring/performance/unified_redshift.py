@@ -184,8 +184,12 @@ class RedshiftProvisioningScore:
         # Predicted p90 latency (p90 wait time + query run time)
         # w = -1/mu * 1/(1-rho) * log(1/rho (1 - percentile))
         eps = 1e-3
-        cpu_util = min(cpu_util, 1.0 - eps)
-        cpu_util = max(cpu_util, eps)
+        # Shift CPU utilization up by 10% to be more conservative; this
+        # effectively means a utilization above 90% is considered 100%.
+        adj_cpu_util = max(cpu_util, 0.0) + 0.1  # TODO: Make configurable.
+        # Adjust the utilization to avoid numeric issues (division by zero).
+        adj_cpu_util = min(adj_cpu_util, 1.0 - eps)
+        adj_cpu_util = max(adj_cpu_util, eps)
         lf = np.log(1.0 / cpu_util * 0.1)
         wait_time = mean_service_time * (-1.0 / (1.0 - cpu_util)) * lf
 
