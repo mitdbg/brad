@@ -322,7 +322,7 @@ class WindowedMetricsFromMonitor(MetricsProvider):
                 )
                 return default_value
             # TODO: This should be configurable.
-            window = max([val for val in [5, 3, 1] if val > num_values])
+            window = max([val for val in [5, 3, 1] if num_values >= val])
             logger.info(
                 "Using a rolling window of %d and selecting p99 to smoothen Redshift CPU values.",
                 window,
