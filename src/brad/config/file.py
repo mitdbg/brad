@@ -6,6 +6,7 @@ import yaml
 from typing import Optional, Dict, Any
 from datetime import timedelta
 
+from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
 from brad.routing.policy import RoutingPolicy
 
@@ -44,13 +45,6 @@ class ConfigFile:
 
     def __init__(self, raw_parsed: Dict[str, Any]):
         self._raw = raw_parsed
-
-    def get_cluster_ids(self) -> Dict[Engine, str]:
-        return {
-            Engine.Aurora: self.aurora_cluster_id,
-            Engine.Redshift: self.redshift_cluster_id,
-            Engine.Athena: "brad-db0",  # TODO(Amadou): I don't want to break existing configs. Coordinate with Geoff on this.
-        }
 
     @property
     def daemon_log_path(self) -> Optional[pathlib.Path]:
@@ -187,7 +181,40 @@ class ConfigFile:
             # Table movement disabled by default.
             return True
 
-    def get_connection_details(self, engine: Engine) -> Dict[str, str]:
+    @property
+    def use_preset_redshift_clusters(self) -> bool:
+        try:
+            # We require that table movement is also disabled. Otherwise we need
+            # to keep track of the table state on each preset cluster.
+            return (
+                self._raw["use_preset_redshift_clusters"]
+                and self.disable_table_movement
+            )
+        except KeyError:
+            return False
+
+    def get_preset_redshift_cluster_id(
+        self, provisioning: Provisioning
+    ) -> Optional[str]:
+        """
+        If a preset cluster is available for the given provisioning, this method
+        returns its cluster ID. Note that this does not check if preset use is
+        disabled.
+        """
+        conn_config = self.get_connection_details(Engine.Redshift)
+        if "presets" not in conn_config:
+            return None
+        for preset in conn_config["presets"]:
+            # Check if any of the preset clusters match the given Redshift
+            # provisioning.
+            if (
+                preset["instance_type"] == provisioning.instance_type()
+                and preset["num_nodes"] == provisioning.num_nodes()
+            ):
+                return preset["cluster_id"]
+        return None
+
+    def get_connection_details(self, engine: Engine) -> Dict[str, Any]:
         """
         Returns the raw configuration details provided for an engine.
         """
