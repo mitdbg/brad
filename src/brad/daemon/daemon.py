@@ -613,7 +613,7 @@ class BradDaemon:
             if len(parts) <= 1:
                 return [("Nothing to modify.",)]
 
-            new_num_nodes = int(parts[2])
+            new_num_nodes = int(parts[1])
             logger.info("Setting Redshift to dc2.large(%d)", new_num_nodes)
 
             curr_blueprint = self._blueprint_mgr.get_blueprint()
