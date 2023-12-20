@@ -608,7 +608,7 @@ _AURORA_METRICS = [
 ]
 
 _REDSHIFT_METRICS = [
-    "CPUUtilization_Average",
+    "CPUUtilization_Maximum",
 ]
 
 _FRONT_END_METRICS = [
