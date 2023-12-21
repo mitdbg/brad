@@ -191,7 +191,7 @@ class RedshiftProvisioningScore:
         adj_cpu_util = min(adj_cpu_util, 1.0 - eps)
         adj_cpu_util = max(adj_cpu_util, eps)
         lf = np.log(1.0 / cpu_util * 0.1)
-        wait_time = mean_service_time * (-1.0 / (1.0 - cpu_util)) * lf
+        wait_time = mean_service_time * (-1.0 / (1.0 - adj_cpu_util)) * lf
 
         # Predicted running time is the query's execution time alone plus the
         # expected wait time (due to system load).

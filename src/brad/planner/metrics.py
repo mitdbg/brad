@@ -161,6 +161,7 @@ class WindowedMetricsFromMonitor(MetricsProvider):
             agg_cfg=agg_cfg,
             name="redshift_cpu",
         )
+        logger.info("Using Redshift CPU: %.2f", redshift_cpu)
         txn_per_s = self._aggregate_possibly_missing(
             front_end.loc[front_end.index <= most_recent_common, _FRONT_END_METRICS[0]],
             num_epochs=aggregate_epochs,
@@ -328,6 +329,18 @@ class WindowedMetricsFromMonitor(MetricsProvider):
                 window,
             )
             smooth = relevant.rolling(window).quantile(0.99)
+            logger.info(
+                "Smooth Redshift CPU - Min: %.2f, Median: %.2f, Max: %.2f",
+                smooth.min(),
+                smooth.median(),
+                smooth.max(),
+            )
+            logger.info(
+                "Original Redshift CPU - Min: %.2f, Median: %.2f, Max: %.2f",
+                relevant.min(),
+                relevant.median(),
+                relevant.max(),
+            )
             if agg_cfg["method"] == "mean":
                 return smooth.mean()
             elif agg_cfg["method"] == "ewm":
