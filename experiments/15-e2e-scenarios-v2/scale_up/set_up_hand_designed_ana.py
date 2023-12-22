@@ -127,7 +127,7 @@ def main():
     # 6. Adjust the placement.
     new_placement = {}
     for table in blueprint.tables():
-        new_placement[table.name] = [Engine.Aurora, Engine.Athena]
+        new_placement[table.name] = [Engine.Aurora, Engine.Redshift, Engine.Athena]
     enum_blueprint.set_table_locations(new_placement)
 
     # 6. Transition to the new blueprint.
