@@ -215,6 +215,8 @@ class RecordedRun:
     def _agg_ana_lats(self, quantile: float) -> pd.DataFrame:
         ts = pd.to_datetime(self.olap_lats["timestamp"])
         il = self.olap_lats[["query_idx", "run_time_s"]]
+        il["query_idx"] = pd.to_numeric(il["query_idx"])
+        il["run_time_s"] = pd.to_numeric(il["run_time_s"])
         return (
             il.groupby([ts.dt.hour, ts.dt.minute])
             .quantile(quantile)
