@@ -16,43 +16,6 @@ heavier_queries="58,61,62,64,69,73,74,51,57,60"
 # --query-indexes
 extract_named_arguments $@
 
-function txn_sweep() {
-  local sweep=$1
-  local gap_minute=$2
-  local keep_last=$3
-
-  for t_clients in $sweep; do
-    start_txn_runner $t_clients  # Implicit: --dataset-type
-    txn_pid=$runner_pid
-
-    sleep $(($gap_minute * 60))
-    if [[ -z $keep_last ]] || [[ $t_clients != $keep_last ]]; then
-      kill -INT $txn_pid
-      wait $txn_pid
-    fi
-  done
-}
-
-function rana_sweep_offset4() {
-  local sweep=$1
-  local gap_minute=$2
-  local keep_last=$3
-  local query_indices=$4
-  local gap_time_s=$5
-  local gap_std_s=$6
-
-  for ra_clients in $sweep; do
-    start_repeating_olap_runner $ra_clients $gap_time_s $gap_std_s $query_indices "ra_sweep_${ra_clients}" 4
-    sweep_rana_pid=$runner_pid
-
-    sleep $(($gap_minute * 60))
-    if [[ -z $keep_last ]] || [[ $ra_clients != $keep_last ]]; then
-      kill -INT $sweep_rana_pid
-      wait $sweep_rana_pid
-    fi
-  done
-}
-
 function inner_cancel_experiment() {
   if [ ! -z $sweep_rana_pid ]; then
     cancel_experiment $rana_pid $txn_pid $sweep_rana_pid
@@ -79,7 +42,7 @@ txn_pid=$runner_pid
 sleep 2
 
 # Scale up to 60 analytical clients in total (56 heavy).
-start_repeating_olap_runner 56 3 1 $heavier_queries "ra_heavy_${ra_clients}" 4
+start_repeating_olap_runner 56 3 1 $heavier_queries "ra_heavy_56" 4
 sweep_rana_pid=$runner_pid
 sleep $((60 * 60))
 
