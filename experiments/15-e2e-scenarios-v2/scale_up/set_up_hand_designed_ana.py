@@ -122,7 +122,7 @@ def main():
 
     # Ensure the provisioning is as expected.
     enum_blueprint.set_aurora_provisioning(Provisioning("db.t4g.medium", 1))
-    enum_blueprint.set_redshift_provisioning(Provisioning("dc2.large", 11))
+    enum_blueprint.set_redshift_provisioning(Provisioning("dc2.large", 10))
 
     # 6. Adjust the placement.
     new_placement = {}

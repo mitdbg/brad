@@ -82,7 +82,7 @@ sleep $((10 * 60)) # 10 mins cumulative
 log_workload_point "start_increase_rana_heavy_4_to_56"
 rana_sweep_offset4 "4 8 12 16 20 24 32 40 48 56" 5 56 $heavier_queries 3 1
 log_workload_point "hold_rana_heavy_56"
-sleep $((6 * 60 * 60))  # 50 + 360 mins; 420 mins cumulative (7 hours)
+sleep $((7 * 60 * 60))  # 50 + 420 mins; 480 mins cumulative (8 hours)
 
 log_workload_point "experiment_workload_done"
 
