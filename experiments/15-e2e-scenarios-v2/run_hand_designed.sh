@@ -47,6 +47,24 @@ function scale_up() {
   sleep 60
 }
 
+function scale_up_ana() {
+  # Scale up (analytics)
+  echo "Running the scale up analytics baseline."
+  python3 scale_up/set_up_hand_designed_ana.py \
+    --physical-config-file ../../config/physical_config_100gb.yml \
+    --schema-name imdb_extended_100g \
+    --system-config-file scale_up/scale_up_config.yml \
+    --query-bank-file ../../workloads/IMDB_100GB/regular_test/queries.sql
+
+  # Warm up first.
+  cond run 15-e2e-scenarios-v2/scale_up/:brad_100g_warmup
+  sleep 60
+
+  # Baseline.
+  cond run 15-e2e-scenarios-v2/scale_up/:hand_designed_100g_ana_up
+  sleep 60
+}
+
 function specialized() {
   # Specialized (vector)
   echo "Running the specialized baseline."
@@ -73,6 +91,7 @@ brad admin --debug control resume --schema-name imdb_extended_100g \
 
 scale_down
 scale_up
+scale_up_ana
 
 if [ ! -z $shutdown_after ]; then
   echo "Shutting down the regular cluster..."
