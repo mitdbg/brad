@@ -56,7 +56,7 @@ class RecordedRun:
                 olap_inner = pd.read_csv(
                     inner / "repeating_olap_batch_{}.csv".format(c)
                 )
-                olap_inner["timestamp"] = pd.to_datetime(olap_inner["timestamp"])
+                olap_inner["timestamp"] = pd.to_datetime(olap_inner["timestamp"], format="mixed")
                 olap_inner["timestamp"] = olap_inner["timestamp"].dt.tz_localize(None)
                 olap_inner.insert(0, "num_clients", clients)
                 all_olap.append(olap_inner)
@@ -207,7 +207,7 @@ class RecordedRun:
         ts = pd.to_datetime(self.txn_lats["timestamp"], format="mixed")
         il = self.txn_lats[["num_clients", "run_time_s"]]
         return (
-            il.groupby([ts.dt.hour, ts.dt.minute])
+            il.groupby([ts.dt.day, ts.dt.hour, ts.dt.minute])
             .quantile(quantile)
             .reset_index(drop=True)
         )
@@ -218,7 +218,7 @@ class RecordedRun:
         il["query_idx"] = pd.to_numeric(il["query_idx"])
         il["run_time_s"] = pd.to_numeric(il["run_time_s"])
         return (
-            il.groupby([ts.dt.hour, ts.dt.minute])
+            il.groupby([ts.dt.day, ts.dt.hour, ts.dt.minute])
             .quantile(quantile)
             .reset_index(drop=True)
         )
