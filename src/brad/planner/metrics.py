@@ -154,6 +154,8 @@ class WindowedMetricsFromMonitor(MetricsProvider):
             )
 
         agg_cfg = self._planner_config.metrics_agg()
+        # Redshift CPU measurements are noisy, so we special case it (see the
+        # comments in the method).
         redshift_cpu = self._aggregate_redshift_cpu(
             redshift.loc[redshift.index <= most_recent_common, _REDSHIFT_METRICS[0]],
             num_epochs=aggregate_epochs,
@@ -301,6 +303,11 @@ class WindowedMetricsFromMonitor(MetricsProvider):
         agg_cfg: AggCfg,
         name: Optional[str] = None,
     ) -> int | float:
+        # Redshift metrics reports can be very noisy (e.g., cycling between 0%
+        # and 100% CPU utilization over the span of a few minutes). This could
+        # be an artifact of how we retrieve metrics. As a "simple" fix, we take
+        # the 99th percentile measurement over a rolling window before applying
+        # the aggregation over the window.
         if name is not None and len(series) == 0:
             logger.warning(
                 "Using default metric value %s for %s", str(default_value), name
@@ -664,6 +671,9 @@ _AURORA_METRICS = [
     "BufferCacheHitRatio_Average",
 ]
 
+# Need to use maximum because we use this metric to estimate tail latency. The
+# average CPU utilization includes the Redshift leader node, which is generally
+# underutilized (and thus incorrectly biases the utilization value we use).
 _REDSHIFT_METRICS = [
     "CPUUtilization_Maximum",
 ]

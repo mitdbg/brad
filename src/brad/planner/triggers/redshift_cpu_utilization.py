@@ -69,5 +69,7 @@ class RedshiftCpuUtilization(Trigger):
             future[_UTILIZATION_METRIC], "forecasted Redshift CPU Utilization"
         )
 
-
+# Need to use maximum because we use this metric to estimate tail latency. The
+# average CPU utilization includes the Redshift leader node, which is generally
+# underutilized (and thus incorrectly biases the utilization value we use).
 _UTILIZATION_METRIC = "CPUUtilization_Maximum"
