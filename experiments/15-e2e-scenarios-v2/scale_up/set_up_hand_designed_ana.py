@@ -121,8 +121,8 @@ def main():
     enum_blueprint.set_routing_policy(replaced_policy)
 
     # Ensure the provisioning is as expected.
-    enum_blueprint.set_aurora_provisioning(Provisioning("db.r6g.large", 1))
-    enum_blueprint.set_redshift_provisioning(Provisioning("dc2.large", 10))
+    enum_blueprint.set_aurora_provisioning(Provisioning("db.t4g.medium", 1))
+    enum_blueprint.set_redshift_provisioning(Provisioning("dc2.large", 11))
 
     # 6. Adjust the placement.
     new_placement = {}
