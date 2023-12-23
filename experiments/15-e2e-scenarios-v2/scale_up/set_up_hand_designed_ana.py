@@ -61,13 +61,16 @@ def main():
         "--athena-queries", type=str, help="Comma separated list of indices."
     )
     parser.add_argument(
-        "--aurora-queries", type=str, help="Comma separated list of indices."
+        "--aurora-queries",
+        type=str,
+        help="Comma separated list of indices.",
+        default="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46",
     )
     parser.add_argument(
         "--redshift-queries",
         type=str,
         help="Comma separated list of indices.",
-        default="58,61,62,64,69,73,74,51,57,60,99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46",
+        default="58,61,62,64,69,73,74,51,57,60",
     )
     args = parser.parse_args()
     set_up_logging(debug_mode=True)
@@ -121,7 +124,7 @@ def main():
     enum_blueprint.set_routing_policy(replaced_policy)
 
     # Ensure the provisioning is as expected.
-    enum_blueprint.set_aurora_provisioning(Provisioning("db.t4g.medium", 1))
+    enum_blueprint.set_aurora_provisioning(Provisioning("db.t4g.medium", 2))
     enum_blueprint.set_redshift_provisioning(Provisioning("dc2.large", 11))
 
     # 6. Adjust the placement.
