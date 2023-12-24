@@ -12,8 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 class ElapsedTimeTrigger(Trigger):
-    def __init__(self, period: timedelta, epoch_length: timedelta) -> None:
-        super().__init__(epoch_length)
+    def __init__(
+        self, period: timedelta, epoch_length: timedelta, observe_bp_delay: timedelta
+    ) -> None:
+        super().__init__(epoch_length, observe_bp_delay)
         self._period = period
         self._reset_trigger_next()
 

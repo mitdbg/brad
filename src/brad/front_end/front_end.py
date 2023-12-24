@@ -4,7 +4,9 @@ import logging
 import random
 import time
 import os
+import ssl
 import multiprocessing as mp
+import redshift_connector.error as redshift_errors
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import timedelta
 from ddsketch import DDSketch
@@ -33,6 +35,7 @@ from brad.front_end.brad_interface import BradInterface
 from brad.front_end.errors import QueryError
 from brad.front_end.grpc import BradGrpc
 from brad.front_end.session import SessionManager, SessionId, Session
+from brad.provisioning.directory import Directory
 from brad.query_rep import QueryRep
 from brad.routing.abstract_policy import AbstractRoutingPolicy
 from brad.routing.always_one import AlwaysOneRouter
@@ -65,6 +68,7 @@ class BradFrontEnd(BradInterface):
         schema_name: str,
         path_to_system_config: str,
         debug_mode: bool,
+        initial_directory: Directory,
         input_queue: mp.Queue,
         output_queue: mp.Queue,
     ):
@@ -83,7 +87,12 @@ class BradFrontEnd(BradInterface):
 
         self._assets = AssetManager(self._config)
         self._blueprint_mgr = BlueprintManager(
-            self._config, self._assets, self._schema_name
+            self._config,
+            self._assets,
+            self._schema_name,
+            # This is provided by the daemon. We want to avoid hitting the AWS
+            # cluster metadata APIs when starting up the front end(s).
+            initial_directory=initial_directory,
         )
         self._path_to_system_config = path_to_system_config
         self._monitor: Optional[Monitor] = None
@@ -164,7 +173,8 @@ class BradFrontEnd(BradInterface):
             logger.debug("BRAD front end _run_teardown() complete.")
 
     async def _run_setup(self) -> None:
-        await self._blueprint_mgr.load()
+        # The directory will have been populated by the daemon.
+        await self._blueprint_mgr.load(skip_directory_refresh=True)
         logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
 
         if self._monitor is not None:
@@ -254,7 +264,7 @@ class BradFrontEnd(BradInterface):
             except ConnectionFailed:
                 if rand_backoff is None:
                     rand_backoff = RandomizedExponentialBackoff(
-                        max_retries=10, base_delay_s=0.5, max_delay_s=10.0
+                        max_retries=20, base_delay_s=0.5, max_delay_s=10.0
                     )
                 time_to_wait = rand_backoff.wait_time_s()
                 if time_to_wait is None:
@@ -352,6 +362,8 @@ class BradFrontEnd(BradInterface):
                 pyodbc.ProgrammingError,
                 pyodbc.Error,
                 pyodbc.OperationalError,
+                redshift_errors.InterfaceError,
+                ssl.SSLEOFError,
             ) as ex:
                 is_transient_error = False
                 if connection.is_connection_lost_error(ex):
@@ -438,6 +450,7 @@ class BradFrontEnd(BradInterface):
             or command == "BRAD_EXPLAIN_SYNC"
             or command.startswith("BRAD_INSPECT_WORKLOAD")
             or command.startswith("BRAD_RUN_PLANNER")
+            or command.startswith("BRAD_MODIFY_REDSHIFT")
         ):
             if self._daemon_request_mailbox.is_active():
                 return [
@@ -521,7 +534,9 @@ class BradFrontEnd(BradInterface):
                     message.version,
                 )
                 # This refreshes any cached state that depends on the old blueprint.
-                await self._run_blueprint_update(message.version)
+                await self._run_blueprint_update(
+                    message.version, message.updated_directory
+                )
                 self._route_redshift_only = False
                 # Tell the daemon that we have updated.
                 self._output_queue.put(
@@ -604,8 +619,11 @@ class BradFrontEnd(BradInterface):
             # files are uploaded.
             await self._qhandler.refresh()
 
-    async def _run_blueprint_update(self, version: int) -> None:
-        await self._blueprint_mgr.load()
+    async def _run_blueprint_update(
+        self, version: int, updated_directory: Directory
+    ) -> None:
+        await self._blueprint_mgr.load(skip_directory_refresh=True)
+        self._blueprint_mgr.get_directory().update_to_directory(updated_directory)
         active_version = self._blueprint_mgr.get_active_blueprint_version()
         if version != active_version:
             logger.error(
@@ -620,7 +638,7 @@ class BradFrontEnd(BradInterface):
         logger.debug("Loaded new directory: %s", directory)
         if self._monitor is not None:
             self._monitor.update_metrics_sources()
-        await self._sessions.add_connections()
+        await self._sessions.add_and_refresh_connections()
         assert self._router is not None
         self._router.update_blueprint(blueprint)
         # NOTE: This will cause any pending queries on the to-be-removed

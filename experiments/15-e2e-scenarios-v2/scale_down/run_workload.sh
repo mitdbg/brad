@@ -39,8 +39,8 @@ trap "inner_cancel_experiment" TERM
 # - Turn off Redshift
 # Detection time is ~5 minutes
 # Transition time is ~7 minutes
-# Allow the workload to run for 2 hours.
-total_second_phase_time_s="$((2 * 60 * 60))"
+# Allow the workload to run for 1.5 hours.
+total_second_phase_time_s="$((90 * 60))"
 wait_start="$(date -u +%s)"
 
 poll_file_for_event $COND_OUT/brad_daemon_events.csv "post_transition_completed" 30

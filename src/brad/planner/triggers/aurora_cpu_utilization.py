@@ -16,10 +16,11 @@ class AuroraCpuUtilization(Trigger):
         lo: float,
         hi: float,
         epoch_length: timedelta,
+        observe_bp_delay: timedelta,
         sustained_epochs: int = 1,
         lookahead_epochs: Optional[int] = None,
     ) -> None:
-        super().__init__(epoch_length)
+        super().__init__(epoch_length, observe_bp_delay)
         self._monitor = monitor
         self._impl = MetricsThresholds(lo, hi, sustained_epochs)
         self._epoch_length = epoch_length
@@ -36,6 +37,12 @@ class AuroraCpuUtilization(Trigger):
         if self._current_blueprint.aurora_provisioning().num_nodes() == 0:
             logger.debug(
                 "Aurora is off, so the Aurora CPU utilization trigger is inactive."
+            )
+            return False
+
+        if not self._passed_delays_since_cutoff():
+            logger.debug(
+                "Skippping Aurora CPU utilization trigger because we have not passed the delay cutoff."
             )
             return False
 

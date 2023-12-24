@@ -90,10 +90,23 @@ def _get_or_compute_query_p90_latency(bp: ComparableBlueprint) -> float:
     if stored is not None:
         return stored
     else:
+        # Note: You probably do not want to use this. The predictions that come
+        # from the blueprint scorer are already "in p90".
         p90_lat = np.quantile(
             bp.get_predicted_analytical_latencies(), 0.9, method="lower"
         )
-        bp.set_memoized_value("query_p90_latency", p90_lat)
+        bp.set_memoized_value("query_max_p90_latency", p90_lat)
+        return p90_lat
+
+
+def _get_or_compute_query_max_p90_latency(bp: ComparableBlueprint) -> float:
+    stored = bp.get_memoized_value("query_max_p90_latency")
+    if stored is not None:
+        return stored
+    else:
+        # These predicted latencies are p90 latencies.
+        p90_lat = np.max(bp.get_predicted_analytical_latencies())
+        bp.set_memoized_value("query_max_p90_latency", p90_lat)
         return p90_lat
 
 
@@ -124,8 +137,8 @@ def _query_p90_ceiling(
     left: ComparableBlueprint, right: ComparableBlueprint, query_ceiling_s: float
 ) -> Optional[bool]:
     # Query latency ceilings.
-    left_lat = _get_or_compute_query_p90_latency(left)
-    right_lat = _get_or_compute_query_p90_latency(right)
+    left_lat = _get_or_compute_query_max_p90_latency(left)
+    right_lat = _get_or_compute_query_max_p90_latency(right)
 
     if left_lat > query_ceiling_s and right_lat > query_ceiling_s:
         # Both are above the latency ceiling.
@@ -140,7 +153,7 @@ def _query_p90_ceiling(
 
 
 def _transition_under_benefit_horizon(
-    left: ComparableBlueprint, right: ComparableBlueprint, payoff_period: timedelta
+    left: ComparableBlueprint, right: ComparableBlueprint, benefit_horizon: timedelta
 ) -> Optional[bool]:
     left_tr_s = left.get_transition_time_s()
     right_tr_s = right.get_transition_time_s()
@@ -148,13 +161,13 @@ def _transition_under_benefit_horizon(
     # If either are above the payoff period, return the blueprint that does
     # better on transition time.
     if (
-        left_tr_s > payoff_period.total_seconds()
-        and right_tr_s > payoff_period.total_seconds()
+        left_tr_s >= benefit_horizon.total_seconds()
+        and right_tr_s >= benefit_horizon.total_seconds()
     ):
         return left_tr_s < right_tr_s
-    elif left_tr_s > payoff_period.total_seconds():
+    elif left_tr_s >= benefit_horizon.total_seconds():
         return False
-    elif right_tr_s > payoff_period.total_seconds():
+    elif right_tr_s >= benefit_horizon.total_seconds():
         return True
 
     return None

@@ -99,6 +99,10 @@ redshift_min_load_removal_fraction: 0.8
 query_latency_p90_ceiling_s: 30.0
 txn_latency_p90_ceiling_s: 0.030
 
+# If set to true, BRAD will attempt to use the specified preset Redshift
+# clusters instead of resizing the main Redshift cluster.
+use_preset_redshift_clusters: false
+
 # Used for ordering blueprints during planning.
 comparator:
   type: benefit_perf_ceiling  # or `perf_ceiling`
@@ -125,6 +129,12 @@ triggers:
   enabled: true
   check_period_s: 90  # Triggers are checked every X seconds.
   check_period_offset_s: 360  # Wait 6 mins before starting.
+
+  # Triggers will not fire for at least this many minutes after a new blueprint
+  # takes effect. Usually this should be greater than zero to give BRAD
+  # sufficient time to observe the effect of the blueprint on the workload. BRAD
+  # may wait longer to ensure metrics are also available for this many minutes.
+  observe_new_blueprint_mins: 3
 
   elapsed_time:
     disabled: true

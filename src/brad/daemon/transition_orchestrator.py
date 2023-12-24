@@ -110,6 +110,22 @@ class TransitionOrchestrator:
 
         if self._config.disable_table_movement:
             logger.debug("Table movement during transitions is disabled.")
+
+            # Note that we only use preset Redshift clusters when table movement
+            # is disabled.
+            if self._config.use_preset_redshift_clusters and redshift_diff is not None:
+                preset_cluster_id = self._config.get_preset_redshift_cluster_id(
+                    self._next_blueprint.redshift_provisioning()
+                )
+                # Here we switch the directory over to/from the preset cluster.
+                self._blueprint_mgr.get_directory().set_override_redshift_cluster_id(
+                    preset_cluster_id
+                )
+                await self._blueprint_mgr.refresh_directory()
+                if on_instance_identity_change is not None:
+                    # The Redshift cluster may have changed.
+                    on_instance_identity_change()
+
             await self._run_prepare_then_transition_cleanup()
             return
 
@@ -180,9 +196,7 @@ class TransitionOrchestrator:
 
         await self._run_prepare_then_transition_cleanup()
 
-    async def _run_prepare_then_transition_cleanup(
-        self,
-    ) -> None:
+    async def _run_prepare_then_transition_cleanup(self) -> None:
         logger.debug("Pre-transition steps complete.")
 
         await self._blueprint_mgr.update_transition_state(
@@ -522,40 +536,61 @@ class TransitionOrchestrator:
             # Nothing to do.
             return
 
-        # Handle special cases: Starting up from 0 or going to 0.
+        # Handle special case: Preset clusters.
+        if self._config.use_preset_redshift_clusters:
+            candidate_cluster = self._config.get_preset_redshift_cluster_id(new)
+            if candidate_cluster is not None:
+                logger.info(
+                    "Will use preset cluster %s with the requested new provisioning %s.",
+                    candidate_cluster,
+                    new,
+                )
+                return
+
+        # Handle special case: Going to 0.
         if diff.new_num_nodes() == 0:
             # This is handled post-transition.
             return
 
-        if old.num_nodes() == 0:
-            logger.debug(
-                "Resuming Redshift cluster %s", self._config.redshift_cluster_id
-            )
-            existing = await self._redshift.resume_and_fetch_existing_provisioning(
-                self._config.redshift_cluster_id
-            )
-            if existing == new:
-                return
+        logger.info(
+            "Using original Redshift cluster: %s", self._config.redshift_cluster_id
+        )
+        # We always resume the cluster and fetch its provisioning to make sure
+        # we stay in sync with what the actual provisioning is. This is
+        # important when we switch from a preset cluster. The resume will be a
+        # no-op if the cluster is already running.
+        logger.debug("Resuming Redshift cluster %s", self._config.redshift_cluster_id)
+        existing = await self._redshift.resume_and_fetch_existing_provisioning(
+            self._config.redshift_cluster_id
+        )
+        if existing == new:
+            return
 
-            # We shut down clusters by pausing them. On restart, they resume
-            # with their old provisioning.
-            old = existing
+        # We shut down clusters by pausing them. On restart, they resume
+        # with their old provisioning. This is also needed if we are switching
+        # away from a preset cluster.
+        old = existing
 
         # Resizes are OK because Redshift maintains read-availability during the
         # resize.
         is_classic = self._redshift.must_use_classic_resize(old, new)
-        if is_classic:
+        resize_completed = False
+        if not is_classic:
+            logger.debug(
+                "Running Redshift elastic resize. Old: %s, New: %s", str(old), str(new)
+            )
+            resize_completed = await self._redshift.elastic_resize(
+                self._config.redshift_cluster_id, new, wait_until_available=True
+            )
+
+        # Sometimes the elastic resize will not be supported even though it
+        # should be (according to the docs). This lets us fall back to a classic
+        # resize, which should always be supported.
+        if is_classic or not resize_completed:
             logger.debug(
                 "Running Redshift classic resize. Old: %s, New: %s", str(old), str(new)
             )
             await self._redshift.classic_resize(
-                self._config.redshift_cluster_id, new, wait_until_available=True
-            )
-        else:
-            logger.debug(
-                "Running Redshift elastic resize. Old: %s, New: %s", str(old), str(new)
-            )
-            await self._redshift.elastic_resize(
                 self._config.redshift_cluster_id, new, wait_until_available=True
             )
 

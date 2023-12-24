@@ -6,6 +6,7 @@ from typing import Dict, TYPE_CHECKING, Optional, Tuple, Any
 from brad.config.engine import Engine
 from brad.blueprint.provisioning import Provisioning
 from brad.planner.scoring.provisioning import aurora_num_cpus
+from brad.planner.scoring.performance.queuing import predict_mm1_wait_time
 
 if TYPE_CHECKING:
     from brad.planner.scoring.context import ScoringContext
@@ -278,15 +279,13 @@ class AuroraProvisioningScore:
         )
 
         mean_service_time = prov_predicted_latency.mean()
-        denom = max(1e-3, 1.0 - cpu_util)  # Want to avoid division by 0.
-        wait_sf = cpu_util / denom
-        mean_wait_time = (
-            mean_service_time * wait_sf * ctx.planner_config.aurora_new_scaling_alpha()
+        # Note the use of p90. The predictions we make are specifically p90 latency.
+        wait_time = predict_mm1_wait_time(
+            mean_service_time_s=mean_service_time, utilization=cpu_util, quantile=0.9
         )
-
         # Predicted running time is the query's execution time alone plus the
         # expected wait time (due to system load)
-        return prov_predicted_latency + mean_wait_time
+        return mean_service_time + wait_time
 
     @staticmethod
     def predict_query_latency_resources(

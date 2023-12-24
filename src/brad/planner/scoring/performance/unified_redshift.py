@@ -6,6 +6,7 @@ from typing import Dict, TYPE_CHECKING, Optional
 from brad.config.engine import Engine
 from brad.blueprint.provisioning import Provisioning
 from brad.planner.scoring.provisioning import redshift_num_cpus
+from brad.planner.scoring.performance.queuing import predict_mm1_wait_time
 
 if TYPE_CHECKING:
     from brad.planner.scoring.context import ScoringContext
@@ -181,17 +182,13 @@ class RedshiftProvisioningScore:
         cpu_util = overall_cpu_denorm / (
             redshift_num_cpus(to_prov) * to_prov.num_nodes()
         )
-        denom = max(1e-3, 1.0 - cpu_util)  # Want to avoid division by 0.
-        wait_sf = cpu_util / denom
-        mean_wait_time = (
-            mean_service_time
-            * wait_sf
-            * ctx.planner_config.redshift_new_scaling_alpha()
+        # Note the use of p90. The predictions we make are specifically p90 latency.
+        wait_time = predict_mm1_wait_time(
+            mean_service_time_s=mean_service_time, utilization=cpu_util, quantile=0.9
         )
-
         # Predicted running time is the query's execution time alone plus the
         # expected wait time (due to system load).
-        return prov_predicted_latency + mean_wait_time
+        return prov_predicted_latency + wait_time
 
     @staticmethod
     def predict_query_latency_resources(
@@ -253,4 +250,7 @@ class RedshiftProvisioningScore:
         dest.update(self.debug_values)
 
 
-_REDSHIFT_BASE_RESOURCE_VALUE = redshift_num_cpus(Provisioning("dc2.large", 2))
+_REDSHIFT_BASE_PROV = Provisioning("dc2.large", 2)
+_REDSHIFT_BASE_RESOURCE_VALUE = (
+    redshift_num_cpus(_REDSHIFT_BASE_PROV) * _REDSHIFT_BASE_PROV.num_nodes()
+)

@@ -67,16 +67,16 @@ class Monitor:
                 )
 
         self._redshift_metrics = RedshiftMetrics(
-            self._config, self._forecasting_method, self._forecasting_window_size
+            self._config,
+            self._blueprint_mgr,
+            self._forecasting_method,
+            self._forecasting_window_size,
         )
 
     def update_metrics_sources(self) -> None:
         """
         Updates the metrics sources when the blueprint changes.
         """
-
-        # We only need to refresh the Aurora metric sources. We never change the
-        # Redshift cluster ID during provisioning changes.
         blueprint = self._blueprint_mgr.get_blueprint()
         num_replicas = blueprint.aurora_provisioning().num_nodes() - 1
 
@@ -109,6 +109,11 @@ class Monitor:
                     )
                 )
                 next_index += 1
+
+        # Refresh the Redshift client (we may be switching to/from a preset
+        # cluster).
+        if self._redshift_metrics is not None:
+            self._redshift_metrics.update_clients()
 
     async def fetch_latest(self) -> None:
         """

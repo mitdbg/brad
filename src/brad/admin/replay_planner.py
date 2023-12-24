@@ -65,12 +65,12 @@ async def replay_planner_impl(args) -> None:
     config = ConfigFile.load_from_new_configs(
         phys_config=args.physical_config_file, system_config=args.system_config_file
     )
-    assets = AssetManager(config)
-    blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
-    await blueprint_mgr.load()
 
     provider = _EstimatorProvider()
     if not args.ignore_estimator:
+        assets = AssetManager(config)
+        blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
+        await blueprint_mgr.load()
         estimator = await PostgresEstimator.connect(args.schema_name, config)
         await estimator.analyze(blueprint_mgr.get_blueprint())
         provider.set_estimator(estimator)

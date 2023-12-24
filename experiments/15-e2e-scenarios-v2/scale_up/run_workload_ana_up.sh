@@ -35,9 +35,11 @@ function rana_sweep_offset4() {
   local gap_minute=$2
   local keep_last=$3
   local query_indices=$4
+  local gap_time_s=$5
+  local gap_std_s=$6
 
   for ra_clients in $sweep; do
-    start_repeating_olap_runner $ra_clients 15 5 $query_indices "ra_sweep_${ra_clients}" 4
+    start_repeating_olap_runner $ra_clients $gap_time_s $gap_std_s $query_indices "ra_sweep_${ra_clients}" 4
     sweep_rana_pid=$runner_pid
 
     sleep $(($gap_minute * 60))
@@ -70,17 +72,17 @@ rana_pid=$runner_pid
 log_workload_point "started_rana_4_$rana_pid"
 sleep 2
 
-# Start with 8 transactional clients; hold for 10 minutes to stabilize.
+# Start with 4 transactional clients; hold for 10 minutes to stabilize.
 log_workload_point "start_txn_4"
 start_txn_runner 4
 txn_pid=$runner_pid
-sleep $((10 * 60))
+sleep $((10 * 60)) # 10 mins cumulative
 
-# Scale up to 28 analytical clients in total (24 heavy).
-log_workload_point "start_increase_rana_heavy_4_to_24"
-rana_sweep_offset4 "4 8 12 16 20 24" 3 24 $heavier_queries
-log_workload_point "hold_rana_heavy_24"
-sleep $((60 * 60))  # 18 + 60 mins; 88 mins cumulative
+# Scale up to 60 analytical clients in total (56 heavy).
+log_workload_point "start_increase_rana_heavy_4_to_56"
+rana_sweep_offset4 "4 8 12 16 20 24 32 40 48 56" 5 56 $heavier_queries 3 1
+log_workload_point "hold_rana_heavy_56"
+sleep $((7 * 60 * 60))  # 50 + 420 mins; 480 mins cumulative (8 hours)
 
 log_workload_point "experiment_workload_done"
 

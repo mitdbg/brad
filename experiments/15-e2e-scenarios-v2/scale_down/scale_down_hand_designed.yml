@@ -6,7 +6,7 @@
 # listen on successive ports (e.g., 6584, 6585, etc.).
 front_end_interface: "0.0.0.0"
 front_end_port: 6583
-num_front_ends: 28
+num_front_ends: 8
 
 # Logging paths. If the value is in ALL_CAPS (with underscores), it is
 # interpreted as an environment variable (BRAD will log to the path stored in
@@ -68,7 +68,7 @@ metrics_agg:
   alpha: 0.86466472   # 1 - 1 / e^2
 
 # Used during planning.
-reinterpret_second_as: 1
+reinterpret_second_as: 12
 
 # The query distribution must change by at least this much for a new blueprint
 # to be accepted.
@@ -95,18 +95,14 @@ redshift_min_load_removal_fraction: 0.8
 query_latency_p90_ceiling_s: 30.0
 txn_latency_p90_ceiling_s: 0.030
 
-# If set to true, BRAD will attempt to use the specified preset Redshift
-# clusters instead of resizing the main Redshift cluster.
-use_preset_redshift_clusters: true
-
 # Used for ordering blueprints during planning.
 comparator:
-  type: perf_ceiling  # or `perf_ceiling`
+  type: benefit_perf_ceiling  # or `perf_ceiling`
 
   benefit_horizon:  # Only used by the `benefit_perf_ceiling` comparator
     weeks: 0
     days: 0
-    hours: 2
+    hours: 24
     minutes: 0
 
   penalty_threshold: 0.8  # Only used by the `benefit_perf_ceiling` comparator
@@ -121,11 +117,12 @@ std_datasets:
 
 # Blueprint planning trigger configs.
 
+# This is the baseline - we pick a static config and stick with it.
 triggers:
-  enabled: true
+  enabled: false
   check_period_s: 90  # Triggers are checked every X seconds.
   check_period_offset_s: 360  # Wait 6 mins before starting.
-  observe_new_blueprint_mins: 10
+  observe_new_blueprint_mins: 3
 
   elapsed_time:
     disabled: true

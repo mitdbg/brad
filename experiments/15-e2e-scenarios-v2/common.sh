@@ -195,6 +195,8 @@ function start_txn_runner() {
   local args=(
     --num-clients $t_clients
     --num-front-ends $num_front_ends
+    # --scale-factor $txn_scale_factor
+    # --dataset-type $dataset_type
   )
 
   if [[ ! -z $client_offset ]]; then
@@ -376,6 +378,9 @@ function extract_named_arguments() {
 
     if [[ $phys_arg =~ --snowset-gap-dist-path=.+ ]]; then
       snowset_gap_dist_path=${phys_arg:24}
+
+    if [[ $phys_arg =~ --txn-scale-factor=.+ ]]; then
+      txn_scale_factor=${phys_arg:19}
     fi
   done
 }

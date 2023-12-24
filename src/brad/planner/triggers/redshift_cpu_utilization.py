@@ -16,10 +16,11 @@ class RedshiftCpuUtilization(Trigger):
         lo: float,
         hi: float,
         epoch_length: timedelta,
+        observe_bp_delay: timedelta,
         sustained_epochs: int = 1,
         lookahead_epochs: Optional[int] = None,
     ) -> None:
-        super().__init__(epoch_length)
+        super().__init__(epoch_length, observe_bp_delay)
         self._monitor = monitor
         self._impl = MetricsThresholds(lo, hi, sustained_epochs)
         self._sustained_epochs = sustained_epochs
@@ -35,6 +36,12 @@ class RedshiftCpuUtilization(Trigger):
         if self._current_blueprint.redshift_provisioning().num_nodes() == 0:
             logger.debug(
                 "Redshift is off, so the Redshift CPU utilization trigger is inactive."
+            )
+            return False
+
+        if not self._passed_delays_since_cutoff():
+            logger.debug(
+                "Skippping Redshift CPU utilization trigger because we have not passed the delay cutoff."
             )
             return False
 
@@ -63,4 +70,7 @@ class RedshiftCpuUtilization(Trigger):
         )
 
 
-_UTILIZATION_METRIC = "CPUUtilization_Average"
+# Need to use maximum because we use this metric to estimate tail latency. The
+# average CPU utilization includes the Redshift leader node, which is generally
+# underutilized (and thus incorrectly biases the utilization value we use).
+_UTILIZATION_METRIC = "CPUUtilization_Maximum"

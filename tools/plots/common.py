@@ -32,4 +32,7 @@ def set_global_plt_configs(
 COLORS = {
     "brad_dark_blue": "#00188d",  # 0, 24, 141 (dark blue)
     "brad_light_blue": "#59b4d9",  # 89, 180, 217 (light blue)
+    "redshift_aurora": "#c03221",  # (orange-red)
+    "tidb": "#3f826d",  # (teal)
+    "hand": "#f7b267",  # (orange)
 }
