@@ -293,7 +293,11 @@ def simulation_runner(
         out_dir = pathlib.Path(".")
 
     if query_frequency_original is not None:
-        query_frequency = copy.deepcopy(query_frequency_original[queries])
+        query_frequency = copy.deepcopy(query_frequency_original)
+        # There are no predictions for query 48 in our test set (query cannot be parsed).
+        # Set its frequency to 0 so it is never used.
+        query_frequency[48] = 0.0
+        query_frequency = query_frequency[queries]
         query_frequency = query_frequency / np.sum(query_frequency)
     else:
         query_frequency = None
