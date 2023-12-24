@@ -132,7 +132,7 @@ class RecordedRun:
     def ana_lat_p90(self) -> pd.DataFrame:
         if self._ana_lat_p90 is not None:
             return self._ana_lat_p90
-        self._ana_lat_p90 = self._agg_ana_lats(0.9)
+        self._ana_lat_p90 = self._agg_ana_lats(window_str="5min", quantile=0.9)
         return self._ana_lat_p90
 
     @property
@@ -214,14 +214,19 @@ class RecordedRun:
             .reset_index(drop=True)
         )
 
-    def _agg_ana_lats(self, quantile: float) -> pd.DataFrame:
-        ts = pd.to_datetime(self.olap_lats["timestamp"])
-        il = self.olap_lats[["query_idx", "run_time_s"]]
-        il["query_idx"] = pd.to_numeric(il["query_idx"])
-        il["run_time_s"] = pd.to_numeric(il["run_time_s"])
+    def _agg_ana_lats(self, window_str: str, quantile: float) -> pd.DataFrame:
+        rel = self.olap_lats[["timestamp", "run_time_s"]].copy()
+        rel["timestamp"] = pd.to_datetime(rel["timestamp"])
+        rel["run_time_s"] = pd.to_numeric(rel["run_time_s"])
+        rel = rel.sort_values(by=["timestamp"])
+        rel = rel.set_index("timestamp")
+        over_window = (
+            rel.rolling(window_str, min_periods=1).quantile(quantile).reset_index()
+        )
+        ts = over_window["timestamp"]
         return (
-            il.groupby([ts.dt.day, ts.dt.hour, ts.dt.minute])
-            .quantile(quantile)
+            over_window.groupby([ts.dt.day, ts.dt.hour, ts.dt.minute])
+            .max()
             .reset_index(drop=True)
         )
 
