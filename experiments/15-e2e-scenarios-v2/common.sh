@@ -378,6 +378,7 @@ function extract_named_arguments() {
 
     if [[ $phys_arg =~ --snowset-gap-dist-path=.+ ]]; then
       snowset_gap_dist_path=${phys_arg:24}
+    fi
 
     if [[ $phys_arg =~ --txn-scale-factor=.+ ]]; then
       txn_scale_factor=${phys_arg:19}

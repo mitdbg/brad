@@ -16,7 +16,7 @@ sleep 30
 
 log_workload_point "clients_starting"
 
-clients_multiplier=5
+clients_multiplier=1
 time_scale_factor=1
 
 # Repeating analytics.
