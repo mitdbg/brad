@@ -79,3 +79,14 @@ run_experiment(
     **COMMON_CONFIGS,
   },
 )
+
+# Second half of the scale up.
+run_command(
+  name="brad_100g_ana_up_test",
+  run="./run_workload_ana_up_test.sh",
+  options={
+    # Note different config - this disables triggers.
+    "system-config-file": "scale_up_hand_designed.yml",
+    **COMMON_CONFIGS,
+  },
+)

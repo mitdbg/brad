@@ -154,13 +154,16 @@ class WindowedMetricsFromMonitor(MetricsProvider):
             )
 
         agg_cfg = self._planner_config.metrics_agg()
-        redshift_cpu = self._aggregate_possibly_missing(
+        # Redshift CPU measurements are noisy, so we special case it (see the
+        # comments in the method).
+        redshift_cpu = self._aggregate_redshift_cpu(
             redshift.loc[redshift.index <= most_recent_common, _REDSHIFT_METRICS[0]],
             num_epochs=aggregate_epochs,
             default_value=0.0,
             agg_cfg=agg_cfg,
             name="redshift_cpu",
         )
+        logger.info("Using Redshift CPU: %.2f", redshift_cpu)
         txn_per_s = self._aggregate_possibly_missing(
             front_end.loc[front_end.index <= most_recent_common, _FRONT_END_METRICS[0]],
             num_epochs=aggregate_epochs,
@@ -289,6 +292,67 @@ class WindowedMetricsFromMonitor(MetricsProvider):
             elif agg_cfg["method"] == "ewm":
                 alpha = agg_cfg["alpha"]
                 return relevant.ewm(alpha=alpha).mean().iloc[-1]
+            else:
+                raise AssertionError()
+
+    def _aggregate_redshift_cpu(
+        self,
+        series: pd.Series,
+        num_epochs: int,
+        default_value: int | float,
+        agg_cfg: AggCfg,
+        name: Optional[str] = None,
+    ) -> int | float:
+        # Redshift metrics reports can be very noisy (e.g., cycling between 0%
+        # and 100% CPU utilization over the span of a few minutes). This could
+        # be an artifact of how we retrieve metrics. As a "simple" fix, we take
+        # the 99th percentile measurement over a rolling window before applying
+        # the aggregation over the window.
+        if name is not None and len(series) == 0:
+            logger.warning(
+                "Using default metric value %s for %s", str(default_value), name
+            )
+
+        if len(series) == 0:
+            logger.warning(
+                "No values to aggregate for Redshift CPU. Using default: %.2f",
+                default_value,
+            )
+            return default_value
+        else:
+            relevant = series.iloc[-num_epochs:]
+            num_values = len(relevant)
+            if num_values == 0:
+                logger.warning(
+                    "No values to aggregate after adjusting epochs for Redshift CPU. "
+                    "Using default: %.2f",
+                    default_value,
+                )
+                return default_value
+            # TODO: This should be configurable.
+            window = max([val for val in [5, 3, 1] if num_values >= val])
+            logger.info(
+                "Using a rolling window of %d and selecting p99 to smoothen Redshift CPU values.",
+                window,
+            )
+            smooth = relevant.rolling(window).quantile(0.99)
+            logger.info(
+                "Smooth Redshift CPU - Min: %.2f, Median: %.2f, Max: %.2f",
+                smooth.min(),
+                smooth.median(),
+                smooth.max(),
+            )
+            logger.info(
+                "Original Redshift CPU - Min: %.2f, Median: %.2f, Max: %.2f",
+                relevant.min(),
+                relevant.median(),
+                relevant.max(),
+            )
+            if agg_cfg["method"] == "mean":
+                return smooth.mean()
+            elif agg_cfg["method"] == "ewm":
+                alpha = agg_cfg["alpha"]
+                return smooth.ewm(alpha=alpha).mean().iloc[-1]
             else:
                 raise AssertionError()
 
@@ -607,8 +671,11 @@ _AURORA_METRICS = [
     "BufferCacheHitRatio_Average",
 ]
 
+# Need to use maximum because we use this metric to estimate tail latency. The
+# average CPU utilization includes the Redshift leader node, which is generally
+# underutilized (and thus incorrectly biases the utilization value we use).
 _REDSHIFT_METRICS = [
-    "CPUUtilization_Average",
+    "CPUUtilization_Maximum",
 ]
 
 _FRONT_END_METRICS = [

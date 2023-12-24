@@ -2,10 +2,12 @@ import asyncio
 import boto3
 import time
 import logging
+import botocore.exceptions
 from typing import Dict, Any
 
 from brad.config.file import ConfigFile
 from brad.blueprint.provisioning import Provisioning
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +93,7 @@ class RedshiftProvisioningManager:
         await asyncio.sleep(20)
         await self.wait_until_available(cluster_id)
 
-        response = await loop.run_in_executor(None, self._get_cluster_state, cluster_id)
+        response = await self._get_cluster_state(cluster_id)
         cluster = response["Clusters"][0]
         instance_type = cluster["NodeType"]
         num_nodes = cluster["NumberOfNodes"]
@@ -177,12 +179,8 @@ class RedshiftProvisioningManager:
     async def wait_until_available(
         self, cluster_id: str, polling_interval: float = 20.0
     ) -> None:
-        loop = asyncio.get_running_loop()
-
         while True:
-            response = await loop.run_in_executor(
-                None, self._get_cluster_state, cluster_id
-            )
+            response = await self._get_cluster_state(cluster_id)
             cluster = response["Clusters"][0]
             modifying = cluster["ClusterAvailabilityStatus"] == "Modifying"
             status = cluster["ClusterStatus"]
@@ -193,8 +191,29 @@ class RedshiftProvisioningManager:
             )
             await asyncio.sleep(polling_interval)
 
-    def _get_cluster_state(self, cluster_id: str) -> Dict[str, Any]:
-        return self._redshift.describe_clusters(ClusterIdentifier=cluster_id)
+    async def _get_cluster_state(self, cluster_id: str) -> Dict[str, Any]:
+        def do_get_state():
+            return self._redshift.describe_clusters(ClusterIdentifier=cluster_id)
+
+        backoff = None
+        loop = asyncio.get_running_loop()
+
+        # The AWS APIs may throttle us. We wrap the call with our own randomized
+        # back off increase the likelihood that this call succeeds.
+        while True:
+            try:
+                return await loop.run_in_executor(None, do_get_state)
+            except botocore.exceptions.ClientError as ex:
+                if backoff is None:
+                    backoff = RandomizedExponentialBackoff(
+                        max_retries=100, base_delay_s=0.1, max_delay_s=6.0
+                    )
+                wait_time_s = backoff.wait_time_s()
+                if wait_time_s is None:
+                    raise RuntimeError(
+                        "Failed to describe Redshift cluster (exceeded maximum retries)."
+                    ) from ex
+                await asyncio.sleep(wait_time_s)
 
 
 class RedshiftProvisioning:

@@ -101,7 +101,7 @@ use_preset_redshift_clusters: true
 
 # Used for ordering blueprints during planning.
 comparator:
-  type: benefit_perf_ceiling  # or `perf_ceiling`
+  type: perf_ceiling  # or `perf_ceiling`
 
   benefit_horizon:  # Only used by the `benefit_perf_ceiling` comparator
     weeks: 0
@@ -125,7 +125,7 @@ triggers:
   enabled: true
   check_period_s: 90  # Triggers are checked every X seconds.
   check_period_offset_s: 360  # Wait 6 mins before starting.
-  observe_new_blueprint_mins: 3
+  observe_new_blueprint_mins: 10
 
   elapsed_time:
     disabled: true

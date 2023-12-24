@@ -56,7 +56,9 @@ class RecordedRun:
                 olap_inner = pd.read_csv(
                     inner / "repeating_olap_batch_{}.csv".format(c)
                 )
-                olap_inner["timestamp"] = pd.to_datetime(olap_inner["timestamp"])
+                olap_inner["timestamp"] = pd.to_datetime(
+                    olap_inner["timestamp"], format="mixed"
+                )
                 olap_inner["timestamp"] = olap_inner["timestamp"].dt.tz_localize(None)
                 olap_inner.insert(0, "num_clients", clients)
                 all_olap.append(olap_inner)
@@ -207,7 +209,7 @@ class RecordedRun:
         ts = pd.to_datetime(self.txn_lats["timestamp"], format="mixed")
         il = self.txn_lats[["num_clients", "run_time_s"]]
         return (
-            il.groupby([ts.dt.hour, ts.dt.minute])
+            il.groupby([ts.dt.day, ts.dt.hour, ts.dt.minute])
             .quantile(quantile)
             .reset_index(drop=True)
         )
@@ -215,8 +217,10 @@ class RecordedRun:
     def _agg_ana_lats(self, quantile: float) -> pd.DataFrame:
         ts = pd.to_datetime(self.olap_lats["timestamp"])
         il = self.olap_lats[["query_idx", "run_time_s"]]
+        il["query_idx"] = pd.to_numeric(il["query_idx"])
+        il["run_time_s"] = pd.to_numeric(il["run_time_s"])
         return (
-            il.groupby([ts.dt.hour, ts.dt.minute])
+            il.groupby([ts.dt.day, ts.dt.hour, ts.dt.minute])
             .quantile(quantile)
             .reset_index(drop=True)
         )
@@ -345,6 +349,47 @@ def get_e2e_axes(
     ana_ax.set_ylabel("Analytics\nLatency (s)")
 
     return fig, txn_ax, ana_ax, cst_ax
+
+
+def get_e2e_axes_with_workload(
+    size: Literal["small", "large"],
+    txn_ceiling_ms=30.0,
+    ana_ceiling_s=30.0,
+    custom_subplots: Optional[
+        Callable[[GridSpec], Tuple[plt.Axes, plt.Axes, plt.Axes, plt.Axes]]
+    ] = None,
+) -> Tuple[plt_fig.Figure, plt.Axes, plt.Axes, plt.Axes, plt.Axes]:
+    fig = plt.figure(
+        figsize=(7, 6) if size == "small" else (10, 7),
+        # This option is problematic when also using `align_ylabels()`.
+        # Use `savefig("...", bbox_inches="tight")` instead.
+        # tight_layout=True,
+    )
+    grid = GridSpec(nrows=4, ncols=1, height_ratios=[2, 2, 1, 1], hspace=0.45)
+
+    if custom_subplots is not None:
+        txn_ax, ana_ax, cst_ax, wrk_ax = custom_subplots(grid)
+    else:
+        txn_ax = plt.subplot(grid[0, 0])
+        ana_ax = plt.subplot(grid[1, 0], sharex=txn_ax)
+        cst_ax = plt.subplot(grid[2, 0], sharex=ana_ax)
+        wrk_ax = plt.subplot(grid[3, 0], sharex=cst_ax)
+        fig.align_ylabels()
+
+    # Transaction Latency ceiling
+    txn_ax.axhspan(ymin=0, ymax=txn_ceiling_ms, color="#000", alpha=0.05)
+    txn_ax.axhline(y=txn_ceiling_ms, color="#000", alpha=0.5, lw=1.5)
+
+    # OLAP Latency ceiling
+    ana_ax.axhspan(ymin=-5, ymax=ana_ceiling_s, color="#000", alpha=0.05)
+    ana_ax.axhline(y=ana_ceiling_s, color="#000", alpha=0.5, lw=1.5)
+
+    cst_ax.set_ylabel("Monthly\nCost ($)")
+    txn_ax.set_ylabel("Transaction\nLatency (ms)")
+    ana_ax.set_ylabel("Analytics\nLatency (s)")
+    wrk_ax.set_xlabel("Time Elapsed (minutes)")
+
+    return fig, txn_ax, ana_ax, cst_ax, wrk_ax
 
 
 def plot_brad_event(
