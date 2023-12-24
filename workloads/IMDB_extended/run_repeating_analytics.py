@@ -293,7 +293,11 @@ def simulation_runner(
         out_dir = pathlib.Path(".")
 
     if query_frequency_original is not None:
-        query_frequency = copy.deepcopy(query_frequency_original[queries])
+        query_frequency = copy.deepcopy(query_frequency_original)
+        # There are no predictions for query 48 in our test set (query cannot be parsed).
+        # Set its frequency to 0 so it is never used.
+        query_frequency[48] = 0.0
+        query_frequency = query_frequency[queries]
         query_frequency = query_frequency / np.sum(query_frequency)
     else:
         query_frequency = None
@@ -507,12 +511,6 @@ def main():
         help="path to the frequency to draw each query in query bank",
     )
     parser.add_argument(
-        "--num-query-path",
-        type=str,
-        default=None,
-        help="Path to the distribution of number of queries for each period of a day",
-    )
-    parser.add_argument(
         "--num-client-path",
         type=str,
         default=None,
@@ -533,6 +531,12 @@ def main():
         type=int,
         default=100,
         help="trace 1s of simulation as X seconds in real-time to match the num-concurrent-query",
+    )
+    parser.add_argument(
+        "--num-client-multiplier",
+        type=int,
+        default=1,
+        help="The multiplier to the number of clients for each period of a day",
     )
     parser.add_argument("--query-indexes", type=str)
     parser.add_argument(
@@ -689,15 +693,27 @@ def main():
     )  # pylint: disable=global-statement
 
     if num_client_trace is not None:
+        print("Scaling number of clients by", args.num_client_multiplier)
+        for k in num_client_trace.keys():
+            num_client_trace[k] *= args.num_client_multiplier
+
         assert args.time_scale_factor is not None, "Need to set --time-scale-factor"
         assert args.run_for_s is not None, "Need to set --run-for-s"
-        print("Telling client no. 0 to start.", flush=True)
-        control_semaphore[0].release()
-        num_running_client = 1
+
+        num_running_client = 0
+        num_client_required = min(num_client_trace[0], args.num_clients)
+        for add_client in range(num_running_client, num_client_required):
+            print(
+                f"Telling client no. {add_client} to start.",
+                flush=True,
+                file=sys.stderr,
+            )
+            control_semaphore[add_client].release()
+            num_running_client += 1
 
         finished_one_day = True
         curr_day_start_time = datetime.now().astimezone(pytz.utc)
-        for time_of_day in num_client_trace:
+        for time_of_day, num_expected_clients in num_client_trace.items():
             if time_of_day == 0:
                 continue
             # at this time_of_day start/shut-down more clients
@@ -715,12 +731,14 @@ def main():
                 finished_one_day = False
                 break
             time.sleep(time_in_s - curr_time_in_s)
-            num_client_required = min(num_client_trace[time_of_day], args.num_clients)
+            num_client_required = min(num_expected_clients, args.num_clients)
             if num_client_required > num_running_client:
                 # starting additional clients
                 for add_client in range(num_running_client, num_client_required):
                     print(
-                        "Telling client no. {} to start.".format(add_client), flush=True
+                        "Telling client no. {} to start.".format(add_client),
+                        flush=True,
+                        file=sys.stderr,
                     )
                     control_semaphore[add_client].release()
                     num_running_client += 1
@@ -730,6 +748,7 @@ def main():
                     print(
                         "Telling client no. {} to stop.".format(delete_client - 1),
                         flush=True,
+                        file=sys.stderr,
                     )
                     control_semaphore[delete_client - 1].release()
                     num_running_client -= 1
