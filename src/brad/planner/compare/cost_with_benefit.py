@@ -86,13 +86,24 @@ def best_cost_under_perf_ceilings_with_benefit_horizon(
 
 
 def _get_or_compute_query_p90_latency(bp: ComparableBlueprint) -> float:
+    stored = bp.get_memoized_value("query_p90_latency")
+    if stored is not None:
+        return stored
+    else:
+        # Note: You probably do not want to use this. The predictions that come
+        # from the blueprint scorer are already "in p90".
+        p90_lat = np.quantile(
+            bp.get_predicted_analytical_latencies(), 0.9, method="lower"
+        )
+        bp.set_memoized_value("query_max_p90_latency", p90_lat)
+        return p90_lat
+
+
+def _get_or_compute_query_max_p90_latency(bp: ComparableBlueprint) -> float:
     stored = bp.get_memoized_value("query_max_p90_latency")
     if stored is not None:
         return stored
     else:
-        p90_lat = np.quantile(
-            bp.get_predicted_analytical_latencies(), 0.9, method="lower"
-        )
         # These predicted latencies are p90 latencies.
         p90_lat = np.max(bp.get_predicted_analytical_latencies())
         bp.set_memoized_value("query_max_p90_latency", p90_lat)
@@ -126,8 +137,8 @@ def _query_p90_ceiling(
     left: ComparableBlueprint, right: ComparableBlueprint, query_ceiling_s: float
 ) -> Optional[bool]:
     # Query latency ceilings.
-    left_lat = _get_or_compute_query_p90_latency(left)
-    right_lat = _get_or_compute_query_p90_latency(right)
+    left_lat = _get_or_compute_query_max_p90_latency(left)
+    right_lat = _get_or_compute_query_max_p90_latency(right)
 
     if left_lat > query_ceiling_s and right_lat > query_ceiling_s:
         # Both are above the latency ceiling.
