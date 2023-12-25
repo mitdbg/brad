@@ -474,8 +474,8 @@ class BlueprintCandidate(ComparableBlueprint):
             Engine.Redshift
         ] = self.redshift_score.scaled_run_times
 
-    def is_better_than(self, other: "BlueprintCandidate") -> bool:
-        return self._comparator(self, other)
+    def is_better_than(self, other: "BlueprintCandidate", verbose: bool = False) -> bool:
+        return self._comparator(self, other, verbose)
 
     def __lt__(self, other: "BlueprintCandidate") -> bool:
         # This is implemented for use with Python's `heapq` module. It

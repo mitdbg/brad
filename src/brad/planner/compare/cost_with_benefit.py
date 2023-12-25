@@ -17,7 +17,7 @@ def best_cost_under_perf_ceilings_with_benefit_horizon(
     penalty_threshold: float,
     penalty_power: float,
 ) -> BlueprintComparator:
-    def is_better_than(left: ComparableBlueprint, right: ComparableBlueprint) -> bool:
+    def is_better_than(left: ComparableBlueprint, right: ComparableBlueprint, verbose: bool) -> bool:
         # Transactional latency ceilings (feasibility check).
         result = _txn_p90_ceiling(left, right, max_txn_p90_latency_s)
         if result is not None:
@@ -79,6 +79,9 @@ def best_cost_under_perf_ceilings_with_benefit_horizon(
         right.set_memoized_value("benefit_penalty_multiplier", penalty_multiplier)
         left.set_memoized_value("cost_score", left_score)
         right.set_memoized_value("cost_score", right_score)
+
+        if verbose:
+            print("is_better_than scores:", left_score, right_score)
 
         return left_score < right_score
 

@@ -88,7 +88,7 @@ def best_cost_under_perf_ceilings(
     max_query_p90_latency_s: float,
     max_txn_p90_latency_s: float,
 ) -> BlueprintComparator:
-    def is_better_than(left: ComparableBlueprint, right: ComparableBlueprint) -> bool:
+    def is_better_than(left: ComparableBlueprint, right: ComparableBlueprint, verbose: bool = True) -> bool:
         # Check transactional latency ceilings first.
         left_txn_p90 = left.get_predicted_transactional_latencies()[1]
         right_txn_p90 = right.get_predicted_transactional_latencies()[1]
@@ -149,7 +149,7 @@ def best_weighted_score_under_perf_ceilings(
     max_query_latency_s: float,
     max_txn_p90_latency_s: float,
 ) -> BlueprintComparator:
-    def is_better_than(left: ComparableBlueprint, right: ComparableBlueprint) -> bool:
+    def is_better_than(left: ComparableBlueprint, right: ComparableBlueprint, verbose: bool = True) -> bool:
         # Check transactional latency ceilings first.
         left_txn_p90 = left.get_predicted_transactional_latencies()[1]
         right_txn_p90 = right.get_predicted_transactional_latencies()[1]
@@ -199,6 +199,9 @@ def best_weighted_score_under_perf_ceilings(
         right_score = _compute_weighted_score(
             right_cost, right_trans, right_lat, right_txn_p90
         )
+
+        if verbose:
+            print("scores", left_score, right_score)
 
         return left_score < right_score
 

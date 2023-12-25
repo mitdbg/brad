@@ -10,6 +10,7 @@ from brad.config.engine import Engine, EngineBitmapValues
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.planner.abstract import BlueprintPlanner
+from brad.planner.baselines.baselines_planner import BaselinePlanner
 from brad.planner.compare.provider import BlueprintComparatorProvider
 from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.beam.query_based_candidate import BlueprintCandidate
@@ -42,11 +43,13 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
     def __init__(
         self,
         *args,
+        n_queries,
         disable_external_logging: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._disable_external_logging = disable_external_logging
+        self.n_queries = n_queries
 
     async def _run_replan_impl(
         self, window_multiplier: int = 1
@@ -105,8 +108,8 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         # 2. Compute query gains and reorder queries by their gain in descending
         # order.
         gains = next_workload.compute_latency_gains()
-        analytical_queries = next_workload.analytical_queries()
-        query_indices = list(range(len(next_workload.analytical_queries())))
+        analytical_queries = next_workload.analytical_queries()[:self.n_queries]
+        query_indices = list(range(self.n_queries))
         query_indices.sort(key=lambda idx: gains[idx], reverse=True)
 
         # Sanity check. We cannot run planning without at least one query in the
@@ -360,6 +363,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             "Metrics used during planning: %s", json.dumps(metrics._asdict(), indent=2)
         )
 
+        # Print score of blueprint candidate.
+        print("FINAL SCORE:")
+        best_candidate.is_better_than(best_candidate, verbose=True)
+
         return best_blueprint, best_blueprint_score
 
 
@@ -400,17 +407,41 @@ class RecordedQueryBasedPlanningRun(RecordedPlanningRun, WorkloadProvider):
             estimator_provider=estimator_provider,
             trigger_provider=EmptyTriggerProvider(),
         )
-        return QueryBasedBeamPlanner(
-            self._config,
-            self._planner_config,
-            self._schema_name,
-            self._current_blueprint,
-            self._current_blueprint_score,
-            providers,
-            # N.B. Purposefully set to `None`.
-            system_event_logger=None,
-            disable_external_logging=True,
-        )
+
+        # Cannot run exhaustive search with all queries.
+        # Only use first n_queries for planning
+        n_queries = 5
+        planners = ["beam", "random", "greedy", "exhaustive"]
+        used_planner = planners[0]
+
+        if used_planner == "beam":
+            return QueryBasedBeamPlanner(
+                self._config,
+                self._planner_config,
+                self._schema_name,
+                self._current_blueprint,
+                self._current_blueprint_score,
+                providers,
+                # N.B. Purposefully set to `None`.
+                system_event_logger=None,
+                disable_external_logging=True,
+                n_queries=n_queries
+            )
+
+        else:
+            return BaselinePlanner(
+                self._config,
+                self._planner_config,
+                self._schema_name,
+                self._current_blueprint,
+                self._current_blueprint_score,
+                providers,
+                # N.B. Purposefully set to `None`.
+                system_event_logger=None,
+                baseline=used_planner,
+                n_queries=n_queries
+            )
+
 
     # Provider methods follow.
 
