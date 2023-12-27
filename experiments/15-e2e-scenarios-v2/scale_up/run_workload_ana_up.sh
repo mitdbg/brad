@@ -82,7 +82,10 @@ sleep $((10 * 60)) # 10 mins cumulative
 log_workload_point "start_increase_rana_heavy_4_to_56"
 rana_sweep_offset4 "4 8 12 16 20 24 32 40 48 56" 5 56 $heavier_queries 3 1
 log_workload_point "hold_rana_heavy_56"
-sleep $((7 * 60 * 60))  # 50 + 420 mins; 480 mins cumulative (8 hours)
+
+# Stop after we reach the expected state; use a time out of 6 hours.
+poll_file_for_event $COND_OUT/brad_daemon_events.csv "reached_expected_state" $((6 * 60))
+sleep $((30 * 60))  # Wait 30 minutes before completing.
 
 log_workload_point "experiment_workload_done"
 

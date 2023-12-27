@@ -30,3 +30,6 @@ class SystemEvent(enum.Enum):
 
     # If this event occurs, we must redo the experiment.
     WatchdogFired = "watchdog_fired"
+
+    # Use this for long running experiments.
+    ReachedExpectedState = "reached_expected_state"
