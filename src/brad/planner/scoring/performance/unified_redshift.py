@@ -166,9 +166,12 @@ class RedshiftProvisioningScore:
 
             # We divide by the CPU count on the next provisioning to adjust for
             # instance type changes.
-            return (query_factor_clean * next_max_cpu_denorm) / redshift_num_cpus(
+            next_util = (query_factor_clean * next_max_cpu_denorm) / redshift_num_cpus(
                 next_prov
             )
+
+            # Clip to [0, 1].
+            return min(max(next_util, 0.0), 1.0)
 
     @classmethod
     def query_movement_factor(
