@@ -285,7 +285,7 @@ class AuroraProvisioningScore:
         )
         # Predicted running time is the query's execution time alone plus the
         # expected wait time (due to system load)
-        return mean_service_time + wait_time
+        return prov_predicted_latency + wait_time
 
     @staticmethod
     def predict_query_latency_resources(
