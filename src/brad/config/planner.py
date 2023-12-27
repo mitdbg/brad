@@ -1,10 +1,11 @@
+import math
 import yaml
 import logging
 import numpy as np
 import numpy.typing as npt
 import importlib.resources as pkg_resources
 from datetime import timedelta
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Tuple
 from brad.planner.strategy import PlanningStrategy
 import brad.planner as brad_planner
 
@@ -311,3 +312,21 @@ class PlannerConfig:
         except KeyError:
             logger.warning("Using default Redshift min load removal fraction: 0.75")
             return 0.75
+
+    def aurora_max_query_factor(self) -> Tuple[float, float]:
+        try:
+            return (
+                self._raw["aurora_max_query_factor"],
+                self._raw["aurora_max_query_factor_replace"],
+            )
+        except KeyError:
+            return math.inf, math.inf
+
+    def redshift_peak_load_multiplier(self) -> Tuple[float, float]:
+        try:
+            return (
+                self._raw["redshift_peak_load_threshold"],
+                self._raw["redshift_peak_load_multiplier"],
+            )
+        except KeyError:
+            return 110.0, 1.0

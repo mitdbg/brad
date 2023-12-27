@@ -370,7 +370,8 @@ class TableBasedBeamPlanner(BlueprintPlanner):
             "Selected blueprint details: %s", json.dumps(debug_values, indent=2)
         )
         logger.info(
-            "Metrics used during planning: %s", json.dumps(metrics._asdict(), indent=2)
+            "Metrics used during planning: %s",
+            json.dumps(metrics._asdict(), indent=2, default=str),
         )
 
         return best_blueprint, best_blueprint_score

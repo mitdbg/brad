@@ -12,7 +12,10 @@ from brad.config.file import ConfigFile
 from brad.config.metrics import FrontEndMetric
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
-from brad.daemon.redshift_metrics import relevant_redshift_node_dimensions
+from brad.daemon.redshift_metrics import (
+    relevant_redshift_node_dimensions,
+    MAX_REDSHIFT_NODES,
+)
 from brad.utils.time_periods import elapsed_time, universal_now
 
 logger = logging.getLogger(__name__)
@@ -677,6 +680,12 @@ def _extract_metrics_from_monitor(
         redshift = redshift_source.read_k_most_recent(
             k=epochs_to_extract, metric_ids=redshift_metric_ids
         )
+        if blueprint.redshift_provisioning().num_nodes() > MAX_REDSHIFT_NODES:
+            logger.warning(
+                "Running with %d Redshift nodes. Only capturing metrics on %d.",
+                blueprint.redshift_provisioning().num_nodes(),
+                MAX_REDSHIFT_NODES,
+            )
     else:
         redshift_metric_ids = _REDSHIFT_METRICS.copy()
         redshift = pd.DataFrame([], columns=_REDSHIFT_METRICS)
