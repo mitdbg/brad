@@ -42,6 +42,9 @@ class AuroraProvisioningScore:
         query_factor = cls.query_movement_factor(
             base_query_run_times, query_arrival_counts, ctx
         )
+        max_factor, max_factor_replace = ctx.planner_config.aurora_max_query_factor()
+        if query_factor is not None and query_factor > max_factor:
+            query_factor = max_factor_replace
         has_queries = base_query_run_times.shape[0] > 0
         txn_cpu_denorm, ana_node_cpu_denorm = cls.predict_loads(
             has_queries, curr_prov, next_prov, query_factor, ctx, debug_dict

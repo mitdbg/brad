@@ -130,6 +130,13 @@ class RedshiftProvisioningScore:
             curr_cpu_denorm = curr_cpu_util * redshift_num_cpus(curr_prov)
             curr_max_cpu_denorm = curr_cpu_denorm.max()
 
+            (
+                peak_load,
+                peak_load_multiplier,
+            ) = ctx.planner_config.redshift_peak_load_multiplier()
+            if curr_cpu_util.max() > (peak_load / 100.0):
+                curr_max_cpu_denorm *= peak_load_multiplier
+
             # First step: Adjust load based on a change in the number of nodes.
             # Key observation is that we're interested in the node with the
             # maximum load. This node will stay the maximum after our
@@ -140,9 +147,12 @@ class RedshiftProvisioningScore:
                 # Thus adding an instance of the same kind of node should not
                 # affect the load as much.
                 skew_adjustment = cls.compute_skew_adjustment(curr_cpu_util)
-                next_max_cpu_denorm = curr_max_cpu_denorm * math.pow(
-                    curr_nodes / next_nodes, skew_adjustment
-                )
+                if skew_adjustment < 0.5:
+                    next_max_cpu_denorm = curr_max_cpu_denorm
+                else:
+                    next_max_cpu_denorm = curr_max_cpu_denorm * math.pow(
+                        curr_nodes / next_nodes, skew_adjustment
+                    )
             elif next_nodes < curr_nodes:
                 removed_nodes = curr_nodes - next_nodes
                 load_to_redist = curr_cpu_denorm[:removed_nodes].sum()
@@ -151,7 +161,7 @@ class RedshiftProvisioningScore:
                 )
             else:
                 # Number of nodes unchanged.
-                next_max_cpu_denorm = curr_cpu_denorm.max()
+                next_max_cpu_denorm = curr_max_cpu_denorm
 
             # We stay conservative here. See `AuroraProvisioningScore`.
             query_factor_clean = 1.0
