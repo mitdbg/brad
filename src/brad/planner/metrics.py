@@ -740,6 +740,10 @@ def _compute_redshift_cpu_stats(
             # well as the "Leader" value.
             continue
         relevant_vals.append(value)
+
+    if len(relevant_vals) == 0:
+        return 0.0, np.empty(0)
+
     arr = np.array(relevant_vals)
     return arr.max(), arr
 
