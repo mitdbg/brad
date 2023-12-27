@@ -134,3 +134,21 @@ def test_on_to_on() -> None:
         curr_prov, next_prov, None, ctx
     )
     assert cpu_util == pytest.approx(0.25)
+
+
+def test_on_to_on_with_skew() -> None:
+    curr_prov = Provisioning("dc2.large", 2)
+    next_prov = Provisioning("dc2.large", 4)
+    ctx = get_fixtures(redshift_cpu=[0.0, 100.0], redshift_prov=curr_prov)
+
+    cpu_util = RedshiftProvisioningScore.predict_max_node_cpu_util(
+        curr_prov, next_prov, 1.0, ctx
+    )
+    # Captures the effect of skewed utilization.
+    assert cpu_util == pytest.approx(1.0)
+
+    next_prov_instance = Provisioning("ra3.xlplus", 2)
+    cpu_util = RedshiftProvisioningScore.predict_max_node_cpu_util(
+        curr_prov, next_prov_instance, 1.0, ctx
+    )
+    assert cpu_util == pytest.approx(0.5)
