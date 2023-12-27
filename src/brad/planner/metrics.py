@@ -2,15 +2,17 @@ import logging
 import math
 import pandas as pd
 import numpy as np
+import numpy.typing as npt
 from datetime import datetime
 from collections import namedtuple
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any, List
 
 from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.config.metrics import FrontEndMetric
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
+from brad.daemon.redshift_metrics import relevant_redshift_node_dimensions
 from brad.utils.time_periods import elapsed_time, universal_now
 
 logger = logging.getLogger(__name__)
@@ -18,6 +20,8 @@ logger = logging.getLogger(__name__)
 Metrics = namedtuple(
     "Metrics",
     [
+        # NOTE! This is incorrectly named. It is now the maximum CPU; we've kept
+        # the legacy name to avoid breaking serialized results.
         "redshift_cpu_avg",
         "aurora_writer_cpu_avg",
         "aurora_reader_cpu_avg",
@@ -30,8 +34,9 @@ Metrics = namedtuple(
         "txn_lat_s_p90",
         "query_lat_s_p50",
         "query_lat_s_p90",
+        "redshift_cpu_list",
     ],
-    defaults=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    defaults=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, np.empty(0)],
 )
 
 AggCfg = Dict[str, Any]
@@ -102,6 +107,7 @@ class WindowedMetricsFromMonitor(MetricsProvider):
             aurora_writer,
             aurora_reader,
             front_end,
+            redshift_metric_ids,
         ) = _extract_metrics_from_monitor(
             self._monitor, self._blueprint_mgr, epochs_to_extract
         )
@@ -109,7 +115,20 @@ class WindowedMetricsFromMonitor(MetricsProvider):
         if redshift.empty and aurora_writer.empty and front_end.empty:
             logger.warning("All metrics are empty.")
             return (
-                Metrics(1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+                Metrics(
+                    1.0,
+                    1.0,
+                    1.0,
+                    100.0,
+                    100.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    np.empty(0),
+                ),
                 universal_now(),
             )
 
@@ -156,14 +175,16 @@ class WindowedMetricsFromMonitor(MetricsProvider):
         agg_cfg = self._planner_config.metrics_agg()
         # Redshift CPU measurements are noisy, so we special case it (see the
         # comments in the method).
-        redshift_cpu = self._aggregate_redshift_cpu(
-            redshift.loc[redshift.index <= most_recent_common, _REDSHIFT_METRICS[0]],
-            num_epochs=aggregate_epochs,
-            default_value=0.0,
-            agg_cfg=agg_cfg,
-            name="redshift_cpu",
-        )
-        logger.info("Using Redshift CPU: %.2f", redshift_cpu)
+        redshift_cpu = {}
+        for metric_id in redshift_metric_ids:
+            redshift_cpu[metric_id] = self._aggregate_redshift_cpu(
+                redshift.loc[redshift.index <= most_recent_common, metric_id],
+                num_epochs=aggregate_epochs,
+                default_value=0.0,
+                agg_cfg=agg_cfg,
+                name=metric_id,
+            )
+        logger.info("Using Redshift CPU values: %s", str(redshift_cpu))
         txn_per_s = self._aggregate_possibly_missing(
             front_end.loc[front_end.index <= most_recent_common, _FRONT_END_METRICS[0]],
             num_epochs=aggregate_epochs,
@@ -252,9 +273,11 @@ class WindowedMetricsFromMonitor(MetricsProvider):
             name="aurora_reader_hit_rate_pct",
         )
 
+        redshift_cpu_avg, redshift_cpu_list = _compute_redshift_cpu_stats(redshift_cpu)
+
         return (
             Metrics(
-                redshift_cpu_avg=redshift_cpu,
+                redshift_cpu_avg=redshift_cpu_avg,
                 aurora_writer_cpu_avg=aurora_writer_cpu,
                 aurora_reader_cpu_avg=aurora_reader_cpu,
                 aurora_writer_buffer_hit_pct_avg=aurora_writer_hit_rate_pct,
@@ -266,6 +289,7 @@ class WindowedMetricsFromMonitor(MetricsProvider):
                 txn_lat_s_p90=txn_lat_s_p90,
                 query_lat_s_p50=query_lat_s_p50,
                 query_lat_s_p90=query_lat_s_p90,
+                redshift_cpu_list=redshift_cpu_list,
             ),
             most_recent_common.to_pydatetime(),
         )
@@ -416,11 +440,16 @@ class MetricsFromMonitor(MetricsProvider):
         self._blueprint_mgr = blueprint_mgr
 
     def get_metrics(self) -> Tuple[Metrics, datetime]:
+        logger.warning(
+            "Using legacy metrics from monitor provider that "
+            "does not take Redshift node skew into account."
+        )
         (
             redshift,
             aurora_writer,
             aurora_reader,
             front_end,
+            _,
         ) = _extract_metrics_from_monitor(
             self._monitor, self._blueprint_mgr, requested_epochs=1
         )
@@ -428,7 +457,21 @@ class MetricsFromMonitor(MetricsProvider):
         if redshift.empty and aurora_writer.empty and front_end.empty:
             logger.warning("All metrics are empty.")
             return (
-                Metrics(1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+                Metrics(
+                    1.0,
+                    1.0,
+                    1.0,
+                    100.0,
+                    100.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    np.empty(0),
+                ),
                 universal_now(),
             )
 
@@ -552,6 +595,7 @@ class MetricsFromMonitor(MetricsProvider):
                 txn_lat_s_p90=txn_lat_s_p90,
                 query_lat_s_p50=query_lat_s_p50,
                 query_lat_s_p90=query_lat_s_p90,
+                redshift_cpu_list=[],
             ),
             most_recent_common.to_pydatetime(),
         )
@@ -597,7 +641,7 @@ class MetricsFromMonitor(MetricsProvider):
 
 def _extract_metrics_from_monitor(
     monitor: Monitor, blueprint_mgr: BlueprintManager, requested_epochs: int
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, List[str]]:
     blueprint = blueprint_mgr.get_blueprint()
     aurora_on = blueprint.aurora_provisioning().num_nodes() > 0
     redshift_on = blueprint.redshift_provisioning().num_nodes() > 0
@@ -621,13 +665,22 @@ def _extract_metrics_from_monitor(
     )
     epochs_to_extract = max(max_available_after_epochs, requested_epochs)
 
-    redshift = (
-        redshift_source.read_k_most_recent(
-            k=epochs_to_extract, metric_ids=_REDSHIFT_METRICS
+    if redshift_on:
+        relevant_dims, _ = relevant_redshift_node_dimensions(
+            blueprint.redshift_provisioning()
         )
-        if redshift_on
-        else pd.DataFrame([], columns=_REDSHIFT_METRICS)
-    )
+        redshift_metric_ids = []
+        for metric_id in _REDSHIFT_METRICS:
+            redshift_metric_ids.append(metric_id)
+            for dim in relevant_dims:
+                redshift_metric_ids.append(f"{metric_id}_{dim}")
+        redshift = redshift_source.read_k_most_recent(
+            k=epochs_to_extract, metric_ids=redshift_metric_ids
+        )
+    else:
+        redshift_metric_ids = _REDSHIFT_METRICS.copy()
+        redshift = pd.DataFrame([], columns=_REDSHIFT_METRICS)
+
     aurora_writer = (
         aurora_writer_source.read_k_most_recent(
             k=epochs_to_extract + 1, metric_ids=_AURORA_METRICS
@@ -654,7 +707,7 @@ def _extract_metrics_from_monitor(
         k=epochs_to_extract, metric_ids=_FRONT_END_METRICS
     )
 
-    return (redshift, aurora_writer, aurora_reader, front_end)
+    return (redshift, aurora_writer, aurora_reader, front_end, redshift_metric_ids)
 
 
 def _fill_empty_metrics(to_fill: pd.DataFrame, guide: pd.DataFrame) -> pd.DataFrame:
@@ -663,6 +716,23 @@ def _fill_empty_metrics(to_fill: pd.DataFrame, guide: pd.DataFrame) -> pd.DataFr
     return pd.DataFrame(
         np.zeros((num_rows, num_cols)), columns=to_fill.columns, index=guide.index
     )
+
+
+def _compute_redshift_cpu_stats(
+    redshift_cpu: Dict[str, float]
+) -> Tuple[float, npt.NDArray]:
+    """
+    Returns the aggregated CPU value and list of all CPU values.
+    """
+    relevant_vals = []
+    for metric_id, value in redshift_cpu.items():
+        if not ("Compute" in metric_id or "Shared" in metric_id):
+            # We want to exclude the Cloudwatch-provided cluster aggregate as
+            # well as the "Leader" value.
+            continue
+        relevant_vals.append(value)
+    arr = np.array(relevant_vals)
+    return arr.max(), arr
 
 
 _AURORA_METRICS = [

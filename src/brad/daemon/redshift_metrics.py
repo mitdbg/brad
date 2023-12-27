@@ -2,15 +2,16 @@ import asyncio
 import pandas as pd
 import json
 from datetime import timedelta
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from importlib.resources import files, as_file
 
 import brad.daemon as daemon
 from .metrics_def import MetricDef
 from .metrics_source import MetricsSourceWithForecasting
 from .metrics_logger import MetricsLogger
-from .cloudwatch import CloudWatchClient
+from .cloudwatch import CloudWatchClient, MAX_REDSHIFT_NODES
 from brad.blueprint.manager import BlueprintManager
+from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.utils.time_periods import impute_old_missing_metrics, universal_now
@@ -77,6 +78,24 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
         now = universal_now()
         cutoff_ts = now - self.METRICS_DELAY
         new_metrics = impute_old_missing_metrics(new_metrics, cutoff_ts, value=0.0)
+
+        # Some dimension metrics are not relevant for the current blueprint.
+        # Note - one potential issue is zeroing out delayed metrics associated
+        # with an old blueprint. As long as we have a sufficient delay before
+        # allowing another blueprint transition, we should be OK.
+        blueprint = self._blueprint_mgr.get_blueprint()
+        _, redshift_dimensions_to_discard = relevant_redshift_node_dimensions(
+            blueprint.redshift_provisioning()
+        )
+        to_discard = []
+        for metric, stat in self._metric_defs:
+            if metric != "CPUUtilization":
+                continue
+            for dimension in redshift_dimensions_to_discard:
+                to_discard.append(f"{metric}_{stat}_{dimension}")
+        new_metrics[to_discard] = new_metrics[to_discard].fillna(0.0)
+
+        # Discard any remaining rows that contain NaNs.
         new_metrics = new_metrics.dropna()
 
         self._values = self._get_updated_metrics(new_metrics)
@@ -112,3 +131,28 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
             period=self._config.epoch_length,
             num_prev_points=num_prev_points,
         )
+
+
+def relevant_redshift_node_dimensions(
+    redshift: Provisioning,
+) -> Tuple[List[str], List[str]]:
+    """
+    Returns the metrics to expect and to discard for the current blueprint.
+    """
+    dim_to_expect = []
+    dim_to_discard = []
+    num_nodes = redshift.num_nodes()
+    if num_nodes == 1:
+        dim_to_expect.append("Shared")
+        dim_to_discard.append("Leader")
+        for idx in range(MAX_REDSHIFT_NODES):
+            dim_to_discard.append(f"Compute{idx}")
+    else:
+        dim_to_expect.append("Leader")
+        dim_to_discard.append("Shared")
+        for idx in range(MAX_REDSHIFT_NODES):
+            if idx < num_nodes:
+                dim_to_expect.append(f"Compute{idx}")
+            else:
+                dim_to_discard.append(f"Compute{idx}")
+    return dim_to_expect, dim_to_discard
