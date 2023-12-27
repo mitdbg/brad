@@ -43,10 +43,10 @@ def main():
             load_from=args.load_from,
         )
     if args.metrics:
-        # From November 9th 2023 at 16:14 UTC to one hour later.
         from datetime import datetime, timedelta
-        start_time = datetime(year=2023, month=12, day=8, hour=20, minute=32)
-        end_time = start_time + timedelta(hours=1)
+        start_time = datetime(year=2023, month=12, day=21, hour=21, minute=12)
+        end_time = datetime(year=2023, month=12, day=22, hour=4, minute=14)
+        outdir = "expt_out_ana_up_redshift_aurora"
         df = loader.fetch_metrics(start_time=start_time, end_time=end_time)
         # Write to csv
         start_time = df['timestamp'].min()
@@ -55,7 +55,7 @@ def main():
             df["cost"] = (0.16 * df["value"]) / 60 # $0.16 per hour.
         elif args.engine == "redshift":
             df["cost"] = (0.36 * df["value"]) / 60 # $0.36 per hour.
-        df.to_csv(f"expt_out/metrics_{args.engine}.csv", index=False)
+        df.to_csv(f"{outdir}/metrics_{args.engine}.csv", index=False)
         print(f"Metrics:\n{df.head()}\n Mean Val: {df['value'].mean()}\n Mean Cost: {df['cost'].mean()}")
         sys.exit(0)
     if args.run_query is not None:

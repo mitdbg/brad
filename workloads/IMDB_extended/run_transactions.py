@@ -219,7 +219,7 @@ def main():
     parser.add_argument(
         "--num-client-multiplier",
         type=int,
-        default=2,
+        default=1,
         help="The multiplier to the number of clients for each period of a day",
     )
     parser.add_argument(
@@ -344,6 +344,7 @@ def main():
         for time_of_day in num_client_trace:
             if time_of_day == 0:
                 continue
+            print(f"[Transactions] Time of day {time_of_day}. Clients required: {num_client_trace[time_of_day]}")
             # at this time_of_day start/shut-down more clients
             time_in_s = time_of_day / args.time_scale_factor
             now = datetime.now().astimezone(pytz.utc)
@@ -355,9 +356,11 @@ def main():
             if args.run_for_s - total_exec_time_in_s <= (time_in_s - curr_time_in_s):
                 wait_time = args.run_for_s - total_exec_time_in_s
                 if wait_time > 0:
+                    print(f"[Transactions] Waiting for {wait_time}s")
                     time.sleep(wait_time)
                 finished_one_day = False
                 break
+            print(f"[Transactions] Waiting for {time_in_s-curr_time_in_s}s")
             time.sleep(time_in_s - curr_time_in_s)
             num_client_required = min(num_client_trace[time_of_day], args.num_clients)
             if num_client_required > num_running_client:

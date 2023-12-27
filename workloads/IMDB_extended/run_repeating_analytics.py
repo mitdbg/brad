@@ -643,7 +643,7 @@ def main():
 
     if num_client_trace is not None:
         assert args.time_scale_factor is not None, "need to set args.time_scale_factor"
-        print("Telling client no.{} to start.".format(0), flush=True)
+        print("[Analytics] Telling client no.{} to start.".format(0), flush=True)
         stop_queue[0].put("")
         num_running_client = 1
 
@@ -652,6 +652,7 @@ def main():
         for time_of_day in num_client_trace:
             if time_of_day == 0:
                 continue
+            print(f"[Analytics] Time of day {time_of_day}. Clients required: {num_client_trace[time_of_day]}")
             # at this time_of_day start/shut-down more clients
             time_in_s = time_of_day / args.time_scale_factor
             now = datetime.now().astimezone(pytz.utc)
@@ -663,16 +664,18 @@ def main():
             if args.run_for_s - total_exec_time_in_s <= (time_in_s - curr_time_in_s):
                 wait_time = args.run_for_s - total_exec_time_in_s
                 if wait_time > 0:
+                    print(f"[Analytics] Waiting for {wait_time}s")
                     time.sleep(wait_time)
                 finished_one_day = False
                 break
+            print(f"[Analytics] Waiting for {time_in_s-curr_time_in_s}s")
             time.sleep(time_in_s - curr_time_in_s)
             num_client_required = min(num_client_trace[time_of_day], args.num_clients)
             if num_client_required > num_running_client:
                 # starting additional clients
                 for add_client in range(num_running_client, num_client_required):
                     print(
-                        "Telling client no.{} to start.".format(add_client), flush=True
+                        "[Analytics] Telling client no.{} to start.".format(add_client), flush=True
                     )
                     stop_queue[add_client].put("")
                     num_running_client += 1
@@ -680,7 +683,7 @@ def main():
                 # shutting down clients
                 for delete_client in range(num_running_client, num_client_required, -1):
                     print(
-                        "Telling client no.{} to stop.".format(delete_client - 1),
+                        "[Analytics] Telling client no.{} to stop.".format(delete_client - 1),
                         flush=True,
                     )
                     stop_queue[delete_client - 1].put("")

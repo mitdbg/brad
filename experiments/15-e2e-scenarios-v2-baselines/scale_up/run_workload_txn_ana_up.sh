@@ -1,7 +1,8 @@
 #! /bin/bash
 
 script_loc=$(cd $(dirname $0) && pwd -P)
-EXPT_OUT="expt_out"
+EXPT_OUT="expt_out_txn_ana_up"
+mkdir -p $EXPT_OUT
 ANALYTICS_ENGINE="redshift"
 TRANSACTION_ENGINE="aurora"
 initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"

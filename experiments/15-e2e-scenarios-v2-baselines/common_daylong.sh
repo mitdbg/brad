@@ -54,30 +54,28 @@ function poll_file_for_event() {
   done
 }
 
-function start_repeating_olap_runner() {
+function start_snowset_repeating_olap_runner() {
   local ra_clients=$1
-  local ra_gap_s=$2
-  local ra_gap_std_s=$3
-  local query_indexes=$4
-  local results_name=$5
+  local time_scale_factor=$2
+  local client_multiplier=$3
+  local results_name=$4
 
   results_dir=$EXPT_OUT/$results_name
   mkdir -p $results_dir
 
   local args=(
     --num-clients $ra_clients
-    --query-indexes $query_indexes
     --query-bank-file $ra_query_bank_file
     --time-scale-factor $time_scale_factor
     --gap-dist-path $gap_dist_path
     --query-frequency-path $query_frequency_path
     --num-client-path $num_client_path
-    --baseline $engine
-    --run-for-s $total_second_phase_time_s
+    --baseline $ANALYTICS_ENGINE
+    --run-for-s $total_time_s
     --output-dir $results_dir
   )
 
-  >&2 echo "[Repeating Analytics] Running with $ra_clients..."
+  >&2 echo "[Snowset Repeating Analytics] Running with $ra_clients..."
 
   log_workload_point $results_name
   python3 workloads/IMDB_extended/run_repeating_analytics.py "${args[@]}" &
@@ -86,11 +84,15 @@ function start_repeating_olap_runner() {
   runner_pid=$!
 }
 
-function start_txn_runner() {
-  t_clients=$1
 
-  >&2 echo "[Transactions] Running with $t_clients..."
-  results_dir=$EXPT_OUT/t_daylong_${t_clients}
+function start_snowset_txn_runner() {
+  local t_clients=$1
+  local time_scale_factor=$2
+  local client_multiplier=$3
+  local results_name=$4
+
+  >&2 echo "[Snowset Transactions] Running with $t_clients..."
+  results_dir=$EXPT_OUT/$results_name
   mkdir -p $results_dir
 
   log_workload_point "txn_${t_clients}"
@@ -99,13 +101,42 @@ function start_txn_runner() {
     --time-scale-factor $time_scale_factor \
     --num-client-path $num_client_path \
     --output-dir $results_dir \
-    --run-for-s $total_second_phase_time_s \
+    --run-for-s $total_time_s \
     --baseline $TRANSACTION_ENGINE \
     &
 
   # This is a special return value variable that we use.
   runner_pid=$!
 }
+
+
+function start_sequence_runner() {
+  local num_clients=$1
+  local gap_s=$2
+  local gap_std_s=$3
+  local results_name=$4
+
+  results_dir=$EXPT_OUT/$results_name
+  mkdir -p $results_dir
+
+  local args=(
+    --num-clients $num_clients
+    --query-sequence-file $seq_query_bank_file
+    --avg-gap-s $gap_s
+    --avg-gap-std-s $gap_std_s
+    --baseline $ANALYTICS_ENGINE
+    --output-dir $results_dir
+  )
+
+  >&2 echo "[Seq Analytics] Running with $num_clients..."
+
+  log_workload_point $results_name
+  python3 workloads/IMDB_extended/run_query_sequence.py "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
 
 function extract_named_arguments() {
   # Evaluates any environment variables in this script's arguments. This script
