@@ -38,6 +38,8 @@ def get_fixtures(
     planner_config = PlannerConfig(
         {
             "redshift_initialize_load_fraction": 0.25,
+            "redshift_peak_load_threshold": 0.0,
+            "redshift_peak_load_multiplier": 1.0,
         }
     )
     workload = Workload(timedelta(hours=1), [Query("SELECT 1")], [], {})
