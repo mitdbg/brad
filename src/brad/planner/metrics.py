@@ -2,6 +2,7 @@ import logging
 import math
 import pandas as pd
 import numpy as np
+import numpy.typing as npt
 from datetime import datetime
 from collections import namedtuple
 from typing import Tuple, Optional, Dict, Any, List
@@ -33,9 +34,9 @@ Metrics = namedtuple(
         "txn_lat_s_p90",
         "query_lat_s_p50",
         "query_lat_s_p90",
-        "redshift_cpu_std",
+        "redshift_cpu_list",
     ],
-    defaults=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    defaults=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, np.empty(0)],
 )
 
 AggCfg = Dict[str, Any]
@@ -114,7 +115,20 @@ class WindowedMetricsFromMonitor(MetricsProvider):
         if redshift.empty and aurora_writer.empty and front_end.empty:
             logger.warning("All metrics are empty.")
             return (
-                Metrics(1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+                Metrics(
+                    1.0,
+                    1.0,
+                    1.0,
+                    100.0,
+                    100.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    np.empty(0),
+                ),
                 universal_now(),
             )
 
@@ -259,7 +273,7 @@ class WindowedMetricsFromMonitor(MetricsProvider):
             name="aurora_reader_hit_rate_pct",
         )
 
-        redshift_cpu_avg, redshift_cpu_std = _compute_redshift_cpu_stats(redshift_cpu)
+        redshift_cpu_avg, redshift_cpu_list = _compute_redshift_cpu_stats(redshift_cpu)
 
         return (
             Metrics(
@@ -275,7 +289,7 @@ class WindowedMetricsFromMonitor(MetricsProvider):
                 txn_lat_s_p90=txn_lat_s_p90,
                 query_lat_s_p50=query_lat_s_p50,
                 query_lat_s_p90=query_lat_s_p90,
-                redshift_cpu_std=redshift_cpu_std,
+                redshift_cpu_list=redshift_cpu_list,
             ),
             most_recent_common.to_pydatetime(),
         )
@@ -444,7 +458,19 @@ class MetricsFromMonitor(MetricsProvider):
             logger.warning("All metrics are empty.")
             return (
                 Metrics(
-                    1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0
+                    1.0,
+                    1.0,
+                    1.0,
+                    100.0,
+                    100.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    np.empty(0),
                 ),
                 universal_now(),
             )
@@ -569,7 +595,7 @@ class MetricsFromMonitor(MetricsProvider):
                 txn_lat_s_p90=txn_lat_s_p90,
                 query_lat_s_p50=query_lat_s_p50,
                 query_lat_s_p90=query_lat_s_p90,
-                redshift_cpu_std=0.0,
+                redshift_cpu_list=[],
             ),
             most_recent_common.to_pydatetime(),
         )
@@ -692,9 +718,11 @@ def _fill_empty_metrics(to_fill: pd.DataFrame, guide: pd.DataFrame) -> pd.DataFr
     )
 
 
-def _compute_redshift_cpu_stats(redshift_cpu: Dict[str, float]) -> Tuple[float, float]:
+def _compute_redshift_cpu_stats(
+    redshift_cpu: Dict[str, float]
+) -> Tuple[float, npt.NDArray]:
     """
-    Returns the aggregated CPU value and standard deviation.
+    Returns the aggregated CPU value and list of all CPU values.
     """
     relevant_vals = []
     for metric_id, value in redshift_cpu.items():
@@ -704,7 +732,7 @@ def _compute_redshift_cpu_stats(redshift_cpu: Dict[str, float]) -> Tuple[float, 
             continue
         relevant_vals.append(value)
     arr = np.array(relevant_vals)
-    return arr.max(), arr.std()
+    return arr.max(), arr
 
 
 _AURORA_METRICS = [
