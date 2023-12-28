@@ -478,12 +478,17 @@ class BlueprintCandidate(ComparableBlueprint):
         if ctx.exp_kind == ExperimentKind.RunTime:
             redshift_qidxs = self.query_locations[Engine.Redshift]
             aurora_qidxs = self.query_locations[Engine.Aurora]
-            redshift_affected = [
-                qidx for qidx in ctx.exp_affected_queries if qidx in redshift_qidxs
-            ]
-            aurora_affected = [
-                qidx for qidx in ctx.exp_affected_queries if qidx in aurora_qidxs
-            ]
+            redshift_affected = []
+            aurora_affected = []
+            for qidx in ctx.exp_affected_queries:
+                try:
+                    redshift_affected.append(redshift_qidxs.index(qidx))
+                except ValueError:
+                    pass
+                try:
+                    aurora_affected.append(aurora_qidxs.index(qidx))
+                except ValueError:
+                    pass
             self.scaled_query_latencies[Engine.Redshift][
                 redshift_affected
             ] *= ctx.exp_change_frac
