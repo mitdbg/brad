@@ -476,7 +476,13 @@ class BlueprintCandidate(ComparableBlueprint):
 
         # Handle the sensitivity experiments.
         if ctx.exp_kind == ExperimentKind.RunTime:
-            pass
+            redshift_qidxs = self.query_locations[Engine.Redshift]
+            aurora_qidxs = self.query_locations[Engine.Aurora]
+            redshift_affected = [qidx for qidx in ctx.exp_affected_queries if qidx in redshift_qidxs]
+            aurora_affected = [qidx for qidx in ctx.exp_affected_queries if qidx in aurora_qidxs]
+            self.scaled_query_latencies[Engine.Redshift][redshift_affected] *= ctx.exp_change_frac
+            self.scaled_query_latencies[Engine.Aurora][aurora_affected] *= ctx.exp_change_frac
+            # Athena is handled earlier because it is not provisioning dependent.
         elif ctx.exp_kind == ExperimentKind.ScanAmount:
             # This is handled earlier because it is not provisioning dependent.
             pass

@@ -112,6 +112,13 @@ class ScoringContext:
                 flush=True,
             )
 
+        if self.exp_kind == ExperimentKind.RunTime:
+            assert self.next_workload._predicted_analytical_latencies is not None
+            # We scale Athena here because it is not provisioning dependent.
+            self.next_workload._predicted_analytical_latencies[
+                self.exp_affected_queries, Workload.EngineLatencyIndex[Engine.Athena]
+            ] *= self.exp_change_frac
+
         if self.exp_kind == ExperimentKind.ScanAmount:
             assert self.next_workload._predicted_athena_bytes_accessed is not None
             # Increase the scan amount.
