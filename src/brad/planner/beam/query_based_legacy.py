@@ -410,7 +410,9 @@ class RecordedQueryBasedLegacyPlanningRun(RecordedPlanningRun, WorkloadProvider)
         self._metrics_timestamp = metrics_timestamp
         self._comparator_provider = comparator_provider
 
-    def create_planner(self, estimator_provider: EstimatorProvider) -> BlueprintPlanner:
+    def create_planner(
+        self, estimator_provider: EstimatorProvider, args
+    ) -> BlueprintPlanner:
         providers = BlueprintProviders(
             workload_provider=self,
             analytics_latency_scorer=NoopAnalyticsLatencyScorer(),

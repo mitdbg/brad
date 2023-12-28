@@ -76,7 +76,7 @@ async def replay_planner_impl(args) -> None:
         provider.set_estimator(estimator)
 
     recorded_run = RecordedPlanningRun.load(args.recorded_run)
-    planner = recorded_run.create_planner(provider)
+    planner = recorded_run.create_planner(provider, None)
 
     logger.info("Re-running recorded run of type: %s", str(type(recorded_run)))
     await planner._run_replan_impl()  # pylint: disable=protected-access

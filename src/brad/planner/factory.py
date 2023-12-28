@@ -48,6 +48,7 @@ class BlueprintPlannerFactory:
                 current_blueprint_score=current_blueprint_score,
                 providers=providers,
                 system_event_logger=system_event_logger,
+                other_args=None,
             )
 
         elif strategy == PlanningStrategy.QueryBasedLegacyBeam:
