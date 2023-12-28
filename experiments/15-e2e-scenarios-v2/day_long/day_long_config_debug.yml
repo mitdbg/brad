@@ -25,7 +25,7 @@ planner_log_path: COND_OUT
 metrics_log_path: COND_OUT
 
 # Probability that each transactional query will be logged.
-txn_log_prob: 0.01
+txn_log_prob: 0.0001
 
 # Set to a non-zero value enable automatic data syncing. When this is set to 0,
 # automatic syncing is disabled.
@@ -48,8 +48,8 @@ disable_table_movement: true
 epoch_length:
   weeks: 0
   days: 0
-  hours: 1
-  minutes: 0
+  hours: 0
+  minutes: 1
 
 # Blueprint planning strategy.
 strategy: query_based_beam
@@ -59,7 +59,7 @@ strategy: query_based_beam
 planning_window:
   weeks: 0
   days: 0
-  hours: 1
+  hours: 3
   minutes: 0
 
 # Used to aggregate metrics collected in the planning window.
