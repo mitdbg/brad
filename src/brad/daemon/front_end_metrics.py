@@ -33,7 +33,7 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             self._epoch_length.total_seconds()
             / self._config.front_end_metrics_reporting_period_seconds
         )
-        sm_window_size = math.ceil(10 * samples_per_epoch)
+        sm_window_size = math.ceil(200 * samples_per_epoch)
         self._numeric_front_end_metrics: Dict[
             _MetricKey, List[StreamingNumericMetric]
         ] = {
