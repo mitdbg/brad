@@ -1,7 +1,7 @@
 import pickle
 import numpy as np
 import numpy.typing as npt
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import Dict, Optional, TYPE_CHECKING, Any
 
 from brad.config.engine import Engine
 
@@ -35,6 +35,8 @@ class Score:
         self.aurora_queries = 0
         self.athena_queries = 0
         self.redshift_queries = 0
+
+        self.debug_values: Any = None
 
     def serialize(self) -> bytes:
         return pickle.dumps(self)

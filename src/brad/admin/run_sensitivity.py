@@ -2,6 +2,7 @@ import asyncio
 import logging
 import pathlib
 import pickle
+import json
 from typing import Optional
 
 from brad.planner.estimator import EstimatorProvider, Estimator
@@ -61,6 +62,11 @@ async def run_sensitivity_impl(args) -> None:
             pickle.dump(bp, file)
         with open(out_dir / "score.pkl", "wb") as file:
             file.write(score.serialize())
+        with open(out_dir / "score_debug.json", "w", encoding="UTF-8") as file:
+            if score.debug_values is not None:
+                json.dump(score.debug_values, file, indent=2)
+            else:
+                json.dump({}, file)
 
 
 # This method is called by `brad.exec.admin.main`.
