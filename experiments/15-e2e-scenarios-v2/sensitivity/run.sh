@@ -1,5 +1,5 @@
 #! /bin/bash
 
 brad admin --debug run_sensitivity \
-  --out-dir=$COND \
+  --out-dir=$COND_OUT \
   $@

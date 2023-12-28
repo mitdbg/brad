@@ -125,6 +125,10 @@ class RedshiftProvisioningScore:
                 return max_peak_util
 
             curr_cpu_util: npt.NDArray = ctx.metrics.redshift_cpu_list.copy() / 100.0
+            if curr_cpu_util.shape[0] == 0:
+                curr_cpu_util = (
+                    np.array([ctx.metrics.redshift_cpu_avg] * curr_nodes) / 100.0
+                )
             assert curr_cpu_util.shape[0] > 0, "Must have Redshift CPU metrics."
             curr_cpu_util.sort()  # In place.
             if ctx.cpu_skew_adjustment is None:

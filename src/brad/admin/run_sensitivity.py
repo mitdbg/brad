@@ -59,6 +59,8 @@ async def run_sensitivity_impl(args) -> None:
     else:
         bp, score = result
         with open(out_dir / "blueprint.pkl", "wb") as file:
+            # Clear this value because it is large and we do not need to serialize it.
+            bp._full_routing_policy.definite_policy = None
             pickle.dump(bp, file)
         with open(out_dir / "score.pkl", "wb") as file:
             file.write(score.serialize())
