@@ -1,0 +1,68 @@
+from itertools import product
+
+SEED = 42
+AFFECTED_FRACS = [0.1, 0.2, 0.4, 0.8]
+PRED_CHANGE_FRACS = [
+  0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
+  -0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8
+]
+
+RUNS = [{
+  "name": "scale_down_last",
+  "file_path": "scale_down_last_query_beam.pkl",
+}]
+
+def printable(val):
+  int_val = abs(int(val * 100))
+  return f"{int_val}p" if val >= 0 else f"{int_val}n"
+
+for run in RUNS:
+  run_experiment_group(
+    name=run["name"],
+    run="./run.sh",
+    experiments=[
+      # Ground truth.
+      ExperimentInstance(
+        name=f"{run['name']}-gt",
+        options={
+          "recorded-run": run["file_path"],
+          "pred-change-frac": 0.0,
+          "affected-frac": 0.0,
+          "exp-kind": "run_time",
+          "seed": SEED,
+        },
+        parallelizable=True,
+      )
+    ] + [
+      # Run time and data scanned.
+      ExperimentInstance(
+        name=f"{run['name']}-{kind}-{printable(affected_frac)}-{printable(pcf)}",
+        options={
+          "recorded-run": run["file_path"],
+          "pred-change-frac": pcf,
+          "affected-frac": affected_frac,
+          "exp-kind": kind,
+          "seed": SEED,
+        },
+        parallelizable=True,
+      )
+      for kind, affected_frac, pcf in product(
+        ["run_time", "scan_amount"],
+        AFFECTED_FRACS,
+        PRED_CHANGE_FRACS,
+      )
+    ] + [
+      # Transaction latency.
+      ExperimentInstance(
+        name=f"{run['name']}-txn_lat-{printable(pcf)}",
+        options={
+          "recorded-run": run["file_path"],
+          "pred-change-frac": pcf,
+          "exp-kind": "txn_lat",
+          "seed": SEED,
+        },
+        parallelizable=True,
+      )
+      for pcf in PRED_CHANGE_FRACS
+    ],
+  )
