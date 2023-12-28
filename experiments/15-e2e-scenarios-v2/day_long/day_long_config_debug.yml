@@ -48,8 +48,8 @@ disable_table_movement: true
 epoch_length:
   weeks: 0
   days: 0
-  hours: 1
-  minutes: 0
+  hours: 0
+  minutes: 1
 
 # Blueprint planning strategy.
 strategy: query_based_beam
@@ -59,7 +59,7 @@ strategy: query_based_beam
 planning_window:
   weeks: 0
   days: 0
-  hours: 1
+  hours: 3
   minutes: 0
 
 # Used to aggregate metrics collected in the planning window.
@@ -123,7 +123,7 @@ std_datasets:
 # Blueprint planning trigger configs.
 
 triggers:
-  enabled: true
+  enabled: false
   check_period_s: 90  # Triggers are checked every X seconds.
   check_period_offset_s: 360  # Wait 10 mins before starting.
 

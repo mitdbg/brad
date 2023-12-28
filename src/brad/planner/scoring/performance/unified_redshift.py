@@ -127,6 +127,9 @@ class RedshiftProvisioningScore:
             curr_cpu_util: npt.NDArray = ctx.metrics.redshift_cpu_list.copy() / 100.0
             assert curr_cpu_util.shape[0] > 0, "Must have Redshift CPU metrics."
             curr_cpu_util.sort()  # In place.
+            if ctx.cpu_skew_adjustment is None:
+                ctx.cpu_skew_adjustment = cls.compute_skew_adjustment(curr_cpu_util)
+
             curr_cpu_denorm = curr_cpu_util * redshift_num_cpus(curr_prov)
             curr_max_cpu_denorm = curr_cpu_denorm.max()
 
@@ -146,12 +149,11 @@ class RedshiftProvisioningScore:
                 # When this value is close to 0, it indicates high load skew.
                 # Thus adding an instance of the same kind of node should not
                 # affect the load as much.
-                skew_adjustment = cls.compute_skew_adjustment(curr_cpu_util)
-                if skew_adjustment < 0.5:
+                if ctx.cpu_skew_adjustment < 0.5:
                     next_max_cpu_denorm = curr_max_cpu_denorm
                 else:
                     next_max_cpu_denorm = curr_max_cpu_denorm * math.pow(
-                        curr_nodes / next_nodes, skew_adjustment
+                        curr_nodes / next_nodes, ctx.cpu_skew_adjustment
                     )
             elif next_nodes < curr_nodes:
                 removed_nodes = curr_nodes - next_nodes

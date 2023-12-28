@@ -44,7 +44,7 @@ trap "inner_cancel_experiment" INT
 trap "inner_cancel_experiment" TERM
 
 sleep $run_for_s
-sleep $((5 * 60))  # Wait for 2 hours and 5 minutes.
+sleep $((5 * 60))  # Wait an extra 5 minutes.
 log_workload_point "experiment_done"
 
 # Shut down everything now.

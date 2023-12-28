@@ -92,6 +92,7 @@ def runner(
     start_queue.put("")
     control_semaphore.acquire()  # type: ignore
 
+    txn_exec_count = 0
     rand_backoff = None
     overall_start = time.time()
     try:
@@ -107,6 +108,7 @@ def runner(
                 print(f"T Runner {worker_idx} is exiting.")
                 break
 
+            txn_exec_count += 1
             txn_idx = txn_prng.choices(txn_indexes, weights=transaction_weights, k=1)[0]
             txn = transactions[txn_idx]
 
@@ -192,6 +194,9 @@ def runner(
                     "{},{},{}".format(txn_idx, now, txn_end - txn_start),
                     file=latency_file,
                 )
+                if txn_exec_count > 20_000:
+                    latency_file.flush()
+                    txn_exec_count = 0
 
                 # Warn if the abort rate is high.
                 total_aborts = sum(aborts)
