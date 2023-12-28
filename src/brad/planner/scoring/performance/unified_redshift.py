@@ -60,9 +60,6 @@ class RedshiftProvisioningScore:
             scaled_rt = cls.predict_query_latency_load_resources(
                 base_query_run_times, next_prov, predicted_max_node_cpu_util, ctx
             )
-            debug_skew_adjustment = cls.compute_skew_adjustment(
-                ctx.metrics.redshift_cpu_list / 100.0
-            )
             return cls(
                 scaled_rt,
                 predicted_max_node_cpu_util,
@@ -70,7 +67,9 @@ class RedshiftProvisioningScore:
                     "redshift_query_factor": query_factor
                     if query_factor is not None
                     else np.nan,
-                    "redshift_skew_adjustment": debug_skew_adjustment,
+                    "redshift_skew_adjustment": ctx.cpu_skew_adjustment
+                    if ctx.cpu_skew_adjustment is not None
+                    else np.nan,
                 },
             )
 
