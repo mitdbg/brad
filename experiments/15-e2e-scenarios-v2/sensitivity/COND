@@ -7,14 +7,28 @@ PRED_CHANGE_FRACS = [
   -0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8
 ]
 
-RUNS = [{
-  "name": "scale_down_last",
-  "file_path": "scale_down_last_query_beam.pkl",
-}]
+RUNS = [
+  {
+    "name": "scale_down_last",
+    "file_path": "scale_down_last_query_beam.pkl",
+  },
+  {
+    "name": "scale_up_ana_last",
+    "file_path": "scale_up_ana_last_query_beam.pkl",
+  },
+]
 
 def printable(val):
   int_val = abs(int(val * 100))
   return f"{int_val}p" if val >= 0 else f"{int_val}n"
+
+group(
+  name="all",
+  deps=[
+    f":{run['name']}"
+    for run in RUNS
+  ],
+)
 
 for run in RUNS:
   run_experiment_group(
