@@ -24,8 +24,9 @@ def register_admin_action(subparser) -> None:
     )
     parser.add_argument("--pred-change-frac", type=float, required=True)
     parser.add_argument("--affected-frac", type=float)
-    parser.add_argument("--sweep-type", choices=["run_time", "scan_amount", "txn_lat"])
+    parser.add_argument("--exp-kind", choices=["run_time", "scan_amount", "txn_lat"])
     parser.add_argument("--out-dir", type=str, default=".")
+    parser.add_argument("--seed", type=int, default=42)
     parser.set_defaults(admin_action=run_sensitivity)
 
 

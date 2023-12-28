@@ -1,5 +1,9 @@
+import enum
 import logging
 import numpy as np
+import random
+import math
+import sys
 from typing import Dict, List, Optional
 from datetime import timedelta
 
@@ -18,6 +22,13 @@ from brad.planner.scoring.performance.unified_aurora import AuroraProvisioningSc
 from brad.planner.scoring.performance.unified_redshift import RedshiftProvisioningScore
 
 logger = logging.getLogger(__name__)
+
+
+class ExperimentKind(enum.Enum):
+    Nothing = "nothing"
+    RunTime = "run_time"
+    ScanAmount = "scan_amount"
+    TxnLatency = "txn_lat"
 
 
 class ScoringContext:
@@ -60,6 +71,53 @@ class ScoringContext:
         # Used to memoize this value instead of recomputing it as it is a
         # function of the CPU utilization values.
         self.cpu_skew_adjustment: Optional[float] = None
+
+        self.exp_kind = ExperimentKind.Nothing
+        self.exp_change_frac = 0.0
+        self.exp_affected_queries: List[int] = []
+
+    def set_up_sensitivity_state(self, args) -> None:
+        if args.exp_kind == ExperimentKind.RunTime.value:
+            self.exp_kind = ExperimentKind.RunTime
+        elif args.exp_kind == ExperimentKind.ScanAmount.value:
+            self.exp_kind = ExperimentKind.ScanAmount
+        elif args.exp_kind == ExperimentKind.TxnLatency.value:
+            self.exp_kind = ExperimentKind.TxnLatency
+        else:
+            raise AssertionError("Unknown: " + args.exp_kind)
+
+        # Add 1 so we can just multiply this value by the predictions.
+        self.exp_change_frac = 1.0 + args.pred_change_frac
+        print(
+            "Running {} with change frac {:.4f}".format(
+                str(self.exp_kind), self.exp_change_frac
+            ),
+            file=sys.stderr,
+            flush=True,
+        )
+
+        if (
+            self.exp_kind == ExperimentKind.RunTime
+            or self.exp_kind == ExperimentKind.ScanAmount
+        ):
+            prng = random.Random(args.seed)
+            assert args.affected_frac is not None
+            num_queries = len(self.next_workload.analytical_queries())
+            num_affected = math.ceil(args.affected_frac * num_queries)
+            self.exp_affected_queries = prng.sample(range(num_queries), k=num_affected)
+            print(
+                "Affected queries:",
+                self.exp_affected_queries,
+                file=sys.stderr,
+                flush=True,
+            )
+
+        if self.exp_kind == ExperimentKind.ScanAmount:
+            assert self.next_workload._predicted_athena_bytes_accessed is not None
+            # Increase the scan amount.
+            self.next_workload._predicted_athena_bytes_accessed[
+                self.exp_affected_queries
+            ] *= self.exp_change_frac
 
     async def simulate_current_workload_routing(self, router: Router) -> None:
         self.current_query_locations[Engine.Aurora].clear()

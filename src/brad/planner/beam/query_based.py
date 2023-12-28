@@ -43,10 +43,12 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         self,
         *args,
         disable_external_logging: bool = False,
+        other_args,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._disable_external_logging = disable_external_logging
+        self._other_args = other_args
 
     async def _run_replan_impl(
         self, window_multiplier: int = 1
@@ -129,6 +131,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             metrics,
             self._planner_config,
         )
+        ctx.set_up_sensitivity_state(self._other_args)
         planning_router = Router.create_from_blueprint(self._current_blueprint)
         await planning_router.run_setup_for_standalone(
             self._providers.estimator_provider.get_estimator()
@@ -389,7 +392,9 @@ class RecordedQueryBasedPlanningRun(RecordedPlanningRun, WorkloadProvider):
         self._metrics_timestamp = metrics_timestamp
         self._comparator_provider = comparator_provider
 
-    def create_planner(self, estimator_provider: EstimatorProvider) -> BlueprintPlanner:
+    def create_planner(
+        self, estimator_provider: EstimatorProvider, args
+    ) -> BlueprintPlanner:
         providers = BlueprintProviders(
             workload_provider=self,
             analytics_latency_scorer=NoopAnalyticsLatencyScorer(),
@@ -411,6 +416,7 @@ class RecordedQueryBasedPlanningRun(RecordedPlanningRun, WorkloadProvider):
             # N.B. Purposefully set to `None`.
             system_event_logger=None,
             disable_external_logging=True,
+            other_args=args,
         )
 
     # Provider methods follow.

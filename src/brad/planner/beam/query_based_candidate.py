@@ -11,7 +11,7 @@ from brad.planner.beam.feasibility import BlueprintFeasibility
 from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
-from brad.planner.scoring.context import ScoringContext
+from brad.planner.scoring.context import ScoringContext, ExperimentKind
 from brad.planner.scoring.performance.unified_aurora import AuroraProvisioningScore
 from brad.planner.scoring.performance.unified_redshift import RedshiftProvisioningScore
 from brad.planner.scoring.provisioning import (
@@ -473,6 +473,15 @@ class BlueprintCandidate(ComparableBlueprint):
         self.scaled_query_latencies[
             Engine.Redshift
         ] = self.redshift_score.scaled_run_times
+
+        # Handle the sensitivity experiments.
+        if ctx.exp_kind == ExperimentKind.RunTime:
+            pass
+        elif ctx.exp_kind == ExperimentKind.ScanAmount:
+            # This is handled earlier because it is not provisioning dependent.
+            pass
+        elif ctx.exp_kind == ExperimentKind.TxnLatency:
+            self.aurora_score.scaled_txn_lats *= ctx.exp_change_frac
 
     def is_better_than(self, other: "BlueprintCandidate") -> bool:
         return self._comparator(self, other)

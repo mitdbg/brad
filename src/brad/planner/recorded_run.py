@@ -23,7 +23,9 @@ class RecordedPlanningRun:
         with open(file_path, "wb") as file:
             pickle.dump(self, file)
 
-    def create_planner(self, estimator_provider: EstimatorProvider) -> BlueprintPlanner:
+    def create_planner(
+        self, estimator_provider: EstimatorProvider, args
+    ) -> BlueprintPlanner:
         """
         Creates a `BlueprintPlanner` that will always run the recorded blueprint
         planning instance when `_run_replan_impl()` is called.
