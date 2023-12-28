@@ -15,6 +15,7 @@ import brad.admin.restore_blueprint as restore_blueprint
 import brad.admin.replay_planner as replay_planner
 import brad.admin.clean_dataset as clean_dataset
 import brad.admin.alter_schema as alter_schema
+import brad.admin.run_sensitivity as run_sensitivity
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ def register_command(subparsers) -> None:
     replay_planner.register_admin_action(admin_subparsers)
     clean_dataset.register_admin_action(admin_subparsers)
     alter_schema.register_admin_action(admin_subparsers)
+    run_sensitivity.register_admin_action(admin_subparsers)
     parser.set_defaults(func=main)
 
 
