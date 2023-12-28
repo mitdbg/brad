@@ -4,7 +4,7 @@ DATASET_PATHS = {
   "query-sequence-file": "../../../workloads/IMDB_100GB/adhoc_test/queries.sql",
   "snowset-query-frequency-path": "../../../workloads/IMDB_100GB/regular_test/query_frequency.npy",
   "snowset-client-dist-path": "../../../workloads/IMDB_100GB/regular_test/num_client.pkl",
-  "snowset-query-frequency-path": "../../../workloads/IMDB_100GB/regular_test/query_frequency.npy",
+  "snowset-gap-dist-path": "../../../workloads/IMDB_100GB/regular_test/gap_time_dist.npy",
 }
 
 # Used to sanity check the code.

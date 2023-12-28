@@ -89,7 +89,12 @@ redshift_initialize_load_fraction: 0.25
 # BRAD will not reduce predicted load lower than these values. Raise these
 # values to be more conservative against mispredictions.
 aurora_min_load_removal_fraction: 0.8
-redshift_min_load_removal_fraction: 0.8
+redshift_min_load_removal_fraction: 0.9
+
+aurora_max_query_factor: 4.0
+aurora_max_query_factor_replace: 10000.0
+redshift_peak_load_threshold: 95.0
+redshift_peak_load_multiplier: 2.0
 
 # Blueprint planning performance ceilings.
 query_latency_p90_ceiling_s: 30.0
@@ -106,7 +111,7 @@ comparator:
     minutes: 0
 
   penalty_threshold: 0.8  # Only used by the `benefit_perf_ceiling` comparator
-  penalty_power: 8  # Only used by the `benefit_perf_ceiling` comparator
+  penalty_power: 2  # Only used by the `benefit_perf_ceiling` comparator
 
 # Used for precomputed predictions.
 std_datasets:

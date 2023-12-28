@@ -17,14 +17,15 @@ sleep 30
 log_workload_point "clients_starting"
 
 clients_multiplier=1
-time_scale_factor=1
+time_scale_factor=2
+run_for_s=$((12 * 60 * 60))  # 12 hours.
 
 # Repeating analytics.
-start_snowset_repeating_olap_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "ra"
+start_snowset_repeating_olap_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "ra" $run_for_s
 rana_pid=$runner_pid
 
 # Transactions.
-start_snowset_txn_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "t"
+start_snowset_txn_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "t" $run_for_s
 txn_pid=$runner_pid
 
 # Ad-hoc queries.
@@ -42,7 +43,8 @@ function inner_cancel_experiment() {
 trap "inner_cancel_experiment" INT
 trap "inner_cancel_experiment" TERM
 
-sleep $((24 * 60 * 60 + 5 * 60))  # Wait for 24 hours and 5 minutes.
+sleep $run_for_s
+sleep $((5 * 60))  # Wait for 24 hours and 5 minutes.
 log_workload_point "experiment_done"
 
 # Shut down everything now.

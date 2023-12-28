@@ -143,6 +143,7 @@ function start_snowset_repeating_olap_runner() {
   local time_scale_factor=$2
   local client_multiplier=$3
   local results_name=$4
+  local run_for_s=$5
 
   local args=(
     --num-clients $ra_clients
@@ -153,6 +154,7 @@ function start_snowset_repeating_olap_runner() {
     --gap-dist-path $snowset_gap_dist_path
     --time-scale-factor $time_scale_factor
     --num-client-multiplier $client_multiplier
+    --run-for-s $run_for_s
   )
 
   >&2 echo "[Snowset Repeating Analytics] Running with up to $ra_clients. Time scale factor $time_scale_factor"
@@ -216,6 +218,7 @@ function start_snowset_txn_runner() {
   local time_scale_factor=$2
   local client_multiplier=$3
   local results_name=$4
+  local run_for_s=$5
 
   >&2 echo "[Snowset Transactions] Running with $t_clients..."
   results_dir=$COND_OUT/${results_name}
@@ -227,6 +230,7 @@ function start_snowset_txn_runner() {
     --num-client-path $snowset_client_dist_path
     --time-scale-factor $time_scale_factor
     --num-client-multiplier $client_multiplier
+    --run-for-s $run_for_s
   )
 
   log_workload_point "txn_${t_clients}"
