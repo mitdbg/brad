@@ -68,6 +68,7 @@ logger = logging.getLogger(__name__)
 # Temporarily used.
 PERSIST_BLUEPRINT_VAR = "BRAD_PERSIST_BLUEPRINT"
 IGNORE_ALL_BLUEPRINTS_VAR = "BRAD_IGNORE_BLUEPRINT"
+LOG_ANA_UP_VAR = "BRAD_LOG_ANA_UP_FINAL_BLUEPRINT"
 
 
 class BradDaemon:
@@ -755,12 +756,15 @@ class BradDaemon:
                 new_redshift = new_blueprint.redshift_provisioning()
                 # TODO: Should change this as needed. This is to signal to the
                 # experiment runner when we have completed the workload.
-                if (
-                    new_redshift.instance_type() == "ra3.xlplus"
-                    and new_redshift.num_nodes() >= 8
-                ) or (
-                    new_redshift.instance_type() == "ra3.4xlarge"
-                    and new_redshift.num_nodes() > 1
+                if LOG_ANA_UP_VAR in os.environ and (
+                    (
+                        new_redshift.instance_type() == "ra3.xlplus"
+                        and new_redshift.num_nodes() >= 8
+                    )
+                    or (
+                        new_redshift.instance_type() == "ra3.4xlarge"
+                        and new_redshift.num_nodes() > 1
+                    )
                 ):
                     self._system_event_logger.log(
                         SystemEvent.ReachedExpectedState,

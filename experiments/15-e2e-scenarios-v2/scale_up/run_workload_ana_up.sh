@@ -61,6 +61,9 @@ function inner_cancel_experiment() {
 trap "inner_cancel_experiment" INT
 trap "inner_cancel_experiment" TERM
 
+# BRAD will log "reached_expected_state" if/when it selects a pre-specified
+# blueprint.
+export LOG_ANA_UP_VAR=1
 start_brad $system_config_file $physical_config_file
 log_workload_point "brad_start_initiated"
 sleep 30
