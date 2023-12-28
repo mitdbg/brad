@@ -1,6 +1,6 @@
 import logging
 import numpy as np
-from typing import Dict, List
+from typing import Dict, List, Optional
 from datetime import timedelta
 
 from brad.config.engine import Engine
@@ -56,6 +56,10 @@ class ScoringContext:
         self.engine_latency_norm_factor: Dict[Engine, float] = {}
 
         self.already_logged_txn_interference_warning = False
+
+        # Used to memoize this value instead of recomputing it as it is a
+        # function of the CPU utilization values.
+        self.cpu_skew_adjustment: Optional[float] = None
 
     async def simulate_current_workload_routing(self, router: Router) -> None:
         self.current_query_locations[Engine.Aurora].clear()
