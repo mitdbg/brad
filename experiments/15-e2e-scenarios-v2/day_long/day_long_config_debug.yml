@@ -25,7 +25,7 @@ planner_log_path: COND_OUT
 metrics_log_path: COND_OUT
 
 # Probability that each transactional query will be logged.
-txn_log_prob: 0.0001
+txn_log_prob: 0.01
 
 # Set to a non-zero value enable automatic data syncing. When this is set to 0,
 # automatic syncing is disabled.
@@ -123,7 +123,7 @@ std_datasets:
 # Blueprint planning trigger configs.
 
 triggers:
-  enabled: true
+  enabled: false
   check_period_s: 90  # Triggers are checked every X seconds.
   check_period_offset_s: 360  # Wait 10 mins before starting.
 
