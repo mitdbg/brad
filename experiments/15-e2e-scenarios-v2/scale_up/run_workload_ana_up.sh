@@ -88,7 +88,7 @@ log_workload_point "hold_rana_heavy_56"
 
 # Stop after we reach the expected state; use a time out of 6 hours.
 poll_file_for_event $COND_OUT/brad_daemon_events.csv "reached_expected_state" $((6 * 60))
-sleep $((30 * 60))  # Wait 30 minutes before completing.
+sleep $((2 * 60 * 60))  # Wait 2 hours before completing.
 
 log_workload_point "experiment_workload_done"
 
