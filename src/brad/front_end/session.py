@@ -158,7 +158,15 @@ class SessionManager:
         if blueprint.redshift_provisioning().num_nodes() > 0:
             expected_engines.add(Engine.Redshift)
 
-        for session in self._sessions.values():
+        # Important to copy and iterate over the sessions because the dictionary
+        # could be modified during the await. This is OK because the blueprint
+        # change is "atomic" - new sessions arriving after the blueprint are
+        # refreshed will connect to the new instances. Another blueprint change
+        # cannot happen until this is complete (because we notify the daemon).
+        existing_sessions = [session for session in self._sessions.values()]
+        for session in existing_sessions:
+            if session.closed:
+                continue
             await session.engines.add_and_refresh_connections(
                 self._config, directory, expected_engines
             )
@@ -179,7 +187,11 @@ class SessionManager:
         if blueprint.redshift_provisioning().num_nodes() > 0:
             expected_engines.add(Engine.Redshift)
 
-        for session in self._sessions.values():
+        # See the comment in `add_and_refresh_connections()`.
+        existing_sessions = [session for session in self._sessions.values()]
+        for session in existing_sessions:
+            if session.closed:
+                continue
             await session.engines.remove_connections(
                 expected_engines, expected_aurora_read_replicas
             )
