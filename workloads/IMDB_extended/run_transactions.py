@@ -4,7 +4,6 @@ import pathlib
 import pickle
 import random
 import signal
-import sys
 import threading
 import time
 import os
