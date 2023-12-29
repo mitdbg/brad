@@ -694,7 +694,7 @@ def main():
         num_running_client = 0
         num_client_required = min(num_client_trace[0], args.num_clients)
         for add_client in range(num_running_client, num_client_required):
-            logger.info("Telling client no. %d to start.", add_client)
+            logger.info("[RA] Telling client no. %d to start.", add_client)
             control_semaphore[add_client].release()
             num_running_client += 1
 
@@ -722,13 +722,15 @@ def main():
             if num_client_required > num_running_client:
                 # starting additional clients
                 for add_client in range(num_running_client, num_client_required):
-                    logger.info("Telling client no. %d to start.", add_client)
+                    logger.info("[RA] Telling client no. %d to start.", add_client)
                     control_semaphore[add_client].release()
                     num_running_client += 1
             elif num_running_client > num_client_required:
                 # shutting down clients
                 for delete_client in range(num_running_client, num_client_required, -1):
-                    logger.info("Telling client no. %d to stop.", (delete_client - 1))
+                    logger.info(
+                        "[RA] Telling client no. %d to stop.", (delete_client - 1)
+                    )
                     control_semaphore[delete_client - 1].release()
                     num_running_client -= 1
         now = datetime.now().astimezone(pytz.utc)
