@@ -183,7 +183,8 @@ class EngineConnections:
         are currently connected to.
         """
         to_remove = []
-        for engine, conn in self._connection_map.items():
+        curr_connections = [item for item in self._connection_map.items()]
+        for engine, conn in curr_connections:
             if engine in expected_engines:
                 continue
             await conn.close()
@@ -192,8 +193,11 @@ class EngineConnections:
         for engine in to_remove:
             del self._connection_map[engine]
 
+        all_replicas_to_remove = []
         while len(self._aurora_read_replicas) > expected_aurora_read_replicas:
-            replica_to_remove = self._aurora_read_replicas.pop()
+            all_replicas_to_remove.append(self._aurora_read_replicas.pop())
+
+        for replica_to_remove in all_replicas_to_remove:
             await replica_to_remove.close()
 
     async def reestablish_connections(
@@ -209,10 +213,11 @@ class EngineConnections:
         overwhelming the underlying engines. Use randomized exponential backoff
         instead.
         """
+        curr_connections = [item for item in self._connection_map.items()]
         new_connections = []
         all_succeeded = True
 
-        for engine, conn in self._connection_map.items():
+        for engine, conn in curr_connections:
             if conn.is_connected():
                 continue
             try:
@@ -235,8 +240,9 @@ class EngineConnections:
             self._connect_to_aurora_read_replicas
             and Engine.Aurora in self._connection_map
         ):
+            curr_replica_conns = self._aurora_read_replicas.copy()
             new_replica_conns = []
-            for replica_idx, conn in enumerate(self._aurora_read_replicas):
+            for replica_idx, conn in enumerate(curr_replica_conns):
                 if conn.is_connected():
                     continue
                 try:
