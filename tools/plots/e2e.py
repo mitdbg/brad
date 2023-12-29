@@ -61,7 +61,28 @@ class RecordedRun:
                 )
                 olap_inner["timestamp"] = olap_inner["timestamp"].dt.tz_localize(None)
                 olap_inner.insert(0, "num_clients", clients)
+                olap_inner.insert(1, "qtype", "repeating")
                 all_olap.append(olap_inner)
+
+        for inner in base.iterdir():
+            if not inner.is_dir() or not inner.name.startswith("adhoc"):
+                continue
+            num_clients = 0
+            this_adhoc = []
+            for data_file in inner.iterdir():
+                if not data_file.name.endswith(".csv"):
+                    continue
+                num_clients += 1
+                olap_inner = pd.read_csv(data_file)
+                olap_inner["timestamp"] = pd.to_datetime(
+                    olap_inner["timestamp"], format="mixed"
+                )
+                olap_inner["timestamp"] = olap_inner["timestamp"].dt.tz_localize(None)
+                this_adhoc.append(olap_inner)
+            adhoc = pd.concat(this_adhoc)
+            adhoc.insert(0, "num_clients", num_clients)
+            adhoc.insert(1, "qtype", "adhoc")
+            all_olap.append(adhoc)
 
         olap = pd.concat(all_olap).sort_values(by=["timestamp"])
 
@@ -127,6 +148,10 @@ class RecordedRun:
             return self._txn_lat_p90
         self._txn_lat_p90 = self._agg_txn_lats(0.9)
         return self._txn_lat_p90
+
+    @property
+    def txn_lat_p90_5min(self) -> pd.DataFrame:
+        return self._agg_txn_lats_window(window_str="5min", quantile=0.9)
 
     @property
     def ana_lat_p90(self) -> pd.DataFrame:
@@ -211,6 +236,22 @@ class RecordedRun:
         return (
             il.groupby([ts.dt.day, ts.dt.hour, ts.dt.minute])
             .quantile(quantile)
+            .reset_index(drop=True)
+        )
+
+    def _agg_txn_lats_window(self, window_str: str, quantile: float) -> pd.DataFrame:
+        rel = self.txn_lats[["timestamp", "run_time_s"]].copy()
+        rel["timestamp"] = pd.to_datetime(rel["timestamp"])
+        rel["run_time_s"] = pd.to_numeric(rel["run_time_s"])
+        rel = rel.sort_values(by=["timestamp"])
+        rel = rel.set_index("timestamp")
+        over_window = (
+            rel.rolling(window_str, min_periods=1).quantile(quantile).reset_index()
+        )
+        ts = over_window["timestamp"]
+        return (
+            over_window.groupby([ts.dt.day, ts.dt.hour, ts.dt.minute])
+            .max()
             .reset_index(drop=True)
         )
 
