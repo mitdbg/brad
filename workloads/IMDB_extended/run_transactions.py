@@ -4,12 +4,12 @@ import pathlib
 import pickle
 import random
 import signal
-import sys
 import threading
 import time
 import os
 import pytz
 import multiprocessing as mp
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -19,9 +19,11 @@ from brad.grpc_client import BradClientError
 from brad.provisioning.directory import Directory
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from brad.utils.time_periods import universal_now
+from brad.utils import set_up_logging
 from workload_utils.connect import connect_to_db
 from workload_utils.transaction_worker import TransactionWorker
 
+logger = logging.getLogger(__name__)
 STARTUP_FAILED = "startup_failed"
 
 
@@ -40,6 +42,8 @@ def runner(
         pass
 
     signal.signal(signal.SIGINT, noop_handler)
+
+    set_up_logging()
 
     worker = TransactionWorker(
         worker_idx,
@@ -75,7 +79,7 @@ def runner(
             f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
         )
     except BradClientError as ex:
-        print(f"[T {worker_idx}] Failed to connect to BRAD:", str(ex))
+        logger.error("[T %d] Failed to connect to BRAD: %s", worker_idx, str(ex))
         start_queue.put_nowait(STARTUP_FAILED)
         return
 
@@ -105,7 +109,7 @@ def runner(
             # Note that `False` means to not block.
             should_exit = control_semaphore.acquire(False)  # type: ignore
             if should_exit:
-                print(f"T Runner {worker_idx} is exiting.")
+                logger.info("T Runner %d is exiting.", worker_idx)
                 break
 
             txn_exec_count += 1
@@ -125,11 +129,7 @@ def runner(
                     succeeded = txn(db)
 
                 if rand_backoff is not None:
-                    print(
-                        f"[T {worker_idx}] Continued after transient errors.",
-                        flush=True,
-                        file=sys.stderr,
-                    )
+                    logger.info("[T %d] Continued after transient errors.", worker_idx)
                     rand_backoff = None
 
             except BradClientError as ex:
@@ -148,37 +148,32 @@ def runner(
                             base_delay_s=0.1,
                             max_delay_s=timedelta(minutes=1).total_seconds(),
                         )
-                        print(
-                            f"[T {worker_idx}] Backing off due to transient errors.",
-                            flush=True,
-                            file=sys.stderr,
+                        logger.info(
+                            "[T %d] Backing off due to transient errors.",
+                            worker_idx,
                         )
 
                     # Delay retrying in the case of a transient error (this
                     # happens during blueprint transitions).
                     wait_s = rand_backoff.wait_time_s()
                     if wait_s is None:
-                        print(
-                            "Aborting benchmark. Too many transient errors.",
-                            flush=True,
-                            file=sys.stderr,
+                        logger.info(
+                            "[T] Aborting benchmark. Too many transient errors.",
                         )
                         break
                     time.sleep(wait_s)
 
                 else:
-                    print(
-                        "Encountered an unexpected `BradClientError`. Aborting the workload...",
-                        flush=True,
-                        file=sys.stderr,
+                    logger.error(
+                        "[T %d] Encountered an unexpected `BradClientError`. Aborting the workload...",
+                        worker_idx,
                     )
                     raise
             except:
                 succeeded = False
-                print(
-                    "Encountered an unexpected error. Aborting the workload...",
-                    flush=True,
-                    file=sys.stderr,
+                logger.error(
+                    "[T %d] Encountered an unexpected error. Aborting the workload...",
+                    worker_idx,
                 )
                 raise
             txn_end = time.time()
@@ -203,13 +198,15 @@ def runner(
                 total_commits = sum(commits)
                 abort_rate = total_aborts / (total_aborts + total_commits)
                 if abort_rate > 0.15:
-                    print(
-                        f"[T {worker_idx}] Abort rate is higher than expected ({abort_rate:.4f})."
+                    logger.info(
+                        "[T %d] Abort rate is higher than expected ({%4f}).",
+                        worker_idx,
+                        abort_rate,
                     )
 
     finally:
         overall_end = time.time()
-        print(f"[{worker_idx}] Done running transactions.", flush=True, file=sys.stderr)
+        logger.info("[T %d] Done running transactions.", worker_idx)
         latency_file.close()
 
         with open(
@@ -328,6 +325,8 @@ def main():
     parser.add_argument("--num-front-ends", type=int, default=1)
     args = parser.parse_args()
 
+    set_up_logging()
+
     if (
         args.num_client_path is not None
         and os.path.exists(args.num_client_path)
@@ -336,12 +335,10 @@ def main():
         # we can only set the num_concurrent_query trace in presence of time_scale_factor
         with open(args.num_client_path, "rb") as f:
             num_client_trace = pickle.load(f)
-        print(
-            "[T] Preparing to run a time varying workload", flush=True, file=sys.stderr
-        )
+        logger.info("[T] Preparing to run a time varying workload")
     else:
         num_client_trace = None
-        print("[T] Preparing to run a steady workload", flush=True, file=sys.stderr)
+        logger.info("[T] Preparing to run a steady workload")
 
     mgr = mp.Manager()
     start_queue = [mgr.Queue() for _ in range(args.num_clients)]
@@ -366,7 +363,7 @@ def main():
         p.start()
         clients.append(p)
 
-    print("Waiting for startup...", file=sys.stderr, flush=True)
+    logger.info("[T] Waiting for startup...")
     one_startup_failed = False
     for i in range(args.num_clients):
         msg = start_queue[i].get()
@@ -374,21 +371,19 @@ def main():
             one_startup_failed = True
 
     if one_startup_failed:
-        print(
+        logger.error(
             "At least one transactional runner failed to start up. Aborting the experiment.",
-            flush=True,
-            file=sys.stderr,
         )
         for i in range(args.num_clients):
             control_semaphore[i].release()
             control_semaphore[i].release()
         for p in clients:
             p.join()
-        print("Transactional client abort complete.", file=sys.stderr, flush=True)
+        logger.info("Transactional client abort complete.")
         return
 
     if num_client_trace is not None:
-        print("Scaling number of clients by", args.num_client_multiplier)
+        logger.info("[T] Scaling number of clients by %d", args.num_client_multiplier)
         for k in num_client_trace.keys():
             num_client_trace[k] *= args.num_client_multiplier
 
@@ -399,11 +394,7 @@ def main():
         num_running_client = 0
         num_client_required = min(num_client_trace[0], args.num_clients)
         for add_client in range(num_running_client, num_client_required):
-            print(
-                f"[T] Telling client no. {add_client} to start.",
-                flush=True,
-                file=sys.stderr,
-            )
+            logger.info("[T] Telling client no. %d to start.", add_client)
             control_semaphore[add_client].release()
             num_running_client += 1
 
@@ -431,60 +422,43 @@ def main():
             if num_client_required > num_running_client:
                 # starting additional clients
                 for add_client in range(num_running_client, num_client_required):
-                    print(
-                        "[T] Telling client no. {} to start.".format(add_client),
-                        flush=True,
-                        file=sys.stderr,
-                    )
+                    logger.info("[T] Telling client no. %d to start.", add_client)
                     control_semaphore[add_client].release()
                     num_running_client += 1
             elif num_running_client > num_client_required:
                 # shutting down clients
                 for delete_client in range(num_running_client, num_client_required, -1):
-                    print(
-                        "[T] Telling client no. {} to stop.".format(delete_client - 1),
-                        flush=True,
-                        file=sys.stderr,
+                    logger.info(
+                        "[T] Telling client no. %d to stop.", (delete_client - 1)
                     )
                     control_semaphore[delete_client - 1].release()
                     num_running_client -= 1
         now = datetime.now().astimezone(pytz.utc)
         total_exec_time_in_s = (now - execute_start_time).total_seconds()
         if finished_one_day:
-            print(
-                f"[T] Finished executing one day of workload in {total_exec_time_in_s}s, will ignore the rest of "
-                f"pre-set execution time {args.run_for_s}s",
-                flush=True,
-                file=sys.stderr,
+            logger.info(
+                "[T] Finished executing one day of workload in %d s, will ignore the rest of "
+                "pre-set execution time %d s",
+                total_exec_time_in_s,
+                args.run_for_s,
             )
         else:
-            print(
-                f"[T] Executed ended but unable to finish executing the trace of a full day within {args.run_for_s}s"
+            logger.info(
+                "[T] Executed ended but unable to finish executing the trace of a full day within %d s",
+                args.run_for_s,
             )
 
     else:
-        print(
-            "[T] Telling all {} clients to start.".format(args.num_clients),
-            file=sys.stderr,
-            flush=True,
-        )
+        logger.info("[T] Telling all %d clients to start.", args.num_clients)
         for idx in range(args.num_clients):
             control_semaphore[idx].release()
 
     if args.run_for_s is not None and num_client_trace is None:
-        print(
-            "[T] Letting the experiment run for {} seconds...".format(args.run_for_s),
-            flush=True,
-            file=sys.stderr,
-        )
+        logger.info("[T] Letting the experiment run for %d seconds...", args.run_for_s)
         time.sleep(args.run_for_s)
 
     elif num_client_trace is None:
-        print(
-            "[T] Waiting until requested to stop... (hit Ctrl-C)",
-            flush=True,
-            file=sys.stderr,
-        )
+        logger.info("[T] Waiting until requested to stop... (hit Ctrl-C)")
         should_shutdown = threading.Event()
 
         def signal_handler(_signal, _frame):
@@ -495,7 +469,7 @@ def main():
 
         should_shutdown.wait()
 
-    print("[T] Stopping clients...", flush=True, file=sys.stderr)
+    logger.info("[T] Stopping clients...")
     for idx in range(args.num_clients):
         # Note that in most cases, one release will have already run. This is OK
         # because downstream runners will not hang if there is a unconsumed
@@ -503,10 +477,10 @@ def main():
         control_semaphore[idx].release()
         control_semaphore[idx].release()
 
-    print("[T] Waiting for clients to terminate...", flush=True, file=sys.stderr)
+    logger.info("[T] Waiting for clients to terminate...")
     for c in clients:
         c.join()
-    print("[T] Done transactions!", flush=True, file=sys.stderr)
+    logger.info("[T] Done transactions!")
 
 
 if __name__ == "__main__":

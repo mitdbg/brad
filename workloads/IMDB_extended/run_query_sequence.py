@@ -4,7 +4,6 @@ import time
 import os
 import pathlib
 import random
-import sys
 import signal
 import pytz
 import logging
@@ -15,6 +14,7 @@ from workload_utils.connect import connect_to_db
 from brad.config.engine import Engine
 from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
+from brad.utils import set_up_logging
 
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,8 @@ def runner(
         pass
 
     signal.signal(signal.SIGINT, noop)
+
+    set_up_logging()
 
     # For printing out results.
     if "COND_OUT" in os.environ:
@@ -61,7 +63,9 @@ def runner(
             disable_direct_redshift_result_cache=True,
         )
     except BradClientError as ex:
-        print(f"[Seq runner {runner_idx}] Failed to connect to BRAD:", str(ex))
+        logger.error(
+            "[Seq runner %d] Failed to connect to BRAD: %s", runner_idx, str(ex)
+        )
         start_queue.put_nowait(STARTUP_FAILED)
         return
 
@@ -92,11 +96,7 @@ def runner(
         )
 
         # Signal that we're ready to start and wait for the controller.
-        print(
-            f"Seq Runner {runner_idx} is ready to start running.",
-            flush=True,
-            file=sys.stderr,
-        )
+        logger.info("Seq Runner %d is ready to start running.", runner_idx)
         start_queue.put_nowait("")
         control_semaphore.acquire()  # type: ignore
 
@@ -106,11 +106,7 @@ def runner(
             # Note that `False` means to not block.
             should_exit_early = control_semaphore.acquire(False)  # type: ignore
             if should_exit_early:
-                print(
-                    f"Seq Runner {runner_idx} is exiting early.",
-                    file=sys.stderr,
-                    flush=True,
-                )
+                logger.info("Seq Runner %d is exiting early.", runner_idx)
                 break
 
             # Wait for some time before issuing, if requested.
@@ -161,10 +157,8 @@ def runner(
 
                 exec_count += 1
                 if rand_backoff is not None:
-                    print(
-                        f"[Seq Runner {runner_idx}] Continued after transient errors.",
-                        flush=True,
-                        file=sys.stderr,
+                    logger.info(
+                        "[Seq Runner %d] Continued after transient errors.", runner_idx
                     )
                     rand_backoff = None
 
@@ -184,37 +178,30 @@ def runner(
                             base_delay_s=1.0,
                             max_delay_s=timedelta(minutes=1).total_seconds(),
                         )
-                        print(
-                            f"[Seq Runner {runner_idx}] Backing off due to transient errors.",
-                            flush=True,
-                            file=sys.stderr,
+                        logger.info(
+                            "[Seq Runner %d] Backing off due to transient errors.",
+                            runner_idx,
                         )
 
                     # Delay retrying in the case of a transient error (this
                     # happens during blueprint transitions).
                     wait_s = rand_backoff.wait_time_s()
                     if wait_s is None:
-                        print(
-                            f"[Seq Runner {runner_idx}] Aborting benchmark. Too many transient errors.",
-                            flush=True,
-                            file=sys.stderr,
+                        logger.error(
+                            "[Seq Runner %d] Aborting benchmark. Too many transient errors.",
+                            runner_idx,
                         )
                         break
                     time.sleep(wait_s)
 
                 else:
-                    print(
-                        "Unexpected seq query error:",
-                        ex.message(),
-                        flush=True,
-                        file=sys.stderr,
-                    )
+                    logger.error("Unexpected seq query error: %s", ex.message())
 
     finally:
         os.fsync(file.fileno())
         file.close()
         database.close_sync()
-        print(f"Seq runner {runner_idx} has exited.", flush=True, file=sys.stderr)
+        logger.info("Seq runner %d has exited.", runner_idx)
 
 
 def main():
@@ -264,6 +251,8 @@ def main():
     )
     args = parser.parse_args()
 
+    set_up_logging()
+
     with open(args.query_sequence_file, "r", encoding="UTF-8") as file:
         query_seq = [line.strip() for line in file]
 
@@ -305,7 +294,7 @@ def main():
         p.start()
         processes.append(p)
 
-    print("Seq: Waiting for startup...", flush=True)
+    logger.info("Seq: Waiting for startup...")
     one_startup_failed = False
     for i in range(args.num_clients):
         msg = start_queue[i].get()
@@ -313,28 +302,24 @@ def main():
             one_startup_failed = True
 
     if one_startup_failed:
-        print("At least one ad-hoc runner failed to start up. Aborting the experiment.")
+        logger.error(
+            "At least one seq runner failed to start up. Aborting the experiment."
+        )
         for i in range(args.num_clients):
             # Ideally we should be able to release twice atomically.
             control_semaphore[i].release()
             control_semaphore[i].release()
         for p in processes:
             p.join()
-        print("Abort complete.")
+        logger.info("Seq: Abort complete.")
         return
 
-    print(
-        "Telling all {} ad-hoc clients to start.".format(args.num_clients), flush=True
-    )
+    logger.info("Seq: Telling all %d seq clients to start.", args.num_clients)
     for i in range(args.num_clients):
         control_semaphore[i].release()
 
     # Wait until requested to stop.
-    print(
-        "Seq queries running until completion. Hit Ctrl-C to stop early.",
-        flush=True,
-        file=sys.stderr,
-    )
+    logger.info("Seq: Queries running until completion. Hit Ctrl-C to stop early.")
 
     def signal_handler(_signal, _frame):
         for i in range(args.num_clients):
@@ -344,11 +329,11 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    print("Waiting for the seq clients to complete...", flush=True, file=sys.stderr)
+    logger.info("Seq: Waiting for the seq clients to complete...")
     for p in processes:
         p.join()
 
-    print("Done query sequence!", flush=True, file=sys.stderr)
+    logger.info("Seq: Done query sequence!")
 
 
 if __name__ == "__main__":

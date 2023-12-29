@@ -20,6 +20,7 @@ from workload_utils.connect import connect_to_db
 from brad.config.engine import Engine
 from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
+from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)
 EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
@@ -65,6 +66,8 @@ def runner(
 
     signal.signal(signal.SIGINT, noop)
 
+    set_up_logging()
+
     # For printing out results.
     if "COND_OUT" in os.environ:
         # pylint: disable-next=import-error
@@ -89,7 +92,7 @@ def runner(
             disable_direct_redshift_result_cache=True,
         )
     except BradClientError as ex:
-        print(f"[RA {runner_idx}] Failed to connect to BRAD:", str(ex))
+        logger.error("[RA %d] Failed to connect to BRAD: %s", runner_idx, str(ex))
         start_queue.put_nowait(STARTUP_FAILED)
         return
 
@@ -126,11 +129,7 @@ def runner(
         first_run = True
 
         # Signal that we're ready to start and wait for the controller.
-        print(
-            f"Runner {runner_idx} is ready to start running.",
-            flush=True,
-            file=sys.stderr,
-        )
+        logger.info("[RA] Runner %d is ready to start running.", runner_idx)
         start_queue.put_nowait("")
         control_semaphore.acquire()  # type: ignore
 
@@ -138,7 +137,7 @@ def runner(
             # Note that `False` means to not block.
             should_exit = control_semaphore.acquire(False)  # type: ignore
             if should_exit:
-                print(f"Runner {runner_idx} is exiting.", file=sys.stderr, flush=True)
+                logger.info("[RA] Runner %d is exiting.", runner_idx)
                 break
 
             if execution_gap_dist is not None:
@@ -211,11 +210,7 @@ def runner(
 
                 exec_count += 1
                 if rand_backoff is not None:
-                    print(
-                        f"[RA {runner_idx}] Continued after transient errors.",
-                        flush=True,
-                        file=sys.stderr,
-                    )
+                    logger.info("[RA %d] Continued after transient errors.", runner_idx)
                     rand_backoff = None
 
             except BradClientError as ex:
@@ -234,37 +229,29 @@ def runner(
                             base_delay_s=1.0,
                             max_delay_s=timedelta(minutes=1).total_seconds(),
                         )
-                        print(
-                            f"[RA {runner_idx}] Backing off due to transient errors.",
-                            flush=True,
-                            file=sys.stderr,
+                        logger.info(
+                            "[RA %d] Backing off due to transient errors.", runner_idx
                         )
 
                     # Delay retrying in the case of a transient error (this
                     # happens during blueprint transitions).
                     wait_s = rand_backoff.wait_time_s()
                     if wait_s is None:
-                        print(
-                            f"[RA {runner_idx}] Aborting benchmark. Too many transient errors.",
-                            flush=True,
-                            file=sys.stderr,
+                        logger.error(
+                            "[RA %d] Aborting benchmark. Too many transient errors.",
+                            runner_idx,
                         )
                         break
                     time.sleep(wait_s)
 
                 else:
-                    print(
-                        "Unexpected query error:",
-                        ex.message(),
-                        flush=True,
-                        file=sys.stderr,
-                    )
+                    logger.error("Unexpected query error: %s", ex.message())
 
     finally:
         os.fsync(file.fileno())
         file.close()
         database.close_sync()
-        print(f"Runner {runner_idx} has exited.", flush=True, file=sys.stderr)
+        logger.info("[RA] Runner %d has exited.", runner_idx)
 
 
 def simulation_runner(
@@ -560,6 +547,8 @@ def main():
     parser.add_argument("--run-for-s", type=int, help="If set, run for this long.")
     args = parser.parse_args()
 
+    set_up_logging()
+
     with open(args.query_bank_file, "r", encoding="UTF-8") as file:
         query_bank = [line.strip() for line in file]
 
@@ -669,7 +658,7 @@ def main():
             p.start()
             processes.append(p)
 
-    print("Waiting for startup...", flush=True)
+    logger.info("[RA] Waiting for startup...")
     one_startup_failed = False
     for i in range(args.num_clients):
         msg = start_queue[i].get()
@@ -677,14 +666,16 @@ def main():
             one_startup_failed = True
 
     if one_startup_failed:
-        print("At least one runner failed to start up. Aborting the experiment.")
+        logger.error(
+            "[RA] At least one runner failed to start up. Aborting the experiment."
+        )
         for i in range(args.num_clients):
             # Ideally we should be able to release twice atomically.
             control_semaphore[i].release()
             control_semaphore[i].release()
         for p in processes:
             p.join()
-        print("Abort complete.")
+        logger.info("[RA] Overall abort complete.")
         return
 
     global EXECUTE_START_TIME  # pylint: disable=global-statement
@@ -693,7 +684,7 @@ def main():
     )  # pylint: disable=global-statement
 
     if num_client_trace is not None:
-        print("Scaling number of clients by", args.num_client_multiplier)
+        logger.info("[RA] Scaling number of clients by %d", args.num_client_multiplier)
         for k in num_client_trace.keys():
             num_client_trace[k] *= args.num_client_multiplier
 
@@ -703,11 +694,7 @@ def main():
         num_running_client = 0
         num_client_required = min(num_client_trace[0], args.num_clients)
         for add_client in range(num_running_client, num_client_required):
-            print(
-                f"Telling client no. {add_client} to start.",
-                flush=True,
-                file=sys.stderr,
-            )
+            logger.info("[RA] Telling client no. %d to start.", add_client)
             control_semaphore[add_client].release()
             num_running_client += 1
 
@@ -735,53 +722,44 @@ def main():
             if num_client_required > num_running_client:
                 # starting additional clients
                 for add_client in range(num_running_client, num_client_required):
-                    print(
-                        "Telling client no. {} to start.".format(add_client),
-                        flush=True,
-                        file=sys.stderr,
-                    )
+                    logger.info("[RA] Telling client no. %d to start.", add_client)
                     control_semaphore[add_client].release()
                     num_running_client += 1
             elif num_running_client > num_client_required:
                 # shutting down clients
                 for delete_client in range(num_running_client, num_client_required, -1):
-                    print(
-                        "Telling client no. {} to stop.".format(delete_client - 1),
-                        flush=True,
-                        file=sys.stderr,
+                    logger.info(
+                        "[RA] Telling client no. %d to stop.", (delete_client - 1)
                     )
                     control_semaphore[delete_client - 1].release()
                     num_running_client -= 1
         now = datetime.now().astimezone(pytz.utc)
         total_exec_time_in_s = (now - EXECUTE_START_TIME).total_seconds()
         if finished_one_day:
-            print(
-                f"Finished executing one day of workload in {total_exec_time_in_s}s, will ignore the rest of "
-                f"pre-set execution time {args.run_for_s}s"
+            logger.info(
+                "[RA] Finished executing one day of workload in %d s, will ignore the rest of "
+                "pre-set execution time %d s",
+                total_exec_time_in_s,
+                args.run_for_s,
             )
         else:
-            print(
-                f"Executed ended but unable to finish executing the trace of a full day within {args.run_for_s}s"
+            logger.info(
+                "[RA] Executed ended but unable to finish executing the trace of a full day within %d s",
+                args.run_for_s,
             )
 
     else:
-        print("Telling all {} clients to start.".format(args.num_clients), flush=True)
+        logger.info("[RA] Telling all %d clients to start.", args.num_clients)
         for i in range(args.num_clients):
             control_semaphore[i].release()
 
     if args.run_for_s is not None and num_client_trace is None:
-        print(
-            "Waiting for {} seconds...".format(args.run_for_s),
-            flush=True,
-            file=sys.stderr,
-        )
+        logger.info("[RA] Waiting for %d seconds...", args.run_for_s)
         time.sleep(args.run_for_s)
     elif num_client_trace is None:
         # Wait until requested to stop.
-        print(
+        logger.info(
             "Repeating analytics waiting until requested to stop... (hit Ctrl-C)",
-            flush=True,
-            file=sys.stderr,
         )
         should_shutdown = threading.Event()
 
@@ -793,7 +771,7 @@ def main():
 
         should_shutdown.wait()
 
-    print("Stopping all clients...", flush=True, file=sys.stderr)
+    logger.info("[RA] Stopping all clients...")
     for i in range(args.num_clients):
         # Note that in most cases, one release will have already run. This is OK
         # because downstream runners will not hang if there is a unconsumed
@@ -801,14 +779,14 @@ def main():
         control_semaphore[i].release()
         control_semaphore[i].release()
 
-    print("Waiting for the clients to complete...", flush=True, file=sys.stderr)
+    logger.info("[RA] Waiting for the clients to complete...")
     for p in processes:
         p.join()
 
     for idx, p in enumerate(processes):
-        print(f"Runner {idx} exit code:", p.exitcode, flush=True, file=sys.stderr)
+        logger.info("Runner %d exit code: %d", idx, p.exitcode)
 
-    print("Done repeating analytics!", flush=True, file=sys.stderr)
+    logger.info("Done repeating analytics!")
 
 
 if __name__ == "__main__":
