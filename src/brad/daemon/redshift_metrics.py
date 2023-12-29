@@ -1,6 +1,7 @@
 import asyncio
 import pandas as pd
 import json
+import logging
 from datetime import timedelta
 from typing import List, Optional, Tuple
 from importlib.resources import files, as_file
@@ -15,6 +16,8 @@ from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.utils.time_periods import impute_old_missing_metrics, universal_now
+
+logger = logging.getLogger(__name__)
 
 
 class RedshiftMetrics(MetricsSourceWithForecasting):
@@ -52,6 +55,7 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
             if overriden_id is not None
             else self._config.redshift_cluster_id
         )
+        logger.info("Will fetch Redshift metrics from %s", redshift_cluster_id)
         self._cw_client = CloudWatchClient(
             Engine.Redshift,
             redshift_cluster_id,

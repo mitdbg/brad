@@ -505,49 +505,55 @@ class BradFrontEnd(BradInterface):
         assert self._input_queue is not None
         loop = asyncio.get_running_loop()
         while True:
-            message = await loop.run_in_executor(None, self._input_queue.get)
-            if message.fe_index != self._fe_index:
-                logger.warning(
-                    "Received message with invalid front end index. Expected %d. Received %d.",
-                    self._fe_index,
-                    message.fe_index,
-                )
-                continue
-
-            if isinstance(message, ShutdownFrontEnd):
-                logger.debug("The BRAD front end is initiating a shut down...")
-                loop.create_task(_orchestrate_shutdown())
-                break
-
-            elif isinstance(message, InternalCommandResponse):
-                if not self._daemon_request_mailbox.is_active():
+            try:
+                message = await loop.run_in_executor(None, self._input_queue.get)
+                if message.fe_index != self._fe_index:
                     logger.warning(
-                        "Received an internal command response but no one was waiting for it: %s",
-                        message,
+                        "Received message with invalid front end index. Expected %d. Received %d.",
+                        self._fe_index,
+                        message.fe_index,
                     )
                     continue
-                self._daemon_request_mailbox.on_new_message(message.response)
 
-            elif isinstance(message, NewBlueprint):
-                logger.info(
-                    "Received notification to update to blueprint version %d",
-                    message.version,
-                )
-                # This refreshes any cached state that depends on the old blueprint.
-                await self._run_blueprint_update(
-                    message.version, message.updated_directory
-                )
-                self._route_redshift_only = False
-                # Tell the daemon that we have updated.
-                self._output_queue.put(
-                    NewBlueprintAck(self._fe_index, message.version), block=False
-                )
-                logger.info(
-                    "Acknowledged update to blueprint version %d", message.version
-                )
+                if isinstance(message, ShutdownFrontEnd):
+                    logger.debug("The BRAD front end is initiating a shut down...")
+                    loop.create_task(_orchestrate_shutdown())
+                    break
 
-            else:
-                logger.info("Received message from the daemon: %s", message)
+                elif isinstance(message, InternalCommandResponse):
+                    if not self._daemon_request_mailbox.is_active():
+                        logger.warning(
+                            "Received an internal command response but no one was waiting for it: %s",
+                            message,
+                        )
+                        continue
+                    self._daemon_request_mailbox.on_new_message(message.response)
+
+                elif isinstance(message, NewBlueprint):
+                    logger.info(
+                        "Received notification to update to blueprint version %d",
+                        message.version,
+                    )
+                    # This refreshes any cached state that depends on the old blueprint.
+                    await self._run_blueprint_update(
+                        message.version, message.updated_directory
+                    )
+                    self._route_redshift_only = False
+                    # Tell the daemon that we have updated.
+                    self._output_queue.put(
+                        NewBlueprintAck(self._fe_index, message.version), block=False
+                    )
+                    logger.info(
+                        "Acknowledged update to blueprint version %d", message.version
+                    )
+
+                else:
+                    logger.info("Received message from the daemon: %s", message)
+            except Exception as ex:
+                if not isinstance(ex, asyncio.CancelledError):
+                    logger.exception(
+                        "Unexpected error when handling message from the daemon."
+                    )
 
     async def _report_metrics_to_daemon(self) -> None:
         try:

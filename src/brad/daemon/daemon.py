@@ -336,57 +336,70 @@ class BradDaemon:
         """
         loop = asyncio.get_running_loop()
         while True:
-            message = await loop.run_in_executor(None, front_end.output_queue.get)
-            if message.fe_index != front_end.fe_index:
-                logger.warning(
-                    "Received message with invalid front end index. Expected %d. Received %d.",
-                    front_end.fe_index,
-                    message.fe_index,
-                )
-                continue
-
-            if isinstance(message, MetricsReport):
-                self._monitor.handle_metric_report(message)
-
-            elif isinstance(message, InternalCommandRequest):
-                task = asyncio.create_task(
-                    self._run_internal_command_request_response(message)
-                )
-                self._internal_command_tasks.add(task)
-                task.add_done_callback(self._internal_command_tasks.discard)
-
-            elif isinstance(message, NewBlueprintAck):
-                if self._transition_orchestrator is None:
-                    logger.error(
-                        "Received blueprint ack message but no transition is in progress. Version: %d, Front end: %d",
-                        message.version,
+            try:
+                message = await loop.run_in_executor(None, front_end.output_queue.get)
+                if message.fe_index != front_end.fe_index:
+                    logger.warning(
+                        "Received message with invalid front end index. Expected %d. Received %d.",
+                        front_end.fe_index,
                         message.fe_index,
                     )
                     continue
 
-                # Sanity check.
-                next_version = self._transition_orchestrator.next_version()
-                if next_version != message.version:
-                    logger.error(
-                        "Received a blueprint ack for a mismatched version. Received %d, Expected %d",
+                if isinstance(message, MetricsReport):
+                    self._monitor.handle_metric_report(message)
+
+                elif isinstance(message, InternalCommandRequest):
+                    task = asyncio.create_task(
+                        self._run_internal_command_request_response(message)
+                    )
+                    self._internal_command_tasks.add(task)
+                    task.add_done_callback(self._internal_command_tasks.discard)
+
+                elif isinstance(message, NewBlueprintAck):
+                    if self._transition_orchestrator is None:
+                        logger.error(
+                            "Received blueprint ack message but no transition is in progress. Version: %d, Front end: %d",
+                            message.version,
+                            message.fe_index,
+                        )
+                        continue
+
+                    # Sanity check.
+                    next_version = self._transition_orchestrator.next_version()
+                    if next_version != message.version:
+                        logger.error(
+                            "Received a blueprint ack for a mismatched version. Received %d, Expected %d",
+                            message.version,
+                            next_version,
+                        )
+                        continue
+
+                    logger.info(
+                        "Received blueprint ack. Version: %d, Front end: %d",
                         message.version,
-                        next_version,
-                    )
-                    continue
-
-                self._transition_orchestrator.decrement_waiting_for_front_ends()
-                if self._transition_orchestrator.waiting_for_front_ends() == 0:
-                    # Schedule the second half of the transition.
-                    self._transition_task = asyncio.create_task(
-                        self._run_transition_part_two()
+                        message.fe_index,
                     )
 
-            else:
-                logger.debug(
-                    "Received unexpected message from front end %d: %s",
-                    front_end.fe_index,
-                    str(message),
-                )
+                    self._transition_orchestrator.decrement_waiting_for_front_ends()
+                    if self._transition_orchestrator.waiting_for_front_ends() == 0:
+                        # Schedule the second half of the transition.
+                        self._transition_task = asyncio.create_task(
+                            self._run_transition_part_two()
+                        )
+
+                else:
+                    logger.debug(
+                        "Received unexpected message from front end %d: %s",
+                        front_end.fe_index,
+                        str(message),
+                    )
+            except Exception as ex:
+                if not isinstance(ex, asyncio.CancelledError):
+                    logger.exception(
+                        "Unexpected error when handling front end message. Front end: %d",
+                        front_end.fe_index,
+                    )
 
     async def _handle_new_blueprint(
         self, blueprint: Blueprint, score: Score, trigger: Optional[Trigger]
