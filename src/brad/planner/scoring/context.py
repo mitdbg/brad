@@ -136,6 +136,25 @@ class ScoringContext:
             )
         )
 
+        redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
+        redshift_it = redshift_enumerator.enumerate_nearby(
+            self.current_blueprint.redshift_provisioning(),
+            redshift_enumerator.scaling_to_distance(
+                self.current_blueprint.redshift_provisioning(),
+                self.planner_config.max_provisioning_multiplier(),
+                Engine.Redshift,
+            ),
+        )
+        self.next_workload.precomputed_redshift_analytical_latencies = (
+            RedshiftProvisioningScore.predict_query_latency_resources_batch(
+                self.next_workload.get_predicted_analytical_latency_all(
+                    Engine.Redshift
+                ),
+                redshift_it,
+                self,
+            )
+        )
+
     def compute_engine_latency_norm_factor(self) -> None:
         for engine in [Engine.Aurora, Engine.Redshift, Engine.Athena]:
             if len(self.current_query_locations[engine]) == 0:

@@ -404,12 +404,8 @@ class BlueprintCandidate(ComparableBlueprint):
             ctx,
         )
         self.redshift_score = RedshiftProvisioningScore.compute(
-            ctx.next_workload.get_predicted_analytical_latency_batch(
-                self.query_locations[Engine.Redshift], Engine.Redshift
-            ),
-            ctx.next_workload.get_arrival_counts_batch(
-                self.query_locations[Engine.Redshift]
-            ),
+            self.query_locations[Engine.Redshift],
+            ctx.next_workload,
             ctx.current_blueprint.redshift_provisioning(),
             self.redshift_provisioning,
             ctx,
