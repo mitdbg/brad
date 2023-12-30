@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 import numpy.typing as npt
-from typing import Dict, TYPE_CHECKING, Optional, Tuple, Any
+from typing import Dict, TYPE_CHECKING, Optional, Tuple, Any, Iterator
 
 from brad.config.engine import Engine
 from brad.blueprint.provisioning import Provisioning
@@ -290,23 +290,49 @@ class AuroraProvisioningScore:
         # expected wait time (due to system load)
         return prov_predicted_latency + wait_time
 
-    @staticmethod
+    @classmethod
     def predict_query_latency_resources(
+        cls,
         base_predicted_latency: npt.NDArray,
         to_prov: Provisioning,
         ctx: "ScoringContext",
     ) -> npt.NDArray:
         if base_predicted_latency.shape[0] == 0:
             return base_predicted_latency
+        res = cls.predict_query_latency_resources_batch(
+            base_predicted_latency, iter([to_prov]), ctx
+        )
+        return next(iter(res.values()))
 
-        resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(to_prov)
-        basis = np.array([resource_factor, 1.0])
+    @staticmethod
+    def predict_query_latency_resources_batch(
+        base_predicted_latency: npt.NDArray,
+        prov_it: Iterator[Provisioning],
+        ctx: "ScoringContext",
+    ) -> Dict[Provisioning, npt.NDArray]:
+        ordering = []
+        resource_factors = []
+        for prov in prov_it:
+            prov.clone()
+            ordering.append(prov)
+            resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(prov)
+            resource_factors.append(resource_factor)
+
+        rf = np.array(resource_factors)
+        basis = np.stack([rf, np.ones_like(rf)])
+        basis = np.transpose(basis)
         coefs = ctx.planner_config.aurora_new_scaling_coefs()
         coefs = np.multiply(coefs, basis)
-        num_coefs = coefs.shape[0]
-        lat_vals = np.expand_dims(base_predicted_latency, axis=1)
-        lat_vals = np.repeat(lat_vals, num_coefs, axis=1)
-        return np.dot(lat_vals, coefs)
+
+        num_coefs = coefs.shape[1]
+        lat_vals = np.expand_dims(base_predicted_latency, axis=0)
+        lat_vals = np.repeat(lat_vals, num_coefs, axis=0)
+
+        predictions = np.matmul(coefs, lat_vals)
+
+        assert len(ordering) == predictions.shape[0]
+        assert predictions.shape[1] == base_predicted_latency.shape[0]
+        return {prov: predictions[idx] for idx, prov in enumerate(ordering)}
 
     @staticmethod
     def predict_query_latency_load_resources_legacy(
