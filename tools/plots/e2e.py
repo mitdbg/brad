@@ -161,6 +161,10 @@ class RecordedRun:
         return self._ana_lat_p90
 
     @property
+    def ana_lat_p90_4min(self) -> pd.DataFrame:
+        return self._agg_ana_lats(window_str="4min", quantile=0.9)
+
+    @property
     def timestamp_offsets(self) -> Tuple[pd.Timestamp, pd.Timestamp]:
         if self._timestamp_offsets is not None:
             return self._timestamp_offsets
