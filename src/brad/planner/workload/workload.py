@@ -10,6 +10,7 @@ from itertools import combinations
 
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
+from brad.planner.enumeration.provisioning import Provisioning
 from brad.planner.workload.query import Query
 from brad.utils.table_sizer import TableSizer
 
@@ -93,6 +94,13 @@ class Workload:
         self._analytical_query_arrival_counts: npt.NDArray = np.array(
             [q.arrival_count() for q in self._analytical_queries]
         )
+
+        self.precomputed_aurora_analytical_latencies: Dict[
+            Provisioning, npt.NDArray
+        ] = {}
+        self.precomputed_redshift_analytical_latencies: Dict[
+            Provisioning, npt.NDArray
+        ] = {}
 
         ###
         ### Legacy properties below.
@@ -202,6 +210,10 @@ class Workload:
             query_indices, self.EngineLatencyIndex[engine]
         ]
 
+    def get_predicted_analytical_latency_all(self, engine: Engine) -> npt.NDArray:
+        assert self._predicted_analytical_latencies is not None
+        return self._predicted_analytical_latencies[:, self.EngineLatencyIndex[engine]]
+
     def set_predicted_data_access_statistics(
         self, aurora_pages: npt.NDArray, athena_bytes: npt.NDArray
     ) -> None:
@@ -230,6 +242,9 @@ class Workload:
 
     def get_arrival_counts_batch(self, query_indices: List[int]) -> npt.NDArray:
         return self._analytical_query_arrival_counts[query_indices]
+
+    def get_arrival_counts(self) -> npt.NDArray:
+        return self._analytical_query_arrival_counts
 
     def compute_latency_gains(self) -> npt.NDArray:
         """

@@ -91,6 +91,18 @@ class PlannerConfig:
     def max_provisioning_multiplier(self) -> float:
         return float(self._raw["max_provisioning_multiplier"])
 
+    def aurora_provisioning_search_distance(self) -> float:
+        try:
+            return self._raw["aurora_provisioning_search_distance"]
+        except KeyError:
+            return 900.0
+
+    def redshift_provisioning_search_distance(self) -> float:
+        try:
+            return self._raw["redshift_provisioning_search_distance"]
+        except KeyError:
+            return 900.0
+
     def athena_usd_per_mb_scanned(self) -> float:
         return float(self._raw["athena_usd_per_mb_scanned"])
 

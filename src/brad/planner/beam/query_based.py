@@ -107,7 +107,13 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         gains = next_workload.compute_latency_gains()
         analytical_queries = next_workload.analytical_queries()
         query_indices = list(range(len(next_workload.analytical_queries())))
+
+        # Want to process queries in decreasing order of frequency followed by
+        # predicted cross-engine gains. Python's sort is stable, so we just
+        # perform two sorts (first by decreasing gain, then arrival frequency).
         query_indices.sort(key=lambda idx: gains[idx], reverse=True)
+        overall_arrival_counts = next_workload.get_arrival_counts()
+        query_indices.sort(key=lambda idx: overall_arrival_counts[idx], reverse=True)
 
         # Sanity check. We cannot run planning without at least one query in the
         # workload.
@@ -134,6 +140,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             self._providers.estimator_provider.get_estimator()
         )
         await ctx.simulate_current_workload_routing(planning_router)
+        ctx.compute_workload_provisioning_predictions()
         ctx.compute_engine_latency_norm_factor()
         ctx.compute_current_workload_predicted_hourly_scan_cost()
         ctx.compute_current_blueprint_provisioning_hourly_cost()
@@ -273,20 +280,22 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         for candidate in current_top_k:
             aurora_it = aurora_enumerator.enumerate_nearby(
                 ctx.current_blueprint.aurora_provisioning(),
-                aurora_enumerator.scaling_to_distance(
-                    ctx.current_blueprint.aurora_provisioning(),
-                    ctx.planner_config.max_provisioning_multiplier(),
-                    Engine.Aurora,
-                ),
+                ctx.planner_config.aurora_provisioning_search_distance(),
+                # aurora_enumerator.scaling_to_distance(
+                #     ctx.current_blueprint.aurora_provisioning(),
+                #     ctx.planner_config.max_provisioning_multiplier(),
+                #     Engine.Aurora,
+                # ),
             )
             for aurora in aurora_it:
                 redshift_it = redshift_enumerator.enumerate_nearby(
                     ctx.current_blueprint.redshift_provisioning(),
-                    redshift_enumerator.scaling_to_distance(
-                        ctx.current_blueprint.redshift_provisioning(),
-                        ctx.planner_config.max_provisioning_multiplier(),
-                        Engine.Redshift,
-                    ),
+                    ctx.planner_config.redshift_provisioning_search_distance(),
+                    # redshift_enumerator.scaling_to_distance(
+                    #     ctx.current_blueprint.redshift_provisioning(),
+                    #     ctx.planner_config.max_provisioning_multiplier(),
+                    #     Engine.Redshift,
+                    # ),
                 )
                 for redshift in redshift_it:
                     new_candidate = candidate.clone()

@@ -6,6 +6,7 @@ from datetime import timedelta
 from brad.config.engine import Engine
 from brad.blueprint import Blueprint
 from brad.config.planner import PlannerConfig
+from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.metrics import Metrics
 from brad.planner.workload import Workload
 from brad.routing.router import Router
@@ -116,6 +117,45 @@ class ScoringContext:
             self.current_blueprint.redshift_provisioning()
         )
         self.current_blueprint_provisioning_hourly_cost = aurora_cost + redshift_cost
+
+    def compute_workload_provisioning_predictions(self) -> None:
+        aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
+        aurora_it = aurora_enumerator.enumerate_nearby(
+            self.current_blueprint.aurora_provisioning(),
+            self.planner_config.aurora_provisioning_search_distance(),
+            # aurora_enumerator.scaling_to_distance(
+            #     self.current_blueprint.aurora_provisioning(),
+            #     self.planner_config.max_provisioning_multiplier(),
+            #     Engine.Aurora,
+            # ),
+        )
+        self.next_workload.precomputed_aurora_analytical_latencies = (
+            AuroraProvisioningScore.predict_query_latency_resources_batch(
+                self.next_workload.get_predicted_analytical_latency_all(Engine.Aurora),
+                aurora_it,
+                self,
+            )
+        )
+
+        redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
+        redshift_it = redshift_enumerator.enumerate_nearby(
+            self.current_blueprint.redshift_provisioning(),
+            self.planner_config.redshift_provisioning_search_distance(),
+            # redshift_enumerator.scaling_to_distance(
+            #     self.current_blueprint.redshift_provisioning(),
+            #     self.planner_config.max_provisioning_multiplier(),
+            #     Engine.Redshift,
+            # ),
+        )
+        self.next_workload.precomputed_redshift_analytical_latencies = (
+            RedshiftProvisioningScore.predict_query_latency_resources_batch(
+                self.next_workload.get_predicted_analytical_latency_all(
+                    Engine.Redshift
+                ),
+                redshift_it,
+                self,
+            )
+        )
 
     def compute_engine_latency_norm_factor(self) -> None:
         for engine in [Engine.Aurora, Engine.Redshift, Engine.Athena]:

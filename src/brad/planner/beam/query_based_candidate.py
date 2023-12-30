@@ -450,19 +450,15 @@ class BlueprintCandidate(ComparableBlueprint):
         )
 
         self.aurora_score = AuroraProvisioningScore.compute(
-            np.array(self.base_query_latencies[Engine.Aurora]),
-            ctx.next_workload.get_arrival_counts_batch(
-                self.query_locations[Engine.Aurora]
-            ),
+            self.query_locations[Engine.Aurora],
+            ctx.next_workload,
             ctx.current_blueprint.aurora_provisioning(),
             self.aurora_provisioning,
             ctx,
         )
         self.redshift_score = RedshiftProvisioningScore.compute(
-            np.array(self.base_query_latencies[Engine.Redshift]),
-            ctx.next_workload.get_arrival_counts_batch(
-                self.query_locations[Engine.Redshift]
-            ),
+            self.query_locations[Engine.Redshift],
+            ctx.next_workload,
             ctx.current_blueprint.redshift_provisioning(),
             self.redshift_provisioning,
             ctx,
@@ -495,11 +491,12 @@ class BlueprintCandidate(ComparableBlueprint):
         aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
         aurora_it = aurora_enumerator.enumerate_nearby(
             ctx.current_blueprint.aurora_provisioning(),
-            aurora_enumerator.scaling_to_distance(
-                ctx.current_blueprint.aurora_provisioning(),
-                ctx.planner_config.max_provisioning_multiplier(),
-                Engine.Aurora,
-            ),
+            ctx.planner_config.aurora_provisioning_search_distance(),
+            # aurora_enumerator.scaling_to_distance(
+            #     ctx.current_blueprint.aurora_provisioning(),
+            #     ctx.planner_config.max_provisioning_multiplier(),
+            #     Engine.Aurora,
+            # ),
         )
 
         working_candidate = self.clone()
@@ -511,11 +508,12 @@ class BlueprintCandidate(ComparableBlueprint):
             redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
             redshift_it = redshift_enumerator.enumerate_nearby(
                 ctx.current_blueprint.redshift_provisioning(),
-                redshift_enumerator.scaling_to_distance(
-                    ctx.current_blueprint.redshift_provisioning(),
-                    ctx.planner_config.max_provisioning_multiplier(),
-                    Engine.Redshift,
-                ),
+                ctx.planner_config.redshift_provisioning_search_distance(),
+                # redshift_enumerator.scaling_to_distance(
+                #     ctx.current_blueprint.redshift_provisioning(),
+                #     ctx.planner_config.max_provisioning_multiplier(),
+                #     Engine.Redshift,
+                # ),
             )
 
             for redshift in redshift_it:
