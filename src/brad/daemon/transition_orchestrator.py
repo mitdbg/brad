@@ -591,7 +591,7 @@ class TransitionOrchestrator:
                 "Running Redshift classic resize. Old: %s, New: %s", str(old), str(new)
             )
             await self._redshift.classic_resize(
-                self._config.redshift_cluster_id, new, wait_until_available=True
+                self._config.redshift_cluster_id, new, wait_until_complete=True
             )
 
         # Redshift's pre-transition work is complete!
