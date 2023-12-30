@@ -140,7 +140,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             self._providers.estimator_provider.get_estimator()
         )
         await ctx.simulate_current_workload_routing(planning_router)
-        ctx.compute_next_workload_provisioning_predictions()
+        ctx.compute_workload_provisioning_predictions()
         ctx.compute_engine_latency_norm_factor()
         ctx.compute_current_workload_predicted_hourly_scan_cost()
         ctx.compute_current_blueprint_provisioning_hourly_cost()

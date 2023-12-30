@@ -1,12 +1,13 @@
 import logging
 import numpy as np
 import numpy.typing as npt
-from typing import Dict, TYPE_CHECKING, Optional, Tuple, Any, Iterator
+from typing import Dict, TYPE_CHECKING, Optional, Tuple, Any, Iterator, List
 
 from brad.config.engine import Engine
 from brad.blueprint.provisioning import Provisioning
 from brad.planner.scoring.provisioning import aurora_num_cpus
 from brad.planner.scoring.performance.queuing import predict_mm1_wait_time
+from brad.planner.workload import Workload
 
 if TYPE_CHECKING:
     from brad.planner.scoring.context import ScoringContext
@@ -28,8 +29,8 @@ class AuroraProvisioningScore:
     @classmethod
     def compute(
         cls,
-        base_query_run_times: npt.NDArray,
-        query_arrival_counts: npt.NDArray,
+        query_indices: List[int],
+        workload: Workload,
         curr_prov: Provisioning,
         next_prov: Provisioning,
         ctx: "ScoringContext",
@@ -39,21 +40,19 @@ class AuroraProvisioningScore:
         place.
         """
         debug_dict: Dict[str, Any] = {}
-        query_factor = cls.query_movement_factor(
-            base_query_run_times, query_arrival_counts, ctx
-        )
+        query_factor = cls.query_movement_factor(query_indices, workload, ctx)
         max_factor, max_factor_replace = ctx.planner_config.aurora_max_query_factor()
         if query_factor is not None and query_factor > max_factor:
             query_factor = max_factor_replace
-        has_queries = base_query_run_times.shape[0] > 0
+        has_queries = len(query_indices) > 0
         txn_cpu_denorm, ana_node_cpu_denorm = cls.predict_loads(
             has_queries, curr_prov, next_prov, query_factor, ctx, debug_dict
         )
         scaled_rt = cls.predict_query_latency_load_resources(
-            base_query_run_times,
+            query_indices,
+            workload,
             next_prov,
             ana_node_cpu_denorm / aurora_num_cpus(next_prov),
-            ctx,
         )
         scaled_txn_lats = cls.predict_txn_latency(
             ctx.metrics.aurora_writer_cpu_avg / 100.0 * aurora_num_cpus(curr_prov),
@@ -248,8 +247,8 @@ class AuroraProvisioningScore:
     @classmethod
     def query_movement_factor(
         cls,
-        base_query_run_times: npt.NDArray,
-        query_arrival_counts: npt.NDArray,
+        query_indices: List[int],
+        workload: Workload,
         ctx: "ScoringContext",
     ) -> Optional[float]:
         # Query movement scaling factor.
@@ -258,28 +257,30 @@ class AuroraProvisioningScore:
             # Special case. We cannot reweigh the queries because nothing in the
             # current workload ran on Aurora.
             return None
-        curr_query_run_times = cls.predict_query_latency_resources(
-            base_query_run_times, ctx.current_blueprint.aurora_provisioning(), ctx
-        )
+        curr_query_run_times = workload.precomputed_aurora_analytical_latencies[
+            ctx.current_blueprint.aurora_provisioning()
+        ][query_indices]
         norm_factor = ctx.engine_latency_norm_factor[Engine.Aurora]
         assert norm_factor != 0.0
-        total_next_latency = np.dot(curr_query_run_times, query_arrival_counts)
+        total_next_latency = np.dot(
+            curr_query_run_times, workload.get_arrival_counts_batch(query_indices)
+        )
         return total_next_latency / norm_factor
 
     @classmethod
     def predict_query_latency_load_resources(
         cls,
-        base_predicted_latency: npt.NDArray,
+        query_indices: List[int],
+        workload: Workload,
         to_prov: Provisioning,
         cpu_util: float,
-        ctx: "ScoringContext",
     ) -> npt.NDArray:
-        if base_predicted_latency.shape[0] == 0:
-            return base_predicted_latency
+        if len(query_indices) == 0:
+            return np.array([])
 
-        prov_predicted_latency = cls.predict_query_latency_resources(
-            base_predicted_latency, to_prov, ctx
-        )
+        prov_predicted_latency = workload.precomputed_aurora_analytical_latencies[
+            to_prov
+        ][query_indices]
 
         mean_service_time = prov_predicted_latency.mean()
         # Note the use of p90. The predictions we make are specifically p90 latency.
@@ -313,9 +314,9 @@ class AuroraProvisioningScore:
         ordering = []
         resource_factors = []
         for prov in prov_it:
-            prov.clone()
-            ordering.append(prov)
-            resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(prov)
+            prov2 = prov.clone()
+            ordering.append(prov2)
+            resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(prov2)
             resource_factors.append(resource_factor)
 
         rf = np.array(resource_factors)

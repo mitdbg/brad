@@ -450,10 +450,8 @@ class BlueprintCandidate(ComparableBlueprint):
         )
 
         self.aurora_score = AuroraProvisioningScore.compute(
-            np.array(self.base_query_latencies[Engine.Aurora]),
-            ctx.next_workload.get_arrival_counts_batch(
-                self.query_locations[Engine.Aurora]
-            ),
+            self.query_locations[Engine.Aurora],
+            ctx.next_workload,
             ctx.current_blueprint.aurora_provisioning(),
             self.aurora_provisioning,
             ctx,

@@ -118,7 +118,7 @@ class ScoringContext:
         )
         self.current_blueprint_provisioning_hourly_cost = aurora_cost + redshift_cost
 
-    def compute_next_workload_provisioning_predictions(self) -> None:
+    def compute_workload_provisioning_predictions(self) -> None:
         aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
         aurora_it = aurora_enumerator.enumerate_nearby(
             self.current_blueprint.aurora_provisioning(),
