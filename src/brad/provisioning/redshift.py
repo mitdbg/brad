@@ -266,6 +266,32 @@ class RedshiftProvisioningManager:
                 await asyncio.sleep(wait_time_s)
 
     async def _get_resize_status(self, cluster_id: str) -> Dict[str, Any]:
+        # The returned value looks like this:
+        # {
+        #     "TargetNodeType": "dc2.large",
+        #     "TargetNumberOfNodes": 5,
+        #     "TargetClusterType": "multi-node",
+        #     "Status": "IN_PROGRESS",
+        #     "AvgResizeRateInMegaBytesPerSecond": 0.0,
+        #     "TotalResizeDataInMegaBytes": 104841,
+        #     "ProgressInMegaBytes": 0,
+        #     "ElapsedTimeInSeconds": 49338,
+        #     "ResizeType": "ClassicResize",
+        #     "TargetEncryptionType": "NONE",
+        #     "DataTransferProgressPercent": 0.0,
+        #     "ResponseMetadata": {
+        #         "RequestId": "c0a43652-c552-48db-bbd0-9a2dde0494fa",
+        #         "HTTPStatusCode": 200,
+        #         "HTTPHeaders": {
+        #         "x-amzn-requestid": "c0a43652-c552-48db-bbd0-9a2dde0494fa",
+        #         "content-type": "text/xml",
+        #         "content-length": "861",
+        #         "date": "Sat, 30 Dec 2023 21:47:27 GMT"
+        #         },
+        #         "RetryAttempts": 0
+        #     }
+        # }
+
         def do_get_status():
             return self._redshift.describe_resize(ClusterIdentifier=cluster_id)
 
