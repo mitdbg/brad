@@ -45,11 +45,47 @@ class QueryMap:
 
         predictions = np.stack(preds, axis=-1)
 
+        # Check for any bad data (all predictions are NaN or Inf).
+        all_inf = np.all(np.isinf(predictions), axis=1)
+        all_nan = np.all(np.isnan(predictions), axis=1)
+
         # Replace any `inf` / `nan` values in the predictions with this value.
         # This prevents a degenerate case in performance estimation.
         timeout_value_s = 210.0
         predictions[np.isinf(predictions)] = timeout_value_s
         predictions[np.isnan(predictions)] = timeout_value_s
+
+        if np.any(all_inf):
+            all_inf_idxs = np.where(all_inf)[0]
+            logger.warning(
+                "[Dataset %s] Some predicted data points are inf on all engines. "
+                "They will be reset to 0.0. %s",
+                name,
+                str(all_inf_idxs),
+            )
+            predictions[all_inf_idxs, [0, 1, 2]] = 0.0
+
+        if np.any(all_nan):
+            all_nan_idxs = np.where(all_nan)[0]
+            logger.warning(
+                "[Dataset %s] Some predicted data points are inf on all engines. "
+                "They will be reset to 0.0. %s",
+                name,
+                str(all_nan_idxs),
+            )
+            predictions[all_nan_idxs, [0, 1, 2]] = 0.0
+
+        negative_value_mask = predictions < 0.0
+        if np.any(negative_value_mask):
+            negative_idxs = np.any(negative_value_mask, axis=1)
+            logger.warning(
+                "[Dataset %s] Some predicted points are negative. "
+                "Will be reset to 0.01. %s",
+                name,
+                str(np.where(negative_idxs)[0]),
+            )
+            # Imputed value to avoid degenerate cases.
+            predictions[negative_value_mask] = 0.01
 
         return cls(name, queries_map, predictions)
 
@@ -142,6 +178,11 @@ class PrecomputedPredictions(AnalyticsLatencyScorer):
         # prevents a degenerate case in performance estimation.
         timeout_value_s = 210.0
         predictions[np.isinf(predictions)] = timeout_value_s
+
+        logger.warning(
+            "Running older precomputed predictions codepath. "
+            "Note that this does not correct for data errors."
+        )
 
         return cls([QueryMap("custom", queries_map, predictions)])
 

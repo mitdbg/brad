@@ -97,6 +97,10 @@ def runner(
         return
 
     if query_frequency is not None:
+        # There are no predictions for query 48 in our test set (query cannot be parsed).
+        # Set its frequency to 0 so it is never used.
+        query_frequency[48] = 0.0
+
         query_frequency = query_frequency[queries]
         query_frequency = query_frequency / np.sum(query_frequency)
 
