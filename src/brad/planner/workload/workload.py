@@ -231,6 +231,9 @@ class Workload:
     def get_arrival_counts_batch(self, query_indices: List[int]) -> npt.NDArray:
         return self._analytical_query_arrival_counts[query_indices]
 
+    def get_arrival_counts(self) -> npt.NDArray:
+        return self._analytical_query_arrival_counts
+
     def compute_latency_gains(self) -> npt.NDArray:
         """
         We define "gain" as the largest ratio between predicted execution times

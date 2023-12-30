@@ -107,7 +107,13 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         gains = next_workload.compute_latency_gains()
         analytical_queries = next_workload.analytical_queries()
         query_indices = list(range(len(next_workload.analytical_queries())))
+
+        # Want to process queries in decreasing order of frequency followed by
+        # predicted cross-engine gains. Python's sort is stable, so we just
+        # perform two sorts (first by decreasing gain, then arrival frequency).
         query_indices.sort(key=lambda idx: gains[idx], reverse=True)
+        overall_arrival_counts = next_workload.get_arrival_counts()
+        query_indices.sort(key=lambda idx: overall_arrival_counts[idx], reverse=True)
 
         # Sanity check. We cannot run planning without at least one query in the
         # workload.
