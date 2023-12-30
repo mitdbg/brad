@@ -122,8 +122,8 @@ std_datasets:
 
 use_preset_redshift_clusters: false
 
-aurora_provisioning_search_distance: 500.0
-redshift_provisioning_search_distance: 500.0
+aurora_provisioning_search_distance: 900.0
+redshift_provisioning_search_distance: 900.0
 
 # Blueprint planning trigger configs.
 
