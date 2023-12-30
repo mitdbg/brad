@@ -491,11 +491,12 @@ class BlueprintCandidate(ComparableBlueprint):
         aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
         aurora_it = aurora_enumerator.enumerate_nearby(
             ctx.current_blueprint.aurora_provisioning(),
-            aurora_enumerator.scaling_to_distance(
-                ctx.current_blueprint.aurora_provisioning(),
-                ctx.planner_config.max_provisioning_multiplier(),
-                Engine.Aurora,
-            ),
+            ctx.planner_config.aurora_provisioning_search_distance(),
+            # aurora_enumerator.scaling_to_distance(
+            #     ctx.current_blueprint.aurora_provisioning(),
+            #     ctx.planner_config.max_provisioning_multiplier(),
+            #     Engine.Aurora,
+            # ),
         )
 
         working_candidate = self.clone()
@@ -507,11 +508,12 @@ class BlueprintCandidate(ComparableBlueprint):
             redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
             redshift_it = redshift_enumerator.enumerate_nearby(
                 ctx.current_blueprint.redshift_provisioning(),
-                redshift_enumerator.scaling_to_distance(
-                    ctx.current_blueprint.redshift_provisioning(),
-                    ctx.planner_config.max_provisioning_multiplier(),
-                    Engine.Redshift,
-                ),
+                ctx.planner_config.redshift_provisioning_search_distance(),
+                # redshift_enumerator.scaling_to_distance(
+                #     ctx.current_blueprint.redshift_provisioning(),
+                #     ctx.planner_config.max_provisioning_multiplier(),
+                #     Engine.Redshift,
+                # ),
             )
 
             for redshift in redshift_it:

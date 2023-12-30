@@ -122,11 +122,12 @@ class ScoringContext:
         aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
         aurora_it = aurora_enumerator.enumerate_nearby(
             self.current_blueprint.aurora_provisioning(),
-            aurora_enumerator.scaling_to_distance(
-                self.current_blueprint.aurora_provisioning(),
-                self.planner_config.max_provisioning_multiplier(),
-                Engine.Aurora,
-            ),
+            self.planner_config.aurora_provisioning_search_distance(),
+            # aurora_enumerator.scaling_to_distance(
+            #     self.current_blueprint.aurora_provisioning(),
+            #     self.planner_config.max_provisioning_multiplier(),
+            #     Engine.Aurora,
+            # ),
         )
         self.next_workload.precomputed_aurora_analytical_latencies = (
             AuroraProvisioningScore.predict_query_latency_resources_batch(
@@ -139,11 +140,12 @@ class ScoringContext:
         redshift_enumerator = ProvisioningEnumerator(Engine.Redshift)
         redshift_it = redshift_enumerator.enumerate_nearby(
             self.current_blueprint.redshift_provisioning(),
-            redshift_enumerator.scaling_to_distance(
-                self.current_blueprint.redshift_provisioning(),
-                self.planner_config.max_provisioning_multiplier(),
-                Engine.Redshift,
-            ),
+            self.planner_config.redshift_provisioning_search_distance(),
+            # redshift_enumerator.scaling_to_distance(
+            #     self.current_blueprint.redshift_provisioning(),
+            #     self.planner_config.max_provisioning_multiplier(),
+            #     Engine.Redshift,
+            # ),
         )
         self.next_workload.precomputed_redshift_analytical_latencies = (
             RedshiftProvisioningScore.predict_query_latency_resources_batch(
