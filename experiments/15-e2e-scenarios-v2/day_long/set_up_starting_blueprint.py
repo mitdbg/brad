@@ -61,19 +61,18 @@ def main():
         "--athena-queries",
         type=str,
         help="Comma separated list of indices.",
-        default=",".join(map(str, range(25))),
     )
     parser.add_argument(
         "--aurora-queries",
         type=str,
         help="Comma separated list of indices.",
-        default=",".join(map(str, range(25, 50))),
+        default=",".join(map(str, range(45, 50))),
     )
     parser.add_argument(
         "--redshift-queries",
         type=str,
         help="Comma separated list of indices.",
-        default=",".join(map(str, range(50, 75))),
+        default=",".join(map(str, range(45))) + "," + ",".join(map(str, range(50, 75))),
     )
     args = parser.parse_args()
     set_up_logging(debug_mode=True)
@@ -128,12 +127,16 @@ def main():
 
     # Ensure the provisioning is as expected.
     enum_blueprint.set_aurora_provisioning(Provisioning("db.t4g.medium", 2))
-    enum_blueprint.set_redshift_provisioning(Provisioning("dc2.large", 2))
+    enum_blueprint.set_redshift_provisioning(Provisioning("ra3.xlplus", 2))
 
     # 6. Adjust the placement.
     new_placement = {}
+    aurora_txn = ["theatres", "showings", "ticket_orders", "movie_info", "aka_title"]
     for table in blueprint.tables():
-        new_placement[table.name] = [Engine.Aurora, Engine.Athena, Engine.Redshift]
+        if table.name in aurora_txn:
+            new_placement[table.name] = [Engine.Aurora, Engine.Redshift, Engine.Athena]
+        else:
+            new_placement[table.name] = [Engine.Redshift, Engine.Athena]
     enum_blueprint.set_table_locations(new_placement)
 
     # 6. Transition to the new blueprint.
