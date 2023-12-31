@@ -90,9 +90,9 @@ def runner(
         rand_backoff = None
 
         logger.info(
-            "[Ad hoc Runner %d] Queries to run: %s",
+            "[Ad hoc Runner %d] Queries to run: %d",
             runner_idx,
-            queries,
+            len(queries),
         )
 
         # Signal that we're ready to start and wait for the controller.
