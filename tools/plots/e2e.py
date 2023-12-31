@@ -308,9 +308,11 @@ class RecordedRun:
             else:
                 intervals.append((last_offset, offset_minute))
             last_offset = offset_minute
+        end_offset_minute = (end_ts - start_ts).total_seconds() / 60.0
         if last_offset is not None:
-            end_offset_minute = (end_ts - start_ts).total_seconds() / 60.0
             intervals.append((last_offset, end_offset_minute))
+        else:
+            intervals.append((0.0, end_offset_minute))
         return intervals
 
     def compute_olap_costs(
