@@ -161,9 +161,15 @@ class RedshiftProvisioningManager:
                         cluster_id,
                     )
                     logger.warning("%s", json.dumps(status, indent=2, default=str))
-                    break
+                    cancel_succeeded = await self.cancel_resize(cluster_id)
+                    if cancel_succeeded:
+                        break
+                    else:
+                        logger.warning(
+                            "Could not cancel the resize on %s. Continuing to wait...",
+                            cluster_id,
+                        )
 
-            await self.cancel_resize(cluster_id)
             await asyncio.sleep(20)
             await self.wait_until_available(cluster_id)
 
@@ -233,13 +239,22 @@ class RedshiftProvisioningManager:
             )
             await asyncio.sleep(polling_interval)
 
-    async def cancel_resize(self, cluster_id: str) -> None:
+    async def cancel_resize(self, cluster_id: str) -> bool:
         def do_cancel():
-            return self._redshift.cancel_resize(ClusterIdentifier=cluster_id)
+            try:
+                self._redshift.cancel_resize(ClusterIdentifier=cluster_id)
+                return True, None
+            except Exception as ex:
+                return False, ex
 
         loop = asyncio.get_running_loop()
         logger.info("Cancelling Redshift resize on %s", cluster_id)
-        await loop.run_in_executor(None, do_cancel)
+        succeeded, ex = await loop.run_in_executor(None, do_cancel)
+        if succeeded:
+            return True
+        else:
+            logger.warning("Cancel resize failed: %s", repr(ex))
+            return False
 
     async def _get_cluster_state(self, cluster_id: str) -> Dict[str, Any]:
         def do_get_state():
