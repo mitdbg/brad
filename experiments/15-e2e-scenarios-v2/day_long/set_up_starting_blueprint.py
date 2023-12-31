@@ -37,6 +37,14 @@ async def run_transition(
 
 
 def main():
+    athena_queries = [79, 88]
+    aurora_queries = [35, 43, 44, 45, 46, 47]
+    redshift_queries = [
+        idx
+        for idx in list(range(100))
+        if idx not in athena_queries and idx not in aurora_queries
+    ]
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--system-config-file",
@@ -61,18 +69,19 @@ def main():
         "--athena-queries",
         type=str,
         help="Comma separated list of indices.",
+        default=",".join(athena_queries),
     )
     parser.add_argument(
         "--aurora-queries",
         type=str,
         help="Comma separated list of indices.",
-        default=",".join(map(str, range(45, 50))),
+        default=",".join(aurora_queries),
     )
     parser.add_argument(
         "--redshift-queries",
         type=str,
         help="Comma separated list of indices.",
-        default=",".join(map(str, range(45))) + "," + ",".join(map(str, range(50, 75))),
+        default=",".join(redshift_queries),
     )
     args = parser.parse_args()
     set_up_logging(debug_mode=True)
@@ -126,14 +135,24 @@ def main():
     enum_blueprint.set_routing_policy(replaced_policy)
 
     # Ensure the provisioning is as expected.
-    enum_blueprint.set_aurora_provisioning(Provisioning("db.t4g.medium", 2))
+    enum_blueprint.set_aurora_provisioning(Provisioning("db.r6g.large", 2))
     enum_blueprint.set_redshift_provisioning(Provisioning("ra3.xlplus", 2))
 
     # 6. Adjust the placement.
     new_placement = {}
     aurora_txn = ["theatres", "showings", "ticket_orders", "movie_info", "aka_title"]
+    aurora_ana = [
+        "aka_name",
+        "cast_info",
+        "char_name",
+        "link_type",
+        "movie_link",
+        "name",
+        "person_info",
+        "title",
+    ]
     for table in blueprint.tables():
-        if table.name in aurora_txn:
+        if table.name in aurora_txn or table.name in aurora_ana:
             new_placement[table.name] = [Engine.Aurora, Engine.Redshift, Engine.Athena]
         else:
             new_placement[table.name] = [Engine.Redshift, Engine.Athena]

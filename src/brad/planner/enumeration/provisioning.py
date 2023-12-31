@@ -65,8 +65,16 @@ class ProvisioningEnumerator:
         ):
             yield candidate
 
+        is_redshift_ra3 = base_provisioning.instance_type().startswith("ra3")
+
         # Consider all other provisionings.
         for instance_type, specs in self._instances.items():
+            if is_redshift_ra3 and instance_type.startswith("dc2"):
+                # Redshift does not support resizing from ra3 to dc2. This
+                # should be encoded as part of our constraints, but for now we
+                # leave this here for convenience.
+                continue
+
             candidate.set_instance_type(instance_type)
             for num_nodes in range(
                 int(specs["min_nodes"]), int(specs["max_nodes"]) + 1
