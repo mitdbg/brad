@@ -1,0 +1,30 @@
+include("../common.cond")
+
+INSTANCE_CONFIGS = [
+  ("dc2_large", 2)
+]
+
+JOINT_QUERY_CONFIGS = list(map(str, JOINT_QUERY_ORDER)) + [
+    ",".join(map(str, JOINT_QUERY_ORDER[:idx + 1]))
+    for idx in range(len(JOINT_QUERY_ORDER))
+]
+
+for instance, nodes in INSTANCE_CONFIGS:
+  run_experiment_group(
+    name=f"{instance}-{nodes}-imdb_extended_100g",
+    run="python3 -m brad.calibration.measure_joint_load",
+    experiments=[
+      ExperimentInstance(
+        name=f"{instance}-{nodes}-imdb_extended_100g-1-c{config_idx}",
+        options={
+          "specific-query-idxs": queries,
+          "run-for-s": RUN_FOR_S,
+          "avg-gap-s": AVG_GAP_S,
+          "wait-before-start": WAIT_BEFORE_START,
+          "query-file": "../../../../workloads/IMDB_100GB/scaling_20/queries.sql",
+          "engine": "redshift",
+        },
+      )
+      for config_idx, queries in enumerate(JOINT_QUERY_CONFIGS)
+    ],
+  )

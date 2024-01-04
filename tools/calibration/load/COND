@@ -19,3 +19,11 @@ for schema in ["imdb_extended_20g", "imdb_extended_100g"]:
       f"//redshift:dc2_large-8-{schema}",
     ],
   )
+
+combine(
+  name="joint",
+  deps=[
+    "//aurora_joint:r6g_xlarge-imdb_extended_100g",
+    "//redshift_joint:dc2_large-2-imdb_extended_100g",
+  ],
+)
