@@ -1,5 +1,5 @@
 AVG_GAP_S = 3
-RUN_FOR_S = 4 * 60  # 4 minutes
+RUN_FOR_S = 10 * 60  # 6 minutes
 NUM_CLIENTS = [1, 2, 4, 6]
 NUM_QUERIES = 20
 WAIT_BEFORE_START = 10
