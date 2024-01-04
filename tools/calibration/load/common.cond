@@ -3,3 +3,7 @@ RUN_FOR_S = 4 * 60  # 4 minutes
 NUM_CLIENTS = [1, 2, 4, 6]
 NUM_QUERIES = 20
 WAIT_BEFORE_START = 10
+
+# prng = random.Random(42)
+# res = prng.sample(range(20), k=10)
+JOINT_QUERY_ORDER = [3, 0, 8, 7, 16, 2, 11, 1, 10, 17]
