@@ -40,7 +40,7 @@ for instance in INSTANCE_TYPES:
       ExperimentInstance(
         name=f"{instance}-imdb_extended_100g-1-d{config_idx}",
         options={
-          "specific-query-idxs": queries,
+          "specific-query-idxs": ",".join(map(str, queries)),
           "run-for-s": RUN_FOR_S,
           "avg-gap-s": AVG_GAP_S,
           "wait-before-start": WAIT_BEFORE_START,
