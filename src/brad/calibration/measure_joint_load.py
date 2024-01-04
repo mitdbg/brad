@@ -207,11 +207,11 @@ def main() -> None:
         processes.append(p)
 
     print("Waiting for startup...", flush=True)
-    for _ in range(args.num_clients):
+    for _ in range(len(qidxs)):
         start_queue.get()
 
-    print("Telling {} clients to start.".format(args.num_clients), flush=True)
-    for _ in range(args.num_clients):
+    print("Telling {} clients to start.".format(len(qidxs)), flush=True)
+    for _ in range(len(qidxs)):
         stop_queue.put("")
 
     if args.run_for_s is not None:
@@ -239,7 +239,7 @@ def main() -> None:
         should_shutdown.wait()
 
     print("Stopping clients...", flush=True, file=sys.stderr)
-    for _ in range(args.num_clients):
+    for _ in range(len(qidxs)):
         stop_queue.put("")
 
     print(
