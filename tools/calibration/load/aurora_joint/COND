@@ -5,8 +5,11 @@ INSTANCE_TYPES = [
 ]
 
 JOINT_QUERY_CONFIGS = list(map(str, JOINT_QUERY_ORDER)) + [
-    ",".join(map(str, JOINT_QUERY_ORDER[:idx + 1]))
-    for idx in range(len(JOINT_QUERY_ORDER))
+  ",".join(map(str, JOINT_QUERY_ORDER[:idx + 1]))
+  for idx in range(len(JOINT_QUERY_ORDER))
+] + [
+  ",".join(map(str, JOINT_QUERY_ORDER_2[:idx + 1]))
+  for idx in range(len(JOINT_QUERY_ORDER_2))
 ]
 
 for instance in INSTANCE_TYPES:

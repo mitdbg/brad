@@ -7,3 +7,4 @@ WAIT_BEFORE_START = 10
 # prng = random.Random(42)
 # res = prng.sample(range(20), k=10)
 JOINT_QUERY_ORDER = [3, 0, 8, 7, 16, 2, 11, 1, 10, 17]
+JOINT_QUERY_ORDER_2 = [1, 9, 4, 14, 11, 10, 15, 12, 19, 7]
