@@ -145,7 +145,7 @@ def main() -> None:
         return
 
     assert args.specific_query_idxs is not None
-    qidxs = [int(idx.strip()) for idx in args.specific_query_idx.split(",")]
+    qidxs = [int(idx.strip()) for idx in args.specific_query_idxs.split(",")]
 
     for qidx in qidxs:
         assert qidx < len(queries), f"Q{qidx} is out of bounds."
