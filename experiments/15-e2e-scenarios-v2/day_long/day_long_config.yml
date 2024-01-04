@@ -93,7 +93,7 @@ redshift_min_load_removal_fraction: 0.9
 
 aurora_max_query_factor: 4.0
 aurora_max_query_factor_replace: 10000.0
-redshift_peak_load_threshold: 95.0
+redshift_peak_load_threshold: 98.5
 redshift_peak_load_multiplier: 2.0
 
 # Blueprint planning performance ceilings.

@@ -69,19 +69,19 @@ def main():
         "--athena-queries",
         type=str,
         help="Comma separated list of indices.",
-        default=",".join(athena_queries),
+        default=",".join(map(str, athena_queries)),
     )
     parser.add_argument(
         "--aurora-queries",
         type=str,
         help="Comma separated list of indices.",
-        default=",".join(aurora_queries),
+        default=",".join(map(str, aurora_queries)),
     )
     parser.add_argument(
         "--redshift-queries",
         type=str,
         help="Comma separated list of indices.",
-        default=",".join(redshift_queries),
+        default=",".join(map(str, redshift_queries)),
     )
     args = parser.parse_args()
     set_up_logging(debug_mode=True)
@@ -135,7 +135,7 @@ def main():
     enum_blueprint.set_routing_policy(replaced_policy)
 
     # Ensure the provisioning is as expected.
-    enum_blueprint.set_aurora_provisioning(Provisioning("db.r6g.large", 2))
+    enum_blueprint.set_aurora_provisioning(Provisioning("db.t4g.medium", 2))
     enum_blueprint.set_redshift_provisioning(Provisioning("ra3.xlplus", 2))
 
     # 6. Adjust the placement.
