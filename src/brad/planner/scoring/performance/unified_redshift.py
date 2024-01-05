@@ -209,6 +209,9 @@ class RedshiftProvisioningScore:
         ctx: "ScoringContext",
         debug_dict: Optional[Dict[str, Any]] = None,
     ) -> Tuple[float, float]:
+        if len(query_indices) == 0:
+            return 0.0, 0.0
+
         alpha, load_max = ctx.planner_config.redshift_rt_to_cpu_denorm()
         query_run_times = workload.precomputed_redshift_analytical_latencies[next_prov][
             query_indices
