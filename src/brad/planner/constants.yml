@@ -201,6 +201,13 @@ redshift_scaling_new:
   coef1: 0.89125617
   coef2: 0.1139099
 
+run_time_to_denorm_cpu:
+  aurora:
+    alpha: 0.39142781
+    max: 3.2
+  redshift:
+    alpha: 0.54941336
+    max: 1.4
 
 ###
 ### The configs below are deprecated.
