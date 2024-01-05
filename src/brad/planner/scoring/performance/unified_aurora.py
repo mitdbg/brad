@@ -44,9 +44,19 @@ class AuroraProvisioningScore:
         max_factor, max_factor_replace = ctx.planner_config.aurora_max_query_factor()
         if query_factor is not None and query_factor > max_factor:
             query_factor = max_factor_replace
+        pred_total_cpu_denorm, max_per_query_cpu_denorm = cls.compute_direct_cpu_denorm(
+            query_indices, workload, next_prov, ctx, debug_dict
+        )
         has_queries = len(query_indices) > 0
         txn_cpu_denorm, ana_node_cpu_denorm = cls.predict_loads(
-            has_queries, curr_prov, next_prov, query_factor, ctx, debug_dict
+            has_queries,
+            curr_prov,
+            next_prov,
+            query_factor,
+            pred_total_cpu_denorm,
+            max_per_query_cpu_denorm,
+            ctx,
+            debug_dict,
         )
         scaled_rt = cls.predict_query_latency_load_resources(
             query_indices,
@@ -81,6 +91,8 @@ class AuroraProvisioningScore:
         curr_prov: Provisioning,
         next_prov: Provisioning,
         query_factor: Optional[float],
+        total_cpu_denorm: float,
+        max_per_query_cpu_denorm: float,
         ctx: "ScoringContext",
         debug_dict: Optional[Dict[str, Any]] = None,
     ) -> Tuple[float, float]:
@@ -149,15 +161,10 @@ class AuroraProvisioningScore:
                 # No replicas -> No replicas
                 if adding_ana_first_time:
                     # Special case. If no queries ran on Aurora and now we are
-                    # running queries, we need to prime the system with some
-                    # load. We use a constant factor to prime the system.
-                    initialized_load = (
-                        ctx.planner_config.aurora_initialize_load_fraction()
-                        * aurora_num_cpus(curr_prov)
-                    )
+                    # running queries, we use the predicted total load.
                     return (
-                        curr_writer_cpu_util_denorm + initialized_load,
-                        curr_writer_cpu_util_denorm + initialized_load,
+                        curr_writer_cpu_util_denorm + total_cpu_denorm,
+                        curr_writer_cpu_util_denorm + total_cpu_denorm,
                     )
                 else:
                     final_denorm = (
@@ -171,15 +178,14 @@ class AuroraProvisioningScore:
                 # No replicas -> Yes replicas
                 if adding_ana_first_time:
                     # Special case. If no queries ran on Aurora and now we are
-                    # running queries, we need to prime the system with some
-                    # load. We use a constant factor to prime the system.
-                    initialized_load = (
-                        ctx.planner_config.aurora_initialize_load_fraction()
-                        * aurora_num_cpus(curr_prov)
-                    )
+                    # running queries, we use the predicted total load.
                     return (
                         curr_writer_cpu_util_denorm,
-                        initialized_load / (next_prov.num_nodes() - 1),
+                        max(
+                            total_cpu_denorm / (next_prov.num_nodes() - 1),
+                            # Cannot scale below this value (single query).
+                            max_per_query_cpu_denorm,
+                        ),
                     )
                 else:
                     # Here we need to separate the load imposed by the
@@ -187,12 +193,16 @@ class AuroraProvisioningScore:
                     # Transactions remain on Aurora.
                     return (
                         curr_writer_cpu_util_denorm * pred_txn_frac,
-                        (
-                            curr_writer_cpu_util_denorm
-                            * pred_ana_frac
-                            * query_factor_clean
-                        )
-                        / (next_prov.num_nodes() - 1),
+                        max(
+                            (
+                                curr_writer_cpu_util_denorm
+                                * pred_ana_frac
+                                * query_factor_clean
+                            )
+                            / (next_prov.num_nodes() - 1),
+                            # Cannot scale below this value (single query).
+                            max_per_query_cpu_denorm,
+                        ),
                     )
 
         else:
@@ -203,22 +213,14 @@ class AuroraProvisioningScore:
                 * aurora_num_cpus(curr_prov)
                 * curr_num_read_replicas
             )
-            # Handling a special case of moving queries onto Aurora where none
-            # previously executed. Note that this should be very rare here
-            # because there are already read replicas.
-            initialized_load = (
-                ctx.planner_config.aurora_initialize_load_fraction()
-                * aurora_num_cpus(curr_prov)
-                * curr_num_read_replicas
-            )
 
             if not next_has_replicas:
                 # Yes replicas -> No replicas
                 if adding_ana_first_time:
                     # Special case.
                     return (
-                        curr_writer_cpu_util_denorm + initialized_load,
-                        (curr_writer_cpu_util_denorm + initialized_load),
+                        curr_writer_cpu_util_denorm + total_cpu_denorm,
+                        (curr_writer_cpu_util_denorm + total_cpu_denorm),
                     )
                 else:
                     return (
@@ -234,15 +236,51 @@ class AuroraProvisioningScore:
                     # Special case.
                     return (
                         curr_writer_cpu_util_denorm,
-                        initialized_load / (next_prov.num_nodes() - 1),
+                        max(
+                            total_cpu_denorm / (next_prov.num_nodes() - 1),
+                            # Cannot scale below this value (single query).
+                            max_per_query_cpu_denorm,
+                        ),
                     )
                 else:
                     return (
                         curr_writer_cpu_util_denorm,
-                        total_reader_cpu_denorm
-                        * query_factor_clean
-                        / (next_prov.num_nodes() - 1),
+                        max(
+                            total_reader_cpu_denorm
+                            * query_factor_clean
+                            / (next_prov.num_nodes() - 1),
+                            # Cannot scale below this value (single query).
+                            max_per_query_cpu_denorm,
+                        ),
                     )
+
+    @classmethod
+    def compute_direct_cpu_denorm(
+        cls,
+        query_indices: List[int],
+        workload: Workload,
+        next_prov: Provisioning,
+        ctx: "ScoringContext",
+        debug_dict: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[float, float]:
+        if len(query_indices) == 0:
+            return 0.0, 0.0
+
+        alpha, load_max = ctx.planner_config.aurora_rt_to_cpu_denorm()
+        query_run_times = workload.precomputed_aurora_analytical_latencies[next_prov][
+            query_indices
+        ]
+        arrival_counts = workload.get_arrival_counts_batch(query_indices)
+        arrival_weights = arrival_counts / arrival_counts.sum()
+        per_query_cpu_denorm = np.clip(
+            query_run_times * alpha, a_min=0.0, a_max=load_max
+        )
+        total_denorm = np.dot(per_query_cpu_denorm, arrival_weights)
+        max_query_cpu_denorm = per_query_cpu_denorm.max()
+        if debug_dict is not None:
+            debug_dict["aurora_total_cpu_denorm"] = total_denorm
+            debug_dict["aurora_max_query_cpu_denorm"] = max_query_cpu_denorm
+        return total_denorm, max_query_cpu_denorm
 
     @classmethod
     def query_movement_factor(

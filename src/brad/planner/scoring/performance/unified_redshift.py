@@ -2,7 +2,7 @@ import logging
 import math
 import numpy as np
 import numpy.typing as npt
-from typing import Dict, TYPE_CHECKING, Optional, Iterator, List
+from typing import Dict, TYPE_CHECKING, Optional, Iterator, List, Tuple, Any
 
 from brad.config.engine import Engine
 from brad.blueprint.provisioning import Provisioning
@@ -40,9 +40,18 @@ class RedshiftProvisioningScore:
         Computes all of the Redshift provisioning-dependent scoring components in one
         place.
         """
+        debug_dict: Dict[str, Any] = {}
         query_factor = cls.query_movement_factor(query_indices, workload, ctx)
+        total_cpu_denorm, max_per_query_cpu_denorm = cls.compute_direct_cpu_denorm(
+            query_indices, workload, next_prov, ctx, debug_dict
+        )
         predicted_max_node_cpu_util = cls.predict_max_node_cpu_util(
-            curr_prov, next_prov, query_factor, ctx
+            curr_prov,
+            next_prov,
+            query_factor,
+            total_cpu_denorm,
+            max_per_query_cpu_denorm,
+            ctx,
         )
 
         # Special case (turning off Redshift).
@@ -53,6 +62,7 @@ class RedshiftProvisioningScore:
                 ),
                 0.0,
                 {
+                    **debug_dict,
                     "redshift_query_factor": 0.0,
                     "redshift_skew_adjustment": np.nan,
                 },
@@ -65,6 +75,7 @@ class RedshiftProvisioningScore:
                 scaled_rt,
                 predicted_max_node_cpu_util,
                 {
+                    **debug_dict,
                     "redshift_query_factor": query_factor
                     if query_factor is not None
                     else np.nan,
@@ -80,6 +91,8 @@ class RedshiftProvisioningScore:
         curr_prov: Provisioning,
         next_prov: Provisioning,
         query_factor: Optional[float],
+        total_cpu_denorm: float,
+        max_per_query_cpu_denorm: float,
         ctx: "ScoringContext",
     ) -> float:
         """
@@ -102,10 +115,8 @@ class RedshiftProvisioningScore:
         if not curr_on and next_on:
             # Turning on Redshift.
             # We cannot reweigh the load because nothing in the current
-            # workload ran on Redshift. We prime the load with a fraction of the
-            # proposed cluster's peak load.
-            max_peak_util = ctx.planner_config.redshift_initialize_load_fraction()
-            return max_peak_util
+            # workload ran on Redshift. We use the computed CPU denorm value.
+            return total_cpu_denorm / redshift_num_cpus(next_prov)
         else:
             # Redshift is staying on, but there is a potential provisioning
             # change.
@@ -121,11 +132,12 @@ class RedshiftProvisioningScore:
                 query_factor is None
                 and len(ctx.current_query_locations[Engine.Redshift]) > 0
             ):
-                max_peak_util = ctx.planner_config.redshift_initialize_load_fraction()
-                return max_peak_util
+                return total_cpu_denorm / redshift_num_cpus(next_prov)
 
             curr_cpu_util: npt.NDArray = ctx.metrics.redshift_cpu_list.copy() / 100.0
-            assert curr_cpu_util.shape[0] > 0, "Must have Redshift CPU metrics."
+            if curr_cpu_util.shape[0] == 0:
+                # This is to support running recorded legacy planning runs.
+                curr_cpu_util = np.ones(curr_nodes) * ctx.metrics.redshift_cpu_avg
             curr_cpu_util.sort()  # In place.
             if ctx.cpu_skew_adjustment is None:
                 ctx.cpu_skew_adjustment = cls.compute_skew_adjustment(curr_cpu_util)
@@ -181,9 +193,42 @@ class RedshiftProvisioningScore:
             next_util = (query_factor_clean * next_max_cpu_denorm) / redshift_num_cpus(
                 next_prov
             )
+            # Continuing to add nodes should not result in continued scaling of
+            # the load beyond the max single query load.
+            next_util = max(
+                next_util, max_per_query_cpu_denorm / redshift_num_cpus(next_prov)
+            )
 
             # Clip to [0, 1].
             return min(max(next_util, 0.0), 1.0)
+
+    @classmethod
+    def compute_direct_cpu_denorm(
+        cls,
+        query_indices: List[int],
+        workload: Workload,
+        next_prov: Provisioning,
+        ctx: "ScoringContext",
+        debug_dict: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[float, float]:
+        if len(query_indices) == 0:
+            return 0.0, 0.0
+
+        alpha, load_max = ctx.planner_config.redshift_rt_to_cpu_denorm()
+        query_run_times = workload.precomputed_redshift_analytical_latencies[next_prov][
+            query_indices
+        ]
+        arrival_counts = workload.get_arrival_counts_batch(query_indices)
+        arrival_weights = arrival_counts / arrival_counts.sum()
+        per_query_cpu_denorm = np.clip(
+            query_run_times * alpha, a_min=0.0, a_max=load_max
+        )
+        total_denorm = np.dot(per_query_cpu_denorm, arrival_weights)
+        max_query_cpu_denorm = per_query_cpu_denorm.max()
+        if debug_dict is not None:
+            debug_dict["redshift_total_cpu_denorm"] = total_denorm
+            debug_dict["redshift_max_query_cpu_denorm"] = max_query_cpu_denorm
+        return total_denorm, max_query_cpu_denorm
 
     @classmethod
     def query_movement_factor(
