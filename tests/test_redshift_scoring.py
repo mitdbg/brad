@@ -80,12 +80,10 @@ def test_off_to_on() -> None:
     next_prov = Provisioning("dc2.large", 2)
     ctx = get_fixtures(redshift_cpu=[], redshift_prov=curr_prov)
     cpu_util = RedshiftProvisioningScore.predict_max_node_cpu_util(
-        curr_prov, next_prov, None, 0.0, 0.0, ctx
+        curr_prov, next_prov, None, 2.0, 0.0, ctx
     )
-    # Special case: we prime the load with a fraction.
-    assert cpu_util == pytest.approx(
-        ctx.planner_config.redshift_initialize_load_fraction()
-    )
+    # Special case: it's dependent on the computed total load.
+    assert cpu_util == pytest.approx(1.0)
 
 
 def test_on_to_on() -> None:
@@ -131,11 +129,12 @@ def test_on_to_on() -> None:
     assert cpu_util == pytest.approx(2.0 * (1 - 0.25) / 2.0)
 
     # Special case (no queries executed before, but now there are queries).
+    # This depends on the computed total load.
     ctx.current_query_locations[Engine.Redshift].append(0)
     cpu_util = RedshiftProvisioningScore.predict_max_node_cpu_util(
-        curr_prov, next_prov, None, 0.0, 0.0, ctx
+        curr_prov, next_prov, None, 1.0, 0.0, ctx
     )
-    assert cpu_util == pytest.approx(0.25)
+    assert cpu_util == pytest.approx(0.5)
 
 
 def test_on_to_on_with_skew() -> None:
