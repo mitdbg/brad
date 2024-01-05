@@ -270,10 +270,12 @@ class AuroraProvisioningScore:
         query_run_times = workload.precomputed_aurora_analytical_latencies[next_prov][
             query_indices
         ]
+        arrival_counts = workload.get_arrival_counts_batch(query_indices)
+        arrival_weights = arrival_counts / arrival_counts.sum()
         per_query_cpu_denorm = np.clip(
             query_run_times * alpha, a_min=0.0, a_max=load_max
         )
-        total_denorm = per_query_cpu_denorm.sum()
+        total_denorm = np.dot(per_query_cpu_denorm, arrival_weights)
         max_query_cpu_denorm = per_query_cpu_denorm.max()
         if debug_dict is not None:
             debug_dict["aurora_total_cpu_denorm"] = total_denorm
