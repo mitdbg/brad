@@ -135,7 +135,9 @@ class RedshiftProvisioningScore:
                 return total_cpu_denorm / redshift_num_cpus(next_prov)
 
             curr_cpu_util: npt.NDArray = ctx.metrics.redshift_cpu_list.copy() / 100.0
-            assert curr_cpu_util.shape[0] > 0, "Must have Redshift CPU metrics."
+            if curr_cpu_util.shape[0] == 0:
+                # This is to support running recorded legacy planning runs.
+                curr_cpu_util = np.ones(curr_nodes) * ctx.metrics.redshift_cpu_avg
             curr_cpu_util.sort()  # In place.
             if ctx.cpu_skew_adjustment is None:
                 ctx.cpu_skew_adjustment = cls.compute_skew_adjustment(curr_cpu_util)
