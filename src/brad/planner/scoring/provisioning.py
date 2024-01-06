@@ -89,13 +89,23 @@ def compute_athena_scanned_bytes(
     accessed_bytes_per_query: Iterable[int],
     planner_config: PlannerConfig,
 ) -> int:
+    return compute_athena_scanned_bytes_batch(
+        accessed_bytes_per_query,
+        map(lambda query: query.arrival_count(), queries),
+        planner_config,
+    )
+
+
+def compute_athena_scanned_bytes_batch(
+    accessed_bytes_per_query: Iterable[int],
+    arrival_counts: Iterable[float],
+    planner_config: PlannerConfig,
+) -> int:
     # N.B. There is a minimum charge of 10 MB per query.
     min_bytes_per_query = planner_config.athena_min_mb_per_query() * 1000 * 1000
     total_accessed_bytes = 0.0
-    for query, accessed_bytes in zip(queries, accessed_bytes_per_query):
-        total_accessed_bytes += (
-            max(accessed_bytes, min_bytes_per_query) * query.arrival_count()
-        )
+    for accessed_bytes, count in zip(accessed_bytes_per_query, arrival_counts):
+        total_accessed_bytes += max(accessed_bytes, min_bytes_per_query) * count
     return max(int(total_accessed_bytes), 1)
 
 

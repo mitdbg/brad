@@ -5,6 +5,7 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.system_event_logger import SystemEventLogger
 from brad.planner.abstract import BlueprintPlanner
+from brad.planner.beam.fpqb import FixedProvisioningQueryBasedBeamPlanner
 from brad.planner.beam.query_based import QueryBasedBeamPlanner
 from brad.planner.beam.query_based_legacy import QueryBasedLegacyBeamPlanner
 from brad.planner.beam.table_based import TableBasedBeamPlanner
@@ -63,6 +64,17 @@ class BlueprintPlannerFactory:
 
         elif strategy == PlanningStrategy.TableBasedBeam:
             return TableBasedBeamPlanner(
+                config=config,
+                planner_config=planner_config,
+                schema_name=schema_name,
+                current_blueprint=current_blueprint,
+                current_blueprint_score=current_blueprint_score,
+                providers=providers,
+                system_event_logger=system_event_logger,
+            )
+
+        elif strategy == PlanningStrategy.FixedProvisioningQueryBasedBeam:
+            return FixedProvisioningQueryBasedBeamPlanner(
                 config=config,
                 planner_config=planner_config,
                 schema_name=schema_name,
