@@ -83,6 +83,7 @@ class PlannerConfig:
         return timedelta(seconds=int(self._raw["reinterpret_second_as"]))
 
     def beam_size(self) -> int:
+        return 200
         return int(self._raw["beam_size"])
 
     def max_num_table_moves(self) -> int:
@@ -336,6 +337,7 @@ class PlannerConfig:
 
     def redshift_peak_load_multiplier(self) -> Tuple[float, float]:
         try:
+            return 99.0, 1.5
             return (
                 self._raw["redshift_peak_load_threshold"],
                 self._raw["redshift_peak_load_multiplier"],
@@ -345,14 +347,16 @@ class PlannerConfig:
 
     def aurora_rt_to_cpu_denorm(self) -> Tuple[float, float]:
         try:
+            return 0.39142781, 3.2
             coefs = self._raw["run_time_to_denorm_cpu"]["aurora"]
             return coefs["alpha"], coefs["max"]
         except KeyError:
-            return self.aurora_initialize_load_fraction() * 2.0, 0.0
+            return 0.0, self.aurora_initialize_load_fraction() * 2.0
 
     def redshift_rt_to_cpu_denorm(self) -> Tuple[float, float]:
         try:
+            return 0.54941336, 1.4
             coefs = self._raw["run_time_to_denorm_cpu"]["redshift"]
             return coefs["alpha"], coefs["max"]
         except KeyError:
-            return self.redshift_initialize_load_fraction() * 2.0, 0.0
+            return 0.0, self.redshift_initialize_load_fraction() * 2.0

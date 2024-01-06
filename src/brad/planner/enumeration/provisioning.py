@@ -87,6 +87,16 @@ class ProvisioningEnumerator:
                 ):
                     yield candidate
 
+        if is_redshift_ra3:
+            test = Provisioning("ra3.xlplus", 8)
+            yield test
+            test = Provisioning("ra3.xlplus", 5)
+            yield test
+            test = Provisioning("ra3.xlplus", 6)
+            yield test
+            test = Provisioning("ra3.xlplus", 7)
+            yield test
+
     # NOTE: These distance metrics should be taken out of here and abstracted as
     # part of the planner transition score.
 

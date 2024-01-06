@@ -18,6 +18,8 @@ def predict_mm1_wait_time(
     util = max(eps, utilization)  # To prevent numeric errors.
     util = min(1.0 - eps, util)
     lf = np.log(1.0 / util * (1.0 - quantile))
+    if lf > 0:
+        lf = 0
     wait_time = mean_service_time_s * (-1.0 / (1.0 - util)) * lf
     return wait_time
 

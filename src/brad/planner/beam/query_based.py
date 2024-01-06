@@ -6,6 +6,7 @@ from datetime import timedelta, datetime
 from typing import List, Tuple, Optional
 
 from brad.blueprint.blueprint import Blueprint
+from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
@@ -33,9 +34,24 @@ from brad.planner.triggers.provider import EmptyTriggerProvider
 from brad.planner.workload import Workload
 from brad.planner.workload.provider import WorkloadProvider
 from brad.routing.router import Router
+from brad.planner.scoring.performance.unified_redshift import RedshiftProvisioningScore
 
 
 logger = logging.getLogger(__name__)
+
+
+def is_relevant(bpc: BlueprintCandidate) -> bool:
+    return len(bpc.query_locations[Engine.Redshift]) > 0
+    #return len(bpc.query_locations[Engine.Redshift]) > 0 and len(bpc.query_locations[Engine.Athena]) < 5
+
+
+def print_bpc_routing(bpc: BlueprintCandidate) -> None:
+    print("Aurora")
+    print(bpc.query_locations[Engine.Aurora])
+    print("Athena")
+    print(bpc.query_locations[Engine.Athena])
+    print("Redshift")
+    print(bpc.query_locations[Engine.Redshift])
 
 
 class QueryBasedBeamPlanner(BlueprintPlanner):
@@ -52,6 +68,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         self, window_multiplier: int = 1
     ) -> Optional[Tuple[Blueprint, Score]]:
         logger.info("Running a query-based beam replan...")
+        logger.info("Current %s", self._current_blueprint)
 
         # 1. Fetch the next workload and apply predictions.
         metrics, metrics_timestamp = self._providers.metrics_provider.get_metrics()
@@ -157,6 +174,37 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         first_query = analytical_queries[first_query_idx]
         current_top_k: List[BlueprintCandidate] = []
 
+        # print("Current workload counts")
+        # print("Aurora", ctx.current_query_locations[Engine.Aurora])
+        # print("Redshift", ctx.current_query_locations[Engine.Redshift])
+        # print("Athena", ctx.current_query_locations[Engine.Athena])
+        # print()
+        # print("Arrival counts")
+        # print(next_workload._analytical_query_arrival_counts[query_indices])
+        # print("Ordered queries")
+        # print(query_indices)
+        # print("Predicted run times (first 10 queries)")
+        # print("Aurora")
+        # print(
+        #     next_workload._predicted_analytical_latencies[
+        #         query_indices[:10], Workload.EngineLatencyIndex[Engine.Aurora]
+        #     ]
+        # )
+        # print("Redshift")
+        # print(
+        #     next_workload._predicted_analytical_latencies[
+        #         query_indices[:10], Workload.EngineLatencyIndex[Engine.Redshift]
+        #     ]
+        # )
+        # print("Athena")
+        # print(
+        #     next_workload._predicted_analytical_latencies[
+        #         query_indices[:10], Workload.EngineLatencyIndex[Engine.Athena]
+        #     ]
+        # )
+
+        keep = []
+
         # 4. Initialize the top-k set (beam).
         for routing_engine in Engine.from_bitmap(
             planning_router.run_functionality_routing(first_query)
@@ -185,8 +233,15 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             )
             return None
 
+        target_round = 140
+        peak_count = 140
+
         # 5. Run beam search to formulate the table placements.
-        for j, query_idx in enumerate(query_indices[1:]):
+        for j, query_idx in enumerate(query_indices[1:peak_count]):
+            if j == target_round + 1:
+                break
+            rel_count = 0
+            keep.clear()
             if j % 5 == 0:
                 # This is a long-running process. We should yield every so often
                 # to allow other tasks to run on the daemon (e.g., processing
@@ -197,6 +252,18 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
 
             next_top_k: List[BlueprintCandidate] = []
             query = analytical_queries[query_idx]
+
+            r_redshift_prov = Provisioning("ra3.xlplus", 4)
+            r_aurora_prov = Provisioning("db.r6g.xlarge", 2)
+
+            logger.debug("[%d] Query of interest: %d", j, query_idx)
+            logger.debug("Base run times (AU, RD, AT): %s", next_workload._predicted_analytical_latencies[query_idx, :])
+            logger.debug("Scaled RT (Redshift %s): %s", r_redshift_prov, next_workload.precomputed_redshift_analytical_latencies[r_redshift_prov][query_idx])
+            logger.debug("Scaled RT (Aurora %s): %s", r_aurora_prov, next_workload.precomputed_aurora_analytical_latencies[r_aurora_prov][query_idx])
+            try:
+                logger.debug("Curr exec. loc: %s", current_workload._analytical_queries[query_idx].most_recent_execution_location())
+            except IndexError:
+                pass
 
             # Only a subset of the engines may support this query if it uses
             # "special functionality".
@@ -243,6 +310,8 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                             # for the best provisioning, it has a worse score
                             # compared to `next_top_k[0]` (the worst scoring
                             # blueprint candidate in the top-k).
+                            if is_relevant(next_candidate):
+                                keep.append(next_candidate)
                             continue
 
                         while (
@@ -258,9 +327,23 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                             heapq.heappush(next_top_k, current_worst)
 
                         if next_candidate.is_better_than(next_top_k[0]):
-                            heapq.heappushpop(next_top_k, next_candidate)
+                            removed = heapq.heappushpop(next_top_k, next_candidate)
+                            if is_relevant(removed):
+                                keep.append(removed)
+                        elif is_relevant(next_candidate):
+                            keep.append(next_candidate)
 
             current_top_k = next_top_k
+
+            for bpc in current_top_k:
+                if is_relevant(bpc):
+                    rel_count += 1
+            print(f"IDX {j}: Relevant count {rel_count}")
+
+            # if rel_count == 0 and len(keep) > 0:
+            #     print("Injecting best relevant into the top k.")
+            #     keep.sort(reverse=True)
+            #     heapq.heappush(current_top_k, keep[0])
 
         if not self._disable_external_logging:
             # Log the placement top k for debugging purposes, if needed.
@@ -270,6 +353,27 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             if placement_top_k_logger is not None:
                 for candidate in current_top_k:
                     placement_top_k_logger.log_debug_values(candidate.to_debug_values())
+
+        # keep.sort(reverse=True)
+        # if len(keep) > 0:
+        #     print("Best relevant:")
+        #     print(keep[0].to_blueprint(ctx, use_legacy_behavior=False))
+        #     print(json.dumps(keep[0].to_debug_values(), indent=2))
+        #     print_bpc_routing(keep[0])
+        #     print("---")
+
+        # current_top_k.sort()
+        # print("Current worst best (excl. ours):")
+        # print(current_top_k[1].to_blueprint(ctx, use_legacy_behavior=False))
+        # print(json.dumps(current_top_k[1].to_debug_values(), indent=2))
+        # print_bpc_routing(current_top_k[1])
+        # print("---")
+        # current_top_k.sort(reverse=True)
+        # print("Current best (ours):")
+        # print(current_top_k[0].to_blueprint(ctx, use_legacy_behavior=False))
+        # print(json.dumps(current_top_k[0].to_debug_values(), indent=2))
+        # print_bpc_routing(current_top_k[0])
+        # return
 
         # 6. Run a final greedy search over provisionings in the top-k set.
         final_top_k: List[BlueprintCandidate] = []
@@ -356,6 +460,7 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             best_candidate.storage_cost += compute_single_athena_table_cost(tbl, ctx)
 
         # 9. Output the new blueprint.
+        comparator(best_candidate, best_candidate)
         best_blueprint = best_candidate.to_blueprint(ctx, use_legacy_behavior=False)
         best_blueprint_score = best_candidate.to_score()
 
@@ -369,6 +474,29 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             "Metrics used during planning: %s",
             json.dumps(metrics._asdict(), indent=2, default=str),
         )
+
+        rel_redshift = Provisioning("ra3.xlplus", 4)
+        manual = BlueprintCandidate(self._current_blueprint, Provisioning("db.t4g.medium", 2).mutable_clone(), rel_redshift.mutable_clone(), self._current_blueprint.table_locations_bitmap(), comparator)
+        for qidx in query_indices[:peak_count]:
+            result = RedshiftProvisioningScore.predict_query_latency_load_resources([qidx], next_workload, rel_redshift, 0.35)
+            result2 = RedshiftProvisioningScore.predict_query_latency_resources(next_workload.get_predicted_analytical_latency_batch([qidx], Engine.Redshift), rel_redshift, ctx)
+            routing_engine = Engine.Redshift if result.item() < 30.0 else Engine.Athena
+            print(f"Predicted {qidx} (w/ load, w/o load):", str(result), str(result2), routing_engine)
+            manual.add_query(
+                qidx,
+                analytical_queries[qidx],
+                routing_engine,
+                next_workload.get_predicted_analytical_latency(
+                    qidx, routing_engine
+                ),
+                ctx,
+            )
+        manual.recompute_provisioning_dependent_scoring(ctx)
+        comparator(manual, manual)
+        print("=====")
+        print("Manual")
+        print(manual.to_blueprint(ctx, use_legacy_behavior=False))
+        print(json.dumps(manual.to_debug_values(), indent=2))
 
         return best_blueprint, best_blueprint_score
 

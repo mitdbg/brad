@@ -274,7 +274,7 @@ class RedshiftProvisioningScore:
         wait_time = predict_mm1_wait_time(
             mean_service_time_s=mean_service_time,
             utilization=max_node_cpu_util,
-            quantile=0.9,
+            quantile=0.5,
         )
         # Predicted running time is the query's execution time alone plus the
         # expected wait time (due to system load).
