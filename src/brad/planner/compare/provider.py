@@ -59,13 +59,15 @@ class BenefitPerformanceCeilingComparatorProvider(BlueprintComparatorProvider):
             penalty_power = self._penalty_power
         else:
             penalty_power = 1.0
+        bh = self._benefit_horizon
+        print("Using benefit horizon", bh)
         return best_cost_under_perf_ceilings_with_benefit_horizon(
             max_query_p90_latency_s=self._max_query_p90_latency_s,
             max_txn_p90_latency_s=self._max_txn_p90_latency_s,
             curr_query_p90_latency_s=metrics.query_lat_s_p90,
             curr_txn_p90_latency_s=metrics.txn_lat_s_p90,
             curr_hourly_cost=curr_hourly_cost,
-            benefit_horizon=self._benefit_horizon,
+            benefit_horizon=bh,
             penalty_threshold=self._threshold,
             penalty_power=penalty_power,
         )

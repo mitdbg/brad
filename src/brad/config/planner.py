@@ -83,7 +83,6 @@ class PlannerConfig:
         return timedelta(seconds=int(self._raw["reinterpret_second_as"]))
 
     def beam_size(self) -> int:
-        return 200
         return int(self._raw["beam_size"])
 
     def max_num_table_moves(self) -> int:

@@ -193,9 +193,9 @@ def _compute_scalar_score(
     benefit_horizon: timedelta,
     penalty_multiplier: float,
 ) -> float:
-    # leftover_time_s = benefit_horizon.total_seconds() - transition_time_s
-    # assert leftover_time_s > 0.0
-    # leftover_time_hr = leftover_time_s / 60.0 / 60.0
+    leftover_time_s = benefit_horizon.total_seconds() - transition_time_s
+    assert leftover_time_s > 0.0
+    leftover_time_hr = leftover_time_s / 60.0 / 60.0
     benefit_horizon_hr = benefit_horizon.total_seconds() / 60.0 / 60.0
     transition_time_hr = transition_time_s / 60.0 / 60.0
     # Lower is better.

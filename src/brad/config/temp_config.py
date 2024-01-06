@@ -39,7 +39,8 @@ class TempConfig:
         return timedelta(
             weeks=period["weeks"],
             days=period["days"],
-            hours=period["hours"],
+            hours=24,
+            #hours=period["hours"],
             minutes=period["minutes"],
         )
 

@@ -96,6 +96,12 @@ class ProvisioningEnumerator:
             yield test
             test = Provisioning("ra3.xlplus", 7)
             yield test
+            # test = Provisioning("dc2.large", 10)
+            # yield test
+            # test = Provisioning("dc2.large", 8)
+            # yield test
+            # test = Provisioning("dc2.large", 4)
+            # yield test
 
     # NOTE: These distance metrics should be taken out of here and abstracted as
     # part of the planner transition score.

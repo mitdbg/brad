@@ -233,8 +233,8 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             )
             return None
 
-        target_round = 140
-        peak_count = 140
+        target_round = 40
+        peak_count = 40
 
         # 5. Run beam search to formulate the table placements.
         for j, query_idx in enumerate(query_indices[1:peak_count]):
@@ -340,10 +340,10 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
                     rel_count += 1
             print(f"IDX {j}: Relevant count {rel_count}")
 
-            # if rel_count == 0 and len(keep) > 0:
-            #     print("Injecting best relevant into the top k.")
-            #     keep.sort(reverse=True)
-            #     heapq.heappush(current_top_k, keep[0])
+            if rel_count == 0 and len(keep) > 0:
+                print("Injecting best relevant into the top k.")
+                keep.sort(reverse=True)
+                heapq.heappush(current_top_k, keep[0])
 
         if not self._disable_external_logging:
             # Log the placement top k for debugging purposes, if needed.
