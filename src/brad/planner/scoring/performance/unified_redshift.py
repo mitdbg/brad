@@ -272,7 +272,7 @@ class RedshiftProvisioningScore:
         mean_service_time = prov_predicted_latency.mean()
         # Note the use of p90. The predictions we make are specifically p90 latency.
         wait_time = predict_mm1_wait_time(
-            mean_service_time_s=mean_service_time,
+            mean_service_time_s=mean_service_time / 8,
             utilization=max_node_cpu_util,
             quantile=0.9,
         )

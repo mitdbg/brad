@@ -323,7 +323,9 @@ class AuroraProvisioningScore:
         mean_service_time = prov_predicted_latency.mean()
         # Note the use of p90. The predictions we make are specifically p90 latency.
         wait_time = predict_mm1_wait_time(
-            mean_service_time_s=mean_service_time, utilization=cpu_util, quantile=0.9
+            mean_service_time_s=mean_service_time / 8,
+            utilization=cpu_util,
+            quantile=0.9,
         )
         # Predicted running time is the query's execution time alone plus the
         # expected wait time (due to system load)
