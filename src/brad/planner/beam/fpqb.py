@@ -166,7 +166,9 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
 
         best_candidate: Optional[BlueprintCandidate] = None
         total_options = len(aurora_options) * len(redshift_options)
-        for j, (aurora, redshift) in enumerate(product(aurora_options, redshift_options)):
+        for j, (aurora, redshift) in enumerate(
+            product(aurora_options, redshift_options)
+        ):
             if j % 10 == 0:
                 logger.debug("Processing provisioning %d of %d", j, total_options)
             candidate = await self._do_query_beam_search(
