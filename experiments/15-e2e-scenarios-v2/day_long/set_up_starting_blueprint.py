@@ -38,7 +38,7 @@ async def run_transition(
 
 def main():
     athena_queries = [79, 88]
-    aurora_queries = [35, 43, 44, 45, 46, 47]
+    aurora_queries = [35, 43, 46]
     redshift_queries = [
         idx
         for idx in list(range(100))
