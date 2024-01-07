@@ -7,6 +7,7 @@ class PlanningStrategy(str, enum.Enum):
     QueryBasedBeam = "query_based_beam"
     TableBasedBeam = "table_based_beam"
     QueryBasedLegacyBeam = "query_based_legacy_beam"
+    FixedProvisioningQueryBasedBeam = "fp_query_based_beam"
 
     @staticmethod
     def from_str(candidate: str) -> "PlanningStrategy":
@@ -20,5 +21,7 @@ class PlanningStrategy(str, enum.Enum):
             return PlanningStrategy.TableBasedBeam
         elif candidate == PlanningStrategy.QueryBasedLegacyBeam.value:
             return PlanningStrategy.QueryBasedLegacyBeam
+        elif candidate == PlanningStrategy.FixedProvisioningQueryBasedBeam.value:
+            return PlanningStrategy.FixedProvisioningQueryBasedBeam
         else:
             raise ValueError("Unrecognized planning strategy {}".format(candidate))
