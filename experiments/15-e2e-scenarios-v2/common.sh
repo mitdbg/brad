@@ -387,5 +387,9 @@ function extract_named_arguments() {
     if [[ $phys_arg =~ --txn-scale-factor=.+ ]]; then
       txn_scale_factor=${phys_arg:19}
     fi
+
+    if [[ $phys_arg =~ --is-daylong-hd=.+ ]]; then
+      is_daylong_hd=1
+    fi
   done
 }
