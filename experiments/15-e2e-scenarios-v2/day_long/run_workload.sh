@@ -43,7 +43,18 @@ function inner_cancel_experiment() {
 trap "inner_cancel_experiment" INT
 trap "inner_cancel_experiment" TERM
 
-sleep $run_for_s
+if [ -z $is_daylong_hd ]; then
+  sleep $run_for_s
+else
+  # Used for the hand designed baseline.
+  # Note - these offsets must be adjusted if you scale the experiment run time.
+  sleep $((290 * 60))
+  brad cli --command "BRAD_USE_PRESET_BP dl_hi"
+  sleep $((270 * 60))
+  brad cli --command "BRAD_USE_PRESET_BP dl_lo"
+  sleep $((170 * 60))
+fi
+
 sleep $((5 * 60))  # Wait for an extra 5 minutes.
 log_workload_point "experiment_done"
 

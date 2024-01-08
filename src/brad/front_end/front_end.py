@@ -451,6 +451,7 @@ class BradFrontEnd(BradInterface):
             or command.startswith("BRAD_INSPECT_WORKLOAD")
             or command.startswith("BRAD_RUN_PLANNER")
             or command.startswith("BRAD_MODIFY_REDSHIFT")
+            or command.startswith("BRAD_USE_PRESET_BP")
         ):
             if self._daemon_request_mailbox.is_active():
                 return [

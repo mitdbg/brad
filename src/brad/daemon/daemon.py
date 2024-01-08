@@ -649,6 +649,42 @@ class BradDaemon:
             self._transition_task = asyncio.create_task(self._run_transition_part_one())
             return [("Transition in progress.",)]
 
+        elif command.startswith("BRAD_USE_PRESET_BP"):
+            parts = command.split(" ")
+            if len(parts) <= 1:
+                return [("Need to specify a preset.",)]
+
+            preset = parts[1]
+            if not preset in ["dl_lo", "dl_hi"]:
+                return [(f"Unrecognized preset {preset}",)]
+
+            curr_blueprint = self._blueprint_mgr.get_blueprint()
+            ebp = EnumeratedBlueprint(curr_blueprint)
+
+            if preset == "dl_lo":
+                ebp.set_aurora_provisioning(Provisioning("db.t4g.medium", 2))
+                ebp.set_redshift_provisioning(Provisioning("ra3.xlplus", 2))
+
+            elif preset == "dl_hi":
+                ebp.set_aurora_provisioning(Provisioning("db.r6g.xlarge", 1))
+                ebp.set_redshift_provisioning(Provisioning("ra3.xlplus", 5))
+
+            new_blueprint = ebp.to_blueprint()
+            new_version = await self._blueprint_mgr.start_transition(
+                new_blueprint, new_score=None
+            )
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.NewBlueprintAccepted, "version={}".format(new_version)
+                )
+            if self._planner is not None:
+                self._planner.set_disable_triggers(disable=True)
+            self._transition_orchestrator = TransitionOrchestrator(
+                self._config, self._blueprint_mgr, self._system_event_logger
+            )
+            self._transition_task = asyncio.create_task(self._run_transition_part_one())
+            return [(f"Transition to {preset} in progress.",)]
+
         else:
             logger.warning("Received unknown internal command: %s", command)
             return []

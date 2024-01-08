@@ -235,45 +235,42 @@ class RecordedRun:
             print()
 
     def _agg_txn_lats(self, quantile: float) -> pd.DataFrame:
-        ts = pd.to_datetime(self.txn_lats["timestamp"], format="mixed")
-        il = self.txn_lats[["num_clients", "run_time_s"]]
-        return (
-            il.groupby([ts.dt.day, ts.dt.hour, ts.dt.minute])
-            .quantile(quantile)
-            .reset_index(drop=True)
-        )
+        rel = self.txn_lats[["timestamp", "run_time_s"]].copy()
+        rel["timestamp"] = pd.to_datetime(rel["timestamp"], format="mixed")
+        rel = rel.sort_values(by=["timestamp"])
+        rel = rel.set_index("timestamp")
+        rel = rel.resample("1T").quantile(quantile).reset_index()
+        return rel
 
-    def _agg_txn_lats_window(self, window_str: str, quantile: float) -> pd.DataFrame:
+    def _agg_txn_lats_window(
+        self, window_str: str, quantile: float, fill_missing: Optional[float] = None
+    ) -> pd.DataFrame:
         rel = self.txn_lats[["timestamp", "run_time_s"]].copy()
         rel["timestamp"] = pd.to_datetime(rel["timestamp"])
         rel["run_time_s"] = pd.to_numeric(rel["run_time_s"])
         rel = rel.sort_values(by=["timestamp"])
         rel = rel.set_index("timestamp")
-        over_window = (
-            rel.rolling(window_str, min_periods=1).quantile(quantile).reset_index()
-        )
-        ts = over_window["timestamp"]
-        return (
-            over_window.groupby([ts.dt.day, ts.dt.hour, ts.dt.minute])
-            .max()
-            .reset_index(drop=True)
-        )
+        over_window = rel.rolling(window_str, min_periods=1).quantile(quantile)
+        over_window = over_window.resample("1T").max()
+        if fill_missing is not None:
+            over_window = over_window.fillna(fill_missing)
+        over_window = over_window.reset_index()
+        return over_window
 
-    def _agg_ana_lats(self, window_str: str, quantile: float) -> pd.DataFrame:
+    def _agg_ana_lats(
+        self, window_str: str, quantile: float, fill_missing: Optional[float] = None
+    ) -> pd.DataFrame:
         rel = self.olap_lats[["timestamp", "run_time_s"]].copy()
         rel["timestamp"] = pd.to_datetime(rel["timestamp"])
         rel["run_time_s"] = pd.to_numeric(rel["run_time_s"])
         rel = rel.sort_values(by=["timestamp"])
         rel = rel.set_index("timestamp")
-        over_window = (
-            rel.rolling(window_str, min_periods=1).quantile(quantile).reset_index()
-        )
-        ts = over_window["timestamp"]
-        return (
-            over_window.groupby([ts.dt.day, ts.dt.hour, ts.dt.minute])
-            .max()
-            .reset_index(drop=True)
-        )
+        over_window = rel.rolling(window_str, min_periods=1).quantile(quantile)
+        over_window = over_window.resample("1T").max()
+        if fill_missing is not None:
+            over_window = over_window.fillna(fill_missing)
+        over_window = over_window.reset_index()
+        return over_window
 
     def _compute_timestamp_offsets(self) -> Tuple[pd.Timestamp, pd.Timestamp]:
         if self.txn_thpt is not None:

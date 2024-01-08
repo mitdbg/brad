@@ -199,6 +199,15 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
             best_candidate.table_placements[tbl] |= EngineBitmapValues[Engine.Athena]
         best_candidate.compute_score(ctx)
 
+        if not self._disable_external_logging:
+            # For later interactive inspection in Python.
+            BlueprintPickleDebugLogger.log_object_if_requested(
+                self._config, "final_fpqb_chosen_blueprint", [best_candidate]
+            )
+            BlueprintPickleDebugLogger.log_object_if_requested(
+                self._config, "scoring_context", ctx
+            )
+
         # 6. Output the new blueprint.
         best_blueprint = best_candidate.to_blueprint(ctx)
         best_blueprint_score = best_candidate.score
