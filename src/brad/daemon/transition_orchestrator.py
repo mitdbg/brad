@@ -595,6 +595,7 @@ class TransitionOrchestrator:
             )
 
         # Redshift's pre-transition work is complete!
+        await self._blueprint_mgr.refresh_directory()
 
     async def _run_redshift_post_transition(
         self, diff: Optional[ProvisioningDiff], table_diffs: Optional[list[TableDiff]]
