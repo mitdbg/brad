@@ -219,12 +219,18 @@ class RedshiftProvisioningScore:
             query_indices
         ]
         arrival_counts = workload.get_arrival_counts_batch(query_indices)
-        arrival_weights = arrival_counts / arrival_counts.sum()
-        per_query_cpu_denorm = np.clip(
-            query_run_times * alpha, a_min=0.0, a_max=load_max
-        )
-        total_denorm = np.dot(per_query_cpu_denorm, arrival_weights)
-        max_query_cpu_denorm = per_query_cpu_denorm.max()
+        denom = arrival_counts.sum()
+        if denom > 0.0:
+            arrival_weights = arrival_counts / denom
+            per_query_cpu_denorm = np.clip(
+                query_run_times * alpha, a_min=0.0, a_max=load_max
+            )
+            total_denorm = np.dot(per_query_cpu_denorm, arrival_weights)
+            max_query_cpu_denorm = per_query_cpu_denorm.max()
+        else:
+            # Edge case: Query with 0 arrival count (used as a constraint).
+            total_denorm = np.zeros_like(query_run_times)
+            max_query_cpu_denorm = 0.0
         if debug_dict is not None:
             debug_dict["redshift_total_cpu_denorm"] = total_denorm
             debug_dict["redshift_max_query_cpu_denorm"] = max_query_cpu_denorm
