@@ -136,7 +136,7 @@ def main():
 
     # Ensure the provisioning is as expected.
     enum_blueprint.set_aurora_provisioning(Provisioning("db.t4g.medium", 2))
-    enum_blueprint.set_redshift_provisioning(Provisioning("ra3.xlplus", 2))
+    enum_blueprint.set_redshift_provisioning(Provisioning("dc2.large", 4))
 
     # 6. Adjust the placement.
     new_placement = {}
