@@ -326,7 +326,12 @@ class AuroraProvisioningScore:
             to_prov
         ][query_indices]
 
-        mean_service_time = prov_predicted_latency.mean()
+        arrival_counts = workload.get_arrival_counts_batch(query_indices)
+        denom = arrival_counts.sum()
+        arrival_weights = (
+            arrival_counts / denom if denom > 0.0 else np.zeros_like(arrival_counts)
+        )
+        mean_service_time = np.dot(prov_predicted_latency, arrival_weights)
         # Note the use of p90. The predictions we make are specifically p90 latency.
         wait_time = predict_mm1_wait_time(
             mean_service_time_s=mean_service_time, utilization=cpu_util, quantile=0.9
