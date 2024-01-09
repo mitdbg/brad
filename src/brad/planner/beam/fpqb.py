@@ -136,6 +136,7 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         ctx.compute_engine_latency_norm_factor()
         ctx.compute_current_workload_predicted_hourly_scan_cost()
         ctx.compute_current_blueprint_provisioning_hourly_cost()
+        ctx.compute_table_transitions()
 
         comparator = self._providers.comparator_provider.get_comparator(
             metrics,
