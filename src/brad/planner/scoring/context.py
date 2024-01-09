@@ -1,6 +1,6 @@
 import logging
 import numpy as np
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from datetime import timedelta
 
 from brad.config.engine import Engine
@@ -17,6 +17,12 @@ from brad.planner.scoring.provisioning import (
 )
 from brad.planner.scoring.performance.unified_aurora import AuroraProvisioningScore
 from brad.planner.scoring.performance.unified_redshift import RedshiftProvisioningScore
+from brad.planner.scoring.table_placement import (
+    compute_single_athena_table_cost,
+    compute_single_aurora_table_cost,
+    compute_single_table_movement_time_and_cost,
+    TableMovementScore,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +67,11 @@ class ScoringContext:
         # Used to memoize this value instead of recomputing it as it is a
         # function of the CPU utilization values.
         self.cpu_skew_adjustment: Optional[float] = None
+
+        # These are computed once and re-used to avoid repeated recomputation
+        # during the optimization.
+        self.table_storage_costs: Dict[Tuple[str, Engine], float] = {}
+        self.table_movement: Dict[Tuple[str, Engine], TableMovementScore] = {}
 
     async def simulate_current_workload_routing(self, router: Router) -> None:
         self.current_query_locations[Engine.Aurora].clear()
@@ -225,3 +236,24 @@ class ScoringContext:
             self.engine_latency_norm_factor[engine] = np.dot(
                 adjusted_latencies, query_weights
             )
+
+    def compute_table_transitions(self) -> None:
+        self.table_storage_costs.clear()
+        self.table_movement.clear()
+        for table in self.current_blueprint.tables():
+            self.table_storage_costs[
+                (table.name, Engine.Athena)
+            ] = compute_single_athena_table_cost(table.name, self)
+            # You only pay for 1 copy of the table on Aurora, regardless of
+            # how many read replicas you have.
+            self.table_storage_costs[
+                (table.name, Engine.Aurora)
+            ] = compute_single_aurora_table_cost(table.name, self)
+
+            curr = self.current_blueprint.table_locations_bitmap()[table.name]
+
+            for engine, bit_mask in Workload.EngineLatencyIndex.items():
+                result = compute_single_table_movement_time_and_cost(
+                    table.name, curr, curr | bit_mask, self
+                )
+                self.table_movement[(table.name, engine)] = result

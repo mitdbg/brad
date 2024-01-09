@@ -21,11 +21,6 @@ from brad.planner.scoring.provisioning import (
     compute_redshift_transition_time_s,
 )
 from brad.planner.scoring.score import Score
-from brad.planner.scoring.table_placement import (
-    compute_single_athena_table_cost,
-    compute_single_aurora_table_cost,
-    compute_single_table_movement_time_and_cost,
-)
 from brad.planner.workload import Workload
 from brad.planner.workload.query import Query
 from brad.routing.abstract_policy import FullRoutingPolicy
@@ -189,24 +184,30 @@ class BlueprintCandidate(ComparableBlueprint):
             # account its storage costs.
             if (placement_bitmap & EngineBitmapValues[Engine.Athena]) != 0:
                 # Table is on Athena.
-                score.storage_cost += compute_single_athena_table_cost(table_name, ctx)
+                score.storage_cost += ctx.table_storage_costs[
+                    (table_name, Engine.Athena)
+                ]
 
             if (placement_bitmap & EngineBitmapValues[Engine.Aurora]) != 0:
                 # Table is on Aurora.
                 # You only pay for 1 copy of the table on Aurora, regardless of
                 # how many read replicas you have.
-                score.storage_cost += compute_single_aurora_table_cost(table_name, ctx)
+                score.storage_cost += ctx.table_storage_costs[
+                    (table_name, Engine.Aurora)
+                ]
 
             curr = ctx.current_blueprint.table_locations_bitmap()[table_name]
-            if ((~curr) & placement_bitmap) == 0:
+            added_bitmap = (~curr) & placement_bitmap
+            if added_bitmap == 0:
                 # This table was already present on the relevant engines.
                 continue
 
-            result = compute_single_table_movement_time_and_cost(
-                table_name, curr, placement_bitmap, ctx
-            )
-            score.table_movement_trans_cost += result.movement_cost
-            score.table_movement_trans_time_s += result.movement_time_s
+            for engine, bit_mask in Workload.EngineLatencyIndex.items():
+                if (bit_mask & added_bitmap) == 0:
+                    continue
+                result = ctx.table_movement[(table_name, engine)]
+                score.table_movement_trans_cost += result.movement_cost
+                score.table_movement_trans_time_s += result.movement_time_s
 
     def get_all_query_indices(self) -> List[int]:
         return (
