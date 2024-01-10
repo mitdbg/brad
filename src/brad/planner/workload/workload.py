@@ -165,6 +165,14 @@ class Workload:
 
         return workload
 
+    def clear_cached(self) -> None:
+        """
+        Call before serializing to avoid recording data that can be quickly
+        recomputed.
+        """
+        self.precomputed_aurora_analytical_latencies.clear()
+        self.precomputed_redshift_analytical_latencies.clear()
+
     def serialize_for_debugging(self, output_path: str | Path) -> None:
         with open(output_path, "wb") as out_file:
             pickle.dump(self, out_file)

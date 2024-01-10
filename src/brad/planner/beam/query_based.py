@@ -326,22 +326,6 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         # `__lt__` method to work with `heapq` to create a max heap).
         final_top_k.sort(reverse=True)
 
-        if not self._disable_external_logging:
-            # For later interactive inspection in Python.
-            BlueprintPickleDebugLogger.log_object_if_requested(
-                self._config, "final_query_based_blueprints", final_top_k
-            )
-            BlueprintPickleDebugLogger.log_object_if_requested(
-                self._config, "scoring_context", ctx
-            )
-            # Log the final top k for debugging purposes, if needed.
-            final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
-                self._config, "query_beam_final_topk"
-            )
-            if final_top_k_logger is not None:
-                for candidate in final_top_k:
-                    final_top_k_logger.log_debug_values(candidate.to_debug_values())
-
         best_candidate = final_top_k[0]
 
         # 8. Touch up the table placements. Add any missing tables to ensure
@@ -369,6 +353,24 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             "Metrics used during planning: %s",
             json.dumps(metrics._asdict(), indent=2, default=str),
         )
+
+        if not self._disable_external_logging:
+            ctx.current_workload.clear_cached()
+            ctx.next_workload.clear_cached()
+            # For later interactive inspection in Python.
+            BlueprintPickleDebugLogger.log_object_if_requested(
+                self._config, "final_query_based_blueprints", final_top_k
+            )
+            BlueprintPickleDebugLogger.log_object_if_requested(
+                self._config, "scoring_context", ctx
+            )
+            # Log the final top k for debugging purposes, if needed.
+            final_top_k_logger = BlueprintPlanningDebugLogger.create_if_requested(
+                self._config, "query_beam_final_topk"
+            )
+            if final_top_k_logger is not None:
+                for candidate in final_top_k:
+                    final_top_k_logger.log_debug_values(candidate.to_debug_values())
 
         return best_blueprint, best_blueprint_score
 
