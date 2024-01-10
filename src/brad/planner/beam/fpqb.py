@@ -2,6 +2,7 @@ import asyncio
 import heapq
 import json
 import logging
+from concurrent.futures import ProcessPoolExecutor
 from datetime import timedelta, datetime
 from typing import List, Tuple, Optional
 from itertools import product
@@ -138,14 +139,6 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         ctx.compute_current_blueprint_provisioning_hourly_cost()
         ctx.compute_table_transitions()
 
-        comparator = self._providers.comparator_provider.get_comparator(
-            metrics,
-            curr_hourly_cost=(
-                ctx.current_workload_predicted_hourly_scan_cost
-                + ctx.current_blueprint_provisioning_hourly_cost
-            ),
-        )
-
         # 4. Do the beam search per provisioning.
         aurora_options = []
         aurora_enumerator = ProvisioningEnumerator(Engine.Aurora)
@@ -165,25 +158,22 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         for redshift in redshift_it:
             redshift_options.append(redshift.clone())
 
-        best_candidate: Optional[BlueprintCandidate] = None
-        total_options = len(aurora_options) * len(redshift_options)
-        for j, (aurora, redshift) in enumerate(
-            product(aurora_options, redshift_options)
-        ):
-            if j % 10 == 0:
-                logger.debug("Processing provisioning %d of %d", j, total_options)
-            candidate = await self._do_query_beam_search(
-                aurora, redshift, comparator, query_indices, planning_router, ctx
+        all_provs = list(product(aurora_options, redshift_options))
+        if ctx.planner_config.flag("use_sequential_fpqb_search"):
+            candidates = await self._do_sequential_search(
+                all_provs, query_indices, planning_router, ctx
             )
-            if candidate is None:
-                continue
-            # For debugging purposes, can store all candidates here.
-            if best_candidate is None:
-                best_candidate = candidate
-            elif candidate.is_better_than(best_candidate):
-                best_candidate = candidate
-
-        if best_candidate is None:
+        else:
+            candidates = await self._do_parallel_batched_search(
+                all_provs,
+                query_indices,
+                planning_router,
+                ctx,
+                batch_size=20,
+                max_workers=8,
+            )
+        candidates.sort(reverse=True)
+        if len(candidates) == 0:
             logger.error(
                 "Fixed provisioning query-based beam blueprint planning failed. "
                 "No feasible candidates."
@@ -192,6 +182,7 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
 
         # 5. Touch up the table placements. Add any missing tables to ensure
         #    we do not have data loss.
+        best_candidate = candidates[0]
         for tbl, placement_bitmap in best_candidate.table_placements.items():
             if placement_bitmap != 0:
                 continue
@@ -225,8 +216,132 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         )
         return best_blueprint, best_blueprint_score
 
-    async def _do_query_beam_search(
+    async def _do_sequential_search(
         self,
+        provisionings: List[Tuple[Provisioning, Provisioning]],
+        query_order: List[int],
+        planning_router: Router,
+        ctx: ScoringContext,
+    ) -> List[BlueprintCandidate]:
+        comparator = self._providers.comparator_provider.get_comparator(
+            ctx.metrics,
+            curr_hourly_cost=(
+                ctx.current_workload_predicted_hourly_scan_cost
+                + ctx.current_blueprint_provisioning_hourly_cost
+            ),
+        )
+        candidates = []
+        for j, (aurora, redshift) in enumerate(provisionings):
+            if j % 10 == 0:
+                logger.debug("Processing provisioning %d of %d", j, len(provisionings))
+            candidate = await self._do_query_beam_search(
+                aurora, redshift, comparator, query_order, planning_router, ctx
+            )
+            if candidate is None:
+                continue
+
+            # We only need to store the best performing candidate. But it's
+            # useful to keep them all around for debugging purposes later on.
+            candidates.append(candidate)
+
+        candidates.sort(reverse=True)
+        return candidates
+
+    async def _do_parallel_batched_search(
+        self,
+        provisionings: List[Tuple[Provisioning, Provisioning]],
+        query_order: List[int],
+        planning_router: Router,
+        ctx: ScoringContext,
+        batch_size: int,
+        max_workers: int,
+    ) -> List[BlueprintCandidate]:
+        loop = asyncio.get_running_loop()
+        ppe = ProcessPoolExecutor(max_workers=max_workers)
+        futures = []
+
+        num_batches = len(provisionings) // batch_size
+        if len(provisionings) % batch_size != 0:
+            num_batches += 1
+
+        offset = 0
+        while offset < len(provisionings):
+            awaitable = loop.run_in_executor(
+                ppe,
+                self._run_batched_query_beam_search,
+                provisionings[offset : offset + batch_size],
+                self._providers.comparator_provider,
+                query_order,
+                planning_router,
+                ctx,
+            )
+            futures.append(asyncio.ensure_future(awaitable))
+            offset += batch_size
+
+        progress = asyncio.create_task(log_planning_progress(futures))
+        results = await asyncio.gather(progress, *futures)
+
+        # Flatten the results.
+        candidates = []
+        for result in results:
+            if result is None:
+                continue
+            if not isinstance(result, list):
+                continue
+            for bpc in result:
+                if bpc is None:
+                    continue
+                candidates.append(bpc)
+
+        if len(candidates) == 0:
+            return candidates
+
+        # The candidates go through a serialization boundary and comparators are
+        # not serialized. This restores the comparator.
+        comparator = self._providers.comparator_provider.get_comparator(
+            ctx.metrics,
+            curr_hourly_cost=(
+                ctx.current_workload_predicted_hourly_scan_cost
+                + ctx.current_blueprint_provisioning_hourly_cost
+            ),
+        )
+        for bpc in candidates:
+            bpc._comparator = comparator  # pylint: disable=protected-access
+        candidates.sort(reverse=True)
+        return candidates
+
+    @staticmethod
+    def _run_batched_query_beam_search(
+        provs: List[Tuple[Provisioning, Provisioning]],
+        comparator_provider: BlueprintComparatorProvider,
+        query_order: List[int],
+        planning_router: Router,
+        ctx: ScoringContext,
+    ) -> List[Optional[BlueprintCandidate]]:
+        """
+        This is used when running a parallel search. Not meant to be called
+        directly.
+        """
+        comparator = comparator_provider.get_comparator(
+            ctx.metrics,
+            curr_hourly_cost=(
+                ctx.current_workload_predicted_hourly_scan_cost
+                + ctx.current_blueprint_provisioning_hourly_cost
+            ),
+        )
+        results = []
+        for aurora, redshift in provs:
+            results.append(
+                asyncio.run(
+                    FixedProvisioningQueryBasedBeamPlanner._do_query_beam_search(
+                        aurora, redshift, comparator, query_order, planning_router, ctx
+                    )
+                )
+            )
+        return results
+
+    @staticmethod
+    async def _do_query_beam_search(
         aurora: Provisioning,
         redshift: Provisioning,
         comparator: BlueprintComparator,
@@ -250,7 +365,7 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         for routing_engine in Engine.from_bitmap(
             planning_router.run_functionality_routing(first_query)
         ):
-            candidate = BlueprintCandidate.based_on(self._current_blueprint, comparator)
+            candidate = BlueprintCandidate.based_on(ctx.current_blueprint, comparator)
             candidate.aurora_provisioning = aurora
             candidate.redshift_provisioning = redshift
             candidate.add_transactional_tables(ctx)
@@ -309,6 +424,18 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
             current_top_k = next_top_k
 
         return max(current_top_k)
+
+
+async def log_planning_progress(futures: List[asyncio.Future]) -> None:
+    completed_tasks = 0
+    total_tasks = len(futures)
+    pending = set(futures)
+
+    logger.info("Parallel search started. Total batches: %d", len(futures))
+    while completed_tasks < total_tasks:
+        done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+        completed_tasks += len(done)
+        logger.info("%d/%d batches completed", completed_tasks, total_tasks)
 
 
 class RecordedFpqbPlanningRun(RecordedPlanningRun, WorkloadProvider):

@@ -409,4 +409,3 @@ class BlueprintCandidate(ComparableBlueprint):
 
     def __setstate__(self, d: Dict[Any, Any]) -> None:
         self.__dict__ = d
-        logger.info("Note: Deserializing FPQB blueprint candidate.")
