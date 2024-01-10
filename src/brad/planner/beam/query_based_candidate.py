@@ -687,6 +687,9 @@ class BlueprintCandidate(ComparableBlueprint):
     def get_operational_monetary_cost(self) -> float:
         return self.storage_cost + self.provisioning_cost + self.workload_scan_cost
 
+    def get_operational_monetary_cost_without_scans(self) -> float:
+        return self.storage_cost + self.provisioning_cost
+
     def get_transition_cost(self) -> float:
         return self.table_movement_trans_cost
 

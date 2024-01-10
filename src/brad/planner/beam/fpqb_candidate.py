@@ -379,6 +379,9 @@ class BlueprintCandidate(ComparableBlueprint):
             + self.score.workload_scan_cost
         )
 
+    def get_operational_monetary_cost_without_scans(self) -> float:
+        return self.score.storage_cost + self.score.provisioning_cost
+
     def get_transition_cost(self) -> float:
         return self.score.table_movement_trans_cost
 

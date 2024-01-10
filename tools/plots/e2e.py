@@ -11,6 +11,9 @@ from typing import Optional, Tuple, List, Literal, Callable
 
 from brad.config.planner import PlannerConfig
 from brad.planner.compare.blueprint import ComparableBlueprint
+from brad.planner.beam.query_based_candidate import BlueprintCandidate as QbCandidate
+from brad.planner.beam.table_based_candidate import BlueprintCandidate as TbCandidate
+from brad.planner.beam.fpqb_candidate import BlueprintCandidate as FpqbCandidate
 
 
 class RecordedRun:
@@ -231,7 +234,20 @@ class RecordedRun:
             print(f"Blueprint {idx} (selected at offset {offset} mins)")
             print("Aurora:", bp.get_aurora_provisioning())
             print("Redshift:", bp.get_redshift_provisioning())
-            print("Operational cost ($/hr):", bp.get_operational_monetary_cost())
+            if hasattr(bp, "get_operational_monetary_cost_without_scans"):
+                operational_cost = bp.get_operational_monetary_cost_without_scans()
+            else:
+                # This is to help with serialized legacy versions of the object.
+                # Not ideal, but this is the best we can do.
+                if isinstance(bp, QbCandidate) or isinstance(bp, TbCandidate):
+                    operational_cost = bp.storage_cost + bp.provisioning_cost
+                elif isinstance(bp, FpqbCandidate):
+                    operational_cost = (
+                        bp.score.storage_cost + bp.score.provisioning_cost
+                    )
+                else:
+                    operational_cost = np.nan
+            print("Operational cost excluding Athena scans ($/hr):", operational_cost)
             print()
 
     def _agg_txn_lats(self, quantile: float) -> pd.DataFrame:

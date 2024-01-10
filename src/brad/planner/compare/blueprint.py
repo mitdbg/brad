@@ -46,6 +46,13 @@ class ComparableBlueprint:
     def get_operational_monetary_cost(self) -> float:
         raise NotImplementedError
 
+    def get_operational_monetary_cost_without_scans(self) -> float:
+        """
+        We want to exclude scans because the blueprint uses estimated values. We
+        account for scan costs separately (examining the query log).
+        """
+        raise NotImplementedError
+
     def get_transition_cost(self) -> float:
         raise NotImplementedError
 
