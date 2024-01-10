@@ -429,7 +429,7 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
 async def log_planning_progress(futures: List[asyncio.Future]) -> None:
     completed_tasks = 0
     total_tasks = len(futures)
-    pending = futures.copy()
+    pending = set(futures)
 
     logger.info("Parallel search started. Total batches: %d", len(futures))
     while completed_tasks < total_tasks:
