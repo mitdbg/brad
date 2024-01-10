@@ -33,3 +33,6 @@ def set_up_logging(filename=None, debug_mode=False, also_console=False):
     logging.getLogger("urllib3").setLevel(logging.INFO)
     logging.getLogger("redshift_connector").setLevel(logging.INFO)
     logging.getLogger("pyathena").setLevel(logging.INFO)
+
+    # Avoids the "Using selector: EpollSelector" (or similar) messages.
+    logging.getLogger("asyncio").setLevel(logging.INFO)
