@@ -549,6 +549,11 @@ def main():
         "--engine", type=str, help="The engine to use, if connecting directly."
     )
     parser.add_argument("--run-for-s", type=int, help="If set, run for this long.")
+    parser.add_argument(
+        "--ff-trace-clients",
+        type=int,
+        help="Start the client trace at the given number of clients. Used for debugging only.",
+    )
     args = parser.parse_args()
 
     set_up_logging()
@@ -704,8 +709,27 @@ def main():
 
         finished_one_day = True
         curr_day_start_time = datetime.now().astimezone(pytz.utc)
+
+        fast_forward_tod = None
+        if args.ff_trace_clients is not None:
+            for tod, clients in num_client_trace.items():
+                if clients >= args.ff_trace_clients:
+                    fast_forward_tod = tod
+                    break
+            if fast_forward_tod is not None:
+                curr_day_start_time -= timedelta(
+                    seconds=fast_forward_tod / args.time_scale_factor
+                )
+                logger.info(
+                    "Fast forward set. Will start the trace at unscaled time of day %d",
+                    fast_forward_tod,
+                )
+
         for time_of_day, num_expected_clients in num_client_trace.items():
             if time_of_day == 0:
+                continue
+            if fast_forward_tod is not None and time_of_day < fast_forward_tod:
+                # Used for debugging.
                 continue
             # at this time_of_day start/shut-down more clients
             time_in_s = time_of_day / args.time_scale_factor
