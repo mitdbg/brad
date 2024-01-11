@@ -167,7 +167,6 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
             candidates = await self._do_parallel_batched_search(
                 all_provs,
                 query_indices,
-                planning_router,
                 ctx,
                 batch_size=20,
                 max_workers=8,
@@ -254,7 +253,6 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         self,
         provisionings: List[Tuple[Provisioning, Provisioning]],
         query_order: List[int],
-        planning_router: Router,
         ctx: ScoringContext,
         batch_size: int,
         max_workers: int,
@@ -275,7 +273,6 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
                 provisionings[offset : offset + batch_size],
                 self._providers.comparator_provider,
                 query_order,
-                planning_router,
                 ctx,
             )
             futures.append(asyncio.ensure_future(awaitable))
@@ -318,7 +315,6 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         provs: List[Tuple[Provisioning, Provisioning]],
         comparator_provider: BlueprintComparatorProvider,
         query_order: List[int],
-        planning_router: Router,
         ctx: ScoringContext,
     ) -> List[Optional[BlueprintCandidate]]:
         """
@@ -332,6 +328,8 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
                 + ctx.current_blueprint_provisioning_hourly_cost
             ),
         )
+        planning_router = Router.create_from_blueprint(ctx.current_blueprint)
+        asyncio.run(planning_router.run_setup_for_standalone(estimator=None))
         results = []
         for aurora, redshift in provs:
             results.append(
