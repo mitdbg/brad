@@ -67,6 +67,19 @@ function log_workload_point() {
   echo "$now,$msg" >> $COND_OUT/points.log
 }
 
+function pause_for_s_past_timepoint() {
+  local timepoint="$1"
+  local wait_s="$2"
+
+  local curr_tp="$(date -u +%s)"
+  elapsed_s="$(($curr_tp - $timepoint))"
+  if (( $elapsed_s < $wait_s )); then
+    leftover_s=$(($wait_s - $elapsed_s))
+    >&2 echo "Waiting $leftover_s seconds before continuing..."
+    sleep $leftover_s
+  fi
+}
+
 function poll_file_for_event() {
   local file="$1"
   local event_name="$2"

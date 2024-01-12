@@ -49,3 +49,17 @@ run_experiment(
     **DATASET_PATHS,
   },
 )
+
+run_experiment(
+  name="hand_designed_100g",
+  run="./run_workload.sh",
+  options={
+    "system-config-file": "day_long_hand_designed.yml",
+    "physical-config-file": "config/physical_config_100gb_dl.yml",
+    "schema-name": "imdb_extended_100g",
+    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+    "num-front-ends": 10,
+    "dataset-type": "100gb",
+    **DATASET_PATHS,
+  },
+)

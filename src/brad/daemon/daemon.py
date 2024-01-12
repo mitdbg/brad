@@ -655,7 +655,7 @@ class BradDaemon:
                 return [("Need to specify a preset.",)]
 
             preset = parts[1]
-            if not preset in ["dl_lo", "dl_hi"]:
+            if not preset in ["dl_lo", "dl_med", "dl_hi"]:
                 return [(f"Unrecognized preset {preset}",)]
 
             curr_blueprint = self._blueprint_mgr.get_blueprint()
@@ -663,11 +663,15 @@ class BradDaemon:
 
             if preset == "dl_lo":
                 ebp.set_aurora_provisioning(Provisioning("db.t4g.medium", 2))
-                ebp.set_redshift_provisioning(Provisioning("ra3.xlplus", 2))
+                ebp.set_redshift_provisioning(Provisioning("dc2.large", 4))
+
+            elif preset == "dl_med":
+                ebp.set_aurora_provisioning(Provisioning("db.r6g.xlarge", 1))
+                ebp.set_redshift_provisioning(Provisioning("dc2.large", 8))
 
             elif preset == "dl_hi":
                 ebp.set_aurora_provisioning(Provisioning("db.r6g.xlarge", 1))
-                ebp.set_redshift_provisioning(Provisioning("ra3.xlplus", 5))
+                ebp.set_redshift_provisioning(Provisioning("dc2.large", 16))
 
             new_blueprint = ebp.to_blueprint()
             new_version = await self._blueprint_mgr.start_transition(

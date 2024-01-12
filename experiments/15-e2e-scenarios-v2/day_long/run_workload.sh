@@ -48,11 +48,23 @@ if [ -z $is_daylong_hd ]; then
 else
   # Used for the hand designed baseline.
   # Note - these offsets must be adjusted if you scale the experiment run time.
+  expt_start="$(date -u +%s)"
   sleep $((290 * 60))
+
+  med_start="$(date -u +%s)"
+  brad cli --command "BRAD_USE_PRESET_BP dl_med"
+  pause_for_s_past_timepoint $med_start $((90 * 60))
+
+  hi_start="$(date -u +%s)"
   brad cli --command "BRAD_USE_PRESET_BP dl_hi"
-  sleep $((270 * 60))
+  pause_for_s_past_timepoint $hi_start $((100 * 60))
+
+  med2_start="$(date -u +%s)"
+  brad cli --command "BRAD_USE_PRESET_BP dl_med"
+  pause_for_s_past_timepoint $med2_start $((60 * 60))
+
   brad cli --command "BRAD_USE_PRESET_BP dl_lo"
-  sleep $((170 * 60))
+  pause_for_s_past_timepoint $expt_start $run_for_s
 fi
 
 sleep $((5 * 60))  # Wait for an extra 5 minutes.
