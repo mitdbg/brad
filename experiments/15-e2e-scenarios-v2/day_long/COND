@@ -60,6 +60,7 @@ run_experiment(
     "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
     "num-front-ends": 10,
     "dataset-type": "100gb",
+    "is-daylong-hd": "yes",
     **DATASET_PATHS,
   },
 )
