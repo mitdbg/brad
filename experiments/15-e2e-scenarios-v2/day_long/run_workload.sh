@@ -48,6 +48,7 @@ if [ -z $is_daylong_hd ]; then
 else
   # Used for the hand designed baseline.
   # Note - these offsets must be adjusted if you scale the experiment run time.
+  >&2 echo "[!] Running the hand designed baseline [!]"
   expt_start="$(date -u +%s)"
   sleep $((290 * 60))
 
