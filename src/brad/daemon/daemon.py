@@ -654,7 +654,7 @@ class BradDaemon:
             if len(parts) <= 1:
                 return [("Need to specify a preset.",)]
 
-            preset = parts[1]
+            preset = parts[1].lower()
             if not preset in ["dl_lo", "dl_med", "dl_hi"]:
                 return [(f"Unrecognized preset {preset}",)]
 
