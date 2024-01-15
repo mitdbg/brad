@@ -348,11 +348,11 @@ class PlannerConfig:
             coefs = self._raw["run_time_to_denorm_cpu"]["aurora"]
             return coefs["alpha"], coefs["max"]
         except KeyError:
-            return self.aurora_initialize_load_fraction() * 2.0, 0.0
+            return 0.0, self.aurora_initialize_load_fraction() * 2.0
 
     def redshift_rt_to_cpu_denorm(self) -> Tuple[float, float]:
         try:
             coefs = self._raw["run_time_to_denorm_cpu"]["redshift"]
             return coefs["alpha"], coefs["max"]
         except KeyError:
-            return self.redshift_initialize_load_fraction() * 2.0, 0.0
+            return 0.0, self.redshift_initialize_load_fraction() * 2.0

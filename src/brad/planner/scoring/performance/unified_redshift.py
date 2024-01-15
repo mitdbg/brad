@@ -286,6 +286,7 @@ class RedshiftProvisioningScore:
             mean_service_time_s=mean_service_time,
             utilization=max_node_cpu_util,
             quantile=0.9,
+            alpha=1 / 8,
         )
         # Predicted running time is the query's execution time alone plus the
         # expected wait time (due to system load).
