@@ -19,7 +19,7 @@ from brad.grpc_client import BradClientError
 from brad.provisioning.directory import Directory
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from brad.utils.time_periods import universal_now
-from brad.utils import set_up_logging
+from brad.utils import set_up_logging, create_custom_logger
 from workload_utils.connect import connect_to_db
 from workload_utils.transaction_worker import TransactionWorker
 
@@ -92,6 +92,13 @@ def runner(
     else:
         out_dir = pathlib.Path(".")
 
+    verbose_log_dir = out_dir / "verbose_logs"
+    verbose_log_dir.mkdir(exist_ok=True)
+    verbose_logger = create_custom_logger(
+        "txn_runner_verbose", str(verbose_log_dir / f"runner_{worker_idx}.log")
+    )
+    verbose_logger.info("Workload starting...")
+
     # Signal that we are ready to start and wait for other clients.
     start_queue.put("")
     control_semaphore.acquire()  # type: ignore
@@ -135,12 +142,7 @@ def runner(
             except BradClientError as ex:
                 succeeded = False
                 if ex.is_transient():
-                    # Too verbose during a transition.
-                    # print(
-                    #     "Encountered transient error (probably engine change). Will retry...",
-                    #     flush=True,
-                    #     file=sys.stderr,
-                    # )
+                    verbose_logger.warning("Transient txn error: %s", ex.message())
 
                     if rand_backoff is None:
                         rand_backoff = RandomizedExponentialBackoff(
