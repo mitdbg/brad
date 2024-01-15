@@ -461,6 +461,8 @@ class AuroraProvisioningScore:
     def predict_base_latency(
         latency: npt.NDArray, prov: Provisioning, ctx: "ScoringContext"
     ) -> npt.NDArray:
+        if prov.num_nodes() == 0:
+            return np.ones_like(latency) * np.inf
         # Ideally we should adjust for load as well.
         resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(prov)
         coefs = ctx.planner_config.aurora_new_scaling_coefs()
