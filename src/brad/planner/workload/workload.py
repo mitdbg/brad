@@ -319,3 +319,14 @@ class Workload:
             return self._table_sizes_mb[(table_name, location)]
         except KeyError:
             return None
+
+    def lookup_query_for_debugging(
+        self, workload_query_idx: int
+    ) -> List[Tuple[str, int]]:
+        possible = []
+        for dataset_name, mappings in self._query_debug_map.items():
+            for our_idx, workload_idx in mappings:
+                if our_idx != workload_query_idx:
+                    continue
+                possible.append((dataset_name, workload_idx))
+        return possible
