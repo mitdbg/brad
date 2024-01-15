@@ -219,6 +219,6 @@ class PrecomputedPredictions(AnalyticsLatencyScorer):
             applied_predictions[:, Workload.EngineLatencyIndex[Engine.Aurora]]
         ).sum()
         if num_unmatched_aurora > 0:
-            raise RuntimeError("Unmatched queries: " + num_unmatched_aurora)
+            raise RuntimeError(f"Unmatched queries: {num_unmatched_aurora.item()}")
 
         workload.set_predicted_analytical_latencies(applied_predictions, debug_map)

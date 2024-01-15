@@ -457,6 +457,16 @@ class AuroraProvisioningScore:
         model = ctx.planner_config.aurora_txn_coefs(ctx.schema_name)
         return completions_per_s * model["C_1"]
 
+    @staticmethod
+    def predict_base_latency(
+        latency: npt.NDArray, prov: Provisioning, ctx: "ScoringContext"
+    ) -> npt.NDArray:
+        # Ideally we should adjust for load as well.
+        resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(prov)
+        coefs = ctx.planner_config.aurora_new_scaling_coefs()
+        coefs[0] *= resource_factor
+        return latency / coefs.sum()
+
     def copy(self) -> "AuroraProvisioningScore":
         return AuroraProvisioningScore(
             self.scaled_run_times,

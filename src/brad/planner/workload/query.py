@@ -155,3 +155,24 @@ class Query(QueryRep):
 
         assert latest_idx is not None
         return self._past_executions[latest_idx][0]
+
+    def most_recent_execution(self) -> Optional[Tuple[Engine, float]]:
+        if self._past_executions is None or len(self._past_executions) == 0:
+            return None
+
+        latest_epoch = None
+        latest_idx = None
+
+        for idx, execution in enumerate(self._past_executions):
+            if latest_epoch is None:
+                latest_epoch = execution[2]
+                latest_idx = idx
+            elif execution[2] > latest_epoch:
+                latest_epoch = execution[2]
+                latest_idx = idx
+
+        assert latest_idx is not None
+        return (
+            self._past_executions[latest_idx][0],
+            self._past_executions[latest_idx][1],
+        )

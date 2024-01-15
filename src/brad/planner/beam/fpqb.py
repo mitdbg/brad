@@ -133,6 +133,8 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
             self._providers.estimator_provider.get_estimator()
         )
         await ctx.simulate_current_workload_routing(planning_router)
+        if not ctx.planner_config.flag("skip_observation_prediction_correction"):
+            ctx.correct_predictions_based_on_observations()
         ctx.compute_workload_provisioning_predictions()
         ctx.compute_engine_latency_norm_factor()
         ctx.compute_current_workload_predicted_hourly_scan_cost()
