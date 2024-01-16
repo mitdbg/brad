@@ -137,6 +137,7 @@ def runner(
                 now = datetime.now().astimezone(pytz.utc)
 
                 # Execute query.
+                verbose_logger.info("[Seq %d] Issuing query %d", runner_idx, qidx)
                 start = time.time()
                 _, engine = database.execute_sync_with_engine(query)
                 end = time.time()

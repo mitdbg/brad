@@ -199,6 +199,7 @@ def runner(
                 else:
                     time_unsimulated_str = "xxx"
 
+                verbose_logger.info("[RA %d] Issuing query %d", runner_idx, qidx)
                 start = time.time()
                 _, engine = database.execute_sync_with_engine(query)
                 end = time.time()
