@@ -160,9 +160,13 @@ def runner(
                     wait_s = rand_backoff.wait_time_s()
                     if wait_s is None:
                         logger.info(
-                            "[T] Aborting benchmark. Too many transient errors.",
+                            "[T %d] Aborting benchmark. Too many transient errors.",
+                            worker_idx,
                         )
                         break
+                    verbose_logger.info(
+                        "[T %d] Backing off for %.4f seconds...", worker_idx, wait_s
+                    )
                     time.sleep(wait_s)
 
                 else:

@@ -248,6 +248,9 @@ def runner(
                             runner_idx,
                         )
                         break
+                    verbose_logger.info(
+                        "[RA %d] Backing off for %.4f seconds...", runner_idx, wait_s
+                    )
                     time.sleep(wait_s)
 
                 else:
