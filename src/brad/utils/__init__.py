@@ -44,10 +44,14 @@ def create_custom_logger(
     handler = logging.FileHandler(log_file)
     formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(message)s")
     handler.setFormatter(formatter)
+
     logger = logging.getLogger(name)
     logger.setLevel(level)
+    # We do not want the messages to propagate up to the root logger.
+    logger.propagate = False
     # Remove default handlers.
     for h in logger.handlers[:]:
         logger.removeHandler(h)
+
     logger.addHandler(handler)
     return logger
