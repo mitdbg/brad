@@ -38,11 +38,16 @@ def set_up_logging(filename=None, debug_mode=False, also_console=False):
     logging.getLogger("asyncio").setLevel(logging.INFO)
 
 
-def create_custom_logger(name: str, log_file: str, level=logging.DEBUG):
+def create_custom_logger(
+    name: str, log_file: str, level: int = logging.DEBUG
+) -> logging.Logger:
     handler = logging.FileHandler(log_file)
     formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(message)s")
     handler.setFormatter(formatter)
     logger = logging.getLogger(name)
     logger.setLevel(level)
+    # Remove default handlers.
+    for h in logger.handlers[:]:
+        logger.removeHandler(h)
     logger.addHandler(handler)
     return logger

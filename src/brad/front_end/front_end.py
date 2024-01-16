@@ -148,9 +148,10 @@ class BradFrontEnd(BradInterface):
             verbose_log_file = (
                 main_log_file.parent / f"brad_front_end_verbose_{fe_index}.log"
             )
-            self._verbose_logger = create_custom_logger(
+            self._verbose_logger: Optional[logging.Logger] = create_custom_logger(
                 "fe_verbose", str(verbose_log_file)
             )
+            self._verbose_logger.info("Verbose logger enabled.")
         else:
             self._verbose_logger = None
 
@@ -369,6 +370,7 @@ class BradFrontEnd(BradInterface):
                 pyodbc.OperationalError,
                 redshift_errors.InterfaceError,
                 ssl.SSLEOFError,
+                IndexError,  # Occurs during Redshift restarts.
             ) as ex:
                 is_transient_error = False
                 if connection.is_connection_lost_error(ex):
