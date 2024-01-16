@@ -724,6 +724,7 @@ class BradFrontEnd(BradInterface):
 
         except:  # pylint: disable=bare-except
             logger.exception("Unexpected failure when reestablishing connections.")
+            self._reestablish_connections_task = None
 
     def _reset_latency_sketches(self) -> None:
         sketch_rel_accuracy = 0.01
