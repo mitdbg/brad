@@ -298,10 +298,15 @@ class RecordedRun:
             start_ts = self.txn_lats.iloc[0]["timestamp"]
             end_ts = self.txn_lats.iloc[-1]["timestamp"]
 
-        return (
+        parsed_start, parsed_end = (
             pd.to_datetime(start_ts).tz_localize(None),
             pd.to_datetime(end_ts).tz_localize(None),
         )
+
+        # Adjust the end timestamp if needed.
+        olap_ts = self.olap_lats["timestamp"]
+        parsed_end = max(parsed_end, olap_ts.max())
+        return parsed_start, parsed_end
 
     def _compute_blueprint_intervals(self) -> List[Tuple[float, float]]:
         if self.events is None:
