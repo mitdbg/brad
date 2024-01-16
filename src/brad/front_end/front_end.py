@@ -148,9 +148,10 @@ class BradFrontEnd(BradInterface):
             verbose_log_file = (
                 main_log_file.parent / f"brad_front_end_verbose_{fe_index}.log"
             )
-            self._verbose_logger = create_custom_logger(
+            self._verbose_logger: Optional[logging.Logger] = create_custom_logger(
                 "fe_verbose", str(verbose_log_file)
             )
+            self._verbose_logger.info("Verbose logger enabled.")
         else:
             self._verbose_logger = None
 
@@ -369,6 +370,7 @@ class BradFrontEnd(BradInterface):
                 pyodbc.OperationalError,
                 redshift_errors.InterfaceError,
                 ssl.SSLEOFError,
+                IndexError,  # Occurs during Redshift restarts.
             ) as ex:
                 is_transient_error = False
                 if connection.is_connection_lost_error(ex):
@@ -651,7 +653,7 @@ class BradFrontEnd(BradInterface):
 
         blueprint = self._blueprint_mgr.get_blueprint()
         directory = self._blueprint_mgr.get_directory()
-        logger.debug("Loaded new directory: %s", directory)
+        logger.info("Loaded new directory: %s", directory)
         if self._monitor is not None:
             self._monitor.update_metrics_sources()
         await self._sessions.add_and_refresh_connections()
@@ -671,40 +673,58 @@ class BradFrontEnd(BradInterface):
         )
 
     async def _do_reestablish_connections(self) -> None:
-        # FIXME: This approach is not ideal because we introduce concurrent
-        # access to the session manager.
-        rand_backoff = None
+        try:
+            # FIXME: This approach is not ideal because we introduce concurrent
+            # access to the session manager.
+            rand_backoff = None
 
-        while True:
-            succeeded = await self._sessions.reestablish_connections()
-            if succeeded:
-                logger.debug("Re-established connections successfully.")
-                self._reestablish_connections_task = None
-                break
+            while True:
+                if self._verbose_logger is not None:
+                    self._verbose_logger.info(
+                        "Attempting to re-establish lost connections."
+                    )
 
-            if rand_backoff is None:
-                rand_backoff = RandomizedExponentialBackoff(
-                    max_retries=100,
-                    base_delay_s=1.0,
-                    max_delay_s=timedelta(minutes=1).total_seconds(),
-                )
+                report = await self._sessions.reestablish_connections()
 
-            wait_time = rand_backoff.wait_time_s()
-            if wait_time is None:
-                logger.warning(
-                    "Abandoning connection re-establishment due to too many failures"
-                )
-                # N.B. We purposefully do not clear the
-                # `_reestablish_connections_task` variable.
-                break
-            else:
-                await asyncio.sleep(wait_time)
+                if self._verbose_logger is not None:
+                    self._verbose_logger.info("%s", str(report))
 
-            # Refresh the blueprint and directory again.
-            logger.debug(
-                "Refreshing the blueprint before attempting to re-establish connections again."
-            )
-            await self._blueprint_mgr.load()
+                if report.all_succeeded():
+                    logger.debug("Re-established connections successfully.")
+                    if self._verbose_logger is not None:
+                        self._verbose_logger.debug(
+                            "Re-established connections successfully."
+                        )
+                    self._reestablish_connections_task = None
+                    break
+
+                if rand_backoff is None:
+                    rand_backoff = RandomizedExponentialBackoff(
+                        max_retries=100,
+                        base_delay_s=1.0,
+                        max_delay_s=timedelta(minutes=1).total_seconds(),
+                    )
+
+                wait_time = rand_backoff.wait_time_s()
+                if wait_time is None:
+                    logger.warning(
+                        "Abandoning connection re-establishment due to too many failures"
+                    )
+                    # N.B. We purposefully do not clear the
+                    # `_reestablish_connections_task` variable.
+                    break
+                else:
+                    await asyncio.sleep(wait_time)
+
+                # N.B. We should not refresh the blueprint/directory here
+                # because it can lead to AWS throttling. The directory only
+                # changes during a blueprint transition; the daemon always
+                # provides the latest directory to the front end on a
+                # transition.
+
+        except:  # pylint: disable=bare-except
+            logger.exception("Unexpected failure when reestablishing connections.")
+            self._reestablish_connections_task = None
 
     def _reset_latency_sketches(self) -> None:
         sketch_rel_accuracy = 0.01

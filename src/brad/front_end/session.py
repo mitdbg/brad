@@ -7,6 +7,7 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.session import SessionId
 from brad.blueprint.manager import BlueprintManager
+from brad.front_end.debug import ReestablishConnectionsReport
 from brad.front_end.engine_connections import EngineConnections
 from brad.planner.estimator import Estimator
 from brad.routing.policy import RoutingPolicy
@@ -196,7 +197,7 @@ class SessionManager:
                 expected_engines, expected_aurora_read_replicas
             )
 
-    async def reestablish_connections(self) -> bool:
+    async def reestablish_connections(self) -> ReestablishConnectionsReport:
         """
         Used to reconnect to engines when a connection has been lost. Lost
         connections may occur during blueprint transitions when the provisioning
@@ -209,18 +210,21 @@ class SessionManager:
         """
         logger.debug("Attempting to reestablish connections...")
         directory = self._blueprint_mgr.get_directory()
-        all_connected = True
         sessions = [session for session in self._sessions.values()]
+        overall_report = ReestablishConnectionsReport()
         for session in sessions:
             if session.closed:
                 continue
 
-            connected = await session.engines.reestablish_connections(
+            report = await session.engines.reestablish_connections(
                 self._config, directory
             )
-            if not connected and not session.closed:
-                all_connected = False
+            if session.closed:
+                continue
+            overall_report.merge(report)
             # Continue running since we still want to try connecting other
             # sessions.
-        logger.debug("Reestablish connections succeeded? %s", str(all_connected))
-        return all_connected
+        logger.debug(
+            "Reestablish connections succeeded? %s", str(overall_report.all_succeeded())
+        )
+        return overall_report

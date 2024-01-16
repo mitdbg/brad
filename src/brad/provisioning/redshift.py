@@ -6,8 +6,9 @@ import json
 import botocore.exceptions
 from typing import Dict, Any, Optional
 
-from brad.config.file import ConfigFile
 from brad.blueprint.provisioning import Provisioning
+from brad.config.file import ConfigFile
+from brad.provisioning.redshift_status import RedshiftAvailabilityStatus
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 
 logger = logging.getLogger(__name__)
@@ -229,9 +230,16 @@ class RedshiftProvisioningManager:
         while True:
             response = await self._get_cluster_state(cluster_id)
             cluster = response["Clusters"][0]
-            modifying = cluster["ClusterAvailabilityStatus"] == "Modifying"
-            status = cluster["ClusterStatus"]
-            if status == "available" and not modifying:
+            availability_status = RedshiftAvailabilityStatus.from_str(
+                cluster["ClusterAvailabilityStatus"]
+            )
+            if (
+                availability_status == RedshiftAvailabilityStatus.Available
+                # `Maintenance` sometimes occurs and probably refers to when AWS
+                # is performing upgrades to the DBMS. We can still serve queries
+                # during this time.
+                or availability_status == RedshiftAvailabilityStatus.Maintenance
+            ):
                 return True
 
             checks_so_far += 1
