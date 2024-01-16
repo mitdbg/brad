@@ -490,6 +490,11 @@ def assemble_brad_cost_data(
     return xs_full, vals_full
 
 
+def compute_cumulative_cost(minutes: npt.NDArray, monthly_costs: npt.NDArray) -> float:
+    minute_cost = monthly_costs / 30 / 24 / 60
+    return np.trapz(minute_cost, x=minutes).item()
+
+
 def _load_txn_data(
     data_dir: pathlib.Path, num_clients: int
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
