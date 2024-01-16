@@ -74,6 +74,9 @@ class Workload:
         # three engines (Aurora, Redshift, Athena) in that order.
         self._predicted_analytical_latencies: Optional[npt.NDArray] = None
 
+        # Used for debug purposes only.
+        self._orig_predicted_analytical_latencies: Optional[npt.NDArray] = None
+
         # Data access statistics (predicted).
         # These properties are set and used by the blueprint planner.
         #
@@ -204,6 +207,21 @@ class Workload:
         self._predicted_analytical_latencies = predicted_latency
         self._query_debug_map = debug_map
 
+    def apply_predicted_latency_corrections(
+        self, engine: Engine, query_indices: npt.NDArray, run_times: npt.NDArray
+    ) -> None:
+        assert self._predicted_analytical_latencies is not None
+        if (
+            hasattr(self, "_orig_predicted_analytical_latencies")
+            and self._orig_predicted_analytical_latencies is None
+        ):
+            self._orig_predicted_analytical_latencies = (
+                self._predicted_analytical_latencies.copy()
+            )
+        self._predicted_analytical_latencies[
+            query_indices, self.EngineLatencyIndex[engine]
+        ] = run_times
+
     def get_predicted_analytical_latency(self, query_idx: int, engine: Engine) -> float:
         assert self._predicted_analytical_latencies is not None
         return self._predicted_analytical_latencies[
@@ -330,3 +348,20 @@ class Workload:
                     continue
                 possible.append((dataset_name, workload_idx))
         return possible
+
+    def get_query_observations(self) -> Tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
+        # The first NDArray has the available observed run times
+        # The second NDArray has the engine execution location.
+        # The third NDArray is the query index in this workload.
+        run_times = []
+        locations = []
+        indices = []
+        for idx, q in enumerate(self.analytical_queries()):
+            e = q.most_recent_execution()
+            if e is None:
+                continue
+            engine, rt = e
+            run_times.append(rt)
+            locations.append(self.EngineLatencyIndex[engine])
+            indices.append(idx)
+        return np.array(run_times), np.array(locations), np.array(indices)

@@ -94,6 +94,10 @@ class RedshiftConnection(Connection):
     def is_connection_lost_error(self, ex: Exception) -> bool:
         if isinstance(ex, redshift_errors.InterfaceError):
             return True
+        if isinstance(ex, IndexError):
+            # Not ideal, but this happens inside the Redshift connector
+            # (probably during a Redshift restart).
+            return True
         message = repr(ex)
         for phrase in _CONNECTION_LOST_PHRASES:
             if phrase in message:

@@ -3,7 +3,6 @@ import json
 import logging
 import random
 import time
-import os
 import ssl
 import multiprocessing as mp
 import redshift_connector.error as redshift_errors
@@ -44,7 +43,7 @@ from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
 from brad.routing.tree_based.forest_policy import ForestPolicy
 from brad.row_list import RowList
-from brad.utils import log_verbose
+from brad.utils import log_verbose, create_custom_logger
 from brad.utils.counter import Counter
 from brad.utils.json_decimal_encoder import DecimalEncoder
 from brad.utils.mailbox import Mailbox
@@ -56,8 +55,6 @@ from brad.workload_logging.epoch_file_handler import EpochFileHandler
 logger = logging.getLogger(__name__)
 
 LINESEP = "\n".encode()
-
-INITIAL_ROUTE_REDSHIFT_ONLY_VAR = "BRAD_INITIAL_ROUTE_REDSHIFT_ONLY"
 
 
 class BradFrontEnd(BradInterface):
@@ -145,9 +142,17 @@ class BradFrontEnd(BradInterface):
         # Used to re-establish engine connections.
         self._reestablish_connections_task: Optional[asyncio.Task[None]] = None
 
-        # This is temporary for experiment purposes. In the future, this will be
-        # part of the blueprint.
-        self._route_redshift_only = INITIAL_ROUTE_REDSHIFT_ONLY_VAR in os.environ
+        # Used for logging transient errors that are too verbose.
+        main_log_file = config.front_end_log_file(fe_index)
+        if main_log_file is not None:
+            verbose_log_file = (
+                main_log_file.parent / f"brad_front_end_verbose_{fe_index}.log"
+            )
+            self._verbose_logger = create_custom_logger(
+                "fe_verbose", str(verbose_log_file)
+            )
+        else:
+            self._verbose_logger = None
 
     async def serve_forever(self):
         await self._run_setup()
@@ -428,6 +433,11 @@ class BradFrontEnd(BradInterface):
             # This is an expected exception. We catch and re-raise it here to
             # avoid triggering the handler below.
             logger.debug("Query error: %s", repr(ex))
+            if self._verbose_logger is not None:
+                if ex.is_transient():
+                    self._verbose_logger.exception("Transient error")
+                else:
+                    self._verbose_logger.exception("Non-transient error")
             raise
         except Exception as ex:
             logger.exception("Encountered unexpected exception when handling request.")
@@ -539,7 +549,6 @@ class BradFrontEnd(BradInterface):
                     await self._run_blueprint_update(
                         message.version, message.updated_directory
                     )
-                    self._route_redshift_only = False
                     # Tell the daemon that we have updated.
                     self._output_queue.put(
                         NewBlueprintAck(self._fe_index, message.version), block=False

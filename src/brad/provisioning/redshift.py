@@ -30,6 +30,8 @@ class RedshiftProvisioningManager:
         """
         Resize method depends on target instance type, and old instance count,
         and the new instance count.
+
+        https://repost.aws/knowledge-center/redshift-elastic-resize
         """
         if old.num_nodes() == 1 or new.num_nodes() == 1:
             return True
@@ -46,10 +48,12 @@ class RedshiftProvisioningManager:
                 new.num_nodes() < old.num_nodes() / 4
                 or new.num_nodes() > 2 * old.num_nodes()
             )
-        # For all other types, must be within double or half.
-        return (
-            new.num_nodes() < old.num_nodes() / 2
-            or new.num_nodes() > 2 * old.num_nodes()
+
+        # For all other types elastic resize is only possible if new is double
+        # or half the size.
+        return not (
+            old.num_nodes() * 2 == new.num_nodes()
+            or old.num_nodes() // 2 == new.num_nodes()
         )
 
     async def pause_cluster(self, cluster_id: str) -> None:

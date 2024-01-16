@@ -368,6 +368,20 @@ class RedshiftProvisioningScore:
 
         return np.dot(lat_vals, coefs)
 
+    @staticmethod
+    def predict_base_latency(
+        latency: npt.NDArray, prov: Provisioning, ctx: "ScoringContext"
+    ) -> npt.NDArray:
+        if prov.num_nodes() == 0:
+            return np.ones_like(latency) * np.inf
+        # Ideally we should adjust for load as well.
+        resource_factor = _REDSHIFT_BASE_RESOURCE_VALUE / (
+            redshift_num_cpus(prov) * prov.num_nodes()
+        )
+        coefs = ctx.planner_config.redshift_new_scaling_coefs()
+        coefs[0] *= resource_factor
+        return latency / coefs.sum()
+
     def copy(self) -> "RedshiftProvisioningScore":
         return RedshiftProvisioningScore(
             self.scaled_run_times,

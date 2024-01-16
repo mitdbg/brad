@@ -14,7 +14,7 @@ from workload_utils.connect import connect_to_db
 from brad.config.engine import Engine
 from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
-from brad.utils import set_up_logging
+from brad.utils import set_up_logging, create_custom_logger
 
 
 logger = logging.getLogger(__name__)
@@ -52,6 +52,13 @@ def runner(
         engine = Engine.from_str(args.engine)
     else:
         engine = None
+
+    verbose_log_dir = out_dir / "verbose_logs"
+    verbose_log_dir.mkdir(exist_ok=True)
+    verbose_logger = create_custom_logger(
+        "seq_runner_verbose", str(verbose_log_dir / f"runner_{runner_idx}.log")
+    )
+    verbose_logger.info("Workload starting...")
 
     try:
         database = connect_to_db(
@@ -164,13 +171,7 @@ def runner(
 
             except BradClientError as ex:
                 if ex.is_transient():
-                    # This is too verbose during a transition.
-                    # print(
-                    #     "Transient query error:",
-                    #     ex.message(),
-                    #     flush=True,
-                    #     file=sys.stderr,
-                    # )
+                    verbose_logger.warning("Transient query error: %s", ex.message())
 
                     if rand_backoff is None:
                         rand_backoff = RandomizedExponentialBackoff(
