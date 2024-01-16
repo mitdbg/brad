@@ -166,12 +166,14 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
                 all_provs, query_indices, planning_router, ctx
             )
         else:
+            max_workers = self._planner_config.planner_max_workers()
+            logger.info("Planner running with %d max workers.", max_workers)
             candidates = await self._do_parallel_batched_search(
                 all_provs,
                 query_indices,
                 ctx,
                 batch_size=20,
-                max_workers=8,
+                max_workers=max_workers,
             )
         candidates.sort(reverse=True)
         if len(candidates) == 0:

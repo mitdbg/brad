@@ -356,3 +356,9 @@ class PlannerConfig:
             return coefs["alpha"], coefs["max"]
         except KeyError:
             return 0.0, self.redshift_initialize_load_fraction() * 2.0
+
+    def planner_max_workers(self) -> int:
+        try:
+            return self._raw["planner_max_workers"]
+        except KeyError:
+            return 8
