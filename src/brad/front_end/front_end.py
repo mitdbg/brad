@@ -678,9 +678,22 @@ class BradFrontEnd(BradInterface):
         rand_backoff = None
 
         while True:
-            succeeded = await self._sessions.reestablish_connections()
-            if succeeded:
+            if self._verbose_logger is not None:
+                self._verbose_logger.info(
+                    "Attempting to re-establish lost connections."
+                )
+
+            report = await self._sessions.reestablish_connections()
+
+            if self._verbose_logger is not None:
+                self._verbose_logger.info("%s", str(report))
+
+            if report.all_succeeded():
                 logger.debug("Re-established connections successfully.")
+                if self._verbose_logger is not None:
+                    self._verbose_logger.debug(
+                        "Re-established connections successfully."
+                    )
                 self._reestablish_connections_task = None
                 break
 

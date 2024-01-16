@@ -7,6 +7,7 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.connection.connection import Connection, ConnectionFailed
 from brad.connection.factory import ConnectionFactory
+from brad.front_end.debug import ReestablishConnectionsReport
 from brad.provisioning.directory import Directory
 
 logger = logging.getLogger(__name__)
@@ -202,7 +203,7 @@ class EngineConnections:
 
     async def reestablish_connections(
         self, config: ConfigFile, directory: Directory
-    ) -> bool:
+    ) -> ReestablishConnectionsReport:
         """
         Used to reconnect to engines when a connection has been lost. Lost
         connections may occur during blueprint transitions when the provisioning
@@ -213,9 +214,9 @@ class EngineConnections:
         overwhelming the underlying engines. Use randomized exponential backoff
         instead.
         """
+        report = ReestablishConnectionsReport()
         curr_connections = [item for item in self._connection_map.items()]
         new_connections = []
-        all_succeeded = True
 
         for engine, conn in curr_connections:
             if conn.is_connected():
@@ -229,8 +230,9 @@ class EngineConnections:
                     cursor = new_conn.cursor_sync()
                     cursor.execute_sync("SET enable_result_cache_for_session = off")
                 new_connections.append((engine, new_conn))
+                report.bump(engine, succeeded=True)
             except ConnectionFailed:
-                all_succeeded = False
+                report.bump(engine, succeeded=False)
 
         for engine, conn in new_connections:
             self._connection_map[engine] = conn
@@ -255,13 +257,14 @@ class EngineConnections:
                         replica_idx,
                     )
                     new_replica_conns.append((replica_idx, new_conn))
+                    report.bump(Engine.Aurora, succeeded=True)
                 except ConnectionFailed:
-                    all_succeeded = False
+                    report.bump(Engine.Aurora, succeeded=False)
 
             for replica_idx, conn in new_replica_conns:
                 self._aurora_read_replicas[replica_idx] = conn
 
-        return all_succeeded
+        return report
 
     def get_connection(self, engine: Engine) -> Connection:
         try:
