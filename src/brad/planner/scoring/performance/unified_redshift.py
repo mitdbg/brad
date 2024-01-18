@@ -50,9 +50,13 @@ class RedshiftProvisioningScore:
         # TODO: Hardcoded SLO.
         gamma = min(ctx.metrics.query_lat_s_p90 / 30.0 + 0.2, 1.0)
         debug_dict["redshift_gamma_factor"] = gamma
-        debug_dict["redshift_effective_cpu_util"] = (
-            gamma * ctx.metrics.redshift_cpu_list.max()
-        )
+        if (
+            ctx.metrics.redshift_cpu_list is not None
+            and ctx.metrics.redshift_cpu_list.shape[0] > 0
+        ):
+            debug_dict["redshift_effective_cpu_util"] = (
+                gamma * ctx.metrics.redshift_cpu_list.max()
+            )
 
         predicted_max_node_cpu_util = cls.predict_max_node_cpu_util(
             curr_prov,
