@@ -58,11 +58,11 @@ else
 
   hi_start="$(date -u +%s)"
   brad cli --command "BRAD_USE_PRESET_BP dl_hi"
-  pause_for_s_past_timepoint $hi_start $((100 * 60))
+  pause_for_s_past_timepoint $hi_start $((120 * 60))
 
   med2_start="$(date -u +%s)"
   brad cli --command "BRAD_USE_PRESET_BP dl_med"
-  pause_for_s_past_timepoint $med2_start $((60 * 60))
+  pause_for_s_past_timepoint $med2_start $((50 * 60))
 
   brad cli --command "BRAD_USE_PRESET_BP dl_lo"
   pause_for_s_past_timepoint $expt_start $run_for_s

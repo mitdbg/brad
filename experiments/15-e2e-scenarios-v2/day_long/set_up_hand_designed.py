@@ -37,7 +37,9 @@ async def run_transition(
 
 
 def main():
-    athena_queries = [79, 88]
+    # Push Athena queries onto Redshift.
+    # athena_queries = [79, 88]
+    athena_queries = []
     aurora_queries = [35, 43, 46]
     redshift_queries = [
         idx
