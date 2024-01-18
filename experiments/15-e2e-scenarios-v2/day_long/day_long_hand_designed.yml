@@ -52,7 +52,7 @@ epoch_length:
   minutes: 1
 
 # Blueprint planning strategy.
-strategy: query_based_beam
+strategy: fp_query_based_beam
 
 # Used to specify the period of time over which to use data for planning.
 # Currrently, this is a "look behind" window for the workload.
@@ -93,8 +93,8 @@ redshift_min_load_removal_fraction: 0.9
 
 aurora_max_query_factor: 4.0
 aurora_max_query_factor_replace: 10000.0
-redshift_peak_load_threshold: 98.5
-redshift_peak_load_multiplier: 2.0
+redshift_peak_load_threshold: 99.0
+redshift_peak_load_multiplier: 1.5
 
 # Blueprint planning performance ceilings.
 query_latency_p90_ceiling_s: 30.0
@@ -107,7 +107,7 @@ comparator:
   benefit_horizon:  # Only used by the `benefit_perf_ceiling` comparator
     weeks: 0
     days: 0
-    hours: 6
+    hours: 3
     minutes: 0
 
   penalty_threshold: 0.8  # Only used by the `benefit_perf_ceiling` comparator
@@ -122,12 +122,15 @@ std_datasets:
 
 use_preset_redshift_clusters: false
 
-aurora_provisioning_search_distance: 900.0
+aurora_provisioning_search_distance: 700.0
 redshift_provisioning_search_distance: 900.0
+
+planner_max_workers: 16
 
 # Blueprint planning trigger configs.
 
 triggers:
+  # N.B. Triggers are disabled because this is an expert-designed baseline.
   enabled: false
   check_period_s: 600  # Triggers are checked every X seconds.
   check_period_offset_s: 1800  # Wait 30 mins before starting.
@@ -143,7 +146,7 @@ triggers:
     sustained_epochs: 3
 
   aurora_cpu:
-    lo: 15
+    lo: 10
     hi: 85
     sustained_epochs: 3
 
