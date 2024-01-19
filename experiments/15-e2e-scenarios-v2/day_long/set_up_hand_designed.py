@@ -71,7 +71,6 @@ def main():
         "--athena-queries",
         type=str,
         help="Comma separated list of indices.",
-        default=",".join(map(str, athena_queries)),
     )
     parser.add_argument(
         "--aurora-queries",
