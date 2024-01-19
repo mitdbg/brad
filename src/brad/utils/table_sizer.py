@@ -50,6 +50,10 @@ class TableSizer:
     async def table_size_rows(
         self, table_name: str, location: Engine, approximate_allowed: bool = False
     ) -> int:
+        # NOTE: Special case.
+        if table_name == "embeddings" and location != Engine.Aurora:
+            return 1
+
         if location == Engine.Aurora:
             conn = self._engines.get_connection(Engine.Aurora)
         elif location == Engine.Redshift:
