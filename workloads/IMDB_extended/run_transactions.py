@@ -1,4 +1,5 @@
 import asyncio
+import math
 import argparse
 import pathlib
 import pickle
@@ -154,7 +155,7 @@ async def runner_impl(
                     error=ex,
                     txn_idx=txn_idx,
                     timestamp=start_ts,
-                    run_time_s=end - start,
+                    run_time_s=math.nan,
                 )
 
         return _run_txn

@@ -95,7 +95,7 @@ def get_run_query(
                 error=ex,
                 timestamp=timestamp,
                 run_time_s=math.nan,
-                engine=engine.value,
+                engine=None,
                 query_idx=query_idx,
                 time_since_execution_s=time_since_execution,
                 time_of_day=time_of_day,

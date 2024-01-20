@@ -152,7 +152,7 @@ async def runner_impl(
                         error=ex,
                         timestamp=timestamp,
                         run_time_s=math.nan,
-                        engine=engine.value,
+                        engine=None,
                         query_idx=query_idx,
                     )
 
@@ -235,19 +235,18 @@ async def runner_impl(
                 )
                 await inflight_runner.wait_for_s(wait_s)
 
+            # Wait for some time before issuing, if requested.
+            if args.avg_gap_s is not None:
+                wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
+            elif args.arrivals_per_s is not None:
+                wait_for_s = prng.expovariate(args.arrivals_per_s)
+                if last_run_time_s is not None:
+                    wait_for_s -= last_run_time_s
             else:
-                # Wait for some time before issuing, if requested.
-                if args.avg_gap_s is not None:
-                    wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
-                elif args.arrivals_per_s is not None:
-                    wait_for_s = prng.expovariate(args.arrivals_per_s)
-                    if last_run_time_s is not None:
-                        wait_for_s -= last_run_time_s
-                else:
-                    wait_for_s = 0.0
+                wait_for_s = 0.0
 
-                if wait_for_s > 0.0:
-                    await inflight_runner.wait_for_s(wait_for_s)
+            if wait_for_s > 0.0:
+                await inflight_runner.wait_for_s(wait_for_s)
 
             logger.debug("Executing qidx: %d", qidx)
             query = queries[qidx]
