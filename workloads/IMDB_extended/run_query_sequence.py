@@ -95,6 +95,7 @@ async def runner_impl(
                 # Ensure we disable the result cache if we are running directly on
                 # Redshift.
                 disable_direct_redshift_result_cache=True,
+                verbose_logger=verbose_logger,
             )
             db_conns.append(db)
     except BradClientError as ex:

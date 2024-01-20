@@ -87,24 +87,6 @@ async def runner_impl(
     aborts = [0 for _ in range(len(transactions))]
     db_conns = []
 
-    # Connect and set the isolation level.
-    try:
-        for slot_idx in range(args.issue_slots):
-            db = connect_to_db(
-                args,
-                worker_idx + slot_idx,
-                direct_engine=Engine.Aurora,
-                directory=directory,
-            )
-            db.execute_sync(
-                f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
-            )
-            db_conns.append(db)
-    except BradClientError as ex:
-        logger.error("[T %d] Failed to connect to BRAD: %s", worker_idx, str(ex))
-        start_queue.put_nowait(STARTUP_FAILED)
-        return
-
     # For printing out results.
     if "COND_OUT" in os.environ:
         # pylint: disable-next=import-error
@@ -119,6 +101,26 @@ async def runner_impl(
     verbose_logger = create_custom_logger(
         "txn_runner_verbose", str(verbose_log_dir / f"runner_{worker_idx}.log")
     )
+
+    # Connect and set the isolation level.
+    try:
+        for slot_idx in range(args.issue_slots):
+            db = connect_to_db(
+                args,
+                worker_idx + slot_idx,
+                direct_engine=Engine.Aurora,
+                directory=directory,
+                verbose_logger=verbose_logger,
+            )
+            db.execute_sync(
+                f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
+            )
+            db_conns.append(db)
+    except BradClientError as ex:
+        logger.error("[T %d] Failed to connect to BRAD: %s", worker_idx, str(ex))
+        start_queue.put_nowait(STARTUP_FAILED)
+        return
+
     verbose_logger.info("Workload starting...")
 
     bh = BackoffHelper()
@@ -212,6 +214,8 @@ async def runner_impl(
         contexts=db_conns, on_result=handle_result
     )
     first_run = True
+
+    logger.info("[T %d] Ready to start.", worker_idx)
 
     # Signal that we are ready to start and wait for other clients.
     start_queue.put("")
