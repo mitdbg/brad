@@ -665,6 +665,8 @@ def main():
 
     set_up_logging()
 
+    logger.info("[RA] Running with %d issue slots per client.", args.issue_slots)
+
     with open(args.query_bank_file, "r", encoding="UTF-8") as file:
         query_bank = [line.strip() for line in file]
 

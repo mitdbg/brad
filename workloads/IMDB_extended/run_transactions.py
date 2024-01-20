@@ -292,7 +292,8 @@ async def runner_impl(
             print(f"add_showing_aborts,{aborts[1]}", file=file)
             print(f"edit_note_aborts,{aborts[2]}", file=file)
 
-        db.close_sync()
+        for db in db_conns:
+            db.close_sync()
 
 
 def main():
@@ -402,6 +403,7 @@ def main():
     args = parser.parse_args()
 
     set_up_logging()
+    logger.info("[T] Running with %d issue slots per client.", args.issue_slots)
 
     if (
         args.num_client_path is not None
