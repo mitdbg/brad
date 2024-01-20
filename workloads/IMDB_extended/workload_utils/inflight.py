@@ -68,6 +68,14 @@ class InflightHelper(Generic[Context, Result]):
                 self._handle_result(result)
         self._inflight = pending
 
+    async def wait_until_next_slot_is_free(self) -> None:
+        pending = self._inflight.copy()
+        done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+        for fut in done:
+            result = fut.result()
+            self._handle_result(result)
+        self._inflight = pending
+
     def _run_with_context(
         self, context: Context, runnable: Callable[[Context], Result]
     ) -> Tuple[Context, Result]:
