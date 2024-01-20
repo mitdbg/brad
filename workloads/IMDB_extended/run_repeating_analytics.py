@@ -350,7 +350,8 @@ async def runner_impl(
                 if was_submitted:
                     break
                 logger.warning(
-                    "Ran out of issue slots. Waiting for next slot to free up."
+                    "[RA %d] Ran out of issue slots. Waiting for next slot to free up.",
+                    runner_idx,
                 )
                 await inflight_runner.wait_until_next_slot_is_free()
 

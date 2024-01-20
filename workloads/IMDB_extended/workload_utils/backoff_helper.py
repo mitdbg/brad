@@ -7,3 +7,4 @@ class BackoffHelper:
     def __init__(self) -> None:
         self.backoff: Optional[RandomizedExponentialBackoff] = None
         self.backoff_timestamp: Optional[datetime] = None
+        self.counter = 0
