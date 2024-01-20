@@ -193,7 +193,7 @@ async def runner_impl(
                 "{},{},{}".format(result.txn_idx, result.timestamp, result.run_time_s),
                 file=latency_file,
             )
-            if bh.counter > 20_000:
+            if bh.counter > 10_000:
                 latency_file.flush()
                 bh.counter = 0
 
