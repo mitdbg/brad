@@ -10,8 +10,9 @@ import os
 import pytz
 import multiprocessing as mp
 import logging
+from collections import namedtuple
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Callable
 
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
@@ -20,11 +21,15 @@ from brad.provisioning.directory import Directory
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from brad.utils.time_periods import universal_now
 from brad.utils import set_up_logging, create_custom_logger
-from workload_utils.connect import connect_to_db
+from workload_utils.connect import connect_to_db, Database
 from workload_utils.transaction_worker import TransactionWorker
+from workload_utils.backoff_helper import BackoffHelper
+from workload_utils.inflight import InflightHelper
 
 logger = logging.getLogger(__name__)
 STARTUP_FAILED = "startup_failed"
+
+TxnResult = namedtuple("TxnResult", ["error", "txn_idx", "timestamp", "run_time_s"])
 
 
 def runner(
@@ -44,7 +49,18 @@ def runner(
     signal.signal(signal.SIGINT, noop_handler)
 
     set_up_logging()
+    asyncio.run(
+        runner_impl(args, worker_idx, directory, start_queue, control_semaphore)
+    )
 
+
+async def runner_impl(
+    args,
+    worker_idx: int,
+    directory: Optional[Directory],
+    start_queue: mp.Queue,
+    control_semaphore: mp.Semaphore,  # type: ignore
+) -> None:
     worker = TransactionWorker(
         worker_idx,
         args.seed ^ worker_idx,
@@ -69,15 +85,21 @@ def runner(
     txn_indexes = list(range(len(transactions)))
     commits = [0 for _ in range(len(transactions))]
     aborts = [0 for _ in range(len(transactions))]
+    db_conns = []
 
     # Connect and set the isolation level.
     try:
-        db = connect_to_db(
-            args, worker_idx, direct_engine=Engine.Aurora, directory=directory
-        )
-        db.execute_sync(
-            f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
-        )
+        for slot_idx in range(args.issue_slots):
+            db = connect_to_db(
+                args,
+                worker_idx + slot_idx,
+                direct_engine=Engine.Aurora,
+                directory=directory,
+            )
+            db.execute_sync(
+                f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
+            )
+            db_conns.append(db)
     except BradClientError as ex:
         logger.error("[T %d] Failed to connect to BRAD: %s", worker_idx, str(ex))
         start_queue.put_nowait(STARTUP_FAILED)
@@ -99,12 +121,102 @@ def runner(
     )
     verbose_logger.info("Workload starting...")
 
+    bh = BackoffHelper()
+
+    def get_run_txn(txn_idx: int) -> Callable[[Database], TxnResult]:
+        txn = transactions[txn_idx]
+        # pylint: disable-next=comparison-with-callable
+        if txn == worker.purchase_tickets:
+            select_using_name = txn_prng.random() < lookup_theatre_id_by_name
+        else:
+            select_using_name = False
+
+        def _run_txn(db: Database) -> TxnResult:
+            try:
+                start_ts = datetime.now().astimezone(pytz.utc)
+                start = time.time()
+                # pylint: disable-next=comparison-with-callable
+                if txn == worker.purchase_tickets:
+                    txn(db, select_using_name=select_using_name)
+                else:
+                    txn(db)
+                end = time.time()
+                return TxnResult(
+                    error=None,
+                    txn_idx=txn_idx,
+                    timestamp=start_ts,
+                    run_time_s=end - start,
+                )
+            except Exception as ex:
+                return TxnResult(
+                    error=ex,
+                    txn_idx=txn_idx,
+                    timestamp=start_ts,
+                    run_time_s=end - start,
+                )
+
+        return _run_txn
+
+    def handle_result(result: TxnResult) -> None:
+        # Record metrics.
+        bh.counter += 1
+        if result.error is None:
+            commits[txn_idx] += 1
+        else:
+            aborts[txn_idx] += 1
+
+        if result.error is not None:
+            ex = result.error
+            if ex.is_transient():
+                verbose_logger.warning("Transient txn error: %s", ex.message())
+
+                if bh.backoff is None:
+                    bh.backoff = RandomizedExponentialBackoff(
+                        max_retries=100,
+                        base_delay_s=0.1,
+                        max_delay_s=timedelta(minutes=1).total_seconds(),
+                    )
+                    bh.backoff_timestamp = datetime.now().astimezone(pytz.utc)
+                    logger.info(
+                        "[T %d] Backing off due to transient errors.",
+                        worker_idx,
+                    )
+
+            else:
+                logger.error(
+                    "[T %d] Encountered an unexpected `BradClientError`.", worker_idx
+                )
+            return
+
+        if txn_prng.random() < args.latency_sample_prob:
+            print(
+                "{},{},{}".format(result.txn_idx, result.timestamp, result.run_time_s),
+                file=latency_file,
+            )
+            if bh.counter > 10_000:
+                latency_file.flush()
+                bh.counter = 0
+
+            # Warn if the abort rate is high.
+            total_aborts = sum(aborts)
+            total_commits = sum(commits)
+            abort_rate = total_aborts / (total_aborts + total_commits)
+            if abort_rate > 0.15:
+                logger.info(
+                    "[T %d] Abort rate is higher than expected ({%4f}).",
+                    worker_idx,
+                    abort_rate,
+                )
+
+    inflight_runner = InflightHelper[Database, TxnResult](
+        contexts=db_conns, on_result=handle_result
+    )
+    first_run = True
+
     # Signal that we are ready to start and wait for other clients.
     start_queue.put("")
     control_semaphore.acquire()  # type: ignore
 
-    txn_exec_count = 0
-    rand_backoff = None
     overall_start = time.time()
     try:
         latency_file = open(
@@ -119,98 +231,51 @@ def runner(
                 logger.info("T Runner %d is exiting.", worker_idx)
                 break
 
-            txn_exec_count += 1
-            txn_idx = txn_prng.choices(txn_indexes, weights=transaction_weights, k=1)[0]
-            txn = transactions[txn_idx]
-
-            now = datetime.now().astimezone(pytz.utc)
-            txn_start = time.time()
-            try:
-                # pylint: disable-next=comparison-with-callable
-                if txn == worker.purchase_tickets:
-                    succeeded = txn(
-                        db,
-                        select_using_name=txn_prng.random() < lookup_theatre_id_by_name,
-                    )
-                else:
-                    succeeded = txn(db)
-
-                if rand_backoff is not None:
-                    logger.info("[T %d] Continued after transient errors.", worker_idx)
-                    rand_backoff = None
-
-            except BradClientError as ex:
-                succeeded = False
-                if ex.is_transient():
-                    verbose_logger.warning("Transient txn error: %s", ex.message())
-
-                    if rand_backoff is None:
-                        rand_backoff = RandomizedExponentialBackoff(
-                            max_retries=100,
-                            base_delay_s=0.1,
-                            max_delay_s=timedelta(minutes=1).total_seconds(),
-                        )
-                        logger.info(
-                            "[T %d] Backing off due to transient errors.",
-                            worker_idx,
-                        )
-
-                    # Delay retrying in the case of a transient error (this
-                    # happens during blueprint transitions).
-                    wait_s = rand_backoff.wait_time_s()
-                    if wait_s is None:
-                        logger.info(
-                            "[T %d] Aborting benchmark. Too many transient errors.",
-                            worker_idx,
-                        )
-                        break
-                    verbose_logger.info(
-                        "[T %d] Backing off for %.4f seconds...", worker_idx, wait_s
-                    )
-                    time.sleep(wait_s)
-
-                else:
-                    logger.error(
-                        "[T %d] Encountered an unexpected `BradClientError`. Aborting the workload...",
+            if bh.backoff is not None:
+                # Delay retrying in the case of a transient error (this
+                # happens during blueprint transitions).
+                wait_s = bh.backoff.wait_time_s()
+                if wait_s is None:
+                    logger.info(
+                        "[T %d] Aborting benchmark. Too many transient errors.",
                         worker_idx,
                     )
-                    raise
-            except:
-                succeeded = False
-                logger.error(
-                    "[T %d] Encountered an unexpected error. Aborting the workload...",
+                    break
+                verbose_logger.info(
+                    "[T %d] Backing off for %.4f seconds...", worker_idx, wait_s
+                )
+                await inflight_runner.wait_for_s(wait_s)
+
+            elif args.avg_gap_s is not None:
+                if first_run:
+                    # We wait a uniformly random amount of time at the beginning
+                    # to stagger queries across all the clients that will run
+                    # (e.g., to avoid having all clients issue transactions at
+                    # the same time).
+                    first_run = False
+                    wait_for_s = txn_prng.uniform(0.0, args.avg_gap_s)
+                    await inflight_runner.wait_for_s(wait_for_s)
+                else:
+                    # Wait times are normally distributed.
+                    wait_for_s = txn_prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
+                    if wait_for_s < 0.0:
+                        wait_for_s = 0.0
+                    await inflight_runner.wait_for_s(wait_for_s)
+
+            txn_idx = txn_prng.choices(txn_indexes, weights=transaction_weights, k=1)[0]
+            txn_fn = get_run_txn(txn_idx)
+            while True:
+                submitted = inflight_runner.submit(txn_fn)
+                if submitted:
+                    break
+                logger.warning(
+                    "[T %d] Ran out of issue slots. Waiting for next slot to free up.",
                     worker_idx,
                 )
-                raise
-            txn_end = time.time()
-
-            # Record metrics.
-            if succeeded:
-                commits[txn_idx] += 1
-            else:
-                aborts[txn_idx] += 1
-
-            if txn_prng.random() < args.latency_sample_prob:
-                print(
-                    "{},{},{}".format(txn_idx, now, txn_end - txn_start),
-                    file=latency_file,
-                )
-                if txn_exec_count > 20_000:
-                    latency_file.flush()
-                    txn_exec_count = 0
-
-                # Warn if the abort rate is high.
-                total_aborts = sum(aborts)
-                total_commits = sum(commits)
-                abort_rate = total_aborts / (total_aborts + total_commits)
-                if abort_rate > 0.15:
-                    logger.info(
-                        "[T %d] Abort rate is higher than expected ({%4f}).",
-                        worker_idx,
-                        abort_rate,
-                    )
+                await inflight_runner.wait_until_next_slot_is_free()
 
     finally:
+        await inflight_runner.wait_until_complete()
         overall_end = time.time()
         logger.info("[T %d] Done running transactions.", worker_idx)
         latency_file.close()
@@ -227,7 +292,8 @@ def runner(
             print(f"add_showing_aborts,{aborts[1]}", file=file)
             print(f"edit_note_aborts,{aborts[2]}", file=file)
 
-        db.close_sync()
+        for db in db_conns:
+            db.close_sync()
 
 
 def main():
@@ -329,9 +395,15 @@ def main():
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)
     parser.add_argument("--num-front-ends", type=int, default=1)
+    parser.add_argument("--issue-slots", type=int, default=1)
+    # 25 milliseconds.
+    parser.add_argument("--avg-gap-s", type=float, default=0.025)
+    # 2 milliseconds.
+    parser.add_argument("--avg-gap-std-s", type=float, default=0.002)
     args = parser.parse_args()
 
     set_up_logging()
+    logger.info("[T] Running with %d issue slots per client.", args.issue_slots)
 
     if (
         args.num_client_path is not None

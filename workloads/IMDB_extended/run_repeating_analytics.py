@@ -1,6 +1,8 @@
+import asyncio
 import argparse
 import copy
 import multiprocessing as mp
+import math
 import time
 import os
 import pickle
@@ -12,11 +14,14 @@ import threading
 import signal
 import pytz
 import logging
-from typing import List, Optional
+from typing import List, Optional, Callable
 import numpy.typing as npt
 from datetime import datetime, timedelta
+from collections import namedtuple
 
-from workload_utils.connect import connect_to_db
+from workload_utils.backoff_helper import BackoffHelper
+from workload_utils.connect import connect_to_db, Database
+from workload_utils.inflight import InflightHelper
 from brad.config.engine import Engine
 from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
@@ -27,6 +32,19 @@ EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
 ENGINE_NAMES = ["ATHENA", "AURORA", "REDSHIFT"]
 
 STARTUP_FAILED = "startup_failed"
+
+QueryResult = namedtuple(
+    "QueryResult",
+    [
+        "error",
+        "timestamp",
+        "run_time_s",
+        "engine",
+        "query_idx",
+        "time_since_execution_s",
+        "time_of_day",
+    ],
+)
 
 
 def get_time_of_the_day_unsimulated(
@@ -51,6 +69,41 @@ def time_in_minute_to_datetime_str(time_unsimulated: Optional[int]) -> str:
     return f"{hour_str}:{minute_str}"
 
 
+def get_run_query(
+    timestamp: datetime,
+    query_idx: int,
+    query: str,
+    time_since_execution: float,
+    time_of_day: str,
+) -> Callable[[Database], QueryResult]:
+    def _run_query(db: Database) -> QueryResult:
+        try:
+            start = time.time()
+            _, engine = db.execute_sync_with_engine(query)
+            end = time.time()
+            return QueryResult(
+                error=None,
+                timestamp=timestamp,
+                run_time_s=end - start,
+                engine=engine.value,
+                query_idx=query_idx,
+                time_since_execution_s=time_since_execution,
+                time_of_day=time_of_day,
+            )
+        except Exception as ex:
+            return QueryResult(
+                error=ex,
+                timestamp=timestamp,
+                run_time_s=math.nan,
+                engine=engine.value,
+                query_idx=query_idx,
+                time_since_execution_s=time_since_execution,
+                time_of_day=time_of_day,
+            )
+
+    return _run_query
+
+
 def runner(
     runner_idx: int,
     start_queue: mp.Queue,
@@ -67,7 +120,30 @@ def runner(
     signal.signal(signal.SIGINT, noop)
 
     set_up_logging()
+    asyncio.run(
+        runner_impl(
+            runner_idx,
+            start_queue,
+            control_semaphore,
+            args,
+            query_bank,
+            queries,
+            query_frequency,
+            execution_gap_dist,
+        )
+    )
 
+
+async def runner_impl(
+    runner_idx: int,
+    start_queue: mp.Queue,
+    control_semaphore: mp.Semaphore,  # type: ignore
+    args,
+    query_bank: List[str],
+    queries: List[int],
+    query_frequency: Optional[npt.NDArray] = None,
+    execution_gap_dist: Optional[npt.NDArray] = None,
+) -> None:
     # For printing out results.
     if "COND_OUT" in os.environ:
         # pylint: disable-next=import-error
@@ -89,15 +165,20 @@ def runner(
     else:
         engine = None
 
+    db_conns: List[Database] = []
     try:
-        database = connect_to_db(
-            args,
-            runner_idx,
-            direct_engine=engine,
-            # Ensure we disable the result cache if we are running directly on
-            # Redshift.
-            disable_direct_redshift_result_cache=True,
-        )
+        for slot_idx in range(args.issue_slots):
+            db_conns.append(
+                connect_to_db(
+                    args,
+                    # Ensures connections are distributed across the front ends.
+                    runner_idx + slot_idx,
+                    direct_engine=engine,
+                    # Ensure we disable the result cache if we are running directly on
+                    # Redshift.
+                    disable_direct_redshift_result_cache=True,
+                )
+            )
     except BradClientError as ex:
         logger.error("[RA %d] Failed to connect to BRAD: %s", runner_idx, str(ex))
         start_queue.put_nowait(STARTUP_FAILED)
@@ -111,7 +192,6 @@ def runner(
         query_frequency = query_frequency[queries]
         query_frequency = query_frequency / np.sum(query_frequency)
 
-    exec_count = 0
     file = open(
         out_dir / "repeating_olap_batch_{}.csv".format(runner_idx),
         "w",
@@ -126,7 +206,7 @@ def runner(
         )
 
         prng = random.Random(args.seed ^ runner_idx)
-        rand_backoff = None
+        bh = BackoffHelper()
 
         logger.info(
             "[Repeating Analytics Runner %d] Queries to run: %s",
@@ -138,6 +218,52 @@ def runner(
         query_order = query_order_main.copy()
 
         first_run = True
+
+        def handle_result(result: QueryResult) -> None:
+            if result.error is not None:
+                ex = result.error
+                if ex.is_transient():
+                    verbose_logger.warning("Transient query error: %s", ex.message())
+
+                    if bh.backoff is None:
+                        bh.backoff = RandomizedExponentialBackoff(
+                            max_retries=100,
+                            base_delay_s=1.0,
+                            max_delay_s=timedelta(minutes=1).total_seconds(),
+                        )
+                        bh.backoff_timestamp = datetime.now().astimezone(pytz.utc)
+                        logger.info(
+                            "[RA %d] Backing off due to transient errors.", runner_idx
+                        )
+                else:
+                    logger.error("Unexpected query error: %s", ex.message())
+                return
+
+            if bh.backoff is not None and bh.backoff_timestamp is not None:
+                if bh.backoff_timestamp < result.timestamp:
+                    # We recovered. This means a query issued after the rand
+                    # backoff was created finished successfully.
+                    bh.backoff = None
+                    bh.backoff_timestamp = None
+                    logger.info("[RA %d] Continued after transient errors.", runner_idx)
+
+            # Record execution result.
+            print(
+                "{},{},{},{},{},{}".format(
+                    result.timestamp,
+                    result.time_since_execution_s,
+                    result.time_of_day,
+                    result.query_idx,
+                    result.run_time_s,
+                    result.engine,
+                ),
+                file=file,
+                flush=True,
+            )
+
+        inflight_runner = InflightHelper[Database, QueryResult](
+            contexts=db_conns, on_result=handle_result
+        )
 
         # Signal that we're ready to start and wait for the controller.
         logger.info("[RA] Runner %d is ready to start running.", runner_idx)
@@ -151,6 +277,21 @@ def runner(
                 logger.info("[RA] Runner %d is exiting.", runner_idx)
                 break
 
+            if bh.backoff is not None:
+                # Delay retrying in the case of a transient error (this
+                # happens during blueprint transitions).
+                wait_s = bh.backoff.wait_time_s()
+                if wait_s is None:
+                    logger.error(
+                        "[RA %d] Aborting benchmark. Too many transient errors.",
+                        runner_idx,
+                    )
+                    break
+                verbose_logger.info(
+                    "[RA %d] Backing off for %.4f seconds...", runner_idx, wait_s
+                )
+                await inflight_runner.wait_for_s(wait_s)
+
             if execution_gap_dist is not None:
                 now = datetime.now().astimezone(pytz.utc)
                 time_unsimulated = get_time_of_the_day_unsimulated(
@@ -159,7 +300,8 @@ def runner(
                 wait_for_s = execution_gap_dist[
                     int(time_unsimulated / (60 * 24) * len(execution_gap_dist))
                 ]
-                time.sleep(wait_for_s)
+                await inflight_runner.wait_for_s(wait_for_s)
+
             elif args.avg_gap_s is not None:
                 if first_run:
                     # We wait a uniformly random amount of time at the beginning
@@ -168,13 +310,13 @@ def runner(
                     # same time).
                     first_run = False
                     wait_for_s = prng.uniform(0.0, args.avg_gap_s)
-                    time.sleep(wait_for_s)
+                    await inflight_runner.wait_for_s(wait_for_s)
                 else:
                     # Wait times are normally distributed if execution_gap_dist is not provided.
                     wait_for_s = prng.gauss(args.avg_gap_s, args.avg_gap_std_s)
                     if wait_for_s < 0.0:
                         wait_for_s = 0.0
-                    time.sleep(wait_for_s)
+                    await inflight_runner.wait_for_s(wait_for_s)
 
             if query_frequency is not None:
                 qidx = prng.choices(queries, list(query_frequency))[0]
@@ -186,80 +328,39 @@ def runner(
             logger.debug("Executing qidx: %d", qidx)
             query = query_bank[qidx]
 
-            try:
-                engine = None
-                now = datetime.now().astimezone(pytz.utc)
-                if args.time_scale_factor is not None:
-                    time_unsimulated = get_time_of_the_day_unsimulated(
-                        now, args.time_scale_factor
-                    )
-                    time_unsimulated_str = time_in_minute_to_datetime_str(
-                        time_unsimulated
-                    )
-                else:
-                    time_unsimulated_str = "xxx"
-
-                verbose_logger.info("[RA %d] Issuing query %d", runner_idx, qidx)
-                start = time.time()
-                _, engine = database.execute_sync_with_engine(query)
-                end = time.time()
-                print(
-                    "{},{},{},{},{},{}".format(
-                        now,
-                        (now - EXECUTE_START_TIME).total_seconds(),
-                        time_unsimulated_str,
-                        qidx,
-                        end - start,
-                        engine.value,
-                    ),
-                    file=file,
-                    flush=True,
+            now = datetime.now().astimezone(pytz.utc)
+            if args.time_scale_factor is not None:
+                time_unsimulated = get_time_of_the_day_unsimulated(
+                    now, args.time_scale_factor
                 )
+                time_unsimulated_str = time_in_minute_to_datetime_str(time_unsimulated)
+            else:
+                time_unsimulated_str = "xxx"
 
-                if exec_count % 20 == 0:
-                    # To avoid data loss if this script crashes.
-                    os.fsync(file.fileno())
-
-                exec_count += 1
-                if rand_backoff is not None:
-                    logger.info("[RA %d] Continued after transient errors.", runner_idx)
-                    rand_backoff = None
-
-            except BradClientError as ex:
-                if ex.is_transient():
-                    verbose_logger.warning("Transient query error: %s", ex.message())
-
-                    if rand_backoff is None:
-                        rand_backoff = RandomizedExponentialBackoff(
-                            max_retries=100,
-                            base_delay_s=1.0,
-                            max_delay_s=timedelta(minutes=1).total_seconds(),
-                        )
-                        logger.info(
-                            "[RA %d] Backing off due to transient errors.", runner_idx
-                        )
-
-                    # Delay retrying in the case of a transient error (this
-                    # happens during blueprint transitions).
-                    wait_s = rand_backoff.wait_time_s()
-                    if wait_s is None:
-                        logger.error(
-                            "[RA %d] Aborting benchmark. Too many transient errors.",
-                            runner_idx,
-                        )
-                        break
-                    verbose_logger.info(
-                        "[RA %d] Backing off for %.4f seconds...", runner_idx, wait_s
-                    )
-                    time.sleep(wait_s)
-
-                else:
-                    logger.error("Unexpected query error: %s", ex.message())
+            verbose_logger.info("[RA %d] Issuing query %d", runner_idx, qidx)
+            run_query_fn = get_run_query(
+                now,
+                qidx,
+                query,
+                (now - EXECUTE_START_TIME).total_seconds(),
+                time_unsimulated_str,
+            )
+            while True:
+                was_submitted = inflight_runner.submit(run_query_fn)
+                if was_submitted:
+                    break
+                logger.warning(
+                    "[RA %d] Ran out of issue slots. Waiting for next slot to free up.",
+                    runner_idx,
+                )
+                await inflight_runner.wait_until_next_slot_is_free()
 
     finally:
+        await inflight_runner.wait_until_complete()
         os.fsync(file.fileno())
         file.close()
-        database.close_sync()
+        for db in db_conns:
+            db.close_sync()
         logger.info("[RA] Runner %d has exited.", runner_idx)
 
 
@@ -559,9 +660,12 @@ def main():
         type=int,
         help="Start the client trace at the given number of clients. Used for debugging only.",
     )
+    parser.add_argument("--issue-slots", type=int, default=1)
     args = parser.parse_args()
 
     set_up_logging()
+
+    logger.info("[RA] Running with %d issue slots per client.", args.issue_slots)
 
     with open(args.query_bank_file, "r", encoding="UTF-8") as file:
         query_bank = [line.strip() for line in file]

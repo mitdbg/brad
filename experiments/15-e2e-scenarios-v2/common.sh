@@ -130,6 +130,7 @@ function start_repeating_olap_runner() {
     --query-bank-file $ra_query_bank_file
     --avg-gap-s $ra_gap_s
     --avg-gap-std-s $ra_gap_std_s
+    --issue-slots 20
   )
 
   if [[ ! -z $ra_query_frequency_path ]]; then
@@ -168,6 +169,7 @@ function start_snowset_repeating_olap_runner() {
     --time-scale-factor $time_scale_factor
     --num-client-multiplier $client_multiplier
     --run-for-s $run_for_s
+    --issue-slots 20
   )
 
   >&2 echo "[Snowset Repeating Analytics] Running with up to $ra_clients. Time scale factor $time_scale_factor"
@@ -210,6 +212,9 @@ function start_txn_runner() {
   local args=(
     --num-clients $t_clients
     --num-front-ends $num_front_ends
+    --issue-slots 20
+    --avg-gap-s 0.025
+    --avg-gap-std-s 0.002
     # --scale-factor $txn_scale_factor
     # --dataset-type $dataset_type
   )
@@ -244,6 +249,9 @@ function start_snowset_txn_runner() {
     --time-scale-factor $time_scale_factor
     --num-client-multiplier $client_multiplier
     --run-for-s $run_for_s
+    --issue-slots 20
+    --avg-gap-s 0.025
+    --avg-gap-std-s 0.002
   )
 
   log_workload_point "txn_${t_clients}"
@@ -267,6 +275,7 @@ function start_other_repeating_runner() {
     --query-bank-file $other_query_bank_file
     --avg-gap-s $gap_s
     --avg-gap-std-s $gap_std_s
+    --issue-slots 20
   )
 
   if [[ ! -z $client_offset ]]; then
@@ -297,6 +306,7 @@ function start_sequence_runner() {
     --query-sequence-file $query_sequence_file
     --avg-gap-s $gap_s
     --avg-gap-std-s $gap_std_s
+    --issue-slots 10
   )
 
   if [[ ! -z $client_offset ]]; then
