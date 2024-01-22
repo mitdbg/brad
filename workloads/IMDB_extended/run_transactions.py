@@ -33,8 +33,6 @@ STARTUP_FAILED = "startup_failed"
 
 TxnResult = namedtuple("TxnResult", ["error", "txn_idx", "timestamp", "run_time_s"])
 
-EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
-
 
 def runner(
     args,
@@ -322,18 +320,6 @@ def main():
     )
     parser.add_argument("--client-offset", type=int, default=0)
     parser.add_argument(
-        "--num-client-path",
-        type=str,
-        default=None,
-        help="Path to the distribution of number of clients for each period of a day",
-    )
-    parser.add_argument(
-        "--num-client-multiplier",
-        type=int,
-        default=1,
-        help="The multiplier to the number of clients for each period of a day",
-    )
-    parser.add_argument(
         "--seed", type=int, default=42, help="Random seed for reproducibility."
     )
     parser.add_argument(
@@ -451,10 +437,12 @@ def main():
         num_client_trace = None
         logger.info("[T] Preparing to run a steady workload")
 
+
     mgr = mp.Manager()
     start_queue = [mgr.Queue() for _ in range(args.num_clients)]
     # pylint: disable-next=no-member
     control_semaphore = [mgr.Semaphore(value=0) for _ in range(args.num_clients)]
+
 
     if args.brad_direct:
         assert args.config_file is not None
@@ -465,34 +453,14 @@ def main():
     else:
         directory = None
 
-    if (
-        args.num_client_path is not None
-        and os.path.exists(args.num_client_path)
-        and args.time_scale_factor is not None
-    ):
-        # we can only set the num_concurrent_query trace in presence of time_scale_factor
-        with open(args.num_client_path, "rb") as f:
-            num_client_trace = pickle.load(f)
-        # Multiply each client with multiplier
-        multiplier = args.num_client_multiplier
-        num_client_trace = {t: n * multiplier for t, n in num_client_trace.items()}
-        # Replace args.num_clients with maximum number of clients in trace.
-        args.num_clients = max(num_client_trace.values())
-    else:
-        num_client_trace = None
-
-    mgr = mp.Manager()
-    start_queue = [mgr.Queue() for _ in range(args.num_clients)]
-    stop_queue = [mgr.Queue() for _ in range(args.num_clients)]
-
-    processes = []
+    clients = []
     for idx in range(args.num_clients):
         p = mp.Process(
             target=runner,
             args=(args, idx, directory, start_queue[idx], control_semaphore[idx]),
         )
         p.start()
-        processes.append(p)
+        clients.append(p)
 
     logger.info("[T] Waiting for startup...")
     one_startup_failed = False
@@ -508,7 +476,7 @@ def main():
         for i in range(args.num_clients):
             control_semaphore[i].release()
             control_semaphore[i].release()
-        for p in processes:
+        for p in clients:
             p.join()
         logger.info("Transactional client abort complete.")
         return
@@ -609,7 +577,7 @@ def main():
         control_semaphore[idx].release()
 
     logger.info("[T] Waiting for clients to terminate...")
-    for c in processes:
+    for c in clients:
         c.join()
     logger.info("[T] Done transactions!")
 
