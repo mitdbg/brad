@@ -80,12 +80,18 @@ def get_run_query(
         try:
             start = time.time()
             _, engine = db.execute_sync_with_engine(query)
+            if engine is None:
+                engine_name = "tidb"
+            elif isinstance(engine, Engine):
+                engine_name = engine.value
+            else:
+                engine_name = engine
             end = time.time()
             return QueryResult(
                 error=None,
                 timestamp=timestamp,
                 run_time_s=end - start,
-                engine=engine.value,
+                engine=engine_name,
                 query_idx=query_idx,
                 time_since_execution_s=time_since_execution,
                 time_of_day=time_of_day,
@@ -223,6 +229,7 @@ async def runner_impl(
         def handle_result(result: QueryResult) -> None:
             if result.error is not None:
                 ex = result.error
+                print(f"QUERY ERROR: {ex}", file=sys.stderr, flush=True)
                 if ex.is_transient():
                     verbose_logger.warning("Transient query error: %s", ex.message())
 

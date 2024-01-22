@@ -5,11 +5,12 @@ TRANSACTION_ENGINE="aurora"
 EXPT_OUT="expt_out_daylong_${ANALYTICS_ENGINE}_${TRANSACTION_ENGINE}"
 mkdir -p $EXPT_OUT
 hours=12
-time_scale_factor=$((24 / $hours))
-run_for_s=$(($hours * 60 * 60))
+time_scale_factor=$(bc <<< "scale=0; 24 / $hours")
+run_for_s=$(bc <<< "scale=0; ($hours * 60 * 60) / 1.0")
+log_workload_point "Running for $run_for_s seconds. Time scale factor: $time_scale_factor."
 # Add 5 minutes of buffer time.
 total_time_s=$(($run_for_s + 5 * 60))
-clients_multiplier=1
+clients_multiplier=10
 gap_dist_path="workloads/IMDB_20GB/regular_test/gap_time_dist.npy"
 query_frequency_path="workloads/IMDB_100GB/regular_test/query_frequency.npy"
 num_client_path="workloads/IMDB_20GB/regular_test/num_client.pkl"
