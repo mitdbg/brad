@@ -59,6 +59,7 @@ function start_snowset_repeating_olap_runner() {
   local time_scale_factor=$2
   local client_multiplier=$3
   local results_name=$4
+  local run_for_s=$5
 
   results_dir=$EXPT_OUT/$results_name
   mkdir -p $results_dir
@@ -70,9 +71,11 @@ function start_snowset_repeating_olap_runner() {
     --gap-dist-path $gap_dist_path
     --query-frequency-path $query_frequency_path
     --num-client-path $num_client_path
+    --num-client-multiplier $client_multiplier
     --baseline $ANALYTICS_ENGINE
-    --run-for-s $total_time_s
+    --run-for-s $run_for_s
     --output-dir $results_dir
+    --issue-slots 5
   )
 
   >&2 echo "[Snowset Repeating Analytics] Running with $ra_clients..."
@@ -90,6 +93,7 @@ function start_snowset_txn_runner() {
   local time_scale_factor=$2
   local client_multiplier=$3
   local results_name=$4
+  local run_for_s=$5
 
   >&2 echo "[Snowset Transactions] Running with $t_clients..."
   results_dir=$EXPT_OUT/$results_name
@@ -100,9 +104,13 @@ function start_snowset_txn_runner() {
     --num-clients $t_clients \
     --time-scale-factor $time_scale_factor \
     --num-client-path $num_client_path \
+    --num-client-multiplier $client_multiplier \
     --output-dir $results_dir \
-    --run-for-s $total_time_s \
+    --run-for-s $run_for_s \
     --baseline $TRANSACTION_ENGINE \
+    --issue-slots 5 \
+    --avg-gap-s 0.025 \
+    --avg-gap-std-s 0.002 \
     &
 
   # This is a special return value variable that we use.
@@ -126,6 +134,7 @@ function start_sequence_runner() {
     --avg-gap-std-s $gap_std_s
     --baseline $ANALYTICS_ENGINE
     --output-dir $results_dir
+    --issue-slots 5
   )
 
   >&2 echo "[Seq Analytics] Running with $num_clients..."
