@@ -6,7 +6,9 @@ EXPT_OUT="expt_out_daylong_${ANALYTICS_ENGINE}_${TRANSACTION_ENGINE}"
 mkdir -p $EXPT_OUT
 hours=12
 time_scale_factor=$((24 / $hours))
-total_time_s=$(($hours * 60 * 60 + 5 * 60))
+run_for_s=$(($hours * 60 * 60))
+# Add 5 minutes of buffer time.
+total_time_s=$(($run_for_s + 5 * 60))
 clients_multiplier=1
 gap_dist_path="workloads/IMDB_20GB/regular_test/gap_time_dist.npy"
 query_frequency_path="workloads/IMDB_100GB/regular_test/query_frequency.npy"
@@ -34,11 +36,11 @@ ls $seq_query_bank_file || exit 1
 log_workload_point "clients_starting"
 
 # Repeating analytics.
-start_snowset_repeating_olap_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "ra"
+start_snowset_repeating_olap_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "ra" $run_for_s
 rana_pid=$runner_pid
 
 # Transactions.
-start_snowset_txn_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "t"
+start_snowset_txn_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "t" $run_for_s
 txn_pid=$runner_pid
 
 # Ad-hoc queries.
