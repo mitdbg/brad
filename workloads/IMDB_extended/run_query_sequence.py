@@ -334,8 +334,6 @@ def main():
         type=str,
         help="Whether to use tidb, aurora or redshift",
     )
-    args = parser.parse_args()
-
     parser.add_argument("--issue-slots", type=int, default=1)
     args = parser.parse_args()
 
