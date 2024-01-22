@@ -7,10 +7,10 @@ mkdir -p $EXPT_OUT
 hours=12
 time_scale_factor=$(bc <<< "scale=0; 24 / $hours")
 run_for_s=$(bc <<< "scale=0; ($hours * 60 * 60) / 1.0")
-log_workload_point "Running for $run_for_s seconds. Time scale factor: $time_scale_factor."
 # Add 5 minutes of buffer time.
 total_time_s=$(($run_for_s + 5 * 60))
-clients_multiplier=10
+clients_multiplier=1
+max_num_clients=$((10 * $clients_multiplier))
 gap_dist_path="workloads/IMDB_20GB/regular_test/gap_time_dist.npy"
 query_frequency_path="workloads/IMDB_100GB/regular_test/query_frequency.npy"
 num_client_path="workloads/IMDB_20GB/regular_test/num_client.pkl"
@@ -37,18 +37,18 @@ ls $seq_query_bank_file || exit 1
 log_workload_point "clients_starting"
 
 # Repeating analytics.
-start_snowset_repeating_olap_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "ra" $run_for_s
+start_snowset_repeating_olap_runner $max_num_clients $time_scale_factor $clients_multiplier "ra" $run_for_s
 rana_pid=$runner_pid
 
-# Transactions.
-start_snowset_txn_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "t" $run_for_s
-txn_pid=$runner_pid
+# # Transactions.
+# start_snowset_txn_runner $max_num_clients $time_scale_factor $clients_multiplier "t" $run_for_s
+# txn_pid=$runner_pid
 
-# Ad-hoc queries.
-# 2 clients, issuing once per 8 minutes on average with a standard deviation of
-# 2 minutes.
-start_sequence_runner 2 $((8 * 60)) $((2 * 60)) "adhoc"
-adhoc_pid=$runner_pid
+# # Ad-hoc queries.
+# # 2 clients, issuing once per 8 minutes on average with a standard deviation of
+# # 2 minutes.
+# start_sequence_runner 2 $((8 * 60)) $((2 * 60)) "adhoc"
+# adhoc_pid=$runner_pid
 
 log_workload_point "clients_started"
 

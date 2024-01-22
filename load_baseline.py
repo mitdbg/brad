@@ -29,7 +29,7 @@ def main():
     args = parser.parse_args()
     if args.redshift_stress:
         query_bank = "workloads/IMDB_100GB/ad_hoc/queries.sql"
-        redshift_stress_test(query_bank, 64)
+        redshift_stress_test(query_bank, 1600)
         sys.exit(0)
     if args.engine == "tidb":
         loader = TiDBLoader()
