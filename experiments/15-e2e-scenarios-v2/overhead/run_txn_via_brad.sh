@@ -12,7 +12,7 @@ extract_named_arguments $@
 start_brad $config_file $planner_config_file
 sleep 30
 
-start_txn_runner 2
+start_txn_runner 2  # Implicit: --dataset-type
 >&2 echo "Waiting for 3 minutes..."
 sleep 180  # 3 minutes
 

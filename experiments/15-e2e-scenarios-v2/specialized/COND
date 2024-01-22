@@ -1,0 +1,50 @@
+include("../common.cond")
+
+COMMON_CONFIGS = {
+  "physical-config-file": "config/physical_config_specialized.yml",
+  "schema-name": "imdb_specialized_100g",
+  "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+  "txn-scale-factor": IMDB_100GB_SF,
+  "other-query-bank-file": "vector.sql",
+  "num-front-ends": 16,
+  "dataset-type": "100gb",
+}
+
+run_experiment(
+  name="brad_100g_vector",
+  run="./run_vector_workload.sh",
+  options={
+    "system-config-file": "specialized_config.yml",
+    **COMMON_CONFIGS,
+  },
+)
+
+run_experiment(
+  name="hand_designed_100g_vector",
+  run="./run_vector_workload.sh",
+  options={
+    # Note the different config.
+    "system-config-file": "specialized_hand_designed.yml",
+    **COMMON_CONFIGS,
+  },
+)
+
+# Essentially the same as above.
+run_command(
+  name="brad_100g_vector_debug",
+  run="./run_vector_workload_debug.sh",
+  options={
+    "system-config-file": "specialized_config.yml",
+    **COMMON_CONFIGS,
+  },
+)
+
+# Essentially the same as above.
+run_command(
+  name="brad_100g_vector_warmup",
+  run="./run_vector_warmup.sh",
+  options={
+    "system-config-file": "specialized_config.yml",
+    **COMMON_CONFIGS,
+  },
+)

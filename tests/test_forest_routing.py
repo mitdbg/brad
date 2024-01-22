@@ -2,8 +2,9 @@ import numpy as np
 
 from sklearn.ensemble import RandomForestClassifier
 
-from brad.config.engine import Engine, EngineBitmapValues
-from brad.routing.tree_based.forest_router import ForestRouter
+from brad.config.engine import Engine
+from brad.routing.context import RoutingContext
+from brad.routing.tree_based.forest_policy import ForestPolicy
 from brad.routing.tree_based.model_wrap import ModelWrap
 from brad.routing.policy import RoutingPolicy
 from brad.query_rep import QueryRep
@@ -18,54 +19,25 @@ def get_dummy_router():
     return ModelWrap(RoutingPolicy.ForestTablePresence, ["test1", "test2"], model)
 
 
-def test_location_constraints():
-    model = get_dummy_router()
-    bitmap = {
-        "test1": EngineBitmapValues[Engine.Aurora],
-        "test2": EngineBitmapValues[Engine.Aurora]
-        | EngineBitmapValues[Engine.Redshift],
-    }
-    router = ForestRouter.for_planner(
-        RoutingPolicy.ForestTablePresence, "test_schema", model, bitmap
-    )
-
-    query1 = QueryRep("SELECT * FROM test1")
-    loc = router.engine_for_sync(query1)
-    assert loc == Engine.Aurora
-
-    query2 = QueryRep("SELECT * FROM test1, test2")
-    loc = router.engine_for_sync(query2)
-    assert loc == Engine.Aurora
-
-
 def test_model_codepath_partial():
     model = get_dummy_router()
-    bitmap = {
-        "test1": EngineBitmapValues[Engine.Aurora]
-        | EngineBitmapValues[Engine.Redshift],
-        "test2": EngineBitmapValues[Engine.Aurora]
-        | EngineBitmapValues[Engine.Redshift],
-    }
-    router = ForestRouter.for_planner(
-        RoutingPolicy.ForestTablePresence, "test_schema", model, bitmap
-    )
+    router = ForestPolicy.from_loaded_model(RoutingPolicy.ForestTablePresence, model)
+    ctx = RoutingContext()
 
     query = QueryRep("SELECT * FROM test1, test2")
-    loc = router.engine_for_sync(query)
-    assert loc == Engine.Aurora or loc == Engine.Redshift
+    loc = router.engine_for_sync(query, ctx)
+    assert (
+        loc[0] == Engine.Aurora or loc[0] == Engine.Redshift or loc[0] == Engine.Athena
+    )
 
 
 def test_model_codepath_all():
     model = get_dummy_router()
-    bitmap = {
-        "test1": Engine.bitmap_all(),
-        "test2": EngineBitmapValues[Engine.Aurora]
-        | EngineBitmapValues[Engine.Redshift],
-    }
-    router = ForestRouter.for_planner(
-        RoutingPolicy.ForestTablePresence, "test_schema", model, bitmap
-    )
+    router = ForestPolicy.from_loaded_model(RoutingPolicy.ForestTablePresence, model)
+    ctx = RoutingContext()
 
     query = QueryRep("SELECT * FROM test1")
-    loc = router.engine_for_sync(query)
-    assert loc == Engine.Aurora or loc == Engine.Redshift or loc == Engine.Athena
+    loc = router.engine_for_sync(query, ctx)
+    assert (
+        loc[0] == Engine.Aurora or loc[0] == Engine.Redshift or loc[0] == Engine.Athena
+    )

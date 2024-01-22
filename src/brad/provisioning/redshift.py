@@ -2,10 +2,14 @@ import asyncio
 import boto3
 import time
 import logging
-from typing import Dict, Any
+import json
+import botocore.exceptions
+from typing import Dict, Any, Optional
 
-from brad.config.file import ConfigFile
 from brad.blueprint.provisioning import Provisioning
+from brad.config.file import ConfigFile
+from brad.provisioning.redshift_status import RedshiftAvailabilityStatus
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +31,8 @@ class RedshiftProvisioningManager:
         """
         Resize method depends on target instance type, and old instance count,
         and the new instance count.
+
+        https://repost.aws/knowledge-center/redshift-elastic-resize
         """
         if old.num_nodes() == 1 or new.num_nodes() == 1:
             return True
@@ -43,15 +49,26 @@ class RedshiftProvisioningManager:
                 new.num_nodes() < old.num_nodes() / 4
                 or new.num_nodes() > 2 * old.num_nodes()
             )
-        # For all other types, must be within double or half.
-        return (
-            new.num_nodes() < old.num_nodes() / 2
-            or new.num_nodes() > 2 * old.num_nodes()
+
+        # For all other types elastic resize is only possible if new is double
+        # or half the size.
+        return not (
+            old.num_nodes() * 2 == new.num_nodes()
+            or old.num_nodes() // 2 == new.num_nodes()
         )
 
     async def pause_cluster(self, cluster_id: str) -> None:
         def do_pause():
-            self._redshift.pause_cluster(ClusterIdentifier=cluster_id)
+            try:
+                self._redshift.pause_cluster(ClusterIdentifier=cluster_id)
+            except Exception as ex:
+                message = repr(ex)
+                # Unclear if there is a better way to check for specific errors.
+                if "InvalidClusterState" in message:
+                    # This may happen if the cluster is already paused.
+                    logger.info("Proceeding past Redshift pause error: %s", message)
+                else:
+                    raise
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, do_pause)
@@ -61,7 +78,20 @@ class RedshiftProvisioningManager:
         self, cluster_id: str
     ) -> Provisioning:
         def do_resume():
-            self._redshift.resume_cluster(ClusterIdentifier=cluster_id)
+            try:
+                self._redshift.resume_cluster(ClusterIdentifier=cluster_id)
+            except Exception as ex:
+                message = repr(ex)
+                # Unclear if there is a better way to check for specific errors.
+                if "InvalidClusterState" in message:
+                    # This may happen if the cluster is already running.
+                    logger.info(
+                        "Proceeding past Redshift resume error for %s: %s",
+                        cluster_id,
+                        message,
+                    )
+                else:
+                    raise
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, do_resume)
@@ -69,7 +99,7 @@ class RedshiftProvisioningManager:
         await asyncio.sleep(20)
         await self.wait_until_available(cluster_id)
 
-        response = await loop.run_in_executor(None, self._get_cluster_state, cluster_id)
+        response = await self._get_cluster_state(cluster_id)
         cluster = response["Clusters"][0]
         instance_type = cluster["NodeType"]
         num_nodes = cluster["NumberOfNodes"]
@@ -79,24 +109,72 @@ class RedshiftProvisioningManager:
         self,
         cluster_id: str,
         provisioning: Provisioning,
-        wait_until_available: bool = True,
+        wait_until_complete: bool = True,
     ) -> None:
         cluster_type = "multi-node" if provisioning.num_nodes() > 1 else "single-node"
+        loop = asyncio.get_running_loop()
 
         # TODO: Classic resize is sometimes disasterously slow. It might be
         # better to manually create a new cluster.
         def do_classic_resize():
-            self._redshift.modify_cluster(
-                ClusterIdentifier=cluster_id,
-                ClusterType=cluster_type,
-                NodeType=provisioning.instance_type(),
-                NumberOfNodes=provisioning.num_nodes(),
-            )
+            try:
+                self._redshift.modify_cluster(
+                    ClusterIdentifier=cluster_id,
+                    ClusterType=cluster_type,
+                    NodeType=provisioning.instance_type(),
+                    NumberOfNodes=provisioning.num_nodes(),
+                )
+                return True, None
+            except Exception as ex:
+                return False, ex
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, do_classic_resize)
+        async def initiate_classic_resize():
+            while True:
+                logger.info("Starting classic resize on Redshift %s", cluster_id)
+                succeeded, ex = await loop.run_in_executor(None, do_classic_resize)
+                if succeeded:
+                    break
+                logger.warning(
+                    "Classic resize failed with an exception. Will retry. %s", repr(ex)
+                )
+                # This is not a great idea in production code. But to make our
+                # experiments more resilient to transient states that Redshift may
+                # go through, we simply continually retry. We log the error to be
+                # aware of any non-transient issues for later fixing.
+                await asyncio.sleep(20)
 
-        if wait_until_available:
+        while True:
+            await initiate_classic_resize()
+            if not wait_until_complete:
+                break
+
+            await asyncio.sleep(20)
+
+            while True:
+                # Wait for 20 minutes before considering aborting.
+                completed = await self.wait_until_available(
+                    cluster_id, polling_interval=30.0, max_checks=40
+                )
+                if completed:
+                    return
+
+                # If the resize has not made any progress, we cancel and retry.
+                status = await self._get_resize_status(cluster_id)
+                if status["DataTransferProgressPercent"] < 1.0:
+                    logger.warning(
+                        "Redshift resize of %s has not started in 20 minutes. Will abort and retry.",
+                        cluster_id,
+                    )
+                    logger.warning("%s", json.dumps(status, indent=2, default=str))
+                    cancel_succeeded = await self.cancel_resize(cluster_id)
+                    if cancel_succeeded:
+                        break
+                    else:
+                        logger.warning(
+                            "Could not cancel the resize on %s. Continuing to wait...",
+                            cluster_id,
+                        )
+
             await asyncio.sleep(20)
             await self.wait_until_available(cluster_id)
 
@@ -105,43 +183,147 @@ class RedshiftProvisioningManager:
         cluster_id: str,
         provisioning: Provisioning,
         wait_until_available: bool = True,
-    ) -> None:
+    ) -> bool:
+        """
+        This will return `True` iff the resize succeeded. Sometimes elastic
+        resizes are not available even when we believe they should be; this
+        method will return `False` in these cases.
+        """
+
         def do_elastic_resize():
-            self._redshift.resize_cluster(
-                ClusterIdentifier=cluster_id,
-                NodeType=provisioning.instance_type(),
-                NumberOfNodes=provisioning.num_nodes(),
-                Classic=False,
-            )
+            try:
+                self._redshift.resize_cluster(
+                    ClusterIdentifier=cluster_id,
+                    NodeType=provisioning.instance_type(),
+                    NumberOfNodes=provisioning.num_nodes(),
+                    Classic=False,
+                )
+                return True, None
+            except Exception as ex:
+                return False, ex
 
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, do_elastic_resize)
+        succeeded, ex = await loop.run_in_executor(None, do_elastic_resize)
+
+        if not succeeded:
+            logger.warning("Elastic resize failed with exception. %s", repr(ex))
+            return False
 
         if wait_until_available:
             await asyncio.sleep(20)
             await self.wait_until_available(cluster_id)
+        return True
 
     async def wait_until_available(
-        self, cluster_id: str, polling_interval: float = 20.0
-    ) -> None:
-        loop = asyncio.get_running_loop()
-
+        self,
+        cluster_id: str,
+        polling_interval: float = 20.0,
+        max_checks: Optional[int] = None,
+    ) -> bool:
+        """
+        Blocks until the Redshift cluster is available. If `max_checks` is set,
+        will abort after checking that many times. The return value indicates
+        whether the wait was successful (this can only be False if `max_checks`
+        is set).
+        """
+        checks_so_far = 0
         while True:
-            response = await loop.run_in_executor(
-                None, self._get_cluster_state, cluster_id
-            )
+            response = await self._get_cluster_state(cluster_id)
             cluster = response["Clusters"][0]
-            modifying = cluster["ClusterAvailabilityStatus"] == "Modifying"
-            status = cluster["ClusterStatus"]
-            if status == "available" and not modifying:
-                break
+            availability_status = RedshiftAvailabilityStatus.from_str(
+                cluster["ClusterAvailabilityStatus"]
+            )
+            if (
+                availability_status == RedshiftAvailabilityStatus.Available
+                # `Maintenance` sometimes occurs and probably refers to when AWS
+                # is performing upgrades to the DBMS. We can still serve queries
+                # during this time.
+                or availability_status == RedshiftAvailabilityStatus.Maintenance
+            ):
+                return True
+
+            checks_so_far += 1
+            if max_checks is not None and checks_so_far >= max_checks:
+                return False
+
             logger.debug(
                 "Waiting for Redshift cluster %s to become available...", cluster_id
             )
             await asyncio.sleep(polling_interval)
 
-    def _get_cluster_state(self, cluster_id: str) -> Dict[str, Any]:
-        return self._redshift.describe_clusters(ClusterIdentifier=cluster_id)
+    async def cancel_resize(self, cluster_id: str) -> bool:
+        def do_cancel():
+            try:
+                self._redshift.cancel_resize(ClusterIdentifier=cluster_id)
+                return True, None
+            except Exception as ex:
+                return False, ex
+
+        loop = asyncio.get_running_loop()
+        logger.info("Cancelling Redshift resize on %s", cluster_id)
+        succeeded, ex = await loop.run_in_executor(None, do_cancel)
+        if succeeded:
+            return True
+        else:
+            logger.warning("Cancel resize failed: %s", repr(ex))
+            return False
+
+    async def _get_cluster_state(self, cluster_id: str) -> Dict[str, Any]:
+        def do_get_state():
+            return self._redshift.describe_clusters(ClusterIdentifier=cluster_id)
+
+        backoff = None
+        loop = asyncio.get_running_loop()
+
+        # The AWS APIs may throttle us. We wrap the call with our own randomized
+        # back off increase the likelihood that this call succeeds.
+        while True:
+            try:
+                return await loop.run_in_executor(None, do_get_state)
+            except botocore.exceptions.ClientError as ex:
+                if backoff is None:
+                    backoff = RandomizedExponentialBackoff(
+                        max_retries=100, base_delay_s=0.1, max_delay_s=6.0
+                    )
+                wait_time_s = backoff.wait_time_s()
+                if wait_time_s is None:
+                    raise RuntimeError(
+                        "Failed to describe Redshift cluster (exceeded maximum retries)."
+                    ) from ex
+                await asyncio.sleep(wait_time_s)
+
+    async def _get_resize_status(self, cluster_id: str) -> Dict[str, Any]:
+        # The returned value looks like this:
+        # {
+        #     "TargetNodeType": "dc2.large",
+        #     "TargetNumberOfNodes": 5,
+        #     "TargetClusterType": "multi-node",
+        #     "Status": "IN_PROGRESS",
+        #     "AvgResizeRateInMegaBytesPerSecond": 0.0,
+        #     "TotalResizeDataInMegaBytes": 104841,
+        #     "ProgressInMegaBytes": 0,
+        #     "ElapsedTimeInSeconds": 49338,
+        #     "ResizeType": "ClassicResize",
+        #     "TargetEncryptionType": "NONE",
+        #     "DataTransferProgressPercent": 0.0,
+        #     "ResponseMetadata": {
+        #         "RequestId": "c0a43652-c552-48db-bbd0-9a2dde0494fa",
+        #         "HTTPStatusCode": 200,
+        #         "HTTPHeaders": {
+        #         "x-amzn-requestid": "c0a43652-c552-48db-bbd0-9a2dde0494fa",
+        #         "content-type": "text/xml",
+        #         "content-length": "861",
+        #         "date": "Sat, 30 Dec 2023 21:47:27 GMT"
+        #         },
+        #         "RetryAttempts": 0
+        #     }
+        # }
+
+        def do_get_status():
+            return self._redshift.describe_resize(ClusterIdentifier=cluster_id)
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, do_get_status)
 
 
 class RedshiftProvisioning:

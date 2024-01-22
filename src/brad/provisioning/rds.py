@@ -2,11 +2,13 @@ import asyncio
 import boto3
 import time
 import logging
+import botocore.exceptions
 from typing import Any, Dict
 
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.blueprint.provisioning import Provisioning
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +85,9 @@ class RdsProvisioningManager:
             await asyncio.sleep(20)
             await self.wait_until_instance_is_available(instance_id)
 
-    async def delete_replica(self, instance_id: str) -> None:
+    async def delete_replica(
+        self, instance_id: str, wait_until_status_updated: bool = True
+    ) -> None:
         def do_delete():
             self._rds.delete_db_instance(
                 DBInstanceIdentifier=instance_id,
@@ -93,6 +97,11 @@ class RdsProvisioningManager:
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, do_delete)
+
+        # Will poll until the instance's status is no longer "available".
+        if wait_until_status_updated:
+            await asyncio.sleep(10)
+            await self.wait_until_instance_is_not_available(instance_id)
 
     async def wait_until_instance_is_available(
         self, instance_id: str, polling_interval: float = 20
@@ -105,6 +114,20 @@ class RdsProvisioningManager:
                 break
             logger.debug(
                 "Waiting for Aurora instance %s to become available...", instance_id
+            )
+            await asyncio.sleep(polling_interval)
+
+    async def wait_until_instance_is_not_available(
+        self, instance_id: str, polling_interval: float = 20
+    ) -> None:
+        while True:
+            response = await self._describe_db_instance(instance_id)
+            instance = response["DBInstances"][0]
+            status = instance["DBInstanceStatus"]
+            if status != "available":
+                break
+            logger.debug(
+                "Waiting for Aurora instance %s to be NOT available...", instance_id
             )
             await asyncio.sleep(polling_interval)
 
@@ -165,7 +188,7 @@ class RdsProvisioningManager:
         if wait_until_available:
             # Need a slight delay to ensure the instance's state change is
             # updated.
-            await asyncio.sleep(20)
+            await asyncio.sleep(60)
             await self.wait_until_instance_is_available(instance_id)
 
     async def _describe_db_instance(self, instance_id: str) -> Dict[str, Any]:
@@ -174,8 +197,23 @@ class RdsProvisioningManager:
                 DBInstanceIdentifier=instance_id,
             )
 
+        backoff = None
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, do_describe)
+
+        while True:
+            try:
+                return await loop.run_in_executor(None, do_describe)
+            except botocore.exceptions.ClientError as ex:
+                if backoff is None:
+                    backoff = RandomizedExponentialBackoff(
+                        max_retries=100, base_delay_s=0.1, max_delay_s=6.0
+                    )
+                wait_time_s = backoff.wait_time_s()
+                if wait_time_s is None:
+                    raise RuntimeError(
+                        "Failed to describe RDS instance (exceeded maximum retries)."
+                    ) from ex
+                await asyncio.sleep(wait_time_s)
 
     async def _describe_db_cluster(self, cluster_id: str) -> Dict[str, Any]:
         def do_describe():
@@ -183,8 +221,25 @@ class RdsProvisioningManager:
                 DBClusterIdentifier=cluster_id,
             )
 
+        backoff = None
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, do_describe)
+
+        # The AWS APIs may throttle us. We wrap the call with our own randomized
+        # back off increase the likelihood that this call succeeds.
+        while True:
+            try:
+                return await loop.run_in_executor(None, do_describe)
+            except botocore.exceptions.ClientError as ex:
+                if backoff is None:
+                    backoff = RandomizedExponentialBackoff(
+                        max_retries=100, base_delay_s=0.1, max_delay_s=6.0
+                    )
+                wait_time_s = backoff.wait_time_s()
+                if wait_time_s is None:
+                    raise RuntimeError(
+                        "Failed to describe RDS cluster (exceeded maximum retries)."
+                    ) from ex
+                await asyncio.sleep(wait_time_s)
 
 
 class RdsProvisioning:

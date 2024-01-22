@@ -1,11 +1,14 @@
 from collections import namedtuple
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from brad.config.engine import Engine, EngineBitmapValues
-from brad.planner.scoring.context import ScoringContext
+
+if TYPE_CHECKING:
+    from brad.planner.scoring.context import ScoringContext
 
 
-def compute_single_athena_table_cost(table_name: str, ctx: ScoringContext) -> float:
+def compute_single_athena_table_cost(table_name: str, ctx: "ScoringContext") -> float:
     athena_table_storage_usd_per_mb_per_month = 0.0
 
     # We make a rough estimate of the table's size on the engine.
@@ -32,7 +35,7 @@ def compute_single_athena_table_cost(table_name: str, ctx: ScoringContext) -> fl
     )
 
 
-def compute_single_aurora_table_cost(table_name: str, ctx: ScoringContext) -> float:
+def compute_single_aurora_table_cost(table_name: str, ctx: "ScoringContext") -> float:
     storage_usd_per_mb_per_month = 0.0
 
     num_rows = ctx.next_workload.table_num_rows(table_name)
@@ -43,11 +46,15 @@ def compute_single_aurora_table_cost(table_name: str, ctx: ScoringContext) -> fl
 
     if ctx.planner_config.use_io_optimized_aurora():
         storage_usd_per_mb_per_month += (
-            raw_extract_mb * ctx.planner_config.aurora_io_opt_usd_per_mb_per_month()
+            raw_extract_mb
+            * ctx.planner_config.aurora_io_opt_usd_per_mb_per_month()
+            * ctx.planner_config.aurora_storage_index_multiplier()
         )
     else:
         storage_usd_per_mb_per_month += (
-            raw_extract_mb * ctx.planner_config.aurora_regular_usd_per_mb_per_month()
+            raw_extract_mb
+            * ctx.planner_config.aurora_regular_usd_per_mb_per_month()
+            * ctx.planner_config.aurora_storage_index_multiplier()
         )
 
     source_period = timedelta(days=30)
@@ -69,7 +76,7 @@ def compute_single_table_movement_time_and_cost(
     table_name: str,
     current_placement: int,
     next_placement: int,
-    ctx: ScoringContext,
+    ctx: "ScoringContext",
 ) -> TableMovementScore:
     movement_cost = 0.0
     movement_time_s = 0.0
@@ -137,7 +144,7 @@ def compute_single_table_movement_time_and_cost(
     return TableMovementScore(movement_cost, movement_time_s)
 
 
-def _best_extract_engine(existing_locations: int, ctx: ScoringContext) -> Engine:
+def _best_extract_engine(existing_locations: int, ctx: "ScoringContext") -> Engine:
     """
     Returns the best source engine to extract a table from.
     """

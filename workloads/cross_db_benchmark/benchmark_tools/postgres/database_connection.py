@@ -194,7 +194,7 @@ class PostgresDatabaseConnection(DatabaseConnection):
             print(f"Set timeout to {timeout_sec} secs for {self.db_name}.")
 
     def run_query_collect_statistics(
-        self, sql, repetitions=3, prefix="", explain_only=False
+        self, sql, repetitions=3, prefix="", explain_only=False, plain_run=True
     ):
         analyze_plans = None
         verbose_plan = None

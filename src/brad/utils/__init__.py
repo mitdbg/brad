@@ -33,3 +33,25 @@ def set_up_logging(filename=None, debug_mode=False, also_console=False):
     logging.getLogger("urllib3").setLevel(logging.INFO)
     logging.getLogger("redshift_connector").setLevel(logging.INFO)
     logging.getLogger("pyathena").setLevel(logging.INFO)
+
+    # Avoids the "Using selector: EpollSelector" (or similar) messages.
+    logging.getLogger("asyncio").setLevel(logging.INFO)
+
+
+def create_custom_logger(
+    name: str, log_file: str, level: int = logging.DEBUG
+) -> logging.Logger:
+    handler = logging.FileHandler(log_file)
+    formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(message)s")
+    handler.setFormatter(formatter)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    # We do not want the messages to propagate up to the root logger.
+    logger.propagate = False
+    # Remove default handlers.
+    for h in logger.handlers[:]:
+        logger.removeHandler(h)
+
+    logger.addHandler(handler)
+    return logger

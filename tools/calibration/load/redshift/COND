@@ -94,3 +94,32 @@ for instance in INSTANCE_TYPES:
           for clients, query_idx in product(NUM_CLIENTS, range(NUM_QUERIES))
         ],
       )
+
+
+extra_data = {
+  "dc2_large": [1, 16],
+  "ra3_xlplus": [1],
+}
+
+# Single client scaling (gathering more data for models)
+for instance in ["dc2_large", "ra3_xlplus"]:
+  for nodes in extra_data[instance]:
+    run_experiment_group(
+      name=f"{instance}-{nodes}-imdb_extended_100g",
+      run="python3 -m brad.calibration.measure_load",
+      experiments=[
+        ExperimentInstance(
+          name=f"{instance}-{nodes}-imdb_extended_100g-1-q{query_idx}",
+          options={
+            "num-clients": 1,
+            "specific-query-idx": query_idx,
+            "run-for-s": RUN_FOR_S,
+            "avg-gap-s": AVG_GAP_S,
+            "wait-before-start": WAIT_BEFORE_START,
+            "query-file": "../../../../workloads/IMDB_100GB/scaling_20/queries.sql",
+            "engine": "redshift",
+          },
+        )
+        for query_idx in range(NUM_QUERIES)
+      ],
+    )

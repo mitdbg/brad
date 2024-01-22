@@ -42,6 +42,7 @@ INSTALL_REQUIRES = [
     "tabulate",
     "PyAthena",
     "ddsketch",
+    "tqdm",
 ]
 
 DEV_REQUIRES = [
@@ -58,7 +59,7 @@ DEV_REQUIRES = [
     "attrs",
     "typing-extensions",
     "types-tabulate",
-    "tqdm",
+    "matplotlib",
 ]
 
 KEYWORDS = []

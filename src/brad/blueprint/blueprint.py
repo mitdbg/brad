@@ -1,11 +1,9 @@
-from typing import Callable, Dict, List, Set, Optional, Tuple, Any
+from typing import Dict, List, Set, Tuple, Any
 
 from brad.blueprint.provisioning import Provisioning
 from brad.blueprint.table import Table
 from brad.config.engine import Engine
-from brad.routing.router import Router
-
-RouterProvider = Callable[[], Router]
+from brad.routing.abstract_policy import FullRoutingPolicy
 
 
 class Blueprint:
@@ -16,14 +14,14 @@ class Blueprint:
         table_locations: Dict[str, List[Engine]],
         aurora_provisioning: Provisioning,
         redshift_provisioning: Provisioning,
-        router_provider: Optional[RouterProvider],
+        full_routing_policy: FullRoutingPolicy,
     ):
         self._schema_name = schema_name
         self._table_schemas = table_schemas
         self._table_locations = table_locations
         self._aurora_provisioning = aurora_provisioning
         self._redshift_provisioning = redshift_provisioning
-        self._router_provider = router_provider
+        self._full_routing_policy = full_routing_policy
 
         # Derived properties used for the class' methods.
         self._tables_by_name = {tbl.name: tbl for tbl in self._table_schemas}
@@ -57,11 +55,8 @@ class Blueprint:
     def redshift_provisioning(self) -> Provisioning:
         return self._redshift_provisioning
 
-    def get_router(self) -> Optional[Router]:
-        return self._router_provider() if self._router_provider is not None else None
-
-    def router_provider(self) -> Optional[RouterProvider]:
-        return self._router_provider
+    def get_routing_policy(self) -> FullRoutingPolicy:
+        return self._full_routing_policy
 
     def base_table_names(self) -> Set[str]:
         return self._base_table_names
@@ -87,6 +82,7 @@ class Blueprint:
             and self.table_locations() == other.table_locations()
             and self.aurora_provisioning() == other.aurora_provisioning()
             and self.redshift_provisioning() == other.redshift_provisioning()
+            and self.get_routing_policy() == other.get_routing_policy()
         )
 
     def _compute_base_tables(self) -> Set[str]:
@@ -118,15 +114,34 @@ class Blueprint:
 
     def __repr__(self) -> str:
         # Useful for debugging purposes.
-        aurora = "Aurora: " + str(self.aurora_provisioning())
-        redshift = "Redshift: " + str(self.redshift_provisioning())
+        aurora = "Aurora:    " + str(self.aurora_provisioning())
+        redshift = "Redshift:  " + str(self.redshift_provisioning())
         tables = "\n  ".join(
             map(
                 lambda name_loc: "".join([name_loc[0], ": ", str(name_loc[1])]),
                 self.table_locations().items(),
             )
         )
-        return "\n  ".join(["Blueprint:", tables, aurora, redshift])
+        routing_policy = self.get_routing_policy()
+        indef_policy_string = "\n    - ".join(
+            [str(policy) for policy in routing_policy.indefinite_policies]
+        )
+        indefinite_policies = f"Indefinite routing policies:  {indef_policy_string}"
+        definite_policy = (
+            f"Definite routing policy:      {routing_policy.definite_policy}"
+        )
+        return "\n  ".join(
+            [
+                "Blueprint:",
+                tables,
+                "---",
+                aurora,
+                redshift,
+                "---",
+                indefinite_policies,
+                definite_policy,
+            ]
+        )
 
     def as_dict(self) -> Dict[str, Any]:
         """

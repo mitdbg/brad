@@ -1,0 +1,53 @@
+include("../common.cond")
+
+INSTANCE_TYPES = [
+  "r6g_xlarge",
+]
+
+JOINT_QUERY_CONFIGS = list(map(str, JOINT_QUERY_ORDER)) + [
+  ",".join(map(str, JOINT_QUERY_ORDER[:idx + 1]))
+  for idx in range(len(JOINT_QUERY_ORDER))
+] + [
+  ",".join(map(str, JOINT_QUERY_ORDER_2[:idx + 1]))
+  for idx in range(len(JOINT_QUERY_ORDER_2))
+] + list(map(str, JOINT_QUERY_ORDER_2))
+
+for instance in INSTANCE_TYPES:
+  run_experiment_group(
+    name=f"{instance}-imdb_extended_100g",
+    run="python3 -m brad.calibration.measure_joint_load",
+    experiments=[
+      ExperimentInstance(
+        name=f"{instance}-imdb_extended_100g-1-c{config_idx}",
+        options={
+          "specific-query-idxs": queries,
+          "run-for-s": RUN_FOR_S,
+          "avg-gap-s": AVG_GAP_S,
+          "wait-before-start": WAIT_BEFORE_START,
+          "query-file": "../../../../workloads/IMDB_100GB/scaling_20/queries.sql",
+          "engine": "aurora",
+        },
+      )
+      for config_idx, queries in enumerate(JOINT_QUERY_CONFIGS)
+    ],
+  )
+
+  # Different mix of queries.
+  run_experiment_group(
+    name=f"{instance}-imdb_extended_100g-d",
+    run="python3 -m brad.calibration.measure_joint_load",
+    experiments=[
+      ExperimentInstance(
+        name=f"{instance}-imdb_extended_100g-1-d{config_idx}",
+        options={
+          "specific-query-idxs": ",".join(map(str, queries)),
+          "run-for-s": RUN_FOR_S,
+          "avg-gap-s": AVG_GAP_S,
+          "wait-before-start": WAIT_BEFORE_START,
+          "query-file": "../../../../workloads/IMDB_100GB/scaling_20/queries.sql",
+          "engine": "aurora",
+        },
+      )
+      for config_idx, queries in enumerate(JOINT_ORDER_3)
+    ],
+  )

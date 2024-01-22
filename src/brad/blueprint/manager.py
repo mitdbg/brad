@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -23,7 +23,11 @@ class BlueprintManager:
     """
 
     def __init__(
-        self, config: ConfigFile, assets: AssetManager, schema_name: str
+        self,
+        config: ConfigFile,
+        assets: AssetManager,
+        schema_name: str,
+        initial_directory: Optional[Directory] = None,
     ) -> None:
         self._assets = assets
         self._schema_name = schema_name
@@ -32,7 +36,10 @@ class BlueprintManager:
         self._current_blueprint_score: Optional[Score] = None
         self._next_blueprint: Optional[Blueprint] = None
         self._next_blueprint_score: Optional[Score] = None
-        self._directory = Directory(config)
+        self._directory = (
+            Directory(config) if initial_directory is None else initial_directory
+        )
+        self._config = config
 
     @staticmethod
     def initialize_schema(
@@ -56,7 +63,7 @@ class BlueprintManager:
             versioning.serialize(),
         )
 
-    async def load(self) -> None:
+    async def load(self, skip_directory_refresh: bool = False) -> None:
         """
         Loads the persisted version of the blueprint from S3.
         """
@@ -85,7 +92,18 @@ class BlueprintManager:
         self._next_blueprint = next_blueprint
         self._next_blueprint_score = next_score
 
-        await self._directory.refresh()
+        if not skip_directory_refresh:
+            # Ensure the Redshift cluster ID is overridden.
+            if self._config.use_preset_redshift_clusters:
+                preset_redshift_cluster_id = (
+                    self._config.get_preset_redshift_cluster_id(
+                        self._current_blueprint.redshift_provisioning()
+                    )
+                )
+                self._directory.set_override_redshift_cluster_id(
+                    preset_redshift_cluster_id
+                )
+            await self._directory.refresh()
         logger.debug("Loaded %s", self._versioning)
 
     def load_sync(self) -> None:
@@ -112,6 +130,16 @@ class BlueprintManager:
             self._next_blueprint_score = None
         asyncio.run(self._directory.refresh())
         logger.debug("Loaded %s", self._versioning)
+
+    async def fetch_historical_version(
+        self, version: int
+    ) -> Tuple[Blueprint, Optional[Score]]:
+        """
+        Used for administrative purposes only.
+        """
+        blueprint = await self._load_blueprint_version(version)
+        score = await self._load_score(version)
+        return blueprint, score
 
     async def start_transition(
         self, new_blueprint: Blueprint, new_score: Optional[Score]

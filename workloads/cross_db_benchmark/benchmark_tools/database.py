@@ -30,7 +30,7 @@ class DatabaseConnection:
     def set_statement_timeout(self, timeout_sec):
         raise NotImplementedError
 
-    def run_query_collect_statistics(self, sql, repetitions=3):
+    def run_query_collect_statistics(self, sql, repetitions=3, plain_run=True):
         raise NotImplementedError
 
     def collect_db_statistics(self):

@@ -2,7 +2,7 @@ import logging
 import pathlib
 import numpy as np
 import numpy.typing as npt
-from typing import Dict
+from typing import Dict, Tuple, List
 
 from .provider import DataAccessProvider
 from brad.planner.workload import Workload
@@ -10,17 +10,13 @@ from brad.planner.workload import Workload
 logger = logging.getLogger(__name__)
 
 
-class PrecomputedDataAccessProvider(DataAccessProvider):
-    """
-    Provides predictions for a fixed workload using precomputed values.
-    Used for debugging purposes.
-    """
-
+class QueryMap:
     @classmethod
     def load_from_standard_dataset(
         cls,
+        name: str,
         dataset_path: str | pathlib.Path,
-    ):
+    ) -> "QueryMap":
         if isinstance(dataset_path, pathlib.Path):
             dsp = dataset_path
         else:
@@ -46,7 +42,60 @@ class PrecomputedDataAccessProvider(DataAccessProvider):
         assert len(aurora.shape) == 1
         assert len(athena.shape) == 1
 
-        return cls(queries_map, aurora, athena)
+        return cls(name, queries_map, aurora, athena)
+
+    def __init__(
+        self,
+        name: str,
+        queries_map: Dict[str, int],
+        aurora_accessed_pages: npt.NDArray,
+        athena_accessed_bytes: npt.NDArray,
+    ) -> None:
+        self.name = name
+        self.queries_map = queries_map
+        self.aurora_accessed_pages = aurora_accessed_pages
+        self.athena_accessed_bytes = athena_accessed_bytes
+
+    def extract_access_statistics(
+        self, workload: Workload
+    ) -> Tuple[List[int], List[int], npt.NDArray, npt.NDArray]:
+        workload_query_index = []
+        indices_in_dataset = []
+        for wqi, query in enumerate(workload.analytical_queries()):
+            try:
+                query_str = query.raw_query.strip()
+                if query_str.endswith(";"):
+                    query_str = query_str[:-1]
+                indices_in_dataset.append(self.queries_map[query_str])
+                workload_query_index.append(wqi)
+            except KeyError:
+                continue
+
+        return (
+            workload_query_index,
+            indices_in_dataset,
+            self.aurora_accessed_pages[indices_in_dataset],
+            self.athena_accessed_bytes[indices_in_dataset],
+        )
+
+
+class PrecomputedDataAccessProvider(DataAccessProvider):
+    """
+    Provides predictions for a fixed workload using precomputed values.
+    Used for debugging purposes.
+    """
+
+    @classmethod
+    def load_from_standard_dataset(
+        cls,
+        datasets: List[Tuple[str, str | pathlib.Path]],
+    ) -> "PrecomputedDataAccessProvider":
+        return cls(
+            [
+                QueryMap.load_from_standard_dataset(name, dataset_path)
+                for name, dataset_path in datasets
+            ]
+        )
 
     @classmethod
     def load(
@@ -72,35 +121,41 @@ class PrecomputedDataAccessProvider(DataAccessProvider):
         assert len(athena.shape) == 1
         assert aurora.shape[0] == athena.shape[0]
 
-        return cls(queries_map, aurora, athena)
+        return cls([QueryMap("custom", queries_map, aurora, athena)])
 
     def __init__(
         self,
-        queries_map: Dict[str, int],
-        aurora_accessed_pages: npt.NDArray,
-        athena_accessed_bytes: npt.NDArray,
+        predictions: List[QueryMap],
     ) -> None:
-        self._queries_map = queries_map
-        self._aurora_accessed_pages = aurora_accessed_pages
-        self._athena_accessed_bytes = athena_accessed_bytes
+        self._predictions = predictions
 
     def apply_access_statistics(self, workload: Workload) -> None:
-        query_indices = []
-        has_unmatched = False
-        for query in workload.analytical_queries():
-            try:
-                query_str = query.raw_query.strip()
-                if query_str.endswith(";"):
-                    query_str = query_str[:-1]
-                query_indices.append(self._queries_map[query_str])
-            except KeyError:
-                logger.warning("Cannot match query:\n%s", query.raw_query.strip())
-                query_indices.append(-1)
-                has_unmatched = True
+        all_queries = workload.analytical_queries()
+        applied_aurora = np.ones(len(all_queries)) * np.nan
+        applied_athena = np.ones(len(all_queries)) * np.nan
 
-        if has_unmatched:
-            raise RuntimeError("Workload contains unmatched queries.")
+        for qm in self._predictions:
+            workload_indices, _, aurora, athena = qm.extract_access_statistics(workload)
+            applied_aurora[workload_indices] = aurora
+            applied_athena[workload_indices] = athena
+
+        # Special case: vector similarity queries.
+        special_vector_queries = []
+        for wqi, q in enumerate(all_queries):
+            if "<=>" in q.raw_query:
+                special_vector_queries.append(wqi)
+        applied_athena[special_vector_queries] = 0.0
+        applied_aurora[special_vector_queries] = 0.0
+
+        # Check for unmatched queries.
+        num_unmatched_athena = np.isnan(applied_athena).sum()
+        if num_unmatched_athena > 0:
+            raise RuntimeError("Unmatched Athena queries: " + num_unmatched_athena)
+        num_unmatched_aurora = np.isnan(applied_aurora).sum()
+        if num_unmatched_aurora > 0:
+            raise RuntimeError("Unmatched Aurora queries: " + num_unmatched_aurora)
+
         workload.set_predicted_data_access_statistics(
-            aurora_pages=self._aurora_accessed_pages[query_indices],
-            athena_bytes=self._athena_accessed_bytes[query_indices],
+            aurora_pages=applied_aurora,
+            athena_bytes=applied_athena,
         )

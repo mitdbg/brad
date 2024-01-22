@@ -1,9 +1,8 @@
 import asyncio
 import logging
 import pathlib
-import pytz
-from typing import Dict
-from datetime import timedelta, datetime
+from typing import Dict, Optional
+from datetime import timedelta
 
 from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
@@ -11,9 +10,10 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
 from brad.data_stats.postgres_estimator import PostgresEstimator
-from brad.planner.compare.cost import best_cost_under_perf_ceilings
+from brad.planner.compare.provider import PerformanceCeilingComparatorProvider
 from brad.planner.estimator import EstimatorProvider, FixedEstimatorProvider
 from brad.planner.factory import BlueprintPlannerFactory
+from brad.planner.providers import BlueprintProviders
 from brad.planner.scoring.score import Score
 from brad.planner.scoring.data_access.precomputed_values import (
     PrecomputedDataAccessProvider,
@@ -21,8 +21,10 @@ from brad.planner.scoring.data_access.precomputed_values import (
 from brad.planner.scoring.performance.precomputed_predictions import (
     PrecomputedPredictions,
 )
+from brad.planner.triggers.provider import EmptyTriggerProvider
+from brad.planner.triggers.trigger import Trigger
 from brad.planner.metrics import (
-    MetricsFromMonitor,
+    WindowedMetricsFromMonitor,
     FixedMetricsProvider,
     Metrics,
     MetricsProvider,
@@ -34,6 +36,7 @@ from brad.routing.policy import RoutingPolicy
 from brad.blueprint.manager import BlueprintManager
 from brad.front_end.engine_connections import EngineConnections
 from brad.utils.table_sizer import TableSizer
+from brad.utils.time_periods import universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +131,7 @@ async def run_planner_impl(args) -> None:
     config = ConfigFile.load(args.config_file)
 
     # 2. Load the planner config.
-    planner_config = PlannerConfig(args.planner_config_file)
+    planner_config = PlannerConfig.load(args.planner_config_file)
 
     # 3. Load the blueprint.
     assets = AssetManager(config)
@@ -211,13 +214,19 @@ async def run_planner_impl(args) -> None:
     monitor = Monitor(config, blueprint_mgr)
     monitor.set_up_metrics_sources()
     if args.use_fixed_metrics is not None:
-        now = datetime.now().astimezone(pytz.utc)
         metrics_provider: MetricsProvider = FixedMetricsProvider(
             Metrics(**parse_metrics(args.use_fixed_metrics)),
-            now,
+            universal_now(),
         )
     else:
-        metrics_provider = MetricsFromMonitor(monitor, blueprint_mgr)
+        metrics_provider = WindowedMetricsFromMonitor(
+            monitor,
+            blueprint_mgr,
+            config,
+            planner_config,
+            # N.B. This means the metrics window will be essentially empty.
+            universal_now(),
+        )
 
     if config.routing_policy == RoutingPolicy.ForestTableSelectivity:
         pe = asyncio.run(PostgresEstimator.connect(args.schema_name, config))
@@ -226,29 +235,33 @@ async def run_planner_impl(args) -> None:
     else:
         estimator_provider = EstimatorProvider()
 
-    planner = BlueprintPlannerFactory.create(
-        current_blueprint=blueprint_mgr.get_blueprint(),
-        current_blueprint_score=blueprint_mgr.get_active_score(),
-        planner_config=planner_config,
-        monitor=monitor,
-        config=config,
-        schema_name=args.schema_name,
+    providers = BlueprintProviders(
         # Next workload is the same as the current workload.
         workload_provider=FixedWorkloadProvider(workload),
         # Used for debugging purposes.
         analytics_latency_scorer=prediction_provider,
-        # TODO: Make this configurable.
-        comparator=best_cost_under_perf_ceilings(
+        comparator_provider=PerformanceCeilingComparatorProvider(
             max_query_latency_s=args.latency_ceiling_s,
-            max_txn_p90_latency_s=0.020,  # FIXME: Add command-line argument if needed.
+            max_txn_p90_latency_s=0.030,  # FIXME: Add command-line argument if needed.
         ),
         metrics_provider=metrics_provider,
         data_access_provider=data_access_provider,
         estimator_provider=estimator_provider,
+        trigger_provider=EmptyTriggerProvider(),
+    )
+    planner = BlueprintPlannerFactory.create(
+        config=config,
+        planner_config=planner_config,
+        schema_name=args.schema_name,
+        current_blueprint=blueprint_mgr.get_blueprint(),
+        current_blueprint_score=blueprint_mgr.get_active_score(),
+        providers=providers,
     )
     asyncio.run(monitor.fetch_latest())
 
-    async def on_new_blueprint(blueprint: Blueprint, score: Score):
+    async def on_new_blueprint(
+        blueprint: Blueprint, score: Score, _trigger: Optional[Trigger]
+    ):
         logger.info("Selected new blueprint")
         logger.info("%s", blueprint)
 
@@ -276,7 +289,7 @@ async def run_planner_impl(args) -> None:
     event_loop = asyncio.new_event_loop()
     event_loop.set_debug(enabled=args.debug)
     asyncio.set_event_loop(event_loop)
-    asyncio.run(planner.run_replan())
+    asyncio.run(planner.run_replan(trigger=None))
 
     if args.save_pickle:
         workload.serialize_for_debugging(

@@ -1,4 +1,5 @@
 import random
+import numpy as np
 import logging
 from datetime import datetime, timedelta
 import time
@@ -27,9 +28,15 @@ class TransactionWorker:
         seed: int,
         scale_factor: int,
         dataset_type: str = "original",
+        use_zipfian_ids: bool = False,
+        zipfian_alpha: float = 1.1,
     ) -> None:
         self.worker_id = worker_id
         self.prng = random.Random(seed)
+        self.use_zipfian_ids = use_zipfian_ids
+        if use_zipfian_ids:
+            self.zprng = np.random.default_rng(seed)
+            self.zipfian_alpha = zipfian_alpha
 
         self.min_movie_id = MIN_MOVIE_ID
         if dataset_type == "original":
@@ -51,6 +58,15 @@ class TransactionWorker:
         self.loc_max = 1e6
         self.showing_years = 2
 
+    def _sample_id(self, min_id: int, max_id: int) -> int:
+        sampled = (
+            self.zprng.zipf(self.zipfian_alpha) - 1 + min_id
+            if self.use_zipfian_ids
+            else self.prng.randint(min_id, max_id)
+        )
+
+        return min(max_id, sampled)
+
     def edit_movie_note(self, db: Database) -> bool:
         """
         Represents editing the "misc info" for a specific movie.
@@ -65,7 +81,7 @@ class TransactionWorker:
         """
 
         # 1. Select a random movie id.
-        movie_id = self.prng.randint(self.min_movie_id, self.max_movie_id)
+        movie_id = self._sample_id(self.min_movie_id, self.max_movie_id)
 
         try:
             # Start the transaction.
@@ -101,7 +117,8 @@ class TransactionWorker:
             return True
 
         except:  # pylint: disable=bare-except
-            logger.exception("Need to rollback.")
+            # This is too verbose when we have a lot of clients hitting the DB.
+            # logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
 
@@ -114,10 +131,10 @@ class TransactionWorker:
         - Insert into showing
         """
         # 1. Select a random theatre id.
-        theatre_id = self.prng.randint(self.min_theatre_id, self.max_theatre_id)
+        theatre_id = self._sample_id(self.min_theatre_id, self.max_theatre_id)
 
         # 2. Select a random movie id.
-        movie_id = self.prng.randint(self.min_movie_id, self.max_movie_id)
+        movie_id = self._sample_id(self.min_movie_id, self.max_movie_id)
 
         showings_to_add = self.prng.randint(*self.showings_to_add)
 
@@ -151,7 +168,8 @@ class TransactionWorker:
             return True
 
         except:  # pylint: disable=bare-except
-            logger.exception("Need to rollback.")
+            # This is too verbose when we have a lot of clients hitting the DB.
+            # logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
 
@@ -165,7 +183,7 @@ class TransactionWorker:
         - Update the `showing` entry
         """
         # 1. Select a random theatre number.
-        theatre_num = self.prng.randint(self.min_theatre_id, self.max_theatre_id)
+        theatre_num = self._sample_id(self.min_theatre_id, self.max_theatre_id)
 
         try:
             # Start the transaction.
@@ -223,7 +241,8 @@ class TransactionWorker:
             return False
 
         except:  # pylint: disable=bare-except
-            logger.exception("Need to rollback.")
+            # This is too verbose when we have a lot of clients hitting the DB.
+            # logger.exception("Need to rollback.")
             db.rollback_sync()
             return False
 

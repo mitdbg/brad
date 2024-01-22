@@ -40,6 +40,10 @@ def training_model_loader(
     database=None,
     limit_queries=None,
     limit_queries_affected_wl=None,
+    limit_num_tables=None,
+    lower_bound_num_tables=None,
+    lower_bound_runtime=None,
+    limit_runtime=None,
     skip_train=False,
     seed=0,
 ):
@@ -80,6 +84,11 @@ def training_model_loader(
         limit_queries=limit_queries,
         limit_queries_affected_wl=limit_queries_affected_wl,
         loss_class_name=loss_class_name,
+        limit_num_tables=limit_num_tables,
+        lower_bound_num_tables=lower_bound_num_tables,
+        lower_bound_runtime=lower_bound_runtime,
+        limit_runtime=limit_runtime,
+        apply_constraint_on_test=True,
     )
 
     if loss_class_name == "QLoss":
@@ -152,6 +161,10 @@ def load_model(
     seed=0,
     limit_queries=None,
     limit_queries_affected_wl=None,
+    limit_num_tables=None,
+    lower_bound_num_tables=None,
+    lower_bound_runtime=None,
+    limit_runtime=None,
     max_no_epochs=None,
     skip_train=False,
 ):
@@ -217,6 +230,10 @@ def load_model(
         limit_queries=limit_queries,
         limit_queries_affected_wl=limit_queries_affected_wl,
         skip_train=skip_train,
+        limit_num_tables=limit_num_tables,
+        lower_bound_num_tables=lower_bound_num_tables,
+        lower_bound_runtime=lower_bound_runtime,
+        limit_runtime=limit_runtime,
     )
 
     assert len(hyperparams) == 0, (
@@ -312,6 +329,10 @@ def test_one_model(
     hyperparameter_path,
     test_workload_runs,
     statistics_file,
+    limit_num_tables=None,
+    lower_bound_num_tables=None,
+    lower_bound_runtime=None,
+    limit_runtime=None,
 ):
     test_loaders, model = load_model(
         test_workload_runs,
@@ -321,6 +342,10 @@ def test_one_model(
         filename_model,
         hyperparameter_path,
         database=database,
+        limit_num_tables=limit_num_tables,
+        lower_bound_num_tables=lower_bound_num_tables,
+        lower_bound_runtime=lower_bound_runtime,
+        limit_runtime=limit_runtime,
     )
     true, pred = validate_model(test_loaders[0], model)
     qerror = np.maximum(true / pred, pred / true)

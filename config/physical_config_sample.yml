@@ -1,0 +1,66 @@
+# This file should be used to store configurations that are specific to you.
+# This includes the name of the AWS clusters you are using and your credentials.
+# ** Do not check in your copy of this file. **
+
+# BRAD uses these credentials when interacting with the AWS APIs.
+# These credentials should have access to
+# - Athena
+# - RDS
+# - Redshift
+# - S3
+aws_access_key: ABCDEFG
+aws_access_key_secret: Abc123
+
+# BRAD stores assets and metadata here (e.g., the physical data blueprint,
+# serialized models, etc.).
+s3_assets_bucket: my-bucket
+s3_assets_path: brad/metadata/
+
+# Holds intermediate results during data syncing.
+s3_extract_bucket: my-bucket
+s3_extract_path: brad/extract/
+s3_extract_region: us-east-1
+
+# BRAD stores query logs here.
+s3_logs_bucket: my-bucket
+s3_logs_path: brad/query_logs/
+local_logs_path: /tmp/brad_query_logs/
+
+# Clusters and credentials. BRAD uses these to connect to and manipulate the
+# underlying engines.
+athena:
+  aws_region: us-east-1
+  s3_output_path: s3://bucket/path
+  s3_data_path: s3://bucket/path
+  access_key: ABCDEFG
+  access_key_secret: Abc123
+
+aurora:
+  cluster_id: aurora-brad
+  odbc_driver: Postgres
+  user: postgres
+  password: abc123
+  monitoring_role_arn: arn:aws:iam::...
+
+redshift:
+  cluster_id: redshift-brad
+  user: awsuser
+  password: abc123
+  s3_iam_role: arn:aws:iam::...
+
+  # Use these configs to specify preset Redshift cluster sizes. These are
+  # optional; leave them out if you want BRAD to run resizes.
+  presets:
+  - cluster_id: redshift-brad-1
+    instance_type: dc2.large
+    num_nodes: 1
+  - cluster_id: redshift-brad-2
+    instance_type: dc2.large
+    num_nodes: 2
+
+sidecar_db:
+  odbc_driver: Postgres
+  host: aurora-sidecar.us-east-1.rds.amazonaws.com
+  port: 5432
+  user: postgres
+  password: abc123

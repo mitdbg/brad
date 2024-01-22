@@ -1,9 +1,14 @@
+import logging
 from typing import Dict, List
 
 from brad.blueprint import Blueprint
 from brad.blueprint.user import UserProvidedBlueprint
 from brad.blueprint.table import Table
 from brad.config.engine import Engine
+from brad.routing.abstract_policy import FullRoutingPolicy
+from brad.routing.round_robin import RoundRobin
+
+logger = logging.getLogger(__name__)
 
 
 def bootstrap_blueprint(user: UserProvidedBlueprint) -> Blueprint:
@@ -83,6 +88,15 @@ def bootstrap_blueprint(user: UserProvidedBlueprint) -> Blueprint:
     # Sanity check: Each table should be present on at least one engine.
     assert all(map(lambda locs: len(locs) > 0, table_locations.values()))
 
+    # Overwrite the placements where requested.
+    bootstrap_locations = user.bootstrap_locations()
+    for table_name in tables_by_name.keys():
+        if table_name not in bootstrap_locations:
+            continue
+        new_locations = list(bootstrap_locations[table_name])
+        logger.info("Setting the locations of %s to %s", table_name, str(new_locations))
+        table_locations[table_name] = new_locations
+
     # We pass through the provisioning hints provided by the user.
     return Blueprint(
         user.schema_name,
@@ -90,5 +104,6 @@ def bootstrap_blueprint(user: UserProvidedBlueprint) -> Blueprint:
         table_locations,
         user.aurora_provisioning(),
         user.redshift_provisioning(),
-        None,
+        # TODO: Replace the default definite policy.
+        FullRoutingPolicy(indefinite_policies=[], definite_policy=RoundRobin()),
     )

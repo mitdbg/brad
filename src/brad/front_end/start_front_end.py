@@ -5,6 +5,7 @@ import multiprocessing as mp
 
 from brad.config.file import ConfigFile
 from brad.front_end.front_end import BradFrontEnd
+from brad.provisioning.directory import Directory
 from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)
@@ -14,8 +15,9 @@ def start_front_end(
     fe_index: int,
     config: ConfigFile,
     schema_name: str,
-    path_to_planner_config: str,
+    path_to_system_config: str,
     debug_mode: bool,
+    directory: Directory,
     input_queue: mp.Queue,
     output_queue: mp.Queue,
 ) -> None:
@@ -43,8 +45,9 @@ def start_front_end(
             fe_index,
             config,
             schema_name,
-            path_to_planner_config,
+            path_to_system_config,
             debug_mode,
+            directory,
             input_queue,
             output_queue,
         )

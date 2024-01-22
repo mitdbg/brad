@@ -2,7 +2,7 @@ import asyncio
 import pyathena
 import pyathena.connection
 import pyathena.cursor
-from typing import Optional, List
+from typing import Any, Iterable, Optional, List
 
 from .cursor import Cursor, Row
 
@@ -32,6 +32,9 @@ class PyAthenaCursor(Cursor):
 
     def execute_sync(self, query: str) -> None:
         self._impl.execute(query)
+
+    def executemany_sync(self, query: str, batch: Iterable[Any]) -> None:
+        raise RuntimeError("Not supported on Athena.")
 
     def fetchone_sync(self) -> Optional[Row]:
         return self._impl.fetchone()  # type: ignore

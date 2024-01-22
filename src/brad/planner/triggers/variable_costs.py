@@ -1,6 +1,5 @@
 import logging
 import math
-import pytz
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Tuple
@@ -10,7 +9,7 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.daemon.monitor import Monitor
-from brad.planner.router_provider import RouterProvider
+from brad.planner.estimator import EstimatorProvider
 from brad.planner.scoring.data_access.provider import DataAccessProvider
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.query import Query
@@ -20,6 +19,8 @@ from brad.planner.scoring.provisioning import (
     compute_aurora_accessed_pages,
     compute_athena_scanned_bytes,
 )
+from brad.routing.router import Router
+from brad.utils.time_periods import elapsed_time, universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +32,11 @@ class VariableCosts(Trigger):
         planner_config: PlannerConfig,
         monitor: Monitor,
         data_access_provider: DataAccessProvider,
-        router_provider: RouterProvider,
+        estimator_provider: EstimatorProvider,
         threshold_frac: float,
         epoch_length: timedelta,
+        startup_timestamp: datetime,
+        observe_bp_delay: timedelta,
     ) -> None:
         """
         This will trigger a replan if the current variable costs (currently,
@@ -43,13 +46,14 @@ class VariableCosts(Trigger):
         For example, if `threshold_frac` is 0.2, then replanning is triggered if
         the estimated cost is +/- 20% of the previously estimated cost.
         """
-        super().__init__(epoch_length)
+        super().__init__(epoch_length, observe_bp_delay)
         self._config = config
         self._planner_config = planner_config
         self._monitor = monitor
         self._data_access_provider = data_access_provider
-        self._router_provider = router_provider
+        self._estimator_provider = estimator_provider
         self._change_ratio = 1.0 + threshold_frac
+        self._startup_timestamp = startup_timestamp
 
     async def should_replan(self) -> bool:
         if self._current_blueprint is None or self._current_score is None:
@@ -57,6 +61,12 @@ class VariableCosts(Trigger):
             # should be.
             logger.debug(
                 "VariableCosts trigger not running because there is no reference point."
+            )
+            return False
+
+        if not self._passed_delays_since_cutoff():
+            logger.debug(
+                "Skippping variable costs trigger because we have not passed the delay cutoff."
             )
             return False
 
@@ -82,7 +92,8 @@ class VariableCosts(Trigger):
 
         if ratio > self._change_ratio:
             logger.info(
-                "Triggering replanning due to variable costs changing. Previously estimated: %.4f. Current estimated: %.4f. Change ratio: %.4f",
+                "Triggering replanning due to variable costs changing. Previously "
+                "estimated: %.4f. Current estimated: %.4f. Change ratio: %.4f",
                 estimated_hourly_cost,
                 current_hourly_cost,
                 self._change_ratio,
@@ -96,13 +107,13 @@ class VariableCosts(Trigger):
             return 0.0, 0.0
 
         # Extract the queries seen in the last window.
-        window_end = datetime.now()
-        window_end = window_end.astimezone(pytz.utc)
-        window_start = (
-            window_end
-            - self._planner_config.planning_window()
-            - self._config.epoch_length
-        )
+        window_end = universal_now()
+        planning_window = self._planner_config.planning_window()
+        running_time = elapsed_time(self._startup_timestamp)
+        if running_time > planning_window:
+            window_start = window_end - planning_window - self._config.epoch_length
+        else:
+            window_start = self._startup_timestamp
         logger.debug("Variable costs range: %s -- %s", window_start, window_end)
         workload = (
             WorkloadBuilder()
@@ -121,12 +132,11 @@ class VariableCosts(Trigger):
         aurora_queries: List[Query] = []
         athena_query_indices: List[int] = []
         athena_queries: List[Query] = []
-        router = await self._router_provider.get_router(
-            self._current_blueprint.table_locations_bitmap()
-        )
+        router = Router.create_from_blueprint(self._current_blueprint)
+        await router.run_setup_for_standalone(self._estimator_provider.get_estimator())
 
         for idx, q in enumerate(workload.analytical_queries()):
-            maybe_engine = q.primary_execution_location()
+            maybe_engine = q.most_recent_execution_location()
             if maybe_engine is None:
                 engine = await router.engine_for(q)
             else:

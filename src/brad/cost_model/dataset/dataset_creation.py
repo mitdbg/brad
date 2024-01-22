@@ -114,6 +114,7 @@ def create_datasets(
     lower_bound_runtime=None,
     shuffle_before_split=True,
     loss_class_name=None,
+    eval_on_test=False,
 ):
     """
     Creating dataset of query featurization. Set read_plans=True for plan datasets
@@ -131,12 +132,16 @@ def create_datasets(
 
     no_plans = len(data)
     plan_idxs = list(range(no_plans))
-    if shuffle_before_split:
-        np.random.shuffle(plan_idxs)
-
-    train_ratio = 1 - val_ratio
-    split_train = int(no_plans * train_ratio)
-    train_idxs = plan_idxs[:split_train]
+    if eval_on_test:
+        # we don't need to create an evaluation dataset
+        train_idxs = plan_idxs
+        split_train = len(train_idxs)
+    else:
+        if shuffle_before_split:
+            np.random.shuffle(plan_idxs)
+        train_ratio = 1 - val_ratio
+        split_train = int(no_plans * train_ratio)
+        train_idxs = plan_idxs[:split_train]
     # Limit number of training samples. To have comparable batch sizes, replicate remaining indexes.
     if cap_training_samples is not None:
         prev_train_length = len(train_idxs)
@@ -150,12 +155,13 @@ def create_datasets(
         train_dataset = QueryDataset([data[i] for i in train_idxs], train_idxs)
 
     val_dataset = None
-    if val_ratio > 0:
-        val_idxs = plan_idxs[split_train:]
-        if read_plans:
-            val_dataset = PlanDataset([data[i] for i in val_idxs], val_idxs)
-        else:
-            val_dataset = QueryDataset([data[i] for i in val_idxs], val_idxs)
+    if not eval_on_test:
+        if val_ratio > 0:
+            val_idxs = plan_idxs[split_train:]
+            if read_plans:
+                val_dataset = PlanDataset([data[i] for i in val_idxs], val_idxs)
+            else:
+                val_dataset = QueryDataset([data[i] for i in val_idxs], val_idxs)
 
     # derive label normalization
     runtimes = np.array([p.plan_runtime / 1000 for p in data])
@@ -199,6 +205,7 @@ def create_plan_dataloader(
     lower_bound_runtime=None,
     limit_runtime=None,
     loss_class_name=None,
+    eval_on_test=False,
 ):
     """
     Creates dataloaders that batches physical plans to train the model in a distributed fashion.
@@ -223,6 +230,7 @@ def create_plan_dataloader(
         limit_runtime=limit_runtime,
         lower_bound_num_tables=lower_bound_num_tables,
         lower_bound_runtime=lower_bound_runtime,
+        eval_on_test=eval_on_test,
     )
 
     # postgres_plan_collator does the heavy lifting of creating the graphs and extracting the features and thus requires both
@@ -232,6 +240,7 @@ def create_plan_dataloader(
     plan_collator = plan_collator_dict[database]
     train_collate_fn = functools.partial(
         plan_collator,
+        database=database,
         db_statistics=database_statistics,
         feature_statistics=feature_statistics,
         plan_featurization_name=plan_featurization_name,
@@ -244,7 +253,10 @@ def create_plan_dataloader(
         pin_memory=pin_memory,
     )
     train_loader = DataLoader(train_dataset, **dataloader_args)
-    val_loader = DataLoader(val_dataset, **dataloader_args)
+    if val_dataset is not None:
+        val_loader = DataLoader(val_dataset, **dataloader_args)
+    else:
+        val_loader = None
 
     # for each test workoad run create a distinct test loader
     test_loaders = None
@@ -261,6 +273,7 @@ def create_plan_dataloader(
             # test dataset
             test_collate_fn = functools.partial(
                 plan_collator,
+                database=database,
                 db_statistics=test_database_statistics,
                 feature_statistics=feature_statistics,
                 plan_featurization_name=plan_featurization_name,
@@ -269,6 +282,29 @@ def create_plan_dataloader(
             dataloader_args.update(collate_fn=test_collate_fn)
             test_loader = DataLoader(test_dataset, **dataloader_args)
             test_loaders.append(test_loader)
+    if eval_on_test:
+        _, val_dataset, _, val_database_statistics = create_datasets(
+            test_workload_run_paths,
+            True,
+            loss_class_name=loss_class_name,
+            val_ratio=0.0,
+            shuffle_before_split=False,
+        )
+        val_collate_fn = functools.partial(
+            plan_collator,
+            database=database,
+            db_statistics=val_database_statistics,
+            feature_statistics=feature_statistics,
+            plan_featurization_name=plan_featurization_name,
+        )
+        dataloader_args = dict(
+            batch_size=batch_size,
+            shuffle=shuffle,
+            num_workers=num_workers,
+            collate_fn=val_collate_fn,
+            pin_memory=pin_memory,
+        )
+        val_loader = DataLoader(val_dataset, **dataloader_args)
 
     return label_norm, feature_statistics, train_loader, val_loader, test_loaders
 
@@ -291,6 +327,8 @@ def create_query_dataloader(
     lower_bound_runtime=None,
     limit_runtime=None,
     loss_class_name=None,
+    eval_on_test=False,
+    apply_constraint_on_test=False,
 ):
     """
     Creates dataloaders that batches query featurization to train the model in a distributed fashion.
@@ -307,6 +345,7 @@ def create_query_dataloader(
         limit_runtime=limit_runtime,
         lower_bound_num_tables=lower_bound_num_tables,
         lower_bound_runtime=lower_bound_runtime,
+        eval_on_test=eval_on_test,
     )
 
     # postgres_plan_collator does the heavy lifting of creating the graphs and extracting the features and thus requires both
@@ -328,20 +367,36 @@ def create_query_dataloader(
         pin_memory=pin_memory,
     )
     train_loader = DataLoader(train_dataset, **dataloader_args)
-    val_loader = DataLoader(val_dataset, **dataloader_args)
+    if val_dataset is not None:
+        val_loader = DataLoader(val_dataset, **dataloader_args)
+    else:
+        val_loader = None
 
     # for each test workoad run create a distinct test loader
     test_loaders = None
     if test_workload_run_paths is not None:
         test_loaders = []
         for p in test_workload_run_paths:
-            _, test_dataset, _, test_database_statistics = create_datasets(
-                [p],
-                False,
-                loss_class_name=loss_class_name,
-                val_ratio=0.0,
-                shuffle_before_split=False,
-            )
+            if apply_constraint_on_test:
+                _, test_dataset, _, test_database_statistics = create_datasets(
+                    [p],
+                    False,
+                    loss_class_name=loss_class_name,
+                    val_ratio=0.0,
+                    shuffle_before_split=False,
+                    limit_num_tables=limit_num_tables,
+                    limit_runtime=limit_runtime,
+                    lower_bound_num_tables=lower_bound_num_tables,
+                    lower_bound_runtime=lower_bound_runtime,
+                )
+            else:
+                _, test_dataset, _, test_database_statistics = create_datasets(
+                    [p],
+                    False,
+                    loss_class_name=loss_class_name,
+                    val_ratio=0.0,
+                    shuffle_before_split=False,
+                )
             # test dataset
             test_collate_fn = functools.partial(
                 query_collator,
@@ -354,6 +409,30 @@ def create_query_dataloader(
             dataloader_args.update(collate_fn=test_collate_fn)
             test_loader = DataLoader(test_dataset, **dataloader_args)
             test_loaders.append(test_loader)
+
+    if eval_on_test:
+        _, val_dataset, _, val_database_statistics = create_datasets(
+            test_workload_run_paths,
+            False,
+            loss_class_name=loss_class_name,
+            val_ratio=0.0,
+            shuffle_before_split=False,
+        )
+        val_collate_fn = functools.partial(
+            query_collator,
+            database=database,
+            db_statistics=val_database_statistics,
+            feature_statistics=feature_statistics,
+            query_featurization_name=query_featurization_name,
+        )
+        dataloader_args = dict(
+            batch_size=batch_size,
+            shuffle=shuffle,
+            num_workers=num_workers,
+            collate_fn=val_collate_fn,
+            pin_memory=pin_memory,
+        )
+        val_loader = DataLoader(val_dataset, **dataloader_args)
 
     return label_norm, feature_statistics, train_loader, val_loader, test_loaders
 
@@ -377,6 +456,8 @@ def create_dataloader(
     limit_runtime=None,
     loss_class_name=None,
     is_query=True,
+    eval_on_test=False,
+    apply_constraint_on_test=False,
 ):
     if is_query:
         return create_query_dataloader(
@@ -397,6 +478,8 @@ def create_dataloader(
             lower_bound_runtime,
             limit_runtime,
             loss_class_name,
+            eval_on_test,
+            apply_constraint_on_test,
         )
     else:
         return create_plan_dataloader(
@@ -417,6 +500,7 @@ def create_dataloader(
             lower_bound_runtime,
             limit_runtime,
             loss_class_name,
+            eval_on_test,
         )
 
 

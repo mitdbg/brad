@@ -113,7 +113,7 @@ python run_cost_model.py --augment_dataset --workload_runs ../data/imdb/parsed_q
 
 
 ## On Redshift
-Provide connection details to Aurora.
+Provide connection details to Redshift.
 ```angular2html
 python run_cost_model.py \
     --database redshift \
@@ -132,7 +132,7 @@ python run_cost_model.py \
 ```
 
 ## On Athena
-Provide connection details to Aurora.
+Provide connection details to Athena.
 ```angular2html
 python run_cost_model.py \
     --database athena \

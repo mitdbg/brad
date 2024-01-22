@@ -1,9 +1,15 @@
+import math
 import yaml
+import logging
 import numpy as np
 import numpy.typing as npt
+import importlib.resources as pkg_resources
 from datetime import timedelta
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Tuple
 from brad.planner.strategy import PlanningStrategy
+import brad.planner as brad_planner
+
+logger = logging.getLogger(__name__)
 
 
 class PlannerConfig:
@@ -12,11 +18,41 @@ class PlannerConfig:
     shared across planning strategies, some are specific to a strategy.
     """
 
-    def __init__(self, path: str):
-        self._raw_path = path
-        with open(path, "r", encoding="UTF-8") as file:
-            self._raw = yaml.load(file, Loader=yaml.Loader)
+    @classmethod
+    def load_from_new_configs(cls, system_config: str) -> "PlannerConfig":
+        with open(system_config, "r", encoding="UTF-8") as file:
+            system_config_dict = yaml.load(file, Loader=yaml.Loader)
+        with pkg_resources.files(brad_planner).joinpath("constants.yml").open(
+            "r"
+        ) as data:
+            system_constants_dict = yaml.load(data, Loader=yaml.Loader)
 
+        merged = {}
+        merged.update(system_config_dict)
+        merged.update(system_constants_dict)
+        return cls(merged)
+
+    @classmethod
+    def load_only_constants(cls) -> "PlannerConfig":
+        with pkg_resources.files(brad_planner).joinpath("constants.yml").open(
+            "r"
+        ) as data:
+            system_constants_dict = yaml.load(data, Loader=yaml.Loader)
+        return cls(system_constants_dict)
+
+    @classmethod
+    def load(cls, path: str) -> "PlannerConfig":
+        with open(path, "r", encoding="UTF-8") as file:
+            raw = yaml.load(file, Loader=yaml.Loader)
+        return cls(raw)
+
+    def __init__(self, raw: Dict[str, Any]):
+        self._raw = raw
+
+        self._aurora_new_scaling_coefs: Optional[npt.NDArray] = None
+        self._redshift_new_scaling_coefs: Optional[npt.NDArray] = None
+
+        # Deprecated
         self._aurora_scaling_coefs: Optional[npt.NDArray] = None
         self._redshift_scaling_coefs: Optional[npt.NDArray] = None
 
@@ -54,6 +90,18 @@ class PlannerConfig:
 
     def max_provisioning_multiplier(self) -> float:
         return float(self._raw["max_provisioning_multiplier"])
+
+    def aurora_provisioning_search_distance(self) -> float:
+        try:
+            return self._raw["aurora_provisioning_search_distance"]
+        except KeyError:
+            return 900.0
+
+    def redshift_provisioning_search_distance(self) -> float:
+        try:
+            return self._raw["redshift_provisioning_search_distance"]
+        except KeyError:
+            return 900.0
 
     def athena_usd_per_mb_scanned(self) -> float:
         return float(self._raw["athena_usd_per_mb_scanned"])
@@ -207,6 +255,15 @@ class PlannerConfig:
     def aurora_txn_coefs(self, schema_name: str) -> Dict[str, float]:
         return self._raw["aurora_txns"][schema_name]
 
+    def aurora_new_scaling_coefs(self) -> npt.NDArray:
+        if self._aurora_new_scaling_coefs is None:
+            coefs = self._raw["aurora_scaling_new"]
+            self._aurora_new_scaling_coefs = np.array([coefs["coef1"], coefs["coef2"]])
+        return self._aurora_new_scaling_coefs
+
+    def aurora_new_scaling_alpha(self) -> float:
+        return self._raw["aurora_scaling_new"]["alpha"]
+
     ###
     ### Unified Redshift scaling
     ###
@@ -217,6 +274,17 @@ class PlannerConfig:
                 [coefs["coef1"], coefs["coef2"], coefs["coef3"], coefs["coef4"]]
             )
         return self._redshift_scaling_coefs
+
+    def redshift_new_scaling_coefs(self) -> npt.NDArray:
+        if self._redshift_new_scaling_coefs is None:
+            coefs = self._raw["redshift_scaling_new"]
+            self._redshift_new_scaling_coefs = np.array(
+                [coefs["coef1"], coefs["coef2"]]
+            )
+        return self._redshift_new_scaling_coefs
+
+    def redshift_new_scaling_alpha(self) -> float:
+        return self._raw["redshift_scaling_new"]["alpha"]
 
     def use_io_optimized_aurora(self) -> bool:
         if "use_io_optimized_aurora" not in self._raw:
@@ -230,3 +298,67 @@ class PlannerConfig:
             return default
         else:
             return self._raw[key]
+
+    def aurora_initialize_load_fraction(self) -> float:
+        return self._raw["aurora_initialize_load_fraction"]
+
+    def redshift_initialize_load_fraction(self) -> float:
+        return self._raw["redshift_initialize_load_fraction"]
+
+    def aurora_storage_index_multiplier(self) -> float:
+        return float(self._raw["aurora_storage_index_multiplier"])
+
+    def metrics_agg(self) -> Dict[str, Any]:
+        return self._raw["metrics_agg"]
+
+    def aurora_min_load_removal_fraction(self) -> float:
+        try:
+            return self._raw["aurora_min_load_removal_fraction"]
+        except KeyError:
+            logger.warning("Using default Aurora min load removal fraction: 0.75")
+            return 0.75
+
+    def redshift_min_load_removal_fraction(self) -> float:
+        try:
+            return self._raw["redshift_min_load_removal_fraction"]
+        except KeyError:
+            logger.warning("Using default Redshift min load removal fraction: 0.75")
+            return 0.75
+
+    def aurora_max_query_factor(self) -> Tuple[float, float]:
+        try:
+            return (
+                self._raw["aurora_max_query_factor"],
+                self._raw["aurora_max_query_factor_replace"],
+            )
+        except KeyError:
+            return math.inf, math.inf
+
+    def redshift_peak_load_multiplier(self) -> Tuple[float, float]:
+        try:
+            return (
+                self._raw["redshift_peak_load_threshold"],
+                self._raw["redshift_peak_load_multiplier"],
+            )
+        except KeyError:
+            return 110.0, 1.0
+
+    def aurora_rt_to_cpu_denorm(self) -> Tuple[float, float]:
+        try:
+            coefs = self._raw["run_time_to_denorm_cpu"]["aurora"]
+            return coefs["alpha"], coefs["max"]
+        except KeyError:
+            return 0.0, self.aurora_initialize_load_fraction() * 2.0
+
+    def redshift_rt_to_cpu_denorm(self) -> Tuple[float, float]:
+        try:
+            coefs = self._raw["run_time_to_denorm_cpu"]["redshift"]
+            return coefs["alpha"], coefs["max"]
+        except KeyError:
+            return 0.0, self.redshift_initialize_load_fraction() * 2.0
+
+    def planner_max_workers(self) -> int:
+        try:
+            return self._raw["planner_max_workers"]
+        except KeyError:
+            return 8

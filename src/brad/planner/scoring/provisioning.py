@@ -1,17 +1,21 @@
 import json
 import math
 import importlib.resources as pkg_resources
+import numpy as np
+import numpy.typing as npt
 from collections import namedtuple
-from typing import Dict, Iterable
+from typing import Dict, Iterable, TYPE_CHECKING
 
 import brad.planner.scoring.data as score_data
 
 from brad.blueprint.diff.provisioning import ProvisioningDiff
 from brad.blueprint.provisioning import Provisioning
 from brad.config.planner import PlannerConfig
-from brad.planner.scoring.context import ScoringContext
 from brad.planner.workload.query import Query
 from brad.provisioning.redshift import RedshiftProvisioningManager
+
+if TYPE_CHECKING:
+    from brad.planner.scoring.context import ScoringContext
 
 
 ProvisioningResources = namedtuple(
@@ -41,7 +45,7 @@ RedshiftSpecs = _load_instance_specs("redshift_instances.json")
 
 
 def compute_aurora_hourly_operational_cost(
-    provisioning: Provisioning, ctx: ScoringContext
+    provisioning: Provisioning, ctx: "ScoringContext"
 ) -> float:
     prov = AuroraSpecs[provisioning.instance_type()]
     if ctx.planner_config.use_io_optimized_aurora():
@@ -85,14 +89,25 @@ def compute_athena_scanned_bytes(
     accessed_bytes_per_query: Iterable[int],
     planner_config: PlannerConfig,
 ) -> int:
+    return compute_athena_scanned_bytes_batch(
+        np.array(accessed_bytes_per_query),
+        np.array(map(lambda query: query.arrival_count(), queries)),
+        planner_config,
+    )
+
+
+def compute_athena_scanned_bytes_batch(
+    accessed_bytes_per_query: npt.NDArray,
+    arrival_counts: npt.NDArray,
+    planner_config: PlannerConfig,
+) -> int:
     # N.B. There is a minimum charge of 10 MB per query.
     min_bytes_per_query = planner_config.athena_min_mb_per_query() * 1000 * 1000
-    total_accessed_bytes = 0
-    arrival_counts = 0.0
-    for query, accessed_bytes in zip(queries, accessed_bytes_per_query):
-        total_accessed_bytes += max(accessed_bytes, min_bytes_per_query)
-        arrival_counts += query.arrival_count()
-    return max(int(total_accessed_bytes * arrival_counts), 1)
+    accessed_bytes_pq = np.clip(
+        accessed_bytes_per_query, a_min=min_bytes_per_query, a_max=None
+    )
+    total_bytes = np.dot(accessed_bytes_pq, arrival_counts)
+    return max(int(total_bytes.item()), 1)
 
 
 def compute_athena_scan_cost(
@@ -101,6 +116,20 @@ def compute_athena_scan_cost(
 ) -> float:
     accessed_mb = total_accessed_bytes / 1000 / 1000
     return accessed_mb * planner_config.athena_usd_per_mb_scanned()
+
+
+def compute_athena_scan_cost_numpy(
+    bytes_accessed: npt.NDArray,
+    arrival_counts: npt.NDArray,
+    planner_config: PlannerConfig,
+) -> float:
+    # Note we use MB instead of MiB
+    mb_accessed = bytes_accessed / 1000.0 / 1000.0
+    mb_accessed = np.clip(
+        mb_accessed, a_min=float(planner_config.athena_min_mb_per_query()), a_max=None
+    )
+    total_mb = np.dot(mb_accessed, arrival_counts)
+    return total_mb * planner_config.athena_usd_per_mb_scanned()
 
 
 def compute_aurora_transition_time_s(
@@ -115,7 +144,7 @@ def compute_aurora_transition_time_s(
         return 0.0
 
     # We transition one instance at a time to minimize disruption.
-    num_nodes_to_create = new.num_nodes() - old.num_nodes()
+    num_nodes_to_create = max(new.num_nodes() - old.num_nodes(), 0)
 
     if new.instance_type() != old.instance_type():
         # We modify "overlapping" nodes. For the primary instance, we actually
@@ -144,9 +173,14 @@ def compute_redshift_transition_time_s(
         return 0.0
 
     if old.num_nodes() == 0 and new.num_nodes() > 0:
-        # Special case: Starting up a paused cluster. For now, we estimate this
-        # as an elastic resize.
-        return planner_config.redshift_elastic_resize_time_s()
+        # Special case: Starting a new cluster. We discourage the use of
+        # single-node clusters because it prevents the use of elastic resize
+        # later on. We treat 0 -> 1 as a "classic resize".
+        new_nodes = new.num_nodes()
+        if new_nodes == 1:
+            return planner_config.redshift_classic_resize_time_s()
+        else:
+            return planner_config.redshift_elastic_resize_time_s()
 
     # Some provisioning changes may take longer than others (classic vs. elastic
     # resize and also the time it takes to transfer data).

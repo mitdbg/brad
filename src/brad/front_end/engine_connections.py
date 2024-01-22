@@ -7,6 +7,7 @@ from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.connection.connection import Connection, ConnectionFailed
 from brad.connection.factory import ConnectionFactory
+from brad.front_end.debug import ReestablishConnectionsReport
 from brad.provisioning.directory import Directory
 
 logger = logging.getLogger(__name__)
@@ -142,16 +143,19 @@ class EngineConnections:
     def schema_name(self) -> Optional[str]:
         return self._schema_name
 
-    async def add_connections(
+    async def add_and_refresh_connections(
         self, config: ConfigFile, directory: Directory, expected_engines: Set[Engine]
     ) -> None:
         """
         Adds connections to engines that are in `expected_engines` but not
-        currently connected to.
+        currently connected to. This will also reconnect to Redshift because we
+        may change the underlying physical endpoint.
         """
         for engine in expected_engines:
-            if engine in self._connection_map:
+            if engine in self._connection_map and engine != Engine.Redshift:
                 continue
+            # We force reconnect to Redshift because we may be changing to a
+            # different physical endpoint.
             self._connection_map[engine] = await ConnectionFactory.connect_to(
                 engine, self._schema_name, config, directory, self._autocommit
             )
@@ -172,13 +176,16 @@ class EngineConnections:
                 directory, self._schema_name, config, self._autocommit
             )
 
-    async def remove_connections(self, expected_engines: Set[Engine]) -> None:
+    async def remove_connections(
+        self, expected_engines: Set[Engine], expected_aurora_read_replicas: int
+    ) -> None:
         """
         Removes connections from engines that are not in `expected_engines` but
         are currently connected to.
         """
         to_remove = []
-        for engine, conn in self._connection_map.items():
+        curr_connections = [item for item in self._connection_map.items()]
+        for engine, conn in curr_connections:
             if engine in expected_engines:
                 continue
             await conn.close()
@@ -187,17 +194,16 @@ class EngineConnections:
         for engine in to_remove:
             del self._connection_map[engine]
 
-        if (
-            Engine.Aurora not in expected_engines
-            and len(self._aurora_read_replicas) > 0
-        ):
-            for conn in self._aurora_read_replicas:
-                await conn.close()
-            self._aurora_read_replicas.clear()
+        all_replicas_to_remove = []
+        while len(self._aurora_read_replicas) > expected_aurora_read_replicas:
+            all_replicas_to_remove.append(self._aurora_read_replicas.pop())
+
+        for replica_to_remove in all_replicas_to_remove:
+            await replica_to_remove.close()
 
     async def reestablish_connections(
         self, config: ConfigFile, directory: Directory
-    ) -> bool:
+    ) -> ReestablishConnectionsReport:
         """
         Used to reconnect to engines when a connection has been lost. Lost
         connections may occur during blueprint transitions when the provisioning
@@ -208,10 +214,11 @@ class EngineConnections:
         overwhelming the underlying engines. Use randomized exponential backoff
         instead.
         """
+        report = ReestablishConnectionsReport()
+        curr_connections = [item for item in self._connection_map.items()]
         new_connections = []
-        all_succeeded = True
 
-        for engine, conn in self._connection_map.items():
+        for engine, conn in curr_connections:
             if conn.is_connected():
                 continue
             try:
@@ -223,8 +230,9 @@ class EngineConnections:
                     cursor = new_conn.cursor_sync()
                     cursor.execute_sync("SET enable_result_cache_for_session = off")
                 new_connections.append((engine, new_conn))
+                report.bump(engine, succeeded=True)
             except ConnectionFailed:
-                all_succeeded = False
+                report.bump(engine, succeeded=False)
 
         for engine, conn in new_connections:
             self._connection_map[engine] = conn
@@ -234,8 +242,9 @@ class EngineConnections:
             self._connect_to_aurora_read_replicas
             and Engine.Aurora in self._connection_map
         ):
+            curr_replica_conns = self._aurora_read_replicas.copy()
             new_replica_conns = []
-            for replica_idx, conn in enumerate(self._aurora_read_replicas):
+            for replica_idx, conn in enumerate(curr_replica_conns):
                 if conn.is_connected():
                     continue
                 try:
@@ -248,13 +257,14 @@ class EngineConnections:
                         replica_idx,
                     )
                     new_replica_conns.append((replica_idx, new_conn))
+                    report.bump(Engine.Aurora, succeeded=True)
                 except ConnectionFailed:
-                    all_succeeded = False
+                    report.bump(Engine.Aurora, succeeded=False)
 
             for replica_idx, conn in new_replica_conns:
                 self._aurora_read_replicas[replica_idx] = conn
 
-        return all_succeeded
+        return report
 
     def get_connection(self, engine: Engine) -> Connection:
         try:

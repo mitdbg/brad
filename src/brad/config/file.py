@@ -6,6 +6,7 @@ import yaml
 from typing import Optional, Dict, Any
 from datetime import timedelta
 
+from brad.blueprint.provisioning import Provisioning
 from brad.config.engine import Engine
 from brad.routing.policy import RoutingPolicy
 
@@ -14,6 +15,29 @@ logger = logging.getLogger(__name__)
 
 class ConfigFile:
     @classmethod
+    def load_from_new_configs(
+        cls, phys_config: str, system_config: str
+    ) -> "ConfigFile":
+        # Note that this implementation is designed to support backward
+        # compatibility (to minimize the invasiveness). We have split our
+        # configs into a physical configuration and system configuration.
+        #
+        # The physical configuration represents deployment-specific configs and
+        # credentials and are not meant to be checked in (e.g., for
+        # experiments). The system configuration is meant for shared BRAD
+        # configurations.
+
+        with open(phys_config, "r", encoding="UTF-8") as file:
+            phys_config_dict = yaml.load(file, Loader=yaml.Loader)
+        with open(system_config, "r", encoding="UTF-8") as file:
+            system_config_dict = yaml.load(file, Loader=yaml.Loader)
+
+        merged = {}
+        merged.update(phys_config_dict)
+        merged.update(system_config_dict)
+        return cls(merged)
+
+    @classmethod
     def load(cls, file_path: str) -> "ConfigFile":
         with open(file_path, "r", encoding="UTF-8") as file:
             raw = yaml.load(file, Loader=yaml.Loader)
@@ -21,13 +45,6 @@ class ConfigFile:
 
     def __init__(self, raw_parsed: Dict[str, Any]):
         self._raw = raw_parsed
-
-    def get_cluster_ids(self) -> Dict[Engine, str]:
-        return {
-            Engine.Aurora: self.aurora_cluster_id,
-            Engine.Redshift: self.redshift_cluster_id,
-            Engine.Athena: "brad-db0",  # TODO(Amadou): I don't want to break existing configs. Coordinate with Geoff on this.
-        }
 
     @property
     def daemon_log_path(self) -> Optional[pathlib.Path]:
@@ -156,7 +173,48 @@ class ConfigFile:
     def txn_log_prob(self) -> float:
         return float(self._raw["txn_log_prob"])
 
-    def get_connection_details(self, engine: Engine) -> Dict[str, str]:
+    @property
+    def disable_table_movement(self) -> bool:
+        try:
+            return self._raw["disable_table_movement"]
+        except KeyError:
+            # Table movement disabled by default.
+            return True
+
+    @property
+    def use_preset_redshift_clusters(self) -> bool:
+        try:
+            # We require that table movement is also disabled. Otherwise we need
+            # to keep track of the table state on each preset cluster.
+            return (
+                self._raw["use_preset_redshift_clusters"]
+                and self.disable_table_movement
+            )
+        except KeyError:
+            return False
+
+    def get_preset_redshift_cluster_id(
+        self, provisioning: Provisioning
+    ) -> Optional[str]:
+        """
+        If a preset cluster is available for the given provisioning, this method
+        returns its cluster ID. Note that this does not check if preset use is
+        disabled.
+        """
+        conn_config = self.get_connection_details(Engine.Redshift)
+        if "presets" not in conn_config:
+            return None
+        for preset in conn_config["presets"]:
+            # Check if any of the preset clusters match the given Redshift
+            # provisioning.
+            if (
+                preset["instance_type"] == provisioning.instance_type()
+                and preset["num_nodes"] == provisioning.num_nodes()
+            ):
+                return preset["cluster_id"]
+        return None
+
+    def get_connection_details(self, engine: Engine) -> Dict[str, Any]:
         """
         Returns the raw configuration details provided for an engine.
         """

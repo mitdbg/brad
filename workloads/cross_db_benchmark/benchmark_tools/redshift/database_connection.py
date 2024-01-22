@@ -179,6 +179,7 @@ class RedshiftDatabaseConnection(DatabaseConnection):
         explain_only=False,
         timeout_sec=None,
         clear_cache=True,
+        plain_run=False,
     ):
         results = None
         runtimes = None
@@ -186,22 +187,32 @@ class RedshiftDatabaseConnection(DatabaseConnection):
         timeout = False
 
         try:
-            analyze_plans = self.get_result(
-                f"{prefix}EXPLAIN {sql}", timeout_sec=timeout_sec
-            )
+            if plain_run:
+                query_start_t = time.perf_counter()
+                results = self.get_result(
+                    sql,
+                    timeout_sec=timeout_sec,
+                    clear_cache=clear_cache,
+                    fetch_output=False,
+                )
+                runtimes = time.perf_counter() - query_start_t
+            else:
+                analyze_plans = self.get_result(
+                    f"{prefix}EXPLAIN {sql}", timeout_sec=timeout_sec
+                )
 
-            results = []
-            runtimes = []
-            if not explain_only:
-                for i in range(repetitions):
-                    statement = f"{prefix} {sql}"
-                    query_start_t = time.perf_counter()
-                    curr_result = self.get_result(
-                        statement, timeout_sec=timeout_sec, clear_cache=clear_cache
-                    )
-                    query_time = time.perf_counter() - query_start_t
-                    results.append(curr_result)
-                    runtimes.append(query_time)
+                results = []
+                runtimes = []
+                if not explain_only:
+                    for i in range(repetitions):
+                        statement = f"{prefix} {sql}"
+                        query_start_t = time.perf_counter()
+                        curr_result = self.get_result(
+                            statement, timeout_sec=timeout_sec, clear_cache=clear_cache
+                        )
+                        query_time = time.perf_counter() - query_start_t
+                        results.append(curr_result)
+                        runtimes.append(query_time)
         # timeout
         except psycopg2.errors.QueryCanceled as e:
             timeout = True
@@ -248,6 +259,7 @@ class RedshiftDatabaseConnection(DatabaseConnection):
         db_created=True,
         timeout_sec=None,
         clear_cache=True,
+        fetch_output=True,
     ):
         connection, cursor = self.get_cursor(db_created=db_created)
         if timeout_sec:
@@ -257,7 +269,11 @@ class RedshiftDatabaseConnection(DatabaseConnection):
             cursor.execute("SET enable_result_cache_for_session = OFF;")
             connection.commit()
         cursor.execute(sql)
-        records = cursor.fetchall()
+        if fetch_output:
+            records = cursor.fetchall()
+        else:
+            records = None
+        connection.commit()
         self.close_conn(connection, cursor)
 
         if include_column_names:

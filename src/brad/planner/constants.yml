@@ -1,0 +1,370 @@
+###
+### Transition and operational cost constants.
+###
+
+# $5.00 per TB of data scanned.
+# There is a minimum charge of 10 MB.
+athena_usd_per_mb_scanned: 0.000005
+athena_min_mb_per_query: 10
+
+# 1 I/O operation per 8 KB page.
+# $0.20 per 1 million I/O operations.
+aurora_usd_per_million_ios: 0.20
+
+# Assumption is a fixed time cost for a provisioning change.
+# The provisioning change time likely is a function of the instance types being
+# changed, number of nodes being added/removed, and amount of data stored.
+redshift_provisioning_change_time_s: 60
+aurora_provisioning_change_time_s: 60
+
+aurora_per_instance_change_time_s: 300  # 5 minutes
+redshift_elastic_resize_time_s: 900  # 15 minutes - https://repost.aws/knowledge-center/resize-redshift-cluster
+redshift_classic_resize_time_s: 7200  # 2 hours (This is very difficult to estimate; it depends on state we have no visibility into.)
+
+# Minimum of 5 seconds per table, but this amount is negligible since we work
+# with relatively large tables.
+redshift_extract_rate_mb_per_s: 30.0
+redshift_load_rate_mb_per_s: 20.0
+
+# There is a minimum of 1 second per table. But this is negligible since we work
+# with relatively large tables.
+aurora_extract_rate_mb_per_s: 12.0
+aurora_load_rate_mb_per_s: 12.0
+
+# Extracting / loading in Athena corresponds to a conversion to/from Iceberg.
+athena_extract_rate_mb_per_s: 15.0
+# From experiments: 820 MB/s * data size + 2.2 s
+# But we just ignore the 2.2 for simplicity as we work with large tables.
+athena_load_rate_mb_per_s: 820.0
+
+# Storage costs.
+s3_usd_per_mb_per_month: 0.000023
+aurora_regular_usd_per_mb_per_month: 0.00010
+aurora_io_opt_usd_per_mb_per_month: 0.000225
+aurora_storage_index_multiplier: 3.0
+
+###
+### Dataset-specific Transition Constants
+###
+
+# Use tools/calibration/table_sizes.py
+table_extract_bytes_per_row:
+  imdb:
+    aka_name: 82.32090609799353
+    aka_title: 115.56655840563032
+    cast_info: 42.24659189517344
+    char_name: 72.90391741131415
+    comp_cast_type: 11.25
+    company_name: 78.17681702901008
+    company_type: 23.0
+    complete_cast: 17.87376189982678
+    info_type: 17.061946902654867
+    keyword: 29.722837823099574
+    kind_type: 12.142857142857142
+    link_type: 14.5
+    movie_companies: 38.37564715243578
+    movie_info_idx: 27.599008162123223
+    movie_keyword: 20.829555089708155
+    movie_link: 21.888322165549887
+    name: 79.93293378151274
+    role_type: 13.333333333333334
+    title: 90.16314998231906
+    movie_info: 73.69504549846432
+    person_info: 133.59130584387262
+
+  imdb_extended:
+    theatres: 30.569
+    showings: 47.33581266922088
+    ticket_orders: 41.52476844359898
+    aka_name: 82.09059925022993
+    aka_title: 115.82265016377478
+    cast_info: 42.755255854541055
+    char_name: 72.92298283720325
+    comp_cast_type: 11.25
+    company_name: 78.13220594305459
+    company_type: 23.0
+    complete_cast: 17.87376189982678
+    info_type: 17.061946902654867
+    keyword: 28.256227174480138
+    kind_type: 12.142857142857142
+    link_type: 14.5
+    movie_companies: 36.64833781694964
+    movie_info_idx: 27.52364903788672
+    movie_keyword: 20.734031472635518
+    movie_link: 21.888322165549887
+    name: 79.88613316741416
+    role_type: 13.333333333333334
+    title: 90.15402727195061
+    movie_info: 66.48728137225561
+    person_info: 133.20102076348735
+
+  imdb_extended_20g:
+    homes: 20.556198
+    theatres: 32.4135
+    showings: 46.01808
+    ticket_orders: 36.773404
+    aka_name: 81.795698
+    aka_title: 115.56834554266997
+    cast_info: 35.296638
+    char_name: 71.25104
+    comp_cast_type: 11.25
+    company_name: 78.345222
+    company_type: 23.0
+    complete_cast: 17.87376189982678
+    info_type: 17.061946902654867
+    keyword: 28.256227174480138
+    kind_type: 12.142857142857142
+    link_type: 14.5
+    movie_companies: 42.636226
+    movie_info_idx: 26.61975
+    movie_keyword: 18.729882
+    movie_link: 21.888322165549887
+    name: 78.5697
+    role_type: 13.333333333333334
+    title: 88.5209
+    movie_info: 29.449154
+    person_info: 133.458044
+
+  imdb_extended_100g:
+    homes: 20.55453
+    theatres: 34.102969696969694
+    showings: 46.73179
+    ticket_orders: 36.166392
+    aka_name: 81.795698
+    aka_title: 116.07618847379604
+    cast_info: 34.775924
+    char_name: 71.25104
+    comp_cast_type: 11.25
+    company_name: 78.345222
+    company_type: 23.0
+    complete_cast: 17.87376189982678
+    info_type: 17.061946902654867
+    keyword: 28.256227174480138
+    kind_type: 12.142857142857142
+    link_type: 14.5
+    movie_companies: 42.636226
+    movie_info_idx: 26.61975
+    movie_keyword: 19.482324
+    movie_link: 21.888322165549887
+    name: 78.670034
+    role_type: 13.333333333333334
+    title: 88.5209
+    movie_info: 29.57191
+    person_info: 133.458044
+
+  imdb_specialized_100g:
+    telemetry: 20.0  # NOTE: Should impute a value here.
+    embeddings: 17811.219206467
+    homes: 20.55453
+    theatres: 34.102969696969694
+    showings: 46.73179
+    ticket_orders: 36.166392
+    aka_name: 81.795698
+    aka_title: 116.07618847379604
+    cast_info: 34.775924
+    char_name: 71.25104
+    comp_cast_type: 11.25
+    company_name: 78.345222
+    company_type: 23.0
+    complete_cast: 17.87376189982678
+    info_type: 17.061946902654867
+    keyword: 28.256227174480138
+    kind_type: 12.142857142857142
+    link_type: 14.5
+    movie_companies: 42.636226
+    movie_info_idx: 26.61975
+    movie_keyword: 19.482324
+    movie_link: 21.888322165549887
+    name: 78.670034
+    role_type: 13.333333333333334
+    title: 88.5209
+    movie_info: 29.57191
+    person_info: 133.458044
+
+###
+### Models used to account for hardware/system load.
+###
+
+aurora_scaling_new:
+  # Wait time (from queuing theory)
+  # alpha * avg_query_time * (u / (1 - u)) + base
+  alpha: 0.0464553
+
+  # Resources
+  # [coef1 (s/d) + coef2] * base
+  coef1: 0.75851053
+  coef2: 0.5486482
+
+redshift_scaling_new:
+  # Same model as above.
+  alpha: 0.730064
+  coef1: 0.89125617
+  coef2: 0.1139099
+
+run_time_to_denorm_cpu:
+  aurora:
+    alpha: 0.39142781
+    max: 3.2
+  redshift:
+    alpha: 0.54941336
+    max: 1.4
+
+###
+### The configs below are deprecated.
+###
+
+###
+### Beam planning constants.
+###
+
+beam_size: 100
+max_feasible_cpu: 85
+
+###
+### Neighborhood blueprint planning constants.
+###
+
+max_num_table_moves: 3
+
+# Used by the "sampled_neighborhood" strategy
+sample_set_size: 100000
+
+
+###
+### [Deprecated]
+### Performance metrics scaling modifiers.
+### (Used by neighborhood planning.)
+###
+
+dataset_scaling:
+  redshift_CPUUtilization_Average: 1.0
+  redshift_ReadIOPS_Average: 1.0
+  aurora_WRITER_CPUUtilization_Average: 1.0
+  aurora_WRITER_ReadIOPS_Average: 1.0
+  aurora_WRITER_WriteIOPS_Average: 1.0
+  athena_TotalExecutionTime_Sum: 1.0
+
+redshift_resource_scaling:
+  redshift_CPUUtilization_Average: 1.0
+  redshift_ReadIOPS_Average: 1.0
+
+aurora_resource_scaling:
+  aurora_WRITER_CPUUtilization_Average: 1.0
+  aurora_WRITER_ReadIOPS_Average: 1.0
+  aurora_WRITER_WriteIOPS_Average: 1.0
+
+# [Deprecated]
+# Legacy Aurora scan cost estimator.
+# $0.000025 per MB scanned.
+aurora_usd_per_mb_scanned: 0.000025
+
+###
+### [Deprecated]
+### Query latency scaling modifiers (across provisionings).
+###
+
+aurora_alpha: 0.97066455
+aurora_gamma: 0.722149076
+
+redshift_alpha: 0.7857837
+redshift_gamma: 0.635405229
+
+
+###
+### [Deprecated]
+### Load factor scaling modifiers.
+###
+
+redshift_load_factor:
+  resource_alpha: 0.753694931989888
+  # p = [alpha * base * gamma * CPU] + [(1 - gamma) * base]
+  cpu_alpha: 0.04322972
+  cpu_gamma: 0.500017
+
+  # Legacy factors.
+  cpu_to_load_alpha: 0.7861541
+  min_scaling_cpu: 30
+
+# [Deprecated]
+aurora_load_factor:
+  # Proportionality factor for cross-provisioning CPU changes.
+  resource_alpha: 1.0
+
+  # Proportionality factor for the load metric's effect on query latency.
+  # p = alpha * base * load
+  load_alpha: 0.53865956
+
+  # Legacy factors.
+  cpu_to_load_alpha: 0.8761541
+  min_scaling_cpu: 30
+
+
+###
+### Transactional workload modifiers.
+###
+
+aurora_txns:
+  # [Deprecated]
+  # N.B. These values are for the initial IMDB "bulk insert" transactions
+  client_thpt_to_load: 0.06493011
+  client_thpt_to_cpu_denorm: 0.04584762
+  # We used the number of CPUs as the "resource score".
+  # Should be a bit more precise.
+  prov_to_peak_cpu_denorm: 0.56730588
+
+  # [Deprecated]
+  # N.B. These values are for the IMDB-extended transactions.
+  client_thpt_to_cpu_denorm: 0.0015366357203185784
+  client_thpt_to_load: 0.0037392906617191367
+  # We used the number of CPUs as the "resource score".
+  # Should be a bit more precise.
+  prov_to_peak_cpu_denorm: 0.6800294117647058
+
+  imdb_extended_20g:
+    # Used for "load translation"
+    C_1: 0.00282164
+    C_2: 0.00108688
+
+    # Used for latency.
+    K: 1.0194002389907837
+    b_p50: 0.005365931428968906
+    b_p90: 0.005891922861337662  # TODO: Update
+
+  imdb_extended_100g:
+    # Used for "load translation"
+    C_1: 0.00282164
+    C_2: 0.00108688
+
+    # Used for latency.
+    K: 1.0811012983322144
+    b_p50: 0.0008631267119199038
+    b_p90: 0.002251814818009734
+
+  imdb_specialized_100g:
+    # Used for "load translation"
+    C_1: 0.00282164
+    C_2: 0.00108688
+
+    # Used for latency.
+    K: 1.0811012983322144
+    b_p50: 0.0008631267119199038
+    b_p90: 0.002251814818009734
+
+
+aurora_scaling:
+  # [Deprecated]
+  # [coef1(load)^2(resource ratio)^2 + coef2(load)^2 + coef3(resource ratio)^2 + coef4] * base
+  coef1: 0.2454489
+  coef2: 0.00841046
+  coef3: 0.27845245
+  coef4: 0.56823644
+
+redshift_scaling:
+  # [Deprecated]
+  # Same model as above.
+  # [coef1(load)^2(resource ratio)^2 + coef2(load)^2 + coef3(resource ratio)^2 + coef4] * base
+  # Load is denormalized CPU usage.
+  coef1: 0.63933825
+  coef2: 0.00370447
+  coef3: 0.49948713
+  coef4: 0.36256359

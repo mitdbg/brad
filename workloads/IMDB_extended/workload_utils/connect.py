@@ -1,6 +1,7 @@
 import asyncio
 import pyodbc
 import os
+import logging
 from typing import Optional
 
 from brad.config.engine import Engine
@@ -23,6 +24,7 @@ def connect_to_db(
     direct_engine: Optional[Engine] = None,
     directory: Optional[Directory] = None,
     disable_direct_redshift_result_cache: bool = False,
+    verbose_logger: Optional[logging.Logger] = None,
 ) -> Database:
     if hasattr(args, "brad_direct") and args.brad_direct:
         assert direct_engine is not None
@@ -54,8 +56,15 @@ def connect_to_db(
             make_postgres_compatible_conn(args.baseline), engine=args.baseline
         )
     else:
-        port_offset = worker_index % args.num_front_ends
-        brad = BradGrpcClient(args.brad_host, args.brad_port + port_offset)
+        port_offset = (worker_index + args.client_offset) % args.num_front_ends
+        port = args.brad_port + port_offset
+        if verbose_logger is not None:
+            verbose_logger.info(
+                "[%d] Connecting to BRAD at %s:%d", worker_index, args.brad_host, port
+            )
+        brad = BradGrpcClient(args.brad_host, port)
         brad.connect()
+        if verbose_logger is not None:
+            verbose_logger.info("[%d] Connected to BRAD.", worker_index)
         db = BradDatabase(brad)
     return db

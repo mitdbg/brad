@@ -92,5 +92,20 @@ class RedshiftConnection(Connection):
         self._connection.close()
 
     def is_connection_lost_error(self, ex: Exception) -> bool:
-        # TODO: Determine how to check for lost connection errors.
+        if isinstance(ex, redshift_errors.InterfaceError):
+            return True
+        if isinstance(ex, IndexError):
+            # Not ideal, but this happens inside the Redshift connector
+            # (probably during a Redshift restart).
+            return True
+        message = repr(ex)
+        for phrase in _CONNECTION_LOST_PHRASES:
+            if phrase in message:
+                return True
         return False
+
+
+_CONNECTION_LOST_PHRASES = [
+    "server socket closed",
+    "EOF occurred in violation of protocol",
+]

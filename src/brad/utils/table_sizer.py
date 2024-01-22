@@ -50,6 +50,10 @@ class TableSizer:
     async def table_size_rows(
         self, table_name: str, location: Engine, approximate_allowed: bool = False
     ) -> int:
+        # NOTE: Special case.
+        if table_name == "embeddings" and location != Engine.Aurora:
+            return 1
+
         if location == Engine.Aurora:
             conn = self._engines.get_connection(Engine.Aurora)
         elif location == Engine.Redshift:
@@ -63,7 +67,7 @@ class TableSizer:
             cursor = conn.cursor_sync()
             await cursor.execute(query)
             row = cursor.fetchone_sync()
-            assert row is not None
+            assert row is not None, table_name
             result = int(row[0])
             if result < 0:
                 logger.warning(
@@ -73,13 +77,14 @@ class TableSizer:
                     result,
                 )
             else:
+                logger.debug("Using approximate size of %s: %d", table_name, result)
                 return result
 
         query = f"SELECT COUNT(*) FROM {table_name}"
         cursor = conn.cursor_sync()
         await cursor.execute(query)
         row = cursor.fetchone_sync()
-        assert row is not None
+        assert row is not None, table_name
         result = int(row[0])
         return result
 

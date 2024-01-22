@@ -22,6 +22,15 @@ class ComparableBlueprint:
     def get_redshift_provisioning(self) -> Provisioning:
         raise NotImplementedError
 
+    def get_routing_decisions(self) -> npt.NDArray:
+        """
+        The query routing decisions for each analytical query in the workload.
+        Use `Workload.EngineLatencyIndex` to map engines to numeric indices.
+
+        Should return an NDArray of shape (N,).
+        """
+        raise NotImplementedError
+
     # Predicted performance.
 
     def get_predicted_analytical_latencies(self) -> npt.NDArray:
@@ -35,6 +44,13 @@ class ComparableBlueprint:
     # predicted latency on a per-query basis.
 
     def get_operational_monetary_cost(self) -> float:
+        raise NotImplementedError
+
+    def get_operational_monetary_cost_without_scans(self) -> float:
+        """
+        We want to exclude scans because the blueprint uses estimated values. We
+        account for scan costs separately (examining the query log).
+        """
         raise NotImplementedError
 
     def get_transition_cost(self) -> float:

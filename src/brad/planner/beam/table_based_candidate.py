@@ -8,7 +8,6 @@ from brad.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning, MutableProvisioning
 from brad.config.engine import Engine, EngineBitmapValues
 from brad.planner.beam.feasibility import BlueprintFeasibility
-from brad.planner.router_provider import RouterProvider
 from brad.planner.compare.blueprint import ComparableBlueprint
 from brad.planner.compare.function import BlueprintComparator
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
@@ -31,6 +30,7 @@ from brad.planner.scoring.table_placement import (
     compute_single_aurora_table_cost,
     compute_single_table_movement_time_and_cost,
 )
+from brad.planner.workload import Workload
 from brad.routing.router import Router
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ class BlueprintCandidate(ComparableBlueprint):
             self.get_table_placement(),
             self.aurora_provisioning.clone(),
             self.redshift_provisioning.clone(),
-            self._source_blueprint.router_provider(),
+            self._source_blueprint.get_routing_policy(),  # TODO: Use chosen policy.
         )
 
     def to_score(self) -> Score:
@@ -188,8 +188,20 @@ class BlueprintCandidate(ComparableBlueprint):
             nxt = cur | placement_bitmap
             self.table_placements[table_name] = nxt
             if nxt != cur:
-                changed_tables.append(table_name)
+                changed_tables.append((table_name, nxt, cur))
                 changed = True
+
+            # If we added the table to Athena or Aurora, we need to take into
+            # account its storage costs.
+            if (((~cur) & nxt) & (EngineBitmapValues[Engine.Athena])) != 0:
+                # We added the table to Athena.
+                self.storage_cost += compute_single_athena_table_cost(table_name, ctx)
+
+            if (((~cur) & nxt) & (EngineBitmapValues[Engine.Aurora])) != 0:
+                # Added table to Aurora.
+                # You only pay for 1 copy of the table on Aurora, regardless of
+                # how many read replicas you have.
+                self.storage_cost += compute_single_aurora_table_cost(table_name, ctx)
 
         # Update movement scoring.
         self._update_movement_score(changed_tables, ctx)
@@ -202,13 +214,11 @@ class BlueprintCandidate(ComparableBlueprint):
 
     async def add_query_cluster(
         self,
-        router_provider: RouterProvider,
+        router: Router,
         query_cluster: List[int],
         reroute_prev: bool,
         ctx: ScoringContext,
     ) -> None:
-        router: Router = await router_provider.get_router(self.table_placements)
-
         if reroute_prev:
             self.query_locations[Engine.Aurora].clear()
             self.query_locations[Engine.Redshift].clear()
@@ -298,6 +308,7 @@ class BlueprintCandidate(ComparableBlueprint):
 
     def add_transactional_tables(self, ctx: ScoringContext) -> None:
         referenced_tables = set()
+        newly_added = []
 
         # Make sure that tables referenced in transactions are present on
         # Aurora.
@@ -306,37 +317,33 @@ class BlueprintCandidate(ComparableBlueprint):
                 if tbl not in self.table_placements:
                     # This is a CTE.
                     continue
+                orig = self.table_placements[tbl]
                 self.table_placements[tbl] |= EngineBitmapValues[Engine.Aurora]
                 referenced_tables.add(tbl)
 
+                if ((~orig) & self.table_placements[tbl]) != 0:
+                    newly_added.append((tbl, self.table_placements[tbl], orig))
+
+        for tbl, _, _ in newly_added:
+            # Aurora only charges for 1 copy of the data.
+            self.storage_cost += compute_single_aurora_table_cost(tbl, ctx)
+
         # If we made a change to the table placement, see if it corresponds to a
         # table score change.
-        self._update_movement_score(referenced_tables, ctx)
+        self._update_movement_score(newly_added, ctx)
 
     def _update_movement_score(
-        self, relevant_tables: Iterable[str], ctx: ScoringContext
+        self, relevant_tables: Iterable[Tuple[str, int, int]], ctx: ScoringContext
     ) -> None:
-        for tbl in relevant_tables:
-            cur = ctx.current_blueprint.table_locations_bitmap()[tbl]
-            nxt = self.table_placements[tbl]
-            if ((~cur) & nxt) == 0:
-                continue
-
-            result = compute_single_table_movement_time_and_cost(tbl, cur, nxt, ctx)
+        for tbl, nxt, cur in relevant_tables:
+            # This is important to only count the movement penalty once (the
+            # first time the table is moved over).
+            adjusted_curr = cur | (ctx.current_blueprint.table_locations_bitmap()[tbl])
+            result = compute_single_table_movement_time_and_cost(
+                tbl, adjusted_curr, nxt, ctx
+            )
             self.table_movement_trans_cost += result.movement_cost
             self.table_movement_trans_time_s += result.movement_time_s
-
-            # If we added the table to Athena or Aurora, we need to take into
-            # account its storage costs.
-            if (((~cur) & nxt) & (EngineBitmapValues[Engine.Athena])) != 0:
-                # We added the table to Athena.
-                self.storage_cost += compute_single_athena_table_cost(tbl, ctx)
-
-            if (((~cur) & nxt) & (EngineBitmapValues[Engine.Aurora])) != 0:
-                # Added table to Aurora.
-                # You only pay for 1 copy of the table on Aurora, regardless of
-                # how many read replicas you have.
-                self.storage_cost += compute_single_aurora_table_cost(tbl, ctx)
 
     def try_to_make_feasible_if_needed(self, ctx: ScoringContext) -> None:
         """
@@ -390,23 +397,15 @@ class BlueprintCandidate(ComparableBlueprint):
         )
 
         self.aurora_score = AuroraProvisioningScore.compute(
-            ctx.next_workload.get_predicted_analytical_latency_batch(
-                self.query_locations[Engine.Aurora], Engine.Aurora
-            ),
-            ctx.next_workload.get_arrival_counts_batch(
-                self.query_locations[Engine.Aurora]
-            ),
+            self.query_locations[Engine.Aurora],
+            ctx.next_workload,
             ctx.current_blueprint.aurora_provisioning(),
             self.aurora_provisioning,
             ctx,
         )
         self.redshift_score = RedshiftProvisioningScore.compute(
-            ctx.next_workload.get_predicted_analytical_latency_batch(
-                self.query_locations[Engine.Redshift], Engine.Redshift
-            ),
-            ctx.next_workload.get_arrival_counts_batch(
-                self.query_locations[Engine.Redshift]
-            ),
+            self.query_locations[Engine.Redshift],
+            ctx.next_workload,
             ctx.current_blueprint.redshift_provisioning(),
             self.redshift_provisioning,
             ctx,
@@ -497,6 +496,8 @@ class BlueprintCandidate(ComparableBlueprint):
         self.update_redshift_provisioning(current_best.redshift_provisioning)
         self.provisioning_cost = current_best.provisioning_cost
         self.provisioning_trans_time_s = current_best.provisioning_trans_time_s
+        self.aurora_score = current_best.aurora_score
+        self.redshift_score = current_best.redshift_score
 
         self.feasibility = current_best.feasibility
         self.explored_provisionings = True
@@ -609,6 +610,18 @@ class BlueprintCandidate(ComparableBlueprint):
     def get_redshift_provisioning(self) -> Provisioning:
         return self.redshift_provisioning
 
+    def get_routing_decisions(self) -> npt.NDArray:
+        engine_query = np.array(
+            [
+                (Workload.EngineLatencyIndex[engine], idx)
+                for engine, qidxs in self.query_locations.items()
+                for idx in qidxs
+            ]
+        )
+        si = np.argsort(engine_query[:, 1])
+        sorted_queries = engine_query[si]
+        return sorted_queries[:, 0]
+
     def get_predicted_analytical_latencies(self) -> npt.NDArray:
         relevant = []
         relevant.append(self.scaled_query_latencies[Engine.Aurora])
@@ -622,6 +635,9 @@ class BlueprintCandidate(ComparableBlueprint):
 
     def get_operational_monetary_cost(self) -> float:
         return self.storage_cost + self.provisioning_cost + self.workload_scan_cost
+
+    def get_operational_monetary_cost_without_scans(self) -> float:
+        return self.storage_cost + self.provisioning_cost
 
     def get_transition_cost(self) -> float:
         return self.table_movement_trans_cost

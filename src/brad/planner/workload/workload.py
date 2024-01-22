@@ -10,6 +10,7 @@ from itertools import combinations
 
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
+from brad.planner.enumeration.provisioning import Provisioning
 from brad.planner.workload.query import Query
 from brad.utils.table_sizer import TableSizer
 
@@ -73,6 +74,9 @@ class Workload:
         # three engines (Aurora, Redshift, Athena) in that order.
         self._predicted_analytical_latencies: Optional[npt.NDArray] = None
 
+        # Used for debug purposes only.
+        self._orig_predicted_analytical_latencies: Optional[npt.NDArray] = None
+
         # Data access statistics (predicted).
         # These properties are set and used by the blueprint planner.
         #
@@ -85,7 +89,7 @@ class Workload:
         # relative to the query bank used to run a workload against BRAD.) This
         # is used to recover the predicted run times for plotting or analysis
         # purposes later on.
-        self._query_index_mapping: List[int] = []
+        self._query_debug_map: Dict[str, List[Tuple[int, int]]] = {}
 
         # Used for reweighing queries.
         # NOTE: Using these weights directly assumes a static routing decision
@@ -93,6 +97,13 @@ class Workload:
         self._analytical_query_arrival_counts: npt.NDArray = np.array(
             [q.arrival_count() for q in self._analytical_queries]
         )
+
+        self.precomputed_aurora_analytical_latencies: Dict[
+            Provisioning, npt.NDArray
+        ] = {}
+        self.precomputed_redshift_analytical_latencies: Dict[
+            Provisioning, npt.NDArray
+        ] = {}
 
         ###
         ### Legacy properties below.
@@ -102,6 +113,32 @@ class Workload:
         self._aurora_row_size_bytes: Dict[str, int] = {}
         self._table_sizes_mb: Dict[Tuple[str, Engine], int] = {}
         self._dataset_size_mb = 0
+
+    def add_priming_analytical_query(self, query_str: str) -> None:
+        """
+        Used to add queries to the workload that should be used during planning
+        as "constraints". This should be called after the workload/statistics
+        providers.
+        """
+        query = Query(query_str, arrival_count=0)
+        self._analytical_queries.append(query)
+
+        if self._predicted_analytical_latencies is not None:
+            self._predicted_analytical_latencies = np.append(
+                self._predicted_analytical_latencies, np.zeros((1, 3)), axis=0
+            )
+        if self._predicted_aurora_pages_accessed is not None:
+            self._predicted_aurora_pages_accessed = np.append(
+                self._predicted_aurora_pages_accessed, np.zeros((1,)), axis=0
+            )
+        if self._predicted_athena_bytes_accessed is not None:
+            self._predicted_athena_bytes_accessed = np.append(
+                self._predicted_athena_bytes_accessed, np.zeros((1,)), axis=0
+            )
+
+        self._analytical_query_arrival_counts = np.append(
+            self._analytical_query_arrival_counts, np.zeros((1,)), axis=0
+        )
 
     def clone(self) -> "Workload":
         workload = Workload(
@@ -131,6 +168,14 @@ class Workload:
 
         return workload
 
+    def clear_cached(self) -> None:
+        """
+        Call before serializing to avoid recording data that can be quickly
+        recomputed.
+        """
+        self.precomputed_aurora_analytical_latencies.clear()
+        self.precomputed_redshift_analytical_latencies.clear()
+
     def serialize_for_debugging(self, output_path: str | Path) -> None:
         with open(output_path, "wb") as out_file:
             pickle.dump(self, out_file)
@@ -155,10 +200,27 @@ class Workload:
     ###
 
     def set_predicted_analytical_latencies(
-        self, predicted_latency: npt.NDArray, query_indices: List[int]
+        self,
+        predicted_latency: npt.NDArray,
+        debug_map: Dict[str, List[Tuple[int, int]]],
     ) -> None:
         self._predicted_analytical_latencies = predicted_latency
-        self._query_index_mapping = query_indices
+        self._query_debug_map = debug_map
+
+    def apply_predicted_latency_corrections(
+        self, engine: Engine, query_indices: npt.NDArray, run_times: npt.NDArray
+    ) -> None:
+        assert self._predicted_analytical_latencies is not None
+        if (
+            hasattr(self, "_orig_predicted_analytical_latencies")
+            and self._orig_predicted_analytical_latencies is None
+        ):
+            self._orig_predicted_analytical_latencies = (
+                self._predicted_analytical_latencies.copy()
+            )
+        self._predicted_analytical_latencies[
+            query_indices, self.EngineLatencyIndex[engine]
+        ] = run_times
 
     def get_predicted_analytical_latency(self, query_idx: int, engine: Engine) -> float:
         assert self._predicted_analytical_latencies is not None
@@ -173,6 +235,10 @@ class Workload:
         return self._predicted_analytical_latencies[
             query_indices, self.EngineLatencyIndex[engine]
         ]
+
+    def get_predicted_analytical_latency_all(self, engine: Engine) -> npt.NDArray:
+        assert self._predicted_analytical_latencies is not None
+        return self._predicted_analytical_latencies[:, self.EngineLatencyIndex[engine]]
 
     def set_predicted_data_access_statistics(
         self, aurora_pages: npt.NDArray, athena_bytes: npt.NDArray
@@ -203,6 +269,9 @@ class Workload:
     def get_arrival_counts_batch(self, query_indices: List[int]) -> npt.NDArray:
         return self._analytical_query_arrival_counts[query_indices]
 
+    def get_arrival_counts(self) -> npt.NDArray:
+        return self._analytical_query_arrival_counts
+
     def compute_latency_gains(self) -> npt.NDArray:
         """
         We define "gain" as the largest ratio between predicted execution times
@@ -218,6 +287,7 @@ class Workload:
             ratios.append(preds[:, j] / preds[:, i])
         combined = np.stack(ratios, axis=1)
         gains = np.amax(combined, axis=1)
+        gains[~np.isfinite(gains)] = 0.0
         return gains
 
     ###
@@ -267,3 +337,31 @@ class Workload:
             return self._table_sizes_mb[(table_name, location)]
         except KeyError:
             return None
+
+    def lookup_query_for_debugging(
+        self, workload_query_idx: int
+    ) -> List[Tuple[str, int]]:
+        possible = []
+        for dataset_name, mappings in self._query_debug_map.items():
+            for our_idx, workload_idx in mappings:
+                if our_idx != workload_query_idx:
+                    continue
+                possible.append((dataset_name, workload_idx))
+        return possible
+
+    def get_query_observations(self) -> Tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
+        # The first NDArray has the available observed run times
+        # The second NDArray has the engine execution location.
+        # The third NDArray is the query index in this workload.
+        run_times = []
+        locations = []
+        indices = []
+        for idx, q in enumerate(self.analytical_queries()):
+            e = q.most_recent_execution()
+            if e is None:
+                continue
+            engine, rt = e
+            run_times.append(rt)
+            locations.append(self.EngineLatencyIndex[engine])
+            indices.append(idx)
+        return np.array(run_times), np.array(locations), np.array(indices)

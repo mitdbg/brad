@@ -4,13 +4,12 @@ import io
 import logging
 import os
 import pathlib
-import pytz
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple, Deque
 
 from .common import TIMESTAMP_PREFIX_FORMAT
-from brad.utils.time_periods import period_start
+from brad.utils.time_periods import period_start, universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +73,7 @@ class EpochFileHandler(logging.Handler):
         Meant to be called periodically (once an "epoch") to do any cleanup
         tasks (e.g., closing the current epoch, uploading files).
         """
-        epoch_start = period_start(
-            datetime.now().astimezone(pytz.utc), self._epoch_length
-        )
+        epoch_start = period_start(universal_now(), self._epoch_length)
         self._close_epoch_and_advance_if_needed(epoch_start)
         await self._do_uploads()
 

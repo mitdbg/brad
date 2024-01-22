@@ -26,10 +26,11 @@ class WorkloadBuilder:
     """
 
     def __init__(self) -> None:
-        # Optionally includes the engine the query was executed on, and its
-        # recorded run time.
+        # Optionally includes the engine the query was executed on, its
+        # recorded run time, and the start timestamp of the epoch where the
+        # execution occurred.
         self._analytical_queries: List[
-            Tuple[str, Optional[Engine], Optional[float]]
+            Tuple[str, Optional[Engine], Optional[float], Optional[datetime]]
         ] = []
         self._transactional_queries: List[str] = []
         self._analytics_count_per: int = 1
@@ -147,7 +148,7 @@ class WorkloadBuilder:
 
         with open(file_path, encoding="UTF-8") as analytics:
             for q in analytics:
-                self._analytical_queries.append((q.strip(), None, None))
+                self._analytical_queries.append((q.strip(), None, None, None))
         return self
 
     def add_transactional_queries_from_file(
@@ -163,14 +164,18 @@ class WorkloadBuilder:
     ) -> "WorkloadBuilder":
         # For more accurate predictions, we should retrieve the size of the
         # table that will actualy be exported/imported.
-        preferred_sources = [Engine.Redshift, Engine.Athena, Engine.Aurora]
+        preferred_sources = [Engine.Redshift, Engine.Aurora, Engine.Athena]
         self._table_sizes.clear()
-        for table, locations in blueprint.tables_with_locations():
+        num_tables = len(blueprint.tables_with_locations())
+        for idx, (table, locations) in enumerate(blueprint.tables_with_locations()):
             for source in preferred_sources:
                 if source not in locations:
                     continue
                 self._table_sizes[table.name] = await table_sizer.table_size_rows(
                     table.name, source, approximate_allowed=True
+                )
+                logger.debug(
+                    "Fetching table size %s - %d of %d", table.name, idx + 1, num_tables
                 )
                 break
             assert table.name in self._table_sizes
@@ -222,7 +227,9 @@ class WorkloadBuilder:
                     q = matches.group("query")
                     engine = Engine.from_str(matches.group("engine"))
                     run_time_s = float(matches.group("duration"))
-                    analytical_queries.append((q.strip(), engine, run_time_s))
+                    analytical_queries.append(
+                        (q.strip(), engine, run_time_s, log_file.epoch_start)
+                    )
                 is_valid = True
 
             elif "transactional" in log_file.file_key:
@@ -263,23 +270,30 @@ class WorkloadBuilder:
         return self
 
     def _deduplicate_and_construct_queries(
-        self, queries: List[Tuple[str, Optional[Engine], Optional[float]]]
+        self,
+        queries: List[
+            Tuple[str, Optional[Engine], Optional[float], Optional[datetime]]
+        ],
     ) -> List[Query]:
         """
         Deduplication is by exact string match only.
         """
-        deduped: Dict[str, List[Optional[Tuple[Engine, float]]]] = {}
-        for q, engine, run_time_s in queries:
+        deduped: Dict[str, List[Optional[Tuple[Engine, float, datetime]]]] = {}
+        for q, engine, run_time_s, epoch_start in queries:
             if q in deduped:
                 deduped[q].append(
-                    (engine, run_time_s)
-                    if engine is not None and run_time_s is not None
+                    (engine, run_time_s, epoch_start)
+                    if engine is not None
+                    and run_time_s is not None
+                    and epoch_start is not None
                     else None
                 )
             else:
                 deduped[q] = [
-                    (engine, run_time_s)
-                    if engine is not None and run_time_s is not None
+                    (engine, run_time_s, epoch_start)
+                    if engine is not None
+                    and run_time_s is not None
+                    and epoch_start is not None
                     else None
                 ]
 

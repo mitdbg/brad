@@ -5,7 +5,7 @@ import pandas as pd
 import pytz
 import copy
 from typing import Dict, List, Optional
-from datetime import datetime, timezone
+from datetime import datetime
 from ddsketch import DDSketch
 
 from .metrics_source import MetricsSourceWithForecasting
@@ -15,6 +15,7 @@ from brad.daemon.messages import MetricsReport
 from brad.daemon.metrics_logger import MetricsLogger
 from brad.utils.streaming_metric import StreamingMetric, StreamingNumericMetric
 from brad.utils import log_verbose
+from brad.utils.time_periods import universal_now
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             self._epoch_length.total_seconds()
             / self._config.front_end_metrics_reporting_period_seconds
         )
-        sm_window_size = math.ceil(10 * samples_per_epoch)
+        sm_window_size = math.ceil(200 * samples_per_epoch)
         self._numeric_front_end_metrics: Dict[
             _MetricKey, List[StreamingNumericMetric]
         ] = {
@@ -70,7 +71,7 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
         )
 
     async def fetch_latest(self) -> None:
-        now = datetime.now(tz=timezone.utc)
+        now = universal_now()
         num_epochs = 5
         end_time = (
             now - (now - datetime.min.replace(tzinfo=pytz.UTC)) % self._epoch_length
@@ -191,7 +192,7 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
         return self._logger
 
     def handle_metric_report(self, report: MetricsReport) -> None:
-        now = datetime.now(tz=timezone.utc)
+        now = universal_now()
         fe_index = report.fe_index
 
         # Each front end server reports these metrics.
@@ -205,7 +206,8 @@ class FrontEndMetrics(MetricsSourceWithForecasting):
             fe_index
         ].add_sample(report.txn_latency_sketch(), now)
 
-        logger.debug(
+        log_verbose(
+            logger,
             "Received metrics report: [%d] %f (ts: %s)",
             report.fe_index,
             report.txn_completions_per_s,

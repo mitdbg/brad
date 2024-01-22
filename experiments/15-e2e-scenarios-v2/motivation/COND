@@ -1,0 +1,74 @@
+include("../common.cond")
+
+# 10 queries that should be acceptable on Aurora. (IMDB_100GB/regular_test)
+aurora_ok = [99, 56, 32, 92, 91, 49, 30, 83, 94, 38]
+
+# 7 queries that should be good on Aurora relative to others (IMDB_100GB/regular_rebalanced_5k)
+aurora_good = [1243, 1277, 1485, 2117, 3988, 4152, 4625]
+
+# 5 queries that should be good on Athena and acceptable on Redshift (IMDB_100GB/regular_rebalanced_5k).
+# Total cost (running once): 0.07977253171000001
+athena_good = [179, 238, 382, 768, 933]
+
+combine(
+  name="all",
+  deps=[
+    ":brad_100g_before",
+    ":brad_100g_after",
+  ],
+)
+
+run_experiment(
+  name="brad_100g_before",
+  run="./run_workload.sh",
+  options={
+    "config-file": "config/config_large_100.yml",
+    "planner-config-file": "config/planner.yml",
+    "schema-name": "imdb_extended_100g",
+    "ra-query-bank-file": "queries.sql",
+    "ra-query-indexes": ",".join(map(str, range(0, 20))),
+    "num-front-ends": 2,
+    "dataset-type": "100gb",
+  },
+  deps=[":set_up_router_before"],
+)
+
+run_experiment(
+  name="brad_100g_after",
+  run="./run_workload.sh",
+  options={
+    "config-file": "config/config_large_100.yml",
+    "planner-config-file": "config/planner.yml",
+    "schema-name": "imdb_extended_100g",
+    "ra-query-bank-file": "queries.sql",
+    "ra-query-indexes": ",".join(map(str, range(0, 20))),
+    "num-front-ends": 2,
+    "dataset-type": "100gb",
+  },
+  deps=[":set_up_router_after"],
+)
+
+run_command(
+  name="set_up_router_before",
+  run="python3 set_up_router.py",
+  options={
+    "config-file": "../../../config/config_large_100.yml",
+    "schema-name": "imdb_extended_100g",
+    "query-bank-file": "queries.sql",
+    "redshift-queries": ",".join(map(str, range(0, 20))),
+  },
+)
+
+run_command(
+  name="set_up_router_after",
+  run="python3 set_up_router.py",
+  options={
+    "config-file": "../../../config/config_large_100.yml",
+    "schema-name": "imdb_extended_100g",
+    "query-bank-file": "queries.sql",
+    "aurora-queries": ",".join(map(str, range(0, 15))),
+    "athena-queries": ",".join(map(str, range(15, 20))),
+  },
+  # Prevents this task from running before `:brad_100g_before` completes.
+  deps=[":brad_100g_before"]
+)

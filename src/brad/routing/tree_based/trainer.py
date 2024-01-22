@@ -1,4 +1,7 @@
+import logging
 import pathlib
+from tqdm import tqdm
+from collections import namedtuple
 
 import numpy as np
 import numpy.typing as npt
@@ -16,8 +19,11 @@ from brad.data_stats.estimator import Estimator
 from brad.query_rep import QueryRep
 from brad.routing.policy import RoutingPolicy
 
+logger = logging.getLogger(__name__)
+
 
 ModelQuality = Dict[str, Dict[str, float]]
+DatasetPath = namedtuple("DatasetPath", ["name", "data_dir", "use_preds"])
 
 
 class ForestTrainer:
@@ -56,6 +62,7 @@ class ForestTrainer:
         self._table_order: List[str] = []
         self._f_table_presence = np.array([])
         self._f_table_selectivity = np.array([])
+        self._f_table_cardinality = np.array([])
 
         self._preprocess_training_data()
 
@@ -83,14 +90,39 @@ class ForestTrainer:
         return cls(policy, bp.tables, raw_queries, stacked)
 
     @classmethod
-    def load_from_standard_dataset(
+    def load_from_standard_datasets(
         cls,
         policy: RoutingPolicy,
         schema_file: str | pathlib.Path,
-        dataset_path: str | pathlib.Path,
+        datasets: List[DatasetPath],
     ) -> "ForestTrainer":
         bp = UserProvidedBlueprint.load_from_yaml_file(schema_file)
+        loaded_datasets = []
+        for dataset_path in datasets:
+            logger.info(
+                "Loading dataset %s. Using predictions to bootstrap? %s",
+                dataset_path.name,
+                dataset_path.use_preds,
+            )
+            loaded = cls.load_single_standard_dataset(
+                dataset_path=dataset_path.data_dir,
+                use_preds=dataset_path.use_preds,
+            )
+            loaded_datasets.append(loaded)
 
+        # Concatenate the queries and run times.
+        queries_concat: List[str] = []
+        for lds in loaded_datasets:
+            queries_concat.extend(lds[0])
+        run_times_concat = np.concatenate([ds[1] for ds in loaded_datasets])
+        return cls(policy, bp.tables, queries_concat, run_times_concat)
+
+    @classmethod
+    def load_single_standard_dataset(
+        cls,
+        dataset_path: str | pathlib.Path,
+        use_preds: bool,
+    ) -> Tuple[List[str], npt.NDArray]:
         if isinstance(dataset_path, pathlib.Path):
             dsp = dataset_path
         else:
@@ -105,14 +137,17 @@ class ForestTrainer:
                 else:
                     raw_queries.append(clean + ";")
 
-        run_times = np.load(dsp / "run_time_s-athena-aurora-redshift.npy")
+        if use_preds:
+            run_times = np.load(dsp / "pred-run_time_s-athena-aurora-redshift.npy")
+        else:
+            run_times = np.load(dsp / "run_time_s-athena-aurora-redshift.npy")
 
         # Reorder the engine dimension.
         stacked = np.stack(
             [run_times[:, 1], run_times[:, 2], run_times[:, 0]], axis=cls.m
         )
 
-        return cls(policy, bp.tables, raw_queries, stacked)
+        return raw_queries, stacked
 
     def train(
         self,
@@ -153,6 +188,8 @@ class ForestTrainer:
             input_features = self._f_table_presence
         elif self._policy == RoutingPolicy.ForestTableSelectivity:
             input_features = self._f_table_selectivity
+        elif self._policy == RoutingPolicy.ForestTableCardinality:
+            input_features = self._f_table_cardinality
         else:
             assert False
 
@@ -224,12 +261,16 @@ class ForestTrainer:
         elif self._policy == RoutingPolicy.ForestTableSelectivity:
             assert estimator is not None
             self._compute_selectivity_features(estimator)
+        elif self._policy == RoutingPolicy.ForestTableCardinality:
+            assert estimator is not None
+            self._compute_cardinality_features(estimator)
         else:
             raise RuntimeError("Unsupported routing policy: {}".format(self._policy))
 
     def _compute_selectivity_features(self, estimator: Estimator) -> None:
         f_table_selectivity = []
-        for q in self._valid_queries:
+        logger.info("Computing table selectivity features...")
+        for q in tqdm(self._valid_queries):
             features = np.zeros(len(self._table_order))
             access_infos = estimator.get_access_info_sync(q)
 
@@ -243,6 +284,7 @@ class ForestTrainer:
 
     def _compute_presence_features(self) -> None:
         f_table_presence = []
+        logger.info("Computing table presence features...")
         for q in self._valid_queries:
             features = np.zeros(len(self._table_order))
             for t in q.tables():
@@ -254,6 +296,21 @@ class ForestTrainer:
             f_table_presence.append(features)
 
         self._f_table_presence = np.array(f_table_presence)
+
+    def _compute_cardinality_features(self, estimator: Estimator) -> None:
+        f_table_cardinality = []
+        logger.info("Computing table cardinality features...")
+        for q in tqdm(self._valid_queries):
+            features = np.zeros(len(self._table_order))
+            access_infos = estimator.get_access_info_sync(q)
+
+            for ai in access_infos:
+                tidx = self._table_order.index(ai.table_name)
+                features[tidx] = max(features[tidx], ai.cardinality)
+
+            f_table_cardinality.append(features)
+
+        self._f_table_cardinality = np.array(f_table_cardinality)
 
     def _compute_routing_quality(
         self, predictions: npt.NDArray, query_indices: npt.NDArray
@@ -289,6 +346,8 @@ class ForestTrainer:
             features = self._f_table_presence
         elif self._policy == RoutingPolicy.ForestTableSelectivity:
             features = self._f_table_selectivity
+        elif self._policy == RoutingPolicy.ForestTableCardinality:
+            features = self._f_table_cardinality
         else:
             assert False
 

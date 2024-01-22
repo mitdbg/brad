@@ -65,8 +65,22 @@ class ProvisioningEnumerator:
         ):
             yield candidate
 
+        is_redshift_ra3 = base_provisioning.instance_type().startswith("ra3")
+
+        # Special casing for Redshift dc2. We want to consider additional
+        # provisionings that enable elastic resizes.
+        is_redshift_dc2 = base_provisioning.instance_type().startswith("dc2")
+        double = base_provisioning.num_nodes() * 2
+        half = base_provisioning.num_nodes() // 2
+
         # Consider all other provisionings.
         for instance_type, specs in self._instances.items():
+            if is_redshift_ra3 and instance_type.startswith("dc2"):
+                # Redshift does not support resizing from ra3 to dc2. This
+                # should be encoded as part of our constraints, but for now we
+                # leave this here for convenience.
+                continue
+
             candidate.set_instance_type(instance_type)
             for num_nodes in range(
                 int(specs["min_nodes"]), int(specs["max_nodes"]) + 1
@@ -76,6 +90,10 @@ class ProvisioningEnumerator:
                 if (
                     abs(self._compute_distance(base_provisioning_value, candidate))
                     <= max_distance
+                ):
+                    yield candidate
+                elif is_redshift_dc2 and (
+                    num_nodes == double or (half > 0 and num_nodes == half)
                 ):
                     yield candidate
 

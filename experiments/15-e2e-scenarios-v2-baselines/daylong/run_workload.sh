@@ -2,7 +2,7 @@
 
 ANALYTICS_ENGINE="redshift"
 TRANSACTION_ENGINE="aurora"
-EXPT_OUT="expt_out_daylong_{$ANALYTICS_ENGINE}_{$TRANSACTION_ENGINE}"
+EXPT_OUT="expt_out_daylong_${ANALYTICS_ENGINE}_${TRANSACTION_ENGINE}"
 mkdir -p $EXPT_OUT
 hours=12
 time_scale_factor=$((24 / $hours))

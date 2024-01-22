@@ -1,4 +1,4 @@
-from typing import Any, Tuple, Optional, List, Iterator, AsyncIterator
+from typing import Any, Tuple, Optional, List, Iterator, AsyncIterator, Iterable
 
 
 Row = Tuple[Any, ...]
@@ -37,6 +37,9 @@ class Cursor:
         raise NotImplementedError
 
     def execute_sync(self, query: str) -> None:
+        raise NotImplementedError
+
+    def executemany_sync(self, query: str, batch: Iterable[Any]) -> None:
         raise NotImplementedError
 
     def fetchone_sync(self) -> Optional[Row]:

@@ -12,6 +12,7 @@ run_experiment(
     "ra-query-indexes": "25,50,51,75,76,27,28,6",
     "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
     "num-front-ends": 4,
+    "dataset-type": "20gb",
   },
 )
 
@@ -27,6 +28,7 @@ run_command(
     "ra-query-indexes": "25,50,51,75,76,27,28,6",
     "ra-query-bank-file": IMDB_20GB_REGULAR_QUERY_BANK,
     "num-front-ends": 4,
+    "dataset-type": "20gb",
   },
 )
 
@@ -37,18 +39,22 @@ aurora_good = [25, 26, 27, 28, 29, 31, 32, 33, 37, 43, 46, 47, 49, 83, 90]
 # Redshift/Athena.
 aurora_alt = [99, 56, 32, 92, 91, 49, 30, 83, 94, 38, 87, 86, 76, 37, 31, 46]
 
+COMMON_100G_CONFIGS = {
+  "physical-config-file": "config/physical_config_100gb.yml",
+  "schema-name": "imdb_extended_100g",
+  "ra-query-indexes": ",".join(map(str, aurora_alt)),
+  "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+  "txn-scale-factor": IMDB_100GB_SF,
+  "num-front-ends": 8,
+  "dataset-type": "100gb",
+}
+
 run_experiment(
   name="brad_100g",
   run="./run_workload.sh",
   options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_large_100.yml",
-    "planner-config-file": "config/planner.yml",
-    "schema-name": "imdb_extended_100g",
-    # TODO: Select regular query indexes
-    "ra-query-indexes": ",".join(map(str, aurora_alt)),
-    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "num-front-ends": 8,
+    "system-config-file": "scale_down_config.yml",
+    **COMMON_100G_CONFIGS,
   },
 )
 
@@ -56,12 +62,17 @@ run_command(
   name="brad_100g_debug",
   run="./run_workload_debug.sh",
   options={
-    # TODO: Ideally, configurations are shared. Only keep AWS secrets separate.
-    "config-file": "config/config_large_100.yml",
-    "planner-config-file": "config/planner.yml",
-    "schema-name": "imdb_extended_100g",
-    "ra-query-indexes": ",".join(map(str, aurora_alt)),
-    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
-    "num-front-ends": 8,
+    "system-config-file": "scale_down_config.yml",
+    **COMMON_100G_CONFIGS,
+  },
+)
+
+run_experiment(
+  name="hand_designed_100g",
+  run="./run_workload.sh",
+  options={
+    # Note the different config.
+    "system-config-file": "scale_down_hand_designed.yml",
+    **COMMON_100G_CONFIGS,
   },
 )

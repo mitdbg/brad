@@ -13,3 +13,8 @@ class AnalyticsLatencyScorer:
         predicted execution latencies.
         """
         raise NotImplementedError
+
+
+class NoopAnalyticsLatencyScorer(AnalyticsLatencyScorer):
+    def apply_predicted_latencies(self, workload: Workload) -> None:
+        pass

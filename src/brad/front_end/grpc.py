@@ -4,6 +4,7 @@ import brad.proto_gen.brad_pb2 as b
 import brad.proto_gen.brad_pb2_grpc as rpc
 from brad.config.engine import Engine
 from brad.config.session import SessionId
+from brad.connection.connection import ConnectionFailed
 from brad.front_end.brad_interface import BradInterface
 from brad.front_end.errors import QueryError
 
@@ -24,8 +25,13 @@ class BradGrpc(rpc.BradServicer):
     async def StartSession(
         self, _request: b.StartSessionRequest, _context
     ) -> b.StartSessionResponse:
-        new_session_id = await self._brad.start_session()
-        return b.StartSessionResponse(id=b.SessionId(id_value=new_session_id.value()))
+        try:
+            new_session_id = await self._brad.start_session()
+            return b.StartSessionResponse(
+                id=b.SessionId(id_value=new_session_id.value())
+            )
+        except ConnectionFailed as ex:
+            return b.StartSessionResponse(error=b.StartSessionError(error_msg=repr(ex)))
 
     async def RunQuery(
         self, request: b.RunQueryRequest, _context

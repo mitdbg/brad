@@ -44,9 +44,9 @@ def main():
         )
     if args.metrics:
         from datetime import datetime, timedelta
-        start_time = datetime(year=2023, month=12, day=21, hour=21, minute=12)
-        end_time = datetime(year=2023, month=12, day=22, hour=4, minute=14)
-        outdir = "expt_out_ana_up_redshift_aurora"
+        start_time = datetime(year=2023, month=12, day=27, hour=14, minute=17)
+        end_time = datetime(year=2023, month=12, day=28, hour=2, minute=22)
+        outdir = "expt_out_daylong_redshift_aurora"
         df = loader.fetch_metrics(start_time=start_time, end_time=end_time)
         # Write to csv
         start_time = df['timestamp'].min()

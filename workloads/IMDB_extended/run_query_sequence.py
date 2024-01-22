@@ -1,25 +1,40 @@
+import asyncio
 import argparse
+import math
 import multiprocessing as mp
 import time
 import os
 import pathlib
 import random
-import sys
 import signal
 import pytz
 import logging
-from typing import List
+from collections import namedtuple
+from typing import List, Callable
 from datetime import datetime, timedelta
 
-from workload_utils.connect import connect_to_db
+from workload_utils.backoff_helper import BackoffHelper
+from workload_utils.connect import connect_to_db, Database
+from workload_utils.inflight import InflightHelper
 from brad.config.engine import Engine
 from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
-
+from brad.utils import set_up_logging, create_custom_logger
 
 logger = logging.getLogger(__name__)
 
 STARTUP_FAILED = "startup_failed"
+
+QueryResult = namedtuple(
+    "QueryResult",
+    [
+        "error",
+        "timestamp",
+        "run_time_s",
+        "engine",
+        "query_idx",
+    ],
+)
 
 
 def runner(
@@ -37,6 +52,17 @@ def runner(
 
     signal.signal(signal.SIGINT, noop)
 
+    set_up_logging()
+    asyncio.run(runner_impl(runner_idx, start_queue, control_semaphore, args, queries))
+
+
+async def runner_impl(
+    runner_idx: int,
+    start_queue: mp.Queue,
+    control_semaphore: mp.Semaphore,  # type: ignore
+    args,
+    queries: List[str],
+):
     # For printing out results.
     if "COND_OUT" in os.environ:
         # pylint: disable-next=import-error
@@ -51,24 +77,37 @@ def runner(
     else:
         engine = None
 
+    verbose_log_dir = out_dir / "verbose_logs"
+    verbose_log_dir.mkdir(exist_ok=True)
+    verbose_logger = create_custom_logger(
+        "seq_runner_verbose", str(verbose_log_dir / f"runner_{runner_idx}.log")
+    )
+    verbose_logger.info("Workload starting...")
+    db_conns = []
+    bh = BackoffHelper()
+
     try:
-        database = connect_to_db(
-            args,
-            runner_idx,
-            direct_engine=engine,
-            # Ensure we disable the result cache if we are running directly on
-            # Redshift.
-            disable_direct_redshift_result_cache=True,
-        )
+        for slot_idx in range(args.issue_slots):
+            db = connect_to_db(
+                args,
+                runner_idx + slot_idx,
+                direct_engine=engine,
+                # Ensure we disable the result cache if we are running directly on
+                # Redshift.
+                disable_direct_redshift_result_cache=True,
+                verbose_logger=verbose_logger,
+            )
+            db_conns.append(db)
     except BradClientError as ex:
-        print(f"[Seq runner {runner_idx}] Failed to connect to BRAD:", str(ex))
+        logger.error(
+            "[Seq runner %d] Failed to connect to BRAD: %s", runner_idx, str(ex)
+        )
         start_queue.put_nowait(STARTUP_FAILED)
         return
 
     # Query indexes the runner should execute.
     runner_qidx = [i for i in range(len(queries)) if i % args.num_clients == runner_idx]
 
-    exec_count = 0
     file = open(
         out_dir / "seq_queries_{}.csv".format(runner_idx),
         "w",
@@ -83,20 +122,92 @@ def runner(
         )
 
         prng = random.Random(args.seed ^ runner_idx)
-        rand_backoff = None
+        bh = BackoffHelper()
 
         logger.info(
-            "[Ad hoc Runner %d] Queries to run: %s",
+            "[Ad hoc Runner %d] Queries to run: %d",
             runner_idx,
-            queries,
+            len(queries),
+        )
+
+        def get_run_query(
+            timestamp: datetime,
+            query_idx: int,
+            query: str,
+        ) -> Callable[[Database], QueryResult]:
+            def _run_query(db: Database) -> QueryResult:
+                try:
+                    start = time.time()
+                    _, engine = db.execute_sync_with_engine(query)
+                    end = time.time()
+                    return QueryResult(
+                        error=None,
+                        timestamp=timestamp,
+                        run_time_s=end - start,
+                        engine=engine.value,
+                        query_idx=query_idx,
+                    )
+                except Exception as ex:
+                    return QueryResult(
+                        error=ex,
+                        timestamp=timestamp,
+                        run_time_s=math.nan,
+                        engine=None,
+                        query_idx=query_idx,
+                    )
+
+            return _run_query
+
+        def handle_result(result: QueryResult) -> None:
+            if result.error is not None:
+                ex = result.error
+                if ex.is_transient():
+                    verbose_logger.warning("Transient query error: %s", ex.message())
+
+                    if bh.backoff is None:
+                        bh.backoff = RandomizedExponentialBackoff(
+                            max_retries=100,
+                            base_delay_s=1.0,
+                            max_delay_s=timedelta(minutes=1).total_seconds(),
+                        )
+                        bh.backoff_timestamp = datetime.now().astimezone(pytz.utc)
+                        logger.info(
+                            "[AHR %d] Backing off due to transient errors.", runner_idx
+                        )
+                else:
+                    logger.error(
+                        "[AHR %d] Unexpected query error: %s", runner_idx, ex.message()
+                    )
+                return
+
+            if bh.backoff is not None and bh.backoff_timestamp is not None:
+                if bh.backoff_timestamp < result.timestamp:
+                    # We recovered. This means a query issued after the rand
+                    # backoff was created finished successfully.
+                    bh.backoff = None
+                    bh.backoff_timestamp = None
+                    logger.info(
+                        "[AHR %d] Continued after transient errors.", runner_idx
+                    )
+
+            # Record execution result.
+            print(
+                "{},{},{},{}".format(
+                    result.timestamp,
+                    result.query_idx,
+                    result.run_time_s,
+                    result.engine,
+                ),
+                file=file,
+                flush=True,
+            )
+
+        inflight_runner = InflightHelper[Database, QueryResult](
+            contexts=db_conns, on_result=handle_result
         )
 
         # Signal that we're ready to start and wait for the controller.
-        print(
-            f"Seq Runner {runner_idx} is ready to start running.",
-            flush=True,
-            file=sys.stderr,
-        )
+        logger.info("Seq Runner %d is ready to start running.", runner_idx)
         start_queue.put_nowait("")
         control_semaphore.acquire()  # type: ignore
 
@@ -106,12 +217,23 @@ def runner(
             # Note that `False` means to not block.
             should_exit_early = control_semaphore.acquire(False)  # type: ignore
             if should_exit_early:
-                print(
-                    f"Seq Runner {runner_idx} is exiting early.",
-                    file=sys.stderr,
-                    flush=True,
-                )
+                logger.info("Seq Runner %d is exiting early.", runner_idx)
                 break
+
+            if bh.backoff is not None:
+                # Delay retrying in the case of a transient error (this
+                # happens during blueprint transitions).
+                wait_s = bh.backoff.wait_time_s()
+                if wait_s is None:
+                    logger.error(
+                        "[AHR %d] Aborting benchmark. Too many transient errors.",
+                        runner_idx,
+                    )
+                    break
+                verbose_logger.info(
+                    "[AHR %d] Backing off for %.4f seconds...", runner_idx, wait_s
+                )
+                await inflight_runner.wait_for_s(wait_s)
 
             # Wait for some time before issuing, if requested.
             if args.avg_gap_s is not None:
@@ -124,100 +246,35 @@ def runner(
                 wait_for_s = 0.0
 
             if wait_for_s > 0.0:
-                time.sleep(wait_for_s)
+                await inflight_runner.wait_for_s(wait_for_s)
 
             logger.debug("Executing qidx: %d", qidx)
             query = queries[qidx]
 
-            try:
-                # Get time stamp for logging.
-                now = datetime.now().astimezone(pytz.utc)
-
-                # Execute query.
-                start = time.time()
-                _, engine = database.execute_sync_with_engine(query)
-                # Log.
-                engine_log = "xxx"
-                if engine is None:
-                    engine_log = "tidb"
-                elif isinstance(engine, Engine):
-                    engine_log = engine.value
-                else:
-                    engine_log = engine
-                end = time.time()
-                run_time_s = end - start
-                print(
-                    "{},{},{},{}".format(
-                        now,
-                        qidx,
-                        run_time_s,
-                        engine_log,
-                    ),
-                    file=file,
-                    flush=True,
+            now = datetime.now().astimezone(pytz.utc)
+            run_query_fn = get_run_query(
+                now,
+                qidx,
+                query,
+            )
+            while True:
+                was_submitted = inflight_runner.submit(run_query_fn)
+                if was_submitted:
+                    break
+                logger.warning(
+                    "[AHR %d] Ran out of issue slots. Waiting for next slot to free up.",
+                    runner_idx,
                 )
-                last_run_time_s = run_time_s
-
-                if exec_count % 20 == 0:
-                    # To avoid data loss if this script crashes.
-                    os.fsync(file.fileno())
-
-                exec_count += 1
-                if rand_backoff is not None:
-                    print(
-                        f"[Seq Runner {runner_idx}] Continued after transient errors.",
-                        flush=True,
-                        file=sys.stderr,
-                    )
-                    rand_backoff = None
-
-            except BradClientError as ex:
-                if ex.is_transient():
-                    # This is too verbose during a transition.
-                    # print(
-                    #     "Transient query error:",
-                    #     ex.message(),
-                    #     flush=True,
-                    #     file=sys.stderr,
-                    # )
-
-                    if rand_backoff is None:
-                        rand_backoff = RandomizedExponentialBackoff(
-                            max_retries=100,
-                            base_delay_s=1.0,
-                            max_delay_s=timedelta(minutes=1).total_seconds(),
-                        )
-                        print(
-                            f"[Seq Runner {runner_idx}] Backing off due to transient errors.",
-                            flush=True,
-                            file=sys.stderr,
-                        )
-
-                    # Delay retrying in the case of a transient error (this
-                    # happens during blueprint transitions).
-                    wait_s = rand_backoff.wait_time_s()
-                    if wait_s is None:
-                        print(
-                            f"[Seq Runner {runner_idx}] Aborting benchmark. Too many transient errors.",
-                            flush=True,
-                            file=sys.stderr,
-                        )
-                        break
-                    time.sleep(wait_s)
-
-                else:
-                    print(
-                        "Unexpected seq query error:",
-                        ex.message(),
-                        flush=True,
-                        file=sys.stderr,
-                    )
+                await inflight_runner.wait_until_next_slot_is_free()
+            verbose_logger.info("[Seq %d] Issued query %d", runner_idx, qidx)
 
     finally:
+        await inflight_runner.wait_until_complete()
         os.fsync(file.fileno())
         file.close()
-        database.close_sync()
-        print(f"Seq runner {runner_idx} has exited.", flush=True, file=sys.stderr)
+        for db in db_conns:
+            db.close_sync()
+        logger.info("Seq runner %d has exited.", runner_idx)
 
 
 def main():
@@ -279,6 +336,13 @@ def main():
     )
     args = parser.parse_args()
 
+    parser.add_argument("--issue-slots", type=int, default=1)
+    args = parser.parse_args()
+
+    set_up_logging()
+
+    logger.info("[AHR] Running with %d issue slots per client.", args.issue_slots)
+
     with open(args.query_sequence_file, "r", encoding="UTF-8") as file:
         query_seq = [line.strip() for line in file]
 
@@ -320,7 +384,7 @@ def main():
         p.start()
         processes.append(p)
 
-    print("Seq: Waiting for startup...", flush=True)
+    logger.info("Seq: Waiting for startup...")
     one_startup_failed = False
     for i in range(args.num_clients):
         msg = start_queue[i].get()
@@ -328,28 +392,24 @@ def main():
             one_startup_failed = True
 
     if one_startup_failed:
-        print("At least one ad-hoc runner failed to start up. Aborting the experiment.")
+        logger.error(
+            "At least one seq runner failed to start up. Aborting the experiment."
+        )
         for i in range(args.num_clients):
             # Ideally we should be able to release twice atomically.
             control_semaphore[i].release()
             control_semaphore[i].release()
         for p in processes:
             p.join()
-        print("Abort complete.")
+        logger.info("Seq: Abort complete.")
         return
 
-    print(
-        "Telling all {} ad-hoc clients to start.".format(args.num_clients), flush=True
-    )
+    logger.info("Seq: Telling all %d seq clients to start.", args.num_clients)
     for i in range(args.num_clients):
         control_semaphore[i].release()
 
     # Wait until requested to stop.
-    print(
-        "Seq queries running until completion. Hit Ctrl-C to stop early.",
-        flush=True,
-        file=sys.stderr,
-    )
+    logger.info("Seq: Queries running until completion. Hit Ctrl-C to stop early.")
 
     def signal_handler(_signal, _frame):
         for i in range(args.num_clients):
@@ -359,11 +419,11 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    print("Waiting for the seq clients to complete...", flush=True, file=sys.stderr)
+    logger.info("Seq: Waiting for the seq clients to complete...")
     for p in processes:
         p.join()
 
-    print("Done query sequence!", flush=True, file=sys.stderr)
+    logger.info("Seq: Done query sequence!")
 
 
 if __name__ == "__main__":
