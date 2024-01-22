@@ -5,7 +5,7 @@ import sys
 
 from typing import Tuple, Optional
 from brad.config.engine import Engine
-from brad.grpc_client import BradGrpcClient, RowList
+from brad.grpc_client import BradGrpcClient, RowList, BradClientError
 from brad.connection.connection import Connection
 
 
@@ -67,18 +67,18 @@ class PyodbcDatabase(Database):
         except pyodbc.ProgrammingError:
             return []
         except mysql.connector.errors.DatabaseError as e:
-            print(f"Transient error: {e}.\nQuery: {query}", flush=True, file=sys.stderr)
-            return []
+            msg = f"Transient error: {e}.\nQuery: {query}"
+            raise BradClientError(msg, is_transient=True)
         except mysql.connector.errors.InterfaceError as e:
-            print(f"Transient error: {e}.\nQuery: {query}", flush=True, file=sys.stderr)
-            return []
+            msg = f"Transient error: {e}.\nQuery: {query}"
+            raise BradClientError(msg, is_transient=True)
         except psycopg2.errors.DatabaseError as e:
-            print(f"Transient error: {e}.\nQuery: {query}", flush=True, file=sys.stderr)
-            return []
+            msg = f"Transient error: {e}.\nQuery: {query}"
+            raise BradClientError(msg, is_transient=True)
         except psycopg2.errors.InterfaceError as e:
             # Restart the connection.
-            print(f"Transient error: {e}.\nQuery: {query}", flush=True, file=sys.stderr)
-            return []
+            msg = f"Transient error: {e}.\nQuery: {query}"
+            raise BradClientError(msg, is_transient=True)
         
 
     def begin_sync(self) -> None:
