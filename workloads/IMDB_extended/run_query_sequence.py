@@ -140,6 +140,13 @@ async def runner_impl(
                     start = time.time()
                     _, engine = db.execute_sync_with_engine(query)
                     end = time.time()
+                    if engine is None:
+                        engine_name = "tidb"
+                    elif isinstance(engine, Engine):
+                        engine_name = engine.value
+                    else:
+                        engine_name = engine
+
                     return QueryResult(
                         error=None,
                         timestamp=timestamp,
