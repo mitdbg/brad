@@ -268,7 +268,9 @@ class BradFrontEnd(BradInterface):
             try:
                 session_id, _ = await self._sessions.create_new_session()
                 if self._verbose_logger is not None:
-                    self._verbose_logger.info("New session started %d", session_id)
+                    self._verbose_logger.info(
+                        "New session started %d", session_id.value()
+                    )
                 return session_id
             except ConnectionFailed:
                 if rand_backoff is None:
@@ -291,7 +293,7 @@ class BradFrontEnd(BradInterface):
     async def end_session(self, session_id: SessionId) -> None:
         await self._sessions.end_session(session_id)
         if self._verbose_logger is not None:
-            self._verbose_logger.info("Session ended %d", session_id)
+            self._verbose_logger.info("Session ended %d", session_id.value())
 
     # pylint: disable-next=invalid-overridden-method
     async def run_query(
