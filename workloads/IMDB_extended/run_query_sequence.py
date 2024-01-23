@@ -159,48 +159,59 @@ async def runner_impl(
             return _run_query
 
         def handle_result(result: QueryResult) -> None:
-            if result.error is not None:
-                ex = result.error
-                if ex.is_transient():
-                    verbose_logger.warning("Transient query error: %s", ex.message())
-
-                    if bh.backoff is None:
-                        bh.backoff = RandomizedExponentialBackoff(
-                            max_retries=100,
-                            base_delay_s=1.0,
-                            max_delay_s=timedelta(minutes=1).total_seconds(),
+            try:
+                if result.error is not None:
+                    ex = result.error
+                    if ex.is_transient():
+                        verbose_logger.warning(
+                            "Transient query error: %s", ex.message()
                         )
-                        bh.backoff_timestamp = datetime.now().astimezone(pytz.utc)
+
+                        if bh.backoff is None:
+                            bh.backoff = RandomizedExponentialBackoff(
+                                max_retries=100,
+                                base_delay_s=1.0,
+                                max_delay_s=timedelta(minutes=1).total_seconds(),
+                            )
+                            bh.backoff_timestamp = datetime.now().astimezone(pytz.utc)
+                            logger.info(
+                                "[AHR %d] Backing off due to transient errors.",
+                                runner_idx,
+                            )
+                    else:
+                        logger.error(
+                            "[AHR %d] Unexpected query error: %s",
+                            runner_idx,
+                            ex.message(),
+                        )
+                    return
+
+                if bh.backoff is not None and bh.backoff_timestamp is not None:
+                    if bh.backoff_timestamp < result.timestamp:
+                        # We recovered. This means a query issued after the rand
+                        # backoff was created finished successfully.
+                        bh.backoff = None
+                        bh.backoff_timestamp = None
                         logger.info(
-                            "[AHR %d] Backing off due to transient errors.", runner_idx
+                            "[AHR %d] Continued after transient errors.", runner_idx
                         )
-                else:
-                    logger.error(
-                        "[AHR %d] Unexpected query error: %s", runner_idx, ex.message()
-                    )
-                return
 
-            if bh.backoff is not None and bh.backoff_timestamp is not None:
-                if bh.backoff_timestamp < result.timestamp:
-                    # We recovered. This means a query issued after the rand
-                    # backoff was created finished successfully.
-                    bh.backoff = None
-                    bh.backoff_timestamp = None
-                    logger.info(
-                        "[AHR %d] Continued after transient errors.", runner_idx
-                    )
-
-            # Record execution result.
-            print(
-                "{},{},{},{}".format(
-                    result.timestamp,
-                    result.query_idx,
-                    result.run_time_s,
-                    result.engine,
-                ),
-                file=file,
-                flush=True,
-            )
+                # Record execution result.
+                print(
+                    "{},{},{},{}".format(
+                        result.timestamp,
+                        result.query_idx,
+                        result.run_time_s,
+                        result.engine,
+                    ),
+                    file=file,
+                    flush=True,
+                )
+            except:  # pylint: disable=bare-except
+                logger.exception(
+                    "[AHR %d] Unexpected exception when handling query result.",
+                    runner_idx,
+                )
 
         inflight_runner = InflightHelper[Database, QueryResult](
             contexts=db_conns, on_result=handle_result
