@@ -29,6 +29,7 @@ class Watchdog:
 
     def start(self, event_loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
         self._event_loop = event_loop
+        self._sentinel.start()
         self.ping()
         self._thread.start()
 
@@ -50,8 +51,10 @@ class Watchdog:
 
     def _log_thread_state(self) -> None:
         logger.info("Watchdog thread stack dump")
+        # pylint: disable-next=protected-access
         for thread_id, _ in threading._active.items():  # type: ignore
             logger.info("Thread ID: %d", thread_id)
+            # pylint: disable-next=protected-access
             frames = sys._current_frames()[thread_id]
             for f in frames:
                 logger.info("\n".join(traceback.format_stack(f)))
