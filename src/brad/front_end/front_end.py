@@ -158,6 +158,7 @@ class BradFrontEnd(BradInterface):
             self._verbose_logger = None
 
         # Used for debug purposes.
+        # We print the system state if the front end becomes unresponsive for >= 5 mins.
         self._watchdog = Watchdog(
             check_period=timedelta(minutes=1), take_action_after=timedelta(minutes=5)
         )

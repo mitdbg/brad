@@ -34,9 +34,11 @@ class Watchdog:
         self._thread.start()
 
     def stop(self) -> None:
+        logger.info("Watchdog stopping...")
         self._sentinel.signal_exit()
         self._thread.join()
         self._sentinel.stop()
+        logger.info("Watchdog stopped.")
 
     def ping(self) -> None:
         with self._lock:
@@ -56,8 +58,7 @@ class Watchdog:
             logger.info("Thread ID: %d", thread_id)
             # pylint: disable-next=protected-access
             frames = sys._current_frames()[thread_id]
-            for f in frames:
-                logger.info("\n".join(traceback.format_stack(f)))
+            logger.info("".join(traceback.format_stack(frames)))
             logger.info("")
         logger.info("")
 
@@ -71,7 +72,7 @@ class Watchdog:
             logger.info("Task ID: %d", id(task))
             frames = task.get_stack()
             for f in frames:
-                logger.info("\n".join(traceback.format_stack(f)))
+                logger.info("".join(traceback.format_stack(f)))
             logger.info("")
         logger.info("")
 
