@@ -6,6 +6,7 @@ import time
 import ssl
 import multiprocessing as mp
 import redshift_connector.error as redshift_errors
+import struct
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import timedelta
 from ddsketch import DDSketch
@@ -266,6 +267,8 @@ class BradFrontEnd(BradInterface):
         while True:
             try:
                 session_id, _ = await self._sessions.create_new_session()
+                if self._verbose_logger is not None:
+                    self._verbose_logger.info("New session started %d", session_id)
                 return session_id
             except ConnectionFailed:
                 if rand_backoff is None:
@@ -287,6 +290,8 @@ class BradFrontEnd(BradInterface):
 
     async def end_session(self, session_id: SessionId) -> None:
         await self._sessions.end_session(session_id)
+        if self._verbose_logger is not None:
+            self._verbose_logger.info("Session ended %d", session_id)
 
     # pylint: disable-next=invalid-overridden-method
     async def run_query(
@@ -371,6 +376,7 @@ class BradFrontEnd(BradInterface):
                 redshift_errors.InterfaceError,
                 ssl.SSLEOFError,
                 IndexError,  # Occurs during Redshift restarts.
+                struct.error,  # Occurs during Redshift restarts.
             ) as ex:
                 is_transient_error = False
                 if connection.is_connection_lost_error(ex):
@@ -594,7 +600,11 @@ class BradFrontEnd(BradInterface):
                     self._txn_latency_sketch,
                     self._query_latency_sketch,
                 )
-                logger.debug(
+                if self._verbose_logger is not None:
+                    logging_fn = self._verbose_logger.info
+                else:
+                    logging_fn = logger.debug
+                logging_fn(
                     "Sending metrics report: txn_completions_per_s: %.2f", sampled_thpt
                 )
                 self._output_queue.put_nowait(metrics_report)
