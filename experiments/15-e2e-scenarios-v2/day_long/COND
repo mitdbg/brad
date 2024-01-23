@@ -22,6 +22,38 @@ run_command(
   },
 )
 
+# N.B. We cannot actually run this complete workload because the client count is
+# not monotonic (assumption made in the runner). That's why this is a command.
+run_command(
+  name="brad_100g_debug_peak",
+  run="./run_workload_debug.sh",
+  options={
+    "system-config-file": "day_long_config_debug.yml",
+    "physical-config-file": "config/physical_config_100gb_dl.yml",
+    "schema-name": "imdb_extended_100g",
+    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+    "num-front-ends": 10,
+    "dataset-type": "100gb",
+    **DATASET_PATHS,
+    "snowset-client-dist-path": "../../../workloads/IMDB_100GB/regular_test/num_client_peak_first.pkl",
+  },
+)
+
+run_experiment(
+  name="brad_100g_fast_start",
+  run="./run_workload.sh",
+  options={
+    "system-config-file": "day_long_config.yml",
+    "physical-config-file": "config/physical_config_100gb_dl.yml",
+    "schema-name": "imdb_extended_100g",
+    "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
+    "num-front-ends": 10,
+    "dataset-type": "100gb",
+    **DATASET_PATHS,
+    "snowset-client-dist-path": "../../../workloads/IMDB_100GB/regular_test/num_client_up_fast.pkl",
+  },
+)
+
 run_experiment(
   name="brad_100g",
   run="./run_workload.sh",

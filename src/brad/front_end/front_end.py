@@ -35,6 +35,7 @@ from brad.front_end.brad_interface import BradInterface
 from brad.front_end.errors import QueryError
 from brad.front_end.grpc import BradGrpc
 from brad.front_end.session import SessionManager, SessionId, Session
+from brad.front_end.watchdog import Watchdog
 from brad.provisioning.directory import Directory
 from brad.query_rep import QueryRep
 from brad.routing.abstract_policy import AbstractRoutingPolicy
@@ -156,6 +157,13 @@ class BradFrontEnd(BradInterface):
         else:
             self._verbose_logger = None
 
+        # Used for debug purposes.
+        # We print the system state if the front end becomes unresponsive for >= 5 mins.
+        self._watchdog = Watchdog(
+            check_period=timedelta(minutes=1), take_action_after=timedelta(minutes=5)
+        )
+        self._ping_watchdog_task: Optional[asyncio.Task[None]] = None
+
     async def serve_forever(self):
         await self._run_setup()
         try:
@@ -199,6 +207,8 @@ class BradFrontEnd(BradInterface):
         self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
 
         self._qlogger_refresh_task = asyncio.create_task(self._refresh_qlogger())
+        self._watchdog.start(asyncio.get_running_loop())
+        self._ping_watchdog_task = asyncio.create_task(self._ping_watchdog())
 
     async def _set_up_router(self) -> None:
         # We have different routing policies for performance evaluation and
@@ -261,6 +271,11 @@ class BradFrontEnd(BradInterface):
         if self._qlogger_refresh_task is not None:
             self._qlogger_refresh_task.cancel()
             self._qlogger_refresh_task = None
+
+        self._watchdog.stop()
+        if self._ping_watchdog_task is not None:
+            self._ping_watchdog_task.cancel()
+            self._ping_watchdog_task = None
 
     async def start_session(self) -> SessionId:
         rand_backoff = None
@@ -648,6 +663,15 @@ class BradFrontEnd(BradInterface):
             # Run one last refresh before exiting to ensure any remaining log
             # files are uploaded.
             await self._qhandler.refresh()
+
+    async def _ping_watchdog(self) -> None:
+        try:
+            while True:
+                await asyncio.sleep(60.0)  # TODO: Hardcoded
+                self._watchdog.ping()
+        except Exception as ex:
+            if not isinstance(ex, asyncio.CancelledError):
+                logger.exception("Watchdog ping task encountered exception.")
 
     async def _run_blueprint_update(
         self, version: int, updated_directory: Directory
