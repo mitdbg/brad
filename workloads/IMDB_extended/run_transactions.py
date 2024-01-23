@@ -214,7 +214,7 @@ async def runner_impl(
                         worker_idx,
                         abort_rate,
                     )
-        except:
+        except:  # pylint: disable=bare-except
             logger.exception(
                 "[T %d] Unexpected error when handling transaction result.", worker_idx
             )

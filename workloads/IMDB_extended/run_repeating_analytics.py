@@ -267,7 +267,7 @@ async def runner_impl(
                     file=file,
                     flush=True,
                 )
-            except:
+            except:  # pylint: disable=bare-except
                 logger.exception(
                     "[RA %d] Unexpected exception when handling query result.",
                     runner_idx,
