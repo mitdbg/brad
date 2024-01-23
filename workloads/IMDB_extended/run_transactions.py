@@ -281,7 +281,7 @@ async def runner_impl(
                 submitted = inflight_runner.submit(txn_fn)
                 if submitted:
                     break
-                logger.warning(
+                verbose_logger.info(
                     "[T %d] Ran out of issue slots. Waiting for next slot to free up.",
                     worker_idx,
                 )
