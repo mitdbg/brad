@@ -18,8 +18,8 @@ sleep 30
 log_workload_point "clients_starting"
 
 clients_multiplier=1
-time_scale_factor=1
-run_for_s=$((24 * 60 * 60))
+time_scale_factor=2
+run_for_s=$((12 * 60 * 60))
 
 # Repeating analytics.
 start_snowset_repeating_olap_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "ra" $run_for_s
