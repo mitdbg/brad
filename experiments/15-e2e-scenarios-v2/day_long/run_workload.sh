@@ -32,7 +32,7 @@ txn_pid=$runner_pid
 # Ad-hoc queries.
 # 2 clients, issuing once per 8 minutes on average with a standard deviation of
 # 2 minutes.
-start_sequence_runner 2 $((8 * 60)) $((2 * 60)) "adhoc" $issue_slots
+start_sequence_runner 2 $((8 * 60)) $((2 * 60)) "adhoc" 0 $issue_slots
 adhoc_pid=$runner_pid
 
 log_workload_point "clients_started"
