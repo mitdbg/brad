@@ -122,6 +122,7 @@ function start_repeating_olap_runner() {
   local query_indexes=$4
   local results_name=$5
   local client_offset=$6
+  local issue_slots=$7
 
   local args=(
     --num-clients $ra_clients
@@ -130,8 +131,11 @@ function start_repeating_olap_runner() {
     --query-bank-file $ra_query_bank_file
     --avg-gap-s $ra_gap_s
     --avg-gap-std-s $ra_gap_std_s
-    --issue-slots 5
   )
+
+  if [[ ! -z $issue_slots ]]; then
+    args+=(--issue-slots $issue_slots)
+  fi
 
   if [[ ! -z $ra_query_frequency_path ]]; then
     args+=(--query-frequency-path $ra_query_frequency_path)
@@ -158,6 +162,7 @@ function start_snowset_repeating_olap_runner() {
   local client_multiplier=$3
   local results_name=$4
   local run_for_s=$5
+  local issue_slots=$6
 
   local args=(
     --num-clients $ra_clients
@@ -169,10 +174,14 @@ function start_snowset_repeating_olap_runner() {
     --time-scale-factor $time_scale_factor
     --num-client-multiplier $client_multiplier
     --run-for-s $run_for_s
-    --issue-slots 5
   )
 
-  >&2 echo "[Snowset Repeating Analytics] Running with up to $ra_clients. Time scale factor $time_scale_factor"
+  if [[ ! -z $issue_slots ]]; then
+    >&2 echo "[Snowset Repeating Analytics] Issue slots $issue_slots."
+    args+=(--issue-slots $issue_slots)
+  fi
+
+  >&2 echo "[Snowset Repeating Analytics] Running with up to $ra_clients. Time scale factor $time_scale_factor."
   results_dir=$COND_OUT/$results_name
   mkdir -p $results_dir
 
@@ -204,6 +213,7 @@ function run_repeating_olap_warmup() {
 function start_txn_runner() {
   t_clients=$1
   client_offset=$2
+  issue_slots=$3
 
   >&2 echo "[Transactions] Running with $t_clients..."
   results_dir=$COND_OUT/t_${t_clients}
@@ -212,12 +222,15 @@ function start_txn_runner() {
   local args=(
     --num-clients $t_clients
     --num-front-ends $num_front_ends
-    --issue-slots 5
     --avg-gap-s 0.025
     --avg-gap-std-s 0.002
     # --scale-factor $txn_scale_factor
     # --dataset-type $dataset_type
   )
+
+  if [[ ! -z $issue_slots ]]; then
+    args+=(--issue-slots $issue_slots)
+  fi
 
   if [[ ! -z $client_offset ]]; then
     args+=(--client-offset $client_offset)
@@ -237,6 +250,7 @@ function start_snowset_txn_runner() {
   local client_multiplier=$3
   local results_name=$4
   local run_for_s=$5
+  local issue_slots=$6
 
   >&2 echo "[Snowset Transactions] Running with $t_clients..."
   results_dir=$COND_OUT/${results_name}
@@ -249,10 +263,14 @@ function start_snowset_txn_runner() {
     --time-scale-factor $time_scale_factor
     --num-client-multiplier $client_multiplier
     --run-for-s $run_for_s
-    --issue-slots 5
     --avg-gap-s 0.025
     --avg-gap-std-s 0.002
   )
+
+  if [[ ! -z $issue_slots ]]; then
+    >&2 echo "[Snowset Transactions] Running with $issue_slots slots..."
+    args+=(--issue-slots $issue_slots)
+  fi
 
   log_workload_point "txn_${t_clients}"
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions.py \
@@ -268,6 +286,7 @@ function start_other_repeating_runner() {
   local gap_std_s=$3
   local results_name=$4
   local client_offset=$5
+  local issue_slots=$6
 
   local args=(
     --num-clients $clients
@@ -275,8 +294,12 @@ function start_other_repeating_runner() {
     --query-bank-file $other_query_bank_file
     --avg-gap-s $gap_s
     --avg-gap-std-s $gap_std_s
-    --issue-slots 5
   )
+
+  if [[ ! -z $issue_slots ]]; then
+    >&2 echo "[Other queries] Running with $issue_slots slots..."
+    args+=(--issue-slots $issue_slots)
+  fi
 
   if [[ ! -z $client_offset ]]; then
     args+=(--client-offset $client_offset)
@@ -299,6 +322,7 @@ function start_sequence_runner() {
   local gap_std_s=$3
   local results_name=$4
   local client_offset=$5
+  local issue_slots=$6
 
   local args=(
     --num-clients $clients
@@ -306,8 +330,12 @@ function start_sequence_runner() {
     --query-sequence-file $query_sequence_file
     --avg-gap-s $gap_s
     --avg-gap-std-s $gap_std_s
-    --issue-slots 5
   )
+
+  if [[ ! -z $issue_slots ]]; then
+    >&2 echo "[Sequence runner] Running with $issue_slots slots..."
+    args+=(--issue-slots $issue_slots)
+  fi
 
   if [[ ! -z $client_offset ]]; then
     args+=(--client-offset $client_offset)

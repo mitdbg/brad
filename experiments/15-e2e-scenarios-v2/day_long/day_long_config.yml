@@ -162,4 +162,5 @@ triggers:
     sustained_epochs: 3
 
   recent_change:
+    disabled: true
     delay_epochs: 5
