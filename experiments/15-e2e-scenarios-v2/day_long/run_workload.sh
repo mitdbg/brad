@@ -19,19 +19,20 @@ log_workload_point "clients_starting"
 clients_multiplier=1
 time_scale_factor=2
 run_for_s=$((12 * 60 * 60))  # 12 hours.
+issue_slots=5
 
 # Repeating analytics.
-start_snowset_repeating_olap_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "ra" $run_for_s
+start_snowset_repeating_olap_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "ra" $run_for_s $issue_slots
 rana_pid=$runner_pid
 
 # Transactions.
-start_snowset_txn_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "t" $run_for_s
+start_snowset_txn_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "t" $run_for_s 1  # NOTE: 1
 txn_pid=$runner_pid
 
 # Ad-hoc queries.
 # 2 clients, issuing once per 8 minutes on average with a standard deviation of
 # 2 minutes.
-start_sequence_runner 2 $((8 * 60)) $((2 * 60)) "adhoc"
+start_sequence_runner 2 $((8 * 60)) $((2 * 60)) "adhoc" $issue_slots
 adhoc_pid=$runner_pid
 
 log_workload_point "clients_started"
