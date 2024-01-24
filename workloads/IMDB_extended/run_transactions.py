@@ -188,8 +188,9 @@ async def runner_impl(
 
                 else:
                     logger.error(
-                        "[T %d] Encountered an unexpected `BradClientError`.",
+                        "[T %d] Encountered an unexpected `BradClientError`: %s",
                         worker_idx,
+                        str(ex),
                     )
                 return
 

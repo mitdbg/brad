@@ -83,6 +83,8 @@ _CONNECTION_LOST_ERR_CODES = [
 
 
 _CONNECTION_LOST_PHRASES = [
+    "the connection is lost",
+    "consuming input failed: EOF detected",
     "server closed the connection unexpectedly",
     "connection has been lost",
     "connection lost",
