@@ -41,6 +41,7 @@ INSTALL_REQUIRES = [
     "PyAthena",
     "ddsketch",
     "tqdm",
+    "psycopg[binary]",
 ]
 
 DEV_REQUIRES = [

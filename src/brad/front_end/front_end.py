@@ -6,6 +6,7 @@ import time
 import ssl
 import multiprocessing as mp
 import redshift_connector.error as redshift_errors
+import psycopg
 import struct
 from typing import AsyncIterable, Optional, Dict, Any
 from datetime import timedelta
@@ -391,9 +392,12 @@ class BradFrontEnd(BradInterface):
                 pyodbc.Error,
                 pyodbc.OperationalError,
                 redshift_errors.InterfaceError,
-                ssl.SSLEOFError,
+                ssl.SSLEOFError,  # Occurs during Redshift restarts.
                 IndexError,  # Occurs during Redshift restarts.
                 struct.error,  # Occurs during Redshift restarts.
+                psycopg.Error,
+                psycopg.OperationalError,
+                psycopg.ProgrammingError,
             ) as ex:
                 is_transient_error = False
                 if connection.is_connection_lost_error(ex):
@@ -442,10 +446,15 @@ class BradFrontEnd(BradInterface):
                 results = [tuple(row) for row in cursor.fetchall_sync()]
                 log_verbose(logger, "Responded with %d rows.", len(results))
                 return results
-            except pyodbc.ProgrammingError:
+            except (pyodbc.ProgrammingError, psycopg.ProgrammingError):
                 log_verbose(logger, "No rows produced.")
                 return []
-            except (pyodbc.Error, pyodbc.OperationalError) as ex:
+            except (
+                pyodbc.Error,
+                pyodbc.OperationalError,
+                psycopg.Error,
+                psycopg.OperationalError,
+            ) as ex:
                 is_transient_error = False
                 if connection.is_connection_lost_error(ex):
                     connection.mark_connection_lost()
