@@ -220,6 +220,7 @@ class EngineConnections:
 
         for engine, conn in curr_connections:
             if conn.is_connected():
+                report.bump_still_connected(engine)
                 continue
             try:
                 new_conn = await ConnectionFactory.connect_to(
@@ -246,6 +247,7 @@ class EngineConnections:
             new_replica_conns = []
             for replica_idx, conn in enumerate(curr_replica_conns):
                 if conn.is_connected():
+                    report.bump_still_connected(Engine.Aurora)
                     continue
                 try:
                     new_conn = await ConnectionFactory.connect_to(
