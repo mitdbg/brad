@@ -138,7 +138,7 @@ def get_run_query(
     def _run_query(db: Database) -> QueryResult:
         try:
             start = time.time()
-            _, engine = db.execute_sync_with_engine(query)
+            db.execute_sync_with_engine(query)
             end = time.time()
             return QueryResult(
                 error=None,
