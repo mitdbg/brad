@@ -232,7 +232,10 @@ async def runner_impl(
                 print(f"QUERY ERROR: {ex}", file=sys.stderr, flush=True)
                 if ex.is_transient():
                     verbose_logger.warning("Transient query error: %s", ex.message())
-
+                    if "syntax" in ex.message().lower():
+                        verbose_logger.warning(f"SYNTAX ERROR: {ex}")
+                        print("SYNTAX ERROR", file=sys.stderr, flush=True)
+                        exit(1)
                     if bh.backoff is None:
                         bh.backoff = RandomizedExponentialBackoff(
                             max_retries=100,

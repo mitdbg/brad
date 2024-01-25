@@ -58,7 +58,7 @@ def make_tidb_conn():
             allow_local_infile=True,
         )
         cur = conn.cursor()
-        cur.execute("SET sql_mode = 'ANSI';")
+        cur.execute("SET SESSION sql_mode = 'REAL_AS_FLOAT,PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ONLY_FULL_GROUP_BY,ANSI';")
         conn.commit()
         cur.close()
         return conn

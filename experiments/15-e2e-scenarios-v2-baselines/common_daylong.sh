@@ -75,7 +75,7 @@ function start_snowset_repeating_olap_runner() {
     --baseline $ANALYTICS_ENGINE
     --run-for-s $run_for_s
     --output-dir $results_dir
-    --issue-slots 5
+    --issue-slots $analytics_issue_slots
   )
 
   >&2 echo "[Snowset Repeating Analytics] Running with $ra_clients..."
@@ -108,7 +108,7 @@ function start_snowset_txn_runner() {
     --output-dir $results_dir \
     --run-for-s $run_for_s \
     --baseline $TRANSACTION_ENGINE \
-    --issue-slots 5 \
+    --issue-slots $txn_issue_slots \
     --avg-gap-s 0.025 \
     --avg-gap-std-s 0.002 \
     &
@@ -134,7 +134,7 @@ function start_sequence_runner() {
     --avg-gap-std-s $gap_std_s
     --baseline $ANALYTICS_ENGINE
     --output-dir $results_dir
-    --issue-slots 5
+    --issue-slots $analytics_issue_slots
   )
 
   >&2 echo "[Seq Analytics] Running with $num_clients..."

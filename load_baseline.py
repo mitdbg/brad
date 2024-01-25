@@ -44,8 +44,8 @@ def main():
         )
     if args.metrics:
         from datetime import datetime, timedelta
-        start_time = datetime(year=2023, month=12, day=27, hour=14, minute=17)
-        end_time = datetime(year=2023, month=12, day=28, hour=2, minute=22)
+        start_time = datetime(year=2024, month=1, day=22, hour=13, minute=38, second=10)
+        end_time = datetime(year=2024, month=1, day=23, hour=1, minute=43, second=10)
         outdir = "expt_out_daylong_redshift_aurora"
         df = loader.fetch_metrics(start_time=start_time, end_time=end_time)
         # Write to csv
