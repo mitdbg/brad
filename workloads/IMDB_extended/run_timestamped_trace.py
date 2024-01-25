@@ -23,6 +23,7 @@ from brad.utils import set_up_logging, create_custom_logger
 logger = logging.getLogger(__name__)
 EXECUTE_START_TIME = datetime.now().astimezone(pytz.utc)
 ENGINE_NAMES = ["ATHENA", "AURORA", "REDSHIFT"]
+SIMULATION = False
 
 STARTUP_FAILED = "startup_failed"
 
@@ -220,6 +221,9 @@ async def runner_impl(
     db_conns: List[Database] = []
     try:
         for slot_idx in range(args.issue_slots):
+            if SIMULATION:
+                db_conns.append(None)
+                continue
             db_conns.append(
                 connect_to_db(
                     args,
@@ -257,7 +261,7 @@ async def runner_impl(
         logger.info(
             "[Trace Runner %d] Queries to run: %d. Dataset: %s",
             runner_idx,
-            len(our_trace),
+            total_items,
             our_trace["dataset"],
         )
 
@@ -314,7 +318,8 @@ async def runner_impl(
             verbose_logger.info(
                 "Waiting %.2f s before issuing query index %d", issue_gap_s, qidx
             )
-            await inflight_runner.wait_for_s(issue_gap_s)
+            if not SIMULATION:
+                await inflight_runner.wait_for_s(issue_gap_s)
 
             now = datetime.now().astimezone(pytz.utc)
             if args.time_scale_factor is not None:
@@ -334,6 +339,8 @@ async def runner_impl(
                 time_unsimulated_str,
             )
             while True:
+                if SIMULATION:
+                    break
                 was_submitted = inflight_runner.submit(run_query_fn)
                 if was_submitted:
                     break
@@ -344,14 +351,17 @@ async def runner_impl(
                 await inflight_runner.wait_until_next_slot_is_free()
 
             if index % 100 == 0:
-                verbose_logger.info("Progress %d / %d", index, total_items)
+                verbose_logger.info(
+                    "[Trace %d] Progress %d / %d", runner_idx, index, total_items
+                )
 
     finally:
         await inflight_runner.wait_until_complete()
         os.fsync(file.fileno())
         file.close()
-        for db in db_conns:
-            db.close_sync()
+        if not SIMULATION:
+            for db in db_conns:
+                db.close_sync()
         logger.info("[Trace] Runner %d has exited.", runner_idx)
 
 
@@ -390,9 +400,10 @@ def main():
     )
     parser.add_argument("--run-for-s", type=int, help="If set, run for this long.")
     parser.add_argument(
-        "--ff-trace-clients",
+        "--time-scale-factor",
         type=int,
-        help="Start the client trace at the given number of clients. Used for debugging only.",
+        default=2,
+        help="trace 1s of simulation as X seconds in real-time to match the num-concurrent-query",
     )
     parser.add_argument("--issue-slots", type=int, default=10)
     parser.add_argument("--trace-manifest", type=str, required=True)
