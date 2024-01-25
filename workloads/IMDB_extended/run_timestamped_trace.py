@@ -269,12 +269,7 @@ async def runner_impl(
             try:
                 if result.error is not None:
                     ex = result.error
-                    if ex.is_transient():
-                        verbose_logger.warning(
-                            "Transient query error: %s", ex.message()
-                        )
-                    else:
-                        logger.error("Unexpected query error: %s", ex.message())
+                    logger.error("Unexpected query error: %s", ex.message())
                     return
 
                 # Record execution result.
@@ -292,7 +287,7 @@ async def runner_impl(
                 )
             except:  # pylint: disable=bare-except
                 logger.exception(
-                    "[RA %d] Unexpected exception when handling query result.",
+                    "[Trace Runner %d] Unexpected exception when handling query result.",
                     runner_idx,
                 )
 
