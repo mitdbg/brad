@@ -305,6 +305,8 @@ async def runner_impl(
         start_queue.put_nowait("")
         control_semaphore.acquire()  # type: ignore
 
+        timepoint = time.time()
+
         for index, row in our_trace["trace"].iterrows():
             # Note that `False` means to not block.
             should_exit = control_semaphore.acquire(False)  # type: ignore
@@ -315,11 +317,19 @@ async def runner_impl(
             qidx = row["query_idx"]
             issue_gap_s = row["g_issue_gap_s"]
             query_sql = our_query_bank[qidx]
+            delta = time.time() - timepoint  # Used to adjust for delays.
+            issue_gap_s_orig = issue_gap_s
+            issue_gap_s -= delta
             verbose_logger.info(
-                "Waiting %.2f s before issuing query index %d", issue_gap_s, qidx
+                "Waiting %.2f s (orig: %.2f s) before issuing query index %d",
+                issue_gap_s,
+                issue_gap_s_orig,
+                qidx,
             )
             if not SIMULATION:
-                await inflight_runner.wait_for_s(issue_gap_s)
+                if issue_gap_s > 0.0:
+                    await inflight_runner.wait_for_s(issue_gap_s)
+            timepoint = time.time()
 
             now = datetime.now().astimezone(pytz.utc)
             if args.time_scale_factor is not None:
