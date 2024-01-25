@@ -2,7 +2,6 @@ from typing import Dict, Optional
 
 from .connection import Connection, ConnectionFailed
 from .odbc_connection import OdbcConnection
-from .psycopg_connection import PsycopgConnection
 from .pyathena_connection import PyAthenaConnection
 from .redshift_connection import RedshiftConnection
 from brad.config.file import ConfigFile
@@ -48,15 +47,10 @@ class ConnectionFactory:
                     )
                 instance = aurora_readers[aurora_read_replica]
                 address, port = instance.endpoint()
-            cstr = cls._pg_aurora_psycopg_connection_string(
-                address,
-                port,
-                connection_details,
-                schema_name,
-                timeout_s,
-                statement_timeout_s=200,
+            cstr = cls._pg_aurora_odbc_connection_string(
+                address, port, connection_details, schema_name
             )
-            return await PsycopgConnection.connect(cstr, autocommit)
+            return await OdbcConnection.connect(cstr, autocommit, timeout_s)
         elif engine == Engine.Athena:
             return await PyAthenaConnection.connect(
                 aws_region=connection_details["aws_region"],
@@ -99,15 +93,10 @@ class ConnectionFactory:
                 else directory.aurora_readers()[aurora_read_replica]
             )
             address, port = instance.endpoint()
-            cstr = cls._pg_aurora_psycopg_connection_string(
-                address,
-                port,
-                connection_details,
-                schema_name,
-                timeout_s,
-                statement_timeout_s=200,
+            cstr = cls._pg_aurora_odbc_connection_string(
+                address, port, connection_details, schema_name
             )
-            return PsycopgConnection.connect_sync(cstr, autocommit)
+            return OdbcConnection.connect_sync(cstr, autocommit, timeout_s)
         elif engine == Engine.Athena:
             return PyAthenaConnection.connect_sync(
                 aws_region=connection_details["aws_region"],
