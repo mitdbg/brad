@@ -144,7 +144,7 @@ def get_run_query(
                 error=None,
                 timestamp=timestamp,
                 run_time_s=end - start,
-                engine=engine.value,
+                engine=None,
                 query_idx=query_idx,
                 time_since_execution_s=time_since_execution,
                 time_of_day=time_of_day,
@@ -269,7 +269,7 @@ async def runner_impl(
             try:
                 if result.error is not None:
                     ex = result.error
-                    logger.error("Unexpected query error: %s", ex.message())
+                    logger.error("Unexpected query error: %s", str(ex))
                     return
 
                 # Record execution result.
