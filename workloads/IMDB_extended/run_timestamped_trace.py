@@ -37,8 +37,14 @@ QueryResult = namedtuple(
         "query_idx",
         "time_since_execution_s",
         "time_of_day",
+        "db",
     ],
 )
+
+connection_lost_phrases = [
+    "server socket closed",
+    "connection has been closed",
+]
 
 
 def load_trace(
@@ -148,6 +154,7 @@ def get_run_query(
                 query_idx=query_idx,
                 time_since_execution_s=time_since_execution,
                 time_of_day=time_of_day,
+                db=db,
             )
         except Exception as ex:
             return QueryResult(
@@ -158,6 +165,7 @@ def get_run_query(
                 query_idx=query_idx,
                 time_since_execution_s=time_since_execution,
                 time_of_day=time_of_day,
+                db=db,
             )
 
     return _run_query
@@ -269,7 +277,16 @@ async def runner_impl(
             try:
                 if result.error is not None:
                     ex = result.error
-                    logger.error("Unexpected query error: %s", str(ex))
+                    logger.error(
+                        "[Trace Runner %d] Unexpected query error: %s",
+                        runner_idx,
+                        str(ex),
+                    )
+                    if not isinstance(ex, BradClientError):
+                        msg = str(ex)
+                        for phrase in connection_lost_phrases:
+                            if phrase in msg:
+                                db.reconnect()
                     return
 
                 # Record execution result.
@@ -409,6 +426,7 @@ def main():
     )
     parser.add_argument("--issue-slots", type=int, default=10)
     parser.add_argument("--trace-manifest", type=str, required=True)
+    parser.add_argument("--serverless-redshift", action="store_true")
     args = parser.parse_args()
 
     set_up_logging()
