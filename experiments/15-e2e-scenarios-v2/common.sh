@@ -135,6 +135,8 @@ function start_repeating_olap_runner() {
 
   if [[ ! -z $issue_slots ]]; then
     args+=(--issue-slots $issue_slots)
+  else
+    >&2 echo "RA - Running with default issue slots"
   fi
 
   if [[ ! -z $ra_query_frequency_path ]]; then
@@ -179,6 +181,8 @@ function start_snowset_repeating_olap_runner() {
   if [[ ! -z $issue_slots ]]; then
     >&2 echo "[Snowset Repeating Analytics] Issue slots $issue_slots."
     args+=(--issue-slots $issue_slots)
+  else
+    >&2 echo "Snowset RA - Running with default issue slots"
   fi
 
   >&2 echo "[Snowset Repeating Analytics] Running with up to $ra_clients. Time scale factor $time_scale_factor."
@@ -222,14 +226,14 @@ function start_txn_runner() {
   local args=(
     --num-clients $t_clients
     --num-front-ends $num_front_ends
-    --avg-gap-s 0.025
-    --avg-gap-std-s 0.002
     # --scale-factor $txn_scale_factor
     # --dataset-type $dataset_type
   )
 
   if [[ ! -z $issue_slots ]]; then
     args+=(--issue-slots $issue_slots)
+  else
+    >&2 echo "Txn - Running with default issue slots"
   fi
 
   if [[ ! -z $client_offset ]]; then
@@ -263,13 +267,13 @@ function start_snowset_txn_runner() {
     --time-scale-factor $time_scale_factor
     --num-client-multiplier $client_multiplier
     --run-for-s $run_for_s
-    --avg-gap-s 0.025
-    --avg-gap-std-s 0.002
   )
 
   if [[ ! -z $issue_slots ]]; then
     >&2 echo "[Snowset Transactions] Running with $issue_slots slots..."
     args+=(--issue-slots $issue_slots)
+  else
+    >&2 echo "Snowset Txns - Running with default issue slots"
   fi
 
   log_workload_point "txn_${t_clients}"
@@ -299,6 +303,8 @@ function start_other_repeating_runner() {
   if [[ ! -z $issue_slots ]]; then
     >&2 echo "[Other queries] Running with $issue_slots slots..."
     args+=(--issue-slots $issue_slots)
+  else
+    >&2 echo "Other RA - Running with default issue slots"
   fi
 
   if [[ ! -z $client_offset ]]; then
@@ -335,6 +341,8 @@ function start_sequence_runner() {
   if [[ ! -z $issue_slots ]]; then
     >&2 echo "[Sequence runner] Running with $issue_slots slots..."
     args+=(--issue-slots $issue_slots)
+  else
+    >&2 echo "Sequence Runner - Running with default issue slots"
   fi
 
   if [[ ! -z $client_offset ]]; then
