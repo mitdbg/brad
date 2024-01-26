@@ -179,7 +179,7 @@ class RedshiftProvisioningScore:
                 # When this value is close to 0, it indicates high load skew.
                 # Thus adding an instance of the same kind of node should not
                 # affect the load as much.
-                if ctx.cpu_skew_adjustment < 0.5:
+                if ctx.cpu_skew_adjustment < 0.8:
                     next_max_cpu_denorm = curr_max_cpu_denorm
                 else:
                     next_max_cpu_denorm = curr_max_cpu_denorm * math.pow(
