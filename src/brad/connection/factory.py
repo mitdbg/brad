@@ -159,3 +159,21 @@ class ConnectionFactory:
         if schema_name is not None:
             cstr += "Schema={};".format(schema_name)
         return cstr
+
+    @staticmethod
+    def _pg_aurora_psycopg_connection_string(
+        address: str,
+        port: int,
+        connection_details: Dict[str, str],
+        schema_name: Optional[str],
+        timeout_s: Optional[int],
+        statement_timeout_s: Optional[int],
+    ) -> str:
+        cstr = f"host={address} port={port} user={connection_details['user']} password={connection_details['password']}"
+        if schema_name is not None:
+            cstr += f" dbname={schema_name}"
+        if timeout_s is not None:
+            cstr += f" connect_timeout={int(timeout_s)}"
+        if statement_timeout_s is not None:
+            cstr += f" options='-c statement_timeout={statement_timeout_s}s'"
+        return cstr

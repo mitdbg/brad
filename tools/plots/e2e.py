@@ -36,10 +36,15 @@ class RecordedRun:
                 continue
             clients = int(inner.name.split("_")[1])
             oltp_stats, oltp_ind_lats = _load_txn_data(inner, clients)
-            stats.append(oltp_stats)
-            ind_lats.append(oltp_ind_lats)
+            if oltp_stats is not None:
+                stats.append(oltp_stats)
+            if oltp_ind_lats is not None:
+                ind_lats.append(oltp_ind_lats)
 
-        oltp_stats = pd.concat(stats).sort_values(by=["num_clients"])
+        if len(stats) > 0:
+            oltp_stats = pd.concat(stats).sort_values(by=["num_clients"])
+        else:
+            oltp_stats = pd.DataFrame.empty
         oltp_ind_lats = pd.concat(ind_lats)
 
         all_olap = []
@@ -56,16 +61,21 @@ class RecordedRun:
                 else:
                     clients = int(name_parts[1])
             for c in range(clients):
-                olap_inner = pd.read_csv(
-                    inner / "repeating_olap_batch_{}.csv".format(c)
-                )
-                olap_inner["timestamp"] = pd.to_datetime(
-                    olap_inner["timestamp"], format="mixed"
-                )
-                olap_inner["timestamp"] = olap_inner["timestamp"].dt.tz_localize(None)
-                olap_inner.insert(0, "num_clients", clients)
-                olap_inner.insert(1, "qtype", "repeating")
-                all_olap.append(olap_inner)
+                try:
+                    olap_inner = pd.read_csv(
+                        inner / "repeating_olap_batch_{}.csv".format(c)
+                    )
+                    olap_inner["timestamp"] = pd.to_datetime(
+                        olap_inner["timestamp"], format="mixed"
+                    )
+                    olap_inner["timestamp"] = olap_inner["timestamp"].dt.tz_localize(
+                        None
+                    )
+                    olap_inner.insert(0, "num_clients", clients)
+                    olap_inner.insert(1, "qtype", "repeating")
+                    all_olap.append(olap_inner)
+                except pd.errors.EmptyDataError:
+                    pass
 
         for inner in base.iterdir():
             if not inner.is_dir() or not inner.name.startswith("adhoc"):
@@ -502,40 +512,48 @@ def _load_txn_data(
     all_stats = []
 
     for exp_file in data_dir.iterdir():
-        if exp_file.name.startswith("oltp_latency_"):
-            df = pd.read_csv(exp_file)
-            df.pop("txn_idx")
-            df.insert(0, "num_clients", num_clients)
-            all_lats.append(df)
+        try:
+            if exp_file.name.startswith("oltp_latency_"):
+                df = pd.read_csv(exp_file)
+                df.pop("txn_idx")
+                df.insert(0, "num_clients", num_clients)
+                all_lats.append(df)
 
-        elif exp_file.name.startswith("oltp_stats_"):
-            stats_df = pd.read_csv(exp_file)
-            stats_df = stats_df.pivot_table(index=None, columns="stat", values="value")
-            stats_df.index.name = None
-            stats_df.insert(0, "num_clients", num_clients)
-            all_stats.append(stats_df)
+            elif exp_file.name.startswith("oltp_stats_"):
+                stats_df = pd.read_csv(exp_file)
+                stats_df = stats_df.pivot_table(
+                    index=None, columns="stat", values="value"
+                )
+                stats_df.index.name = None
+                stats_df.insert(0, "num_clients", num_clients)
+                all_stats.append(stats_df)
+        except pd.errors.EmptyDataError:
+            pass
 
-    if len(all_lats) == 0 or len(all_stats) == 0:
-        return None, None
+    if len(all_lats) > 0:
+        comb_lats = pd.concat(all_lats, ignore_index=True)
+    else:
+        comb_lats = None
 
-    comb_lats = pd.concat(all_lats, ignore_index=True)
-
-    comb_stats = pd.concat(all_stats, ignore_index=True)
-    comb_stats = (
-        comb_stats.groupby("num_clients")
-        .agg(
-            {
-                "purchase_aborts": "sum",
-                "add_showing_aborts": "sum",
-                "edit_note_aborts": "sum",
-                "purchase_commits": "sum",
-                "add_showing_commits": "sum",
-                "edit_note_commits": "sum",
-                "overall_run_time_s": "max",
-            }
+    if len(all_stats) > 0:
+        comb_stats = pd.concat(all_stats, ignore_index=True)
+        comb_stats = (
+            comb_stats.groupby("num_clients")
+            .agg(
+                {
+                    "purchase_aborts": "sum",
+                    "add_showing_aborts": "sum",
+                    "edit_note_aborts": "sum",
+                    "purchase_commits": "sum",
+                    "add_showing_commits": "sum",
+                    "edit_note_commits": "sum",
+                    "overall_run_time_s": "max",
+                }
+            )
+            .reset_index()
         )
-        .reset_index()
-    )
+    else:
+        comb_stats = None
 
     return (comb_stats, comb_lats)
 

@@ -48,7 +48,7 @@ class RedshiftProvisioningScore:
 
         # Load adjustment factor.
         # TODO: Hardcoded SLO.
-        gamma = min(ctx.metrics.query_lat_s_p90 / 30.0 + 0.2, 1.0)
+        gamma = min(ctx.metrics.query_lat_s_p90 / 30.0, 1.0)
         debug_dict["redshift_gamma_factor"] = gamma
         if (
             ctx.metrics.redshift_cpu_list is not None
@@ -179,7 +179,7 @@ class RedshiftProvisioningScore:
                 # When this value is close to 0, it indicates high load skew.
                 # Thus adding an instance of the same kind of node should not
                 # affect the load as much.
-                if ctx.cpu_skew_adjustment < 0.5:
+                if ctx.cpu_skew_adjustment < 0.8:
                     next_max_cpu_denorm = curr_max_cpu_denorm
                 else:
                     next_max_cpu_denorm = curr_max_cpu_denorm * math.pow(

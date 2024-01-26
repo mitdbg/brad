@@ -263,64 +263,69 @@ class ScoringContext:
             Engine.Redshift
         )
         obs, obs_locs, obs_idx = self.next_workload.get_query_observations()
+        if obs_idx.shape[0] == 0:
+            logger.info("No queries in the workload.")
+            return
 
         # Process Redshift.
         is_redshift = np.where(obs_locs == Workload.EngineLatencyIndex[Engine.Redshift])
-        redshift_obs = obs[is_redshift]
-        redshift_qidx = obs_idx[is_redshift]
-        redshift_preds = redshift_preds_orig[redshift_qidx]
-        base = RedshiftProvisioningScore.predict_base_latency(
-            redshift_obs, self.current_blueprint.redshift_provisioning(), self
-        )
-        ratio = redshift_preds / base
-        # Queries where we have observations where the predictions are probably
-        # 5x larger and the predictions violate the SLOs.
-        hes = np.where((ratio > 5.0) & (redshift_preds > 30.0))
-        redshift_to_replace = redshift_qidx[hes]
-        logger.info(
-            "[Redshift Prediction Corrections] Replacing %d base predictions.",
-            len(redshift_to_replace),
-        )
-        if len(redshift_to_replace) > 0:
-            self.next_workload.apply_predicted_latency_corrections(
-                Engine.Redshift, redshift_to_replace, base[hes]
+        if is_redshift[0].sum() > 0:
+            redshift_obs = obs[is_redshift]
+            redshift_qidx = obs_idx[is_redshift]
+            redshift_preds = redshift_preds_orig[redshift_qidx]
+            base = RedshiftProvisioningScore.predict_base_latency(
+                redshift_obs, self.current_blueprint.redshift_provisioning(), self
             )
-            for i, qidx in enumerate(redshift_to_replace):
-                logger.info(
-                    "Replacing Redshift %d -- %s -- %.4f (Orig. pred. %.4f)",
-                    qidx,
-                    str(self.next_workload.lookup_query_for_debugging(qidx)),
-                    base[hes][i],
-                    redshift_preds[hes][i],
+            ratio = redshift_preds / base
+            # Queries where we have observations where the predictions are probably
+            # 5x larger and the predictions violate the SLOs.
+            hes = np.where((ratio > 3.0) & (redshift_preds > 30.0))
+            redshift_to_replace = redshift_qidx[hes]
+            logger.info(
+                "[Redshift Prediction Corrections] Replacing %d base predictions.",
+                len(redshift_to_replace),
+            )
+            if len(redshift_to_replace) > 0:
+                self.next_workload.apply_predicted_latency_corrections(
+                    Engine.Redshift, redshift_to_replace, base[hes]
                 )
+                for i, qidx in enumerate(redshift_to_replace):
+                    logger.info(
+                        "Replacing Redshift %d -- %s -- %.4f (Orig. pred. %.4f)",
+                        qidx,
+                        str(self.next_workload.lookup_query_for_debugging(qidx)),
+                        base[hes][i],
+                        redshift_preds[hes][i],
+                    )
 
         # Process Aurora.
         aurora_preds_orig = self.next_workload.get_predicted_analytical_latency_all(
             Engine.Aurora
         )
         is_aurora = np.where(obs_locs == Workload.EngineLatencyIndex[Engine.Aurora])
-        aurora_obs = obs[is_aurora]
-        aurora_qidx = obs_idx[is_aurora]
-        aurora_preds = aurora_preds_orig[aurora_qidx]
-        aurora_base = AuroraProvisioningScore.predict_base_latency(
-            aurora_obs, self.current_blueprint.aurora_provisioning(), self
-        )
-        aurora_ratio = aurora_preds / aurora_base
-        ahes = np.where((aurora_ratio > 5.0) & (aurora_preds > 30.0))
-        aurora_to_replace = aurora_qidx[ahes]
-        logger.info(
-            "[Aurora Prediction Corrections] Replacing %d base predictions.",
-            len(aurora_to_replace),
-        )
-        if len(aurora_to_replace) > 0:
-            self.next_workload.apply_predicted_latency_corrections(
-                Engine.Aurora, aurora_to_replace, aurora_base[ahes]
+        if is_aurora[0].sum() > 0:
+            aurora_obs = obs[is_aurora]
+            aurora_qidx = obs_idx[is_aurora]
+            aurora_preds = aurora_preds_orig[aurora_qidx]
+            aurora_base = AuroraProvisioningScore.predict_base_latency(
+                aurora_obs, self.current_blueprint.aurora_provisioning(), self
             )
-            for i, qidx in enumerate(aurora_to_replace):
-                logger.info(
-                    "Replacing Aurora %d -- %s -- %.4f (Orig. pred. %.4f)",
-                    qidx,
-                    str(self.next_workload.lookup_query_for_debugging(qidx)),
-                    aurora_base[ahes][i],
-                    aurora_preds[ahes][i],
+            aurora_ratio = aurora_preds / aurora_base
+            ahes = np.where((aurora_ratio > 5.0) & (aurora_preds > 30.0))
+            aurora_to_replace = aurora_qidx[ahes]
+            logger.info(
+                "[Aurora Prediction Corrections] Replacing %d base predictions.",
+                len(aurora_to_replace),
+            )
+            if len(aurora_to_replace) > 0:
+                self.next_workload.apply_predicted_latency_corrections(
+                    Engine.Aurora, aurora_to_replace, aurora_base[ahes]
                 )
+                for i, qidx in enumerate(aurora_to_replace):
+                    logger.info(
+                        "Replacing Aurora %d -- %s -- %.4f (Orig. pred. %.4f)",
+                        qidx,
+                        str(self.next_workload.lookup_query_for_debugging(qidx)),
+                        aurora_base[ahes][i],
+                        aurora_preds[ahes][i],
+                    )

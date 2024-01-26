@@ -1,6 +1,7 @@
 import asyncio
 import redshift_connector
 import redshift_connector.error as redshift_errors
+import struct
 from typing import Optional
 
 from .connection import Connection, ConnectionFailed
@@ -94,7 +95,7 @@ class RedshiftConnection(Connection):
     def is_connection_lost_error(self, ex: Exception) -> bool:
         if isinstance(ex, redshift_errors.InterfaceError):
             return True
-        if isinstance(ex, IndexError):
+        if isinstance(ex, IndexError) or isinstance(ex, struct.error):
             # Not ideal, but this happens inside the Redshift connector
             # (probably during a Redshift restart).
             return True

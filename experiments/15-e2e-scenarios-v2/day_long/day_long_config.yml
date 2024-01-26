@@ -93,7 +93,7 @@ redshift_min_load_removal_fraction: 0.9
 
 aurora_max_query_factor: 4.0
 aurora_max_query_factor_replace: 10000.0
-redshift_peak_load_threshold: 99.0
+redshift_peak_load_threshold: 96.0
 redshift_peak_load_multiplier: 1.5
 
 # Blueprint planning performance ceilings.
@@ -123,7 +123,7 @@ std_datasets:
 use_preset_redshift_clusters: false
 
 aurora_provisioning_search_distance: 700.0
-redshift_provisioning_search_distance: 900.0
+redshift_provisioning_search_distance: 5000.0
 
 planner_max_workers: 16
 
@@ -142,12 +142,12 @@ triggers:
   redshift_cpu:
     lo: 15
     hi: 85
-    sustained_epochs: 3
+    sustained_epochs: 6
 
   aurora_cpu:
     lo: 10
     hi: 85
-    sustained_epochs: 3
+    sustained_epochs: 6
 
   variable_costs:
     disabled: true
@@ -162,4 +162,5 @@ triggers:
     sustained_epochs: 3
 
   recent_change:
+    disabled: true
     delay_epochs: 5

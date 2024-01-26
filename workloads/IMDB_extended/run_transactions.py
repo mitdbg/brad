@@ -163,55 +163,64 @@ async def runner_impl(
         return _run_txn
 
     def handle_result(result: TxnResult) -> None:
-        # Record metrics.
-        bh.counter += 1
-        if result.error is None:
-            commits[txn_idx] += 1
-        else:
-            aborts[txn_idx] += 1
-
-        if result.error is not None:
-            ex = result.error
-            if ex.is_transient():
-                verbose_logger.warning("Transient txn error: %s", ex.message())
-
-                if bh.backoff is None:
-                    bh.backoff = RandomizedExponentialBackoff(
-                        max_retries=100,
-                        base_delay_s=0.1,
-                        max_delay_s=timedelta(minutes=1).total_seconds(),
-                    )
-                    bh.backoff_timestamp = datetime.now().astimezone(pytz.utc)
-                    logger.info(
-                        "[T %d] Backing off due to transient errors.",
-                        worker_idx,
-                    )
-
+        try:
+            # Record metrics.
+            bh.counter += 1
+            if result.error is None:
+                commits[txn_idx] += 1
             else:
-                logger.error(
-                    "[T %d] Encountered an unexpected `BradClientError`.", worker_idx
-                )
-            return
+                aborts[txn_idx] += 1
 
-        if txn_prng.random() < args.latency_sample_prob:
-            print(
-                "{},{},{}".format(result.txn_idx, result.timestamp, result.run_time_s),
-                file=latency_file,
+            if result.error is not None:
+                ex = result.error
+                if ex.is_transient():
+                    verbose_logger.warning("Transient txn error: %s", ex.message())
+
+                    if bh.backoff is None:
+                        bh.backoff = RandomizedExponentialBackoff(
+                            max_retries=100,
+                            base_delay_s=0.1,
+                            max_delay_s=timedelta(minutes=1).total_seconds(),
+                        )
+                        bh.backoff_timestamp = datetime.now().astimezone(pytz.utc)
+                        logger.info(
+                            "[T %d] Backing off due to transient errors.",
+                            worker_idx,
+                        )
+
+                else:
+                    logger.error(
+                        "[T %d] Encountered an unexpected `BradClientError`: %s",
+                        worker_idx,
+                        str(ex),
+                    )
+                return
+
+            if txn_prng.random() < args.latency_sample_prob:
+                print(
+                    "{},{},{}".format(
+                        result.txn_idx, result.timestamp, result.run_time_s
+                    ),
+                    file=latency_file,
+                )
+                if bh.counter > 10_000:
+                    latency_file.flush()
+                    bh.counter = 0
+
+                # Warn if the abort rate is high.
+                total_aborts = sum(aborts)
+                total_commits = sum(commits)
+                abort_rate = total_aborts / (total_aborts + total_commits)
+                if abort_rate > 0.15:
+                    logger.info(
+                        "[T %d] Abort rate is higher than expected ({%4f}).",
+                        worker_idx,
+                        abort_rate,
+                    )
+        except:  # pylint: disable=bare-except
+            logger.exception(
+                "[T %d] Unexpected error when handling transaction result.", worker_idx
             )
-            if bh.counter > 10_000:
-                latency_file.flush()
-                bh.counter = 0
-
-            # Warn if the abort rate is high.
-            total_aborts = sum(aborts)
-            total_commits = sum(commits)
-            abort_rate = total_aborts / (total_aborts + total_commits)
-            if abort_rate > 0.15:
-                logger.info(
-                    "[T %d] Abort rate is higher than expected ({%4f}).",
-                    worker_idx,
-                    abort_rate,
-                )
 
     inflight_runner = InflightHelper[Database, TxnResult](
         contexts=db_conns, on_result=handle_result
@@ -229,7 +238,7 @@ async def runner_impl(
         latency_file = open(
             out_dir / "oltp_latency_{}.csv".format(worker_idx), "w", encoding="UTF-8"
         )
-        print("txn_idx,timestamp,run_time_s", file=latency_file)
+        print("txn_idx,timestamp,run_time_s", file=latency_file, flush=True)
 
         while True:
             # Note that `False` means to not block.
@@ -275,7 +284,7 @@ async def runner_impl(
                 submitted = inflight_runner.submit(txn_fn)
                 if submitted:
                     break
-                logger.warning(
+                verbose_logger.info(
                     "[T %d] Ran out of issue slots. Waiting for next slot to free up.",
                     worker_idx,
                 )

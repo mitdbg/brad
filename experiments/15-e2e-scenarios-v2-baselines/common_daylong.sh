@@ -54,6 +54,53 @@ function poll_file_for_event() {
   done
 }
 
+function start_trace_runner() {
+  results_dir=$EXPT_OUT
+  mkdir -p $results_dir
+
+  local args=(
+    --trace-manifest $trace_manifest
+    --issue-slots $analytics_issue_slots
+    --baseline $ANALYTICS_ENGINE
+    --output-dir $results_dir
+  )
+
+  >&2 echo "[Trace Analytics] Running..."
+
+  log_workload_point "starting_trace"
+  python3 workloads/IMDB_extended/run_timestamped_trace.py "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
+function start_trace_txn_runner() {
+  local t_clients=$1
+  local time_scale_factor=$2
+  local client_multiplier=$3
+  local results_name=$4
+  local run_for_s=$5
+
+  >&2 echo "[Snowset Transactions] Running with $t_clients..."
+  results_dir=$EXPT_OUT/$results_name
+  mkdir -p $results_dir
+
+  log_workload_point "txn_${t_clients}"
+  python3 workloads/IMDB_extended/run_transactions.py \
+    --num-clients $t_clients \
+    --time-scale-factor $time_scale_factor \
+    --num-client-path $num_client_path \
+    --num-client-multiplier $client_multiplier \
+    --output-dir $results_dir \
+    --run-for-s $run_for_s \
+    --baseline $TRANSACTION_ENGINE \
+    --issue-slots $txn_issue_slots \
+    &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
 function start_snowset_repeating_olap_runner() {
   local ra_clients=$1
   local time_scale_factor=$2
