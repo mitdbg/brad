@@ -279,7 +279,7 @@ class ScoringContext:
             ratio = redshift_preds / base
             # Queries where we have observations where the predictions are probably
             # 5x larger and the predictions violate the SLOs.
-            hes = np.where((ratio > 3.0) & (redshift_preds > 30.0))
+            hes = np.where((ratio > 5.0) & (redshift_preds > 30.0))
             redshift_to_replace = redshift_qidx[hes]
             logger.info(
                 "[Redshift Prediction Corrections] Replacing %d base predictions.",

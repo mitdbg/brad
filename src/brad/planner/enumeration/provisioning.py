@@ -67,8 +67,9 @@ class ProvisioningEnumerator:
 
         is_redshift_ra3 = base_provisioning.instance_type().startswith("ra3")
 
-        # Special casing for "nearness". We want to consider additional
+        # Special casing for Redshift dc2. We want to consider additional
         # provisionings that enable elastic resizes.
+        is_redshift_dc2 = base_provisioning.instance_type().startswith("dc2")
         double = base_provisioning.num_nodes() * 2
         half = base_provisioning.num_nodes() // 2
 
@@ -91,7 +92,9 @@ class ProvisioningEnumerator:
                     <= max_distance
                 ):
                     yield candidate
-                elif num_nodes == double or (half > 0 and num_nodes == half):
+                elif is_redshift_dc2 and (
+                    num_nodes == double or (half > 0 and num_nodes == half)
+                ):
                     yield candidate
 
     # NOTE: These distance metrics should be taken out of here and abstracted as

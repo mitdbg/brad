@@ -410,10 +410,8 @@ def main():
     parser.add_argument("--brad-port", type=int, default=6583)
     parser.add_argument("--num-front-ends", type=int, default=1)
     parser.add_argument("--issue-slots", type=int, default=1)
-    # 25 milliseconds.
-    parser.add_argument("--avg-gap-s", type=float, default=0.025)
-    # 2 milliseconds.
-    parser.add_argument("--avg-gap-std-s", type=float, default=0.002)
+    parser.add_argument("--avg-gap-s", type=float)
+    parser.add_argument("--avg-gap-std-s", type=float)
     args = parser.parse_args()
 
     set_up_logging()
