@@ -138,13 +138,13 @@ def get_run_query(
     def _run_query(db: Database) -> QueryResult:
         try:
             start = time.time()
-            db.execute_sync_with_engine(query)
+            _, engine = db.execute_sync_with_engine(query)
             end = time.time()
             return QueryResult(
                 error=None,
                 timestamp=timestamp,
                 run_time_s=end - start,
-                engine=None,
+                engine=engine.value if engine is not None else None,
                 query_idx=query_idx,
                 time_since_execution_s=time_since_execution,
                 time_of_day=time_of_day,
@@ -381,10 +381,7 @@ def main():
         type=str,
         help="Set to connect via ODBC instead of the BRAD client (for use with other baselines).",
     )
-    parser.add_argument("--num-clients", type=int, default=1)
     parser.add_argument("--client-offset", type=int, default=0)
-    parser.add_argument("--avg-gap-s", type=float)
-    parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
     parser.add_argument(
         "--brad-direct",
         action="store_true",
@@ -419,6 +416,14 @@ def main():
     logger.info(
         "[Trace Runner] Running with %d issue slots per client.", args.issue_slots
     )
+    if args.brad_direct:
+        logger.info(
+            "[Trace Runner] Running directly against an engine: %s", args.engine
+        )
+    else:
+        logger.info(
+            "[Trace Runner] Running on BRAD with %d front ends.", args.num_front_ends
+        )
 
     dataset, client_trace = load_trace(args.trace_manifest)
     for idx, trace in enumerate(client_trace):

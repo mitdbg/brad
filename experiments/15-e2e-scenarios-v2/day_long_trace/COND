@@ -1,8 +1,41 @@
+DATASET_PATHS = {
+  "query-sequence-file": "../../../workloads/IMDB_100GB/adhoc_test/queries.sql",
+  "snowset-query-frequency-path": "../../../workloads/IMDB_100GB/regular_test/query_frequency.npy",
+  "snowset-client-dist-path": "../../../workloads/IMDB_100GB/regular_test/num_client.pkl",
+  "snowset-gap-dist-path": "../../../workloads/IMDB_100GB/regular_test/gap_time_dist.npy",
+}
+
 run_experiment(
   name="redshift_direct",
   run="./run_redshift_direct.sh",
   args=[
     "../../../config/physical_config_100gb_dl_servl_ar.yml",
     "imdb_extended_100g",
+    "trace_manifest.yml",
+    20,  # Issue slots.
   ],
+)
+
+run_experiment(
+  name="sl_redshift_new_trace",
+  run="./run_redshift_direct.sh",
+  args=[
+    "../../../config/physical_config_100gb_dl_servl_ar.yml",
+    "imdb_extended_100g",
+    "new_trace_manifest.yml",
+    10, # Issue slots (fairness with BRAD).
+  ],
+)
+
+run_experiment(
+  name="brad_new_trace",
+  run="./run_new_trace.sh",
+  options={
+    "system-config-file": "day_long_config.yml",
+    "physical-config-file": "config/physical_config_100gb_dl.yml",
+    "schema-name": "imdb_extended_100g",
+    "num-front-ends": 10,
+    "dataset-type": "100gb",
+    **DATASET_PATHS,
+  },
 )
