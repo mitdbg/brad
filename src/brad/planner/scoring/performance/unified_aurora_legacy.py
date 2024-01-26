@@ -320,12 +320,12 @@ class AuroraProvisioningScoreLegacy:
         """
         Adds this score instance's debug values to the `dest` dict.
         """
-        dest[
-            "aurora_analytics_affected_per_machine_load"
-        ] = self.analytics_affected_per_machine_load
-        dest[
-            "aurora_analytics_affected_per_machine_cpu_denorm"
-        ] = self.analytics_affected_per_machine_cpu_denorm
+        dest["aurora_analytics_affected_per_machine_load"] = (
+            self.analytics_affected_per_machine_load
+        )
+        dest["aurora_analytics_affected_per_machine_cpu_denorm"] = (
+            self.analytics_affected_per_machine_cpu_denorm
+        )
         dest["aurora_txn_affected_cpu_denorm"] = self.txn_affected_cpu_denorm
         dest["aurora_pred_txn_peak_cpu_denorm"] = self.pred_txn_peak_cpu_denorm
         (

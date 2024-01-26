@@ -318,9 +318,9 @@ class Workload:
 
             # Fetch the row size as well, if applicable.
             if Engine.Aurora in locations:
-                self._aurora_row_size_bytes[
-                    table.name
-                ] = table_sizer.aurora_row_size_bytes(table.name)
+                self._aurora_row_size_bytes[table.name] = (
+                    table_sizer.aurora_row_size_bytes(table.name)
+                )
 
     def set_dataset_size_from_table_sizes(self) -> None:
         largest_table_mb: Dict[str, int] = {}

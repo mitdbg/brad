@@ -290,11 +290,13 @@ class WorkloadBuilder:
                 )
             else:
                 deduped[q] = [
-                    (engine, run_time_s, epoch_start)
-                    if engine is not None
-                    and run_time_s is not None
-                    and epoch_start is not None
-                    else None
+                    (
+                        (engine, run_time_s, epoch_start)
+                        if engine is not None
+                        and run_time_s is not None
+                        and epoch_start is not None
+                        else None
+                    )
                 ]
 
         return [

@@ -414,13 +414,13 @@ class BlueprintCandidate(ComparableBlueprint):
         # Predicted query performance.
         self.scaled_query_latencies.clear()
         self.scaled_query_latencies[Engine.Aurora] = self.aurora_score.scaled_run_times
-        self.scaled_query_latencies[
-            Engine.Redshift
-        ] = self.redshift_score.scaled_run_times
-        self.scaled_query_latencies[
-            Engine.Athena
-        ] = ctx.next_workload.get_predicted_analytical_latency_batch(
-            self.query_locations[Engine.Athena], Engine.Athena
+        self.scaled_query_latencies[Engine.Redshift] = (
+            self.redshift_score.scaled_run_times
+        )
+        self.scaled_query_latencies[Engine.Athena] = (
+            ctx.next_workload.get_predicted_analytical_latency_batch(
+                self.query_locations[Engine.Athena], Engine.Athena
+            )
         )
 
     def is_better_than(self, other: "BlueprintCandidate") -> bool:

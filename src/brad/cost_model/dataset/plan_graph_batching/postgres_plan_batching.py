@@ -391,9 +391,9 @@ def postgres_plan_collator(
     )
 
     # we additionally have filters, tables, columns, output_columns and plan nodes as node types
-    data_dict[
-        ("column", "col_output_col", "output_column")
-    ] = column_to_output_column_edges
+    data_dict[("column", "col_output_col", "output_column")] = (
+        column_to_output_column_edges
+    )
     for u, v in output_column_to_plan_edges:
         v_node_id, d_v = plan_dict[v]
         data_dict[("output_column", "to_plan", f"plan{d_v}")].append((u, v_node_id))

@@ -90,12 +90,14 @@ class RedshiftProvisioningScore:
                 predicted_max_node_cpu_util,
                 {
                     **debug_dict,
-                    "redshift_query_factor": query_factor
-                    if query_factor is not None
-                    else np.nan,
-                    "redshift_skew_adjustment": ctx.cpu_skew_adjustment
-                    if ctx.cpu_skew_adjustment is not None
-                    else np.nan,
+                    "redshift_query_factor": (
+                        query_factor if query_factor is not None else np.nan
+                    ),
+                    "redshift_skew_adjustment": (
+                        ctx.cpu_skew_adjustment
+                        if ctx.cpu_skew_adjustment is not None
+                        else np.nan
+                    ),
                 },
             )
 

@@ -145,16 +145,16 @@ class BlueprintCandidate(ComparableBlueprint):
             ctx,
         )
         score.scaled_query_latencies.clear()
-        score.scaled_query_latencies[
-            Engine.Aurora
-        ] = score.aurora_score.scaled_run_times
-        score.scaled_query_latencies[
-            Engine.Redshift
-        ] = score.redshift_score.scaled_run_times
-        score.scaled_query_latencies[
-            Engine.Athena
-        ] = ctx.next_workload.get_predicted_analytical_latency_batch(
-            self.query_locations[Engine.Athena], Engine.Athena
+        score.scaled_query_latencies[Engine.Aurora] = (
+            score.aurora_score.scaled_run_times
+        )
+        score.scaled_query_latencies[Engine.Redshift] = (
+            score.redshift_score.scaled_run_times
+        )
+        score.scaled_query_latencies[Engine.Athena] = (
+            ctx.next_workload.get_predicted_analytical_latency_batch(
+                self.query_locations[Engine.Athena], Engine.Athena
+            )
         )
 
         score.aurora_queries = len(self.query_locations[Engine.Aurora])

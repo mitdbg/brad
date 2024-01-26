@@ -34,9 +34,11 @@ class DeleteS3Objects(Operator):
                 self._delete_object_sync,
                 ctx.s3_client(),
                 ctx.s3_bucket(),
-                "{}{}".format(ctx.s3_path(), s3_path)
-                if self._paths_are_relative
-                else s3_path,
+                (
+                    "{}{}".format(ctx.s3_path(), s3_path)
+                    if self._paths_are_relative
+                    else s3_path
+                ),
             )
         return self
 

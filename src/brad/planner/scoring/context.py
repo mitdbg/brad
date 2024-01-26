@@ -241,14 +241,14 @@ class ScoringContext:
         self.table_storage_costs.clear()
         self.table_movement.clear()
         for table in self.current_blueprint.tables():
-            self.table_storage_costs[
-                (table.name, Engine.Athena)
-            ] = compute_single_athena_table_cost(table.name, self)
+            self.table_storage_costs[(table.name, Engine.Athena)] = (
+                compute_single_athena_table_cost(table.name, self)
+            )
             # You only pay for 1 copy of the table on Aurora, regardless of
             # how many read replicas you have.
-            self.table_storage_costs[
-                (table.name, Engine.Aurora)
-            ] = compute_single_aurora_table_cost(table.name, self)
+            self.table_storage_costs[(table.name, Engine.Aurora)] = (
+                compute_single_aurora_table_cost(table.name, self)
+            )
 
             curr = self.current_blueprint.table_locations_bitmap()[table.name]
 

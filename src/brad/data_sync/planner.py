@@ -49,9 +49,9 @@ def make_logical_data_sync_plan(blueprint: Blueprint) -> LogicalDataSyncPlan:
                 extract_op = ExtractDeltas(table.name)
                 all_operators.append(extract_op)
                 base_operators.append(extract_op)
-                delta_source_for_this_table: Optional[
-                    LogicalDataSyncOperator
-                ] = extract_op
+                delta_source_for_this_table: Optional[LogicalDataSyncOperator] = (
+                    extract_op
+                )
             else:
                 # This scenario occurs when we have "static" table replicas
                 # (e.g, a table replicated on Redshift and S3 that does not
