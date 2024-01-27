@@ -1,7 +1,7 @@
 #! /bin/bash
 
-ANALYTICS_ENGINE="redshift"
-TRANSACTION_ENGINE="aurora"
+ANALYTICS_ENGINE="tidb"
+TRANSACTION_ENGINE="tidb"
 EXPT_OUT="expt_out_daylong_${ANALYTICS_ENGINE}_${TRANSACTION_ENGINE}"
 mkdir -p $EXPT_OUT
 hours=12
@@ -16,7 +16,7 @@ txn_issue_slots=1
 max_num_clients=$((10 * $clients_multiplier))
 script_loc=$(cd $(dirname $0) && pwd -P)
 source $script_loc/../common_daylong.sh
-trace_manifest=$script_loc/trace_manifest.yml
+trace_manifest=$script_loc/new_trace_manifest.yml
 
 # TODO: This executor file should be adapted to run against the baselines too
 # (TiDB / Serverless Redshift + Aurora)
@@ -43,7 +43,7 @@ txn_pid=$runner_pid
 log_workload_point "clients_started"
 
 function inner_cancel_experiment() {
-  cancel_experiment $rana_pid $txn_pid $adhoc_pid
+  cancel_experiment $rana_pid $txn_pid
 }
 
 trap "inner_cancel_experiment" INT
@@ -54,5 +54,5 @@ log_workload_point "experiment_done"
 
 # Shut down everything now.
 >&2 echo "Experiment done. Shutting down runners..."
-graceful_shutdown $rana_pid $txn_pid $adhoc_pid
+graceful_shutdown $rana_pid $txn_pid
 log_workload_point "shutdown_complete"

@@ -173,6 +173,8 @@ async def runner_impl(
 
             if result.error is not None:
                 ex = result.error
+                verbose_logger.warning(f"ERR: {ex}")
+                # Check if object has a `is_transient` method.
                 if ex.is_transient():
                     verbose_logger.warning("Transient txn error: %s", ex.message())
 
