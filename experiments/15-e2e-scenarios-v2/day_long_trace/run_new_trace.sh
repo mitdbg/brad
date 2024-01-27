@@ -19,7 +19,7 @@ log_workload_point "clients_starting"
 clients_multiplier=1
 time_scale_factor=2
 run_for_s=$((12 * 60 * 60))  # 12 hours.
-issue_slots=10
+issue_slots=5
 
 # Transactions.
 start_snowset_txn_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "t" $run_for_s 1  # NOTE: 1
