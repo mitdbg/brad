@@ -31,7 +31,7 @@ run_experiment(
   name="brad_new_trace",
   run="./run_new_trace.sh",
   options={
-    "system-config-file": "day_long_config.yml",
+    "system-config-file": "../day_long/day_long_config.yml",
     "physical-config-file": "config/physical_config_100gb_dl.yml",
     "schema-name": "imdb_extended_100g",
     "num-front-ends": 10,
