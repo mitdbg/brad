@@ -25,13 +25,7 @@ issue_slots=10
 start_snowset_txn_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "t" $run_for_s 1  # NOTE: 1
 txn_pid=$runner_pid
 
-# Ad-hoc queries.
-# 2 clients, issuing once per 8 minutes on average with a standard deviation of
-# 2 minutes.
-start_sequence_runner 2 $((8 * 60)) $((2 * 60)) "adhoc" 0 $issue_slots
-adhoc_pid=$runner_pid
-
-# Repeating queries trace runner.
+# Query trace runner.
 python3 ../../../workloads/IMDB_extended/run_timestamped_trace.py \
   --trace-manifest new_trace_manifest.yml \
   --issue-slots $issue_slots \

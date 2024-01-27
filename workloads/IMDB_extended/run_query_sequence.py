@@ -33,6 +33,7 @@ QueryResult = namedtuple(
         "run_time_s",
         "engine",
         "query_idx",
+        "db",
     ],
 )
 
@@ -146,6 +147,7 @@ async def runner_impl(
                         run_time_s=end - start,
                         engine=engine.value,
                         query_idx=query_idx,
+                        db=db,
                     )
                 except Exception as ex:
                     return QueryResult(
@@ -154,6 +156,7 @@ async def runner_impl(
                         run_time_s=math.nan,
                         engine=None,
                         query_idx=query_idx,
+                        db=db,
                     )
 
             return _run_query
@@ -162,7 +165,7 @@ async def runner_impl(
             try:
                 if result.error is not None:
                     ex = result.error
-                    if ex.is_transient():
+                    if isinstance(ex, BradClientError) and ex.is_transient():
                         verbose_logger.warning(
                             "Transient query error: %s", ex.message()
                         )
@@ -182,7 +185,7 @@ async def runner_impl(
                         logger.error(
                             "[AHR %d] Unexpected query error: %s",
                             runner_idx,
-                            ex.message(),
+                            str(ex),
                         )
                     return
 
