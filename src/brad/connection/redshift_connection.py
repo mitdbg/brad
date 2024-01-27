@@ -85,8 +85,8 @@ class RedshiftConnection(Connection):
         if self._is_closed:
             return
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self._connection.close)
         self._is_closed = True
+        await loop.run_in_executor(None, self._connection.close)
 
     def cursor_sync(self) -> Cursor:
         if self._cursor is None:
