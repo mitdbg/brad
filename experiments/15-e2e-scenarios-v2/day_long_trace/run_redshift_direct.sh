@@ -11,4 +11,5 @@ python3 ../../../workloads/IMDB_extended/run_timestamped_trace.py \
   --brad-direct \
   --config-file $config_file \
   --schema-name $schema_name \
-  --engine redshift
+  --engine redshift \
+  --serverless-redshift
