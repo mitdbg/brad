@@ -286,7 +286,7 @@ async def runner_impl(
                         msg = str(ex)
                         for phrase in connection_lost_phrases:
                             if phrase in msg:
-                                db.reconnect()
+                                result.db.reconnect()
                     return
 
                 # Record execution result.
