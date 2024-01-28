@@ -194,6 +194,14 @@ async def runner_impl(
                     )
                 return
 
+            if bh.backoff is not None and bh.backoff_timestamp is not None:
+                if bh.backoff_timestamp < result.timestamp:
+                    # We recovered. This means a query issued after the rand
+                    # backoff was created finished successfully.
+                    bh.backoff = None
+                    bh.backoff_timestamp = None
+                    logger.info("[T %d] Continued after transient errors.", worker_idx)
+
             if txn_prng.random() < args.latency_sample_prob:
                 print(
                     "{},{},{}".format(
