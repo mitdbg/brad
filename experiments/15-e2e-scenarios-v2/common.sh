@@ -248,6 +248,33 @@ function start_txn_runner() {
   runner_pid=$!
 }
 
+function start_txn_runner_serial() {
+  t_clients=$1
+  client_offset=$2
+
+  >&2 echo "[Transactions] Running with $t_clients..."
+  results_dir=$COND_OUT/t_${t_clients}
+  mkdir -p $results_dir
+
+  local args=(
+    --num-clients $t_clients
+    --num-front-ends $num_front_ends
+    # --scale-factor $txn_scale_factor
+    # --dataset-type $dataset_type
+  )
+
+  if [[ ! -z $client_offset ]]; then
+    args+=(--client-offset $client_offset)
+  fi
+
+  log_workload_point "txn_${t_clients}"
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions_serial.py \
+    "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
 function start_snowset_txn_runner() {
   local t_clients=$1
   local time_scale_factor=$2
@@ -278,6 +305,34 @@ function start_snowset_txn_runner() {
 
   log_workload_point "txn_${t_clients}"
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions.py \
+    "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
+function start_snowset_txn_runner_serial() {
+  local t_clients=$1
+  local time_scale_factor=$2
+  local client_multiplier=$3
+  local results_name=$4
+  local run_for_s=$5
+
+  >&2 echo "[Snowset Transactions] Running with $t_clients..."
+  results_dir=$COND_OUT/${results_name}
+  mkdir -p $results_dir
+
+  local args=(
+    --num-clients $t_clients
+    --num-front-ends $num_front_ends
+    --num-client-path $snowset_client_dist_path
+    --time-scale-factor $time_scale_factor
+    --num-client-multiplier $client_multiplier
+    --run-for-s $run_for_s
+  )
+
+  log_workload_point "txn_${t_clients}"
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions_serial.py \
     "${args[@]}" &
 
   # This is a special return value variable that we use.

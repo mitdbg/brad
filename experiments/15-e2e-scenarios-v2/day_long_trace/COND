@@ -23,7 +23,7 @@ run_experiment(
     "../../../config/physical_config_100gb_dl_servl_ar.yml",
     "imdb_extended_100g",
     "new_trace_manifest.yml",
-    10, # Issue slots (fairness with BRAD).
+    5, # Issue slots (fairness with BRAD).
   ],
 )
 

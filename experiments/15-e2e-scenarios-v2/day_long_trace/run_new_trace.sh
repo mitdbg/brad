@@ -21,12 +21,15 @@ time_scale_factor=2
 run_for_s=$((12 * 60 * 60))  # 12 hours.
 issue_slots=5
 
+trace_results_dir=$COND_OUT/trace
+mkdir -p $trace_results_dir
+
 # Transactions.
-start_snowset_txn_runner $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "t" $run_for_s 1  # NOTE: 1
+start_snowset_txn_runner_serial $((10 * $clients_multiplier)) $time_scale_factor $clients_multiplier "t" $run_for_s 1
 txn_pid=$runner_pid
 
 # Query trace runner.
-python3 ../../../workloads/IMDB_extended/run_timestamped_trace.py \
+COND_OUT=$trace_results_dir python3 ../../../workloads/IMDB_extended/run_timestamped_trace.py \
   --trace-manifest new_trace_manifest.yml \
   --issue-slots $issue_slots \
   --num-front-ends $num_front_ends &
