@@ -28,8 +28,32 @@ run_experiment(
 )
 
 run_experiment(
+  name="sl_redshift_del_trace",
+  run="./run_redshift_direct.sh",
+  args=[
+    "../../../config/physical_config_100gb_dl_servl_ar.yml",
+    "imdb_extended_100g",
+    "del_trace_manifest.yml",
+    5, # Issue slots (fairness with BRAD).
+  ],
+)
+
+run_experiment(
   name="brad_new_trace",
   run="./run_new_trace.sh",
+  options={
+    "system-config-file": "../day_long/day_long_config.yml",
+    "physical-config-file": "config/physical_config_100gb_dl.yml",
+    "schema-name": "imdb_extended_100g",
+    "num-front-ends": 10,
+    "dataset-type": "100gb",
+    **DATASET_PATHS,
+  },
+)
+
+run_experiment(
+  name="brad_del_trace",
+  run="./run_del_trace.sh",
   options={
     "system-config-file": "../day_long/day_long_config.yml",
     "physical-config-file": "config/physical_config_100gb_dl.yml",
