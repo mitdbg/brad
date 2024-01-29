@@ -48,7 +48,20 @@ class RedshiftProvisioningScore:
 
         # Load adjustment factor.
         # TODO: Hardcoded SLO.
-        gamma = min(ctx.metrics.query_lat_s_p90 / 30.0 + 0.2, 1.0)
+        if (
+            ctx.metrics.redshift_cpu_list is not None
+            and ctx.metrics.redshift_cpu_list.shape[0] > 0
+        ):
+            avg_cpu = ctx.metrics.redshift_cpu_list.mean()
+        else:
+            # This won't be used. This is actually max.
+            avg_cpu = ctx.metrics.redshift_cpu_avg
+
+        gamma = (
+            min(ctx.metrics.query_lat_s_p90 / 30.0 + 0.5, 1.0)
+            if avg_cpu >= 90.0
+            else 1.0
+        )
         debug_dict["redshift_gamma_factor"] = gamma
         if (
             ctx.metrics.redshift_cpu_list is not None

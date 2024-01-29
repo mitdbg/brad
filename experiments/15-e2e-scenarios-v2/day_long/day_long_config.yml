@@ -89,7 +89,7 @@ redshift_initialize_load_fraction: 0.25
 # BRAD will not reduce predicted load lower than these values. Raise these
 # values to be more conservative against mispredictions.
 aurora_min_load_removal_fraction: 0.8
-redshift_min_load_removal_fraction: 0.9
+redshift_min_load_removal_fraction: 0.99  # To fix a bug.
 
 aurora_max_query_factor: 4.0
 aurora_max_query_factor_replace: 10000.0
