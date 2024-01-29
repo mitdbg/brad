@@ -122,8 +122,8 @@ std_datasets:
 
 use_preset_redshift_clusters: false
 
-aurora_provisioning_search_distance: 700.0
-redshift_provisioning_search_distance: 900.0
+aurora_provisioning_search_distance: 1500.0
+redshift_provisioning_search_distance: 400.0
 
 planner_max_workers: 16
 
