@@ -52,7 +52,7 @@ epoch_length:
   minutes: 1
 
 # Blueprint planning strategy.
-strategy: query_based_beam
+strategy: fp_query_based_beam
 
 # Used to specify the period of time over which to use data for planning.
 # Currrently, this is a "look behind" window for the workload.
@@ -124,6 +124,10 @@ aurora_max_query_factor_replace: 10000.0
 
 redshift_peak_load_threshold: 95.0
 redshift_peak_load_multiplier: 2.0
+
+planner_max_workers: 16
+aurora_provisioning_search_distance: 900.0
+redshift_provisioning_search_distance: 900.0
 
 # Blueprint planning trigger configs.
 
