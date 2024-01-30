@@ -563,6 +563,12 @@ def main():
 
     set_up_logging()
 
+    logger.info(
+        "[Serial RA] Using query bank %s. Query indices: %s",
+        args.query_bank_file,
+        args.query_indexes,
+    )
+
     with open(args.query_bank_file, "r", encoding="UTF-8") as file:
         query_bank = [line.strip() for line in file]
 
