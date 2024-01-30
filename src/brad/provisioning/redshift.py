@@ -160,7 +160,12 @@ class RedshiftProvisioningManager:
 
                 # If the resize has not made any progress, we cancel and retry.
                 status = await self._get_resize_status(cluster_id)
-                if status["DataTransferProgressPercent"] < 1.0:
+                if "DataTransferProgressPercent" not in status:
+                    logger.warning(
+                        "Redshift resize progress has unexpected structure. %s",
+                        json.dumps(status, default=str, indent=2),
+                    )
+                elif status["DataTransferProgressPercent"] < 1.0:
                     logger.warning(
                         "Redshift resize of %s has not started in 20 minutes. Will abort and retry.",
                         cluster_id,
