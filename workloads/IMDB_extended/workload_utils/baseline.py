@@ -32,36 +32,41 @@ def load_schema_sql(dataset, sql_filename):
     return data
 
 
-def make_tidb_conn():
-    config_file = "config/baseline.yml"
-    with open(config_file, "r", encoding="utf-8") as f:
-        config = yaml.load(f, Loader=yaml.Loader)
-        config = config["tidb"]
-        host = config["host"]
-        password = config["password"]
-        user = config["user"]
-        port = config["port"]
-        is_mac = platform.system() == "Darwin"
-        if is_mac:
-            ssl_file = "/etc/ssl/cert.pem"
-        else:
-            ssl_file = "/etc/ssl/certs/ca-certificates.crt"
+def make_tidb_conn(num_tries=10):
+    for _ in range(num_tries):
+        try:
+            config_file = "config/baseline.yml"
+            with open(config_file, "r", encoding="utf-8") as f:
+                config = yaml.load(f, Loader=yaml.Loader)
+                config = config["tidb"]
+                host = config["host"]
+                password = config["password"]
+                user = config["user"]
+                port = config["port"]
+                is_mac = platform.system() == "Darwin"
+                if is_mac:
+                    ssl_file = "/etc/ssl/cert.pem"
+                else:
+                    ssl_file = "/etc/ssl/certs/ca-certificates.crt"
 
-        conn = mysql.connector.connect(
-            host=host,
-            port=port,
-            user=user,
-            password=password,
-            database="test",
-            ssl_ca=ssl_file,
-            ssl_verify_identity=True,
-            allow_local_infile=True,
-        )
-        cur = conn.cursor()
-        cur.execute("SET SESSION sql_mode = 'REAL_AS_FLOAT,PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ONLY_FULL_GROUP_BY,ANSI';")
-        conn.commit()
-        cur.close()
-        return conn
+                conn = mysql.connector.connect(
+                    host=host,
+                    port=port,
+                    user=user,
+                    password=password,
+                    database="test",
+                    ssl_ca=ssl_file,
+                    ssl_verify_identity=True,
+                    allow_local_infile=True,
+                )
+                cur = conn.cursor()
+                cur.execute("SET SESSION sql_mode = 'REAL_AS_FLOAT,PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ONLY_FULL_GROUP_BY,ANSI';")
+                conn.commit()
+                cur.close()
+                return conn
+        except Exception as e:
+            print(f"Error: {e}")
+            time.sleep(1)
 
 
 def make_postgres_compatible_conn(engine="redshift"):

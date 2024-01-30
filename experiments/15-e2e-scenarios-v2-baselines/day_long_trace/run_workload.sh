@@ -16,7 +16,7 @@ txn_issue_slots=1
 max_num_clients=$((10 * $clients_multiplier))
 script_loc=$(cd $(dirname $0) && pwd -P)
 source $script_loc/../common_daylong.sh
-trace_manifest=$script_loc/new_trace_manifest.yml
+trace_manifest=$script_loc/del_trace_manifest.yml
 
 # TODO: This executor file should be adapted to run against the baselines too
 # (TiDB / Serverless Redshift + Aurora)
