@@ -29,7 +29,7 @@ rana_pid=$runner_pid
 sleep 2
 
 log_workload_point "start_txn_2"
-start_txn_runner 2
+start_txn_runner_serial 2
 txn_pid=$runner_pid
 
 sleep $((5 * 60))
