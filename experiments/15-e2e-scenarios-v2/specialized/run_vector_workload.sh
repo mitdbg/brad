@@ -43,7 +43,7 @@ rana_pid=$runner_pid
 start_other_repeating_runner 2 8 5 "ra_vector" 8
 other_pid=$runner_pid
 
-start_txn_runner 4  # Implicit: --dataset-type
+start_txn_runner_serial 4  # Implicit: --dataset-type
 txn_pid=$runner_pid
 log_workload_point "clients_started"
 

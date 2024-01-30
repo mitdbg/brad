@@ -29,7 +29,7 @@ function txn_sweep() {
   local keep_last=$3
 
   for t_clients in $sweep; do
-    start_txn_runner $t_clients  # Implicit: --dataset-type
+    start_txn_runner_serial $t_clients  # Implicit: --dataset-type
     txn_pid=$runner_pid
 
     sleep $(($gap_minute * 60))
@@ -62,7 +62,7 @@ sleep 2
 
 # Start with 4 transactional clients; hold for 15 minutes to stabilize.
 log_workload_point "start_txn_4"
-start_txn_runner 4
+start_txn_runner_serial 4
 txn_pid=$runner_pid
 sleep $((10 * 60))  # 10 mins; 10 mins cumulative
 
