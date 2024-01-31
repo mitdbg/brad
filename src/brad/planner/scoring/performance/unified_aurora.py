@@ -142,16 +142,13 @@ class AuroraProvisioningScore:
         if not current_has_replicas:
             # We estimate the fraction of the current writer load that belongs
             # to the transactional workload vs. the query workload.
-            min_load_removal = ctx.planner_config.aurora_min_load_removal_fraction()
+            # min_load_removal = ctx.planner_config.aurora_min_load_removal_fraction()
             pred_txn_cpu_denorm = cls.predict_txn_cpu_denorm(
                 ctx.metrics.txn_completions_per_s, ctx
             )
-            pred_txn_frac = pred_txn_cpu_denorm / curr_writer_cpu_util_denorm
-            pred_txn_frac = max(min_load_removal, pred_txn_frac)
-            pred_txn_frac = min(1.0, pred_txn_frac)
-            pred_ana_frac = 1.0 - pred_txn_frac
-            pred_ana_frac = max(min_load_removal, pred_ana_frac)
-            pred_ana_frac = min(1.0, pred_ana_frac)
+            # Temporary bug fix for the day long scenario.
+            pred_txn_frac = 1.0
+            pred_ana_frac = 0.0
             if debug_dict is not None:
                 debug_dict["aurora_pred_txn_frac"] = pred_txn_frac
                 debug_dict["aurora_pred_ana_frac"] = pred_ana_frac

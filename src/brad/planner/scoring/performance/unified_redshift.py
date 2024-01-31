@@ -58,7 +58,7 @@ class RedshiftProvisioningScore:
             avg_cpu = ctx.metrics.redshift_cpu_avg
 
         gamma = (
-            min(ctx.metrics.query_lat_s_p90 / 30.0 + 0.5, 1.0)
+            min(ctx.metrics.query_lat_s_p90 / 30.0 + 0.35, 1.0)
             if avg_cpu >= 90.0
             else 1.0
         )
