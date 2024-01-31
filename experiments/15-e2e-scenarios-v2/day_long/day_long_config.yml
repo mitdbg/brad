@@ -94,7 +94,7 @@ redshift_min_load_removal_fraction: 0.99  # To fix a bug.
 aurora_max_query_factor: 4.0
 aurora_max_query_factor_replace: 10000.0
 redshift_peak_load_threshold: 99.0
-redshift_peak_load_multiplier: 1.5
+redshift_peak_load_multiplier: 1.0
 
 # Blueprint planning performance ceilings.
 query_latency_p90_ceiling_s: 30.0
@@ -162,5 +162,4 @@ triggers:
     sustained_epochs: 3
 
   recent_change:
-    disabled: true
     delay_epochs: 5
