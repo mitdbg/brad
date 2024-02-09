@@ -1,0 +1,53 @@
+include("../common.cond")
+
+
+INSTANCES = [
+  "t4g_medium",
+  "t4g_large",
+  "r6g_large",
+  "r6g_xlarge",
+  "r6g_2xlarge",
+  "r6g_4xlarge",
+  "x2g_large",
+  "x2g_xlarge",
+  "x2g_2xlarge",
+  "x2g_4xlarge",
+]
+
+
+for instance in INSTANCES:
+  run_experiment_group(
+    name=f"{instance}_single",
+    run="python3 -m brad.calibration.measure_load",
+    experiments=[
+      ExperimentInstance(
+        name="{}-1-q{}".format(instance, query_idx),
+        options={
+          "num-clients": 1,
+          "specific-query-idx": query_idx,
+          "run-for-s": RUN_FOR_S,
+          "avg-gap-s": AVG_GAP_S,
+          "wait-before-start": WAIT_BEFORE_START,
+          "query-file": QUERY_BANK,
+          "engine": "aurora",
+        },
+      )
+      for query_idx in range(NUM_QUERIES)
+    ],
+  )
+
+  group(
+    name="{}-1-of-2".format(instance),
+    deps=[
+      ":{}-1-q{}".format(instance, qidx)
+      for qidx in range(NUM_QUERIES) if qidx % 2 == 0
+    ],
+  )
+
+  group(
+    name="{}-2-of-2".format(instance),
+    deps=[
+      ":{}-1-q{}".format(instance, qidx)
+      for qidx in range(NUM_QUERIES) if qidx % 2 == 1
+    ],
+  )
