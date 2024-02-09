@@ -1,7 +1,7 @@
 #! /bin/bash
 
 if [ -z $3 ]; then
-  >&2 echo "Usage: $0 <config_path> <aurora instance id> <rank (0 or 1)>"
+  >&2 echo "Usage: $0 <config_path> <aurora instance id> <aurora cluster id> <rank (0 or 1)>"
   >&2 echo "The config path should be relative to the aurora/ subdirectory."
   exit 1
 fi
@@ -11,7 +11,8 @@ export BRAD_AURORA_INSTANCE_ID=$2
 export BRAD_SCHEMA="imdb_extended_100g"
 
 db_instance=$2
-rank=$3
+cluster_id=$3
+rank=$4
 
 function run_warm_up() {
   >&2 echo "Running warm up..."
@@ -52,6 +53,9 @@ all_instances=(
 >&2 echo "Starting as rank $rank"
 >&2 echo "Running $BRAD_AURORA_INSTANCE_ID"
 >&2 echo "Config $BRAD_CONFIG"
+>&2 echo "Cluster id $cluster_id"
+>&2 echo "Instance id $db_instance"
+sleep 10
 
 for inst_type in "${all_instances[@]}"; do
   aws_inst_id="${inst_type//_/.}"
@@ -59,5 +63,10 @@ for inst_type in "${all_instances[@]}"; do
   modify_instance_sync $db_instance "db.${aws_inst_type}"
   >&2 echo "Warming up..."
   run_warm_up
+  >&2 echo "Running..."
   cond run //aurora/:${inst_type}-${rank}-of-2
 done
+
+sleep 60
+>&2 echo "Done. Pausing $cluster_id"
+aws rds stop-db-cluster --db-instance-identifier $cluster_id
