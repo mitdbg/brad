@@ -1,0 +1,10 @@
+AVG_GAP_S = 3
+RUN_FOR_S = 5 * 60  # 5 minutes
+NUM_CLIENTS = [1, 2, 4, 6]
+WAIT_BEFORE_START = 10
+NUM_QUERIES = 200
+
+
+# Relative to experiment definition directories.
+QUERY_BANK = "../query_bank.sql"
+
