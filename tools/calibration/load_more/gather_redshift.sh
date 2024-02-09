@@ -1,6 +1,6 @@
 #! /bin/bash
 
-if [ -z $4 ]; then
+if [ -z $3 ]; then
   >&2 echo "Usage: $0 <config_path> <cluster id> <rank (1 or 2)>"
   >&2 echo "The config path should be relative to the redshift/ subdirectory."
   exit 1

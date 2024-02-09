@@ -1,6 +1,6 @@
 #! /bin/bash
 
-if [ -z $3 ]; then
+if [ -z $4 ]; then
   >&2 echo "Usage: $0 <config_path> <aurora instance id> <aurora cluster id> <rank (0 or 1)>"
   >&2 echo "The config path should be relative to the aurora/ subdirectory."
   exit 1
@@ -59,8 +59,8 @@ sleep 10
 
 for inst_type in "${all_instances[@]}"; do
   aws_inst_id="${inst_type//_/.}"
-  >&2 echo aws_inst_id
-  modify_instance_sync $db_instance "db.${aws_inst_type}"
+  >&2 echo $aws_inst_id
+  modify_instance_sync $db_instance "db.${aws_inst_id}"
   >&2 echo "Warming up..."
   run_warm_up
   >&2 echo "Running..."
