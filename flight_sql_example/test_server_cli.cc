@@ -23,7 +23,8 @@
 #include <string>
 
 #include <arrow/flight/server.h>
-#include <arrow/flight/sql/example/sqlite_server.h>
+// #include <arrow/flight/sql/example/sqlite_server.h>
+#include "example/sqlite_server.h"
 #include <arrow/io/test_common.h>
 #include <arrow/util/logging.h>
 
