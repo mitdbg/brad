@@ -1,7 +1,7 @@
 #! /bin/bash
 
 if [ -z $4 ]; then
-  >&2 echo "Usage: $0 <config_path> <aurora instance id> <aurora cluster id> <rank (0 or 1)>"
+  >&2 echo "Usage: $0 <config_path> <aurora instance id> <aurora cluster id> <rank (1 or 2)>"
   >&2 echo "The config path should be relative to the aurora/ subdirectory."
   exit 1
 fi
@@ -17,7 +17,7 @@ rank=$4
 function run_warm_up() {
   >&2 echo "Running warm up..."
   pushd aurora
-  python3 -m brad.calibration.measure_load --run-warmup --engine aurora --query-file ../../../../workloads/IMDB_100GB/scaling_20/queries.sql
+  python3 -m brad.calibration.measure_load --run-warmup --engine aurora --query-file ../../../../tools/calibration/load_more/query_bank.sql
   popd
 }
 
@@ -69,4 +69,4 @@ done
 
 sleep 60
 >&2 echo "Done. Pausing $cluster_id"
-aws rds stop-db-cluster --db-instance-identifier $cluster_id
+aws rds stop-db-cluster --db-cluster-identifier $cluster_id

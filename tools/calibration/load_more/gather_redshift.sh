@@ -15,7 +15,7 @@ export BRAD_SCHEMA="imdb_extended_100g"
 function run_warm_up() {
   >&2 echo "Running warm up..."
   pushd redshift
-  python3 -m brad.calibration.measure_load --run-warmup --engine redshift --query-file ../../../../workloads/IMDB_100GB/scaling_20/queries.sql
+  python3 -m brad.calibration.measure_load --run-warmup --engine redshift --query-file ../../../../tools/calibration/load_more/query_bank.sql
   popd
 }
 
