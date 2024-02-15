@@ -29,6 +29,7 @@ class AuroraMetrics(MetricsSourceWithForecasting):
         forecasting_window_size: int,
     ) -> None:
         self._config = config
+        self._in_stub_mode = self._config.stub_mode_path is not None
         self._blueprint_mgr = blueprint_mgr
         self._reader_instance_index = reader_instance_index
 
@@ -41,15 +42,21 @@ class AuroraMetrics(MetricsSourceWithForecasting):
         )
 
         self.update_clients()
-        self._logger = MetricsLogger.create_from_config(
-            self._config, self._metrics_logger_name(reader_instance_index)
-        )
+        if not self._in_stub_mode:
+            self._logger = MetricsLogger.create_from_config(
+                self._config, self._metrics_logger_name(reader_instance_index)
+            )
+        else:
+            self._logger = None
 
         super().__init__(
             self._config.epoch_length, forecasting_method, forecasting_window_size
         )
 
     def update_clients(self) -> None:
+        if self._in_stub_mode:
+            return
+
         directory = self._blueprint_mgr.get_directory()
         resource_id = (
             directory.aurora_writer().resource_id()
@@ -75,6 +82,9 @@ class AuroraMetrics(MetricsSourceWithForecasting):
             )
 
     async def fetch_latest(self) -> None:
+        if self._in_stub_mode:
+            return
+
         loop = asyncio.get_running_loop()
         new_pi_metrics = await loop.run_in_executor(None, self._fetch_pi_metrics, 5)
         new_cw_metrics = await loop.run_in_executor(None, self._fetch_cw_metrics, 5)
@@ -112,7 +122,8 @@ class AuroraMetrics(MetricsSourceWithForecasting):
         else:
             return "brad_metrics_aurora_reader_{}.log".format(reader_instance_index)
 
-    def _load_metric_defs(self) -> Tuple[List[MetricDef], List[MetricDef]]:
+    @staticmethod
+    def _load_metric_defs() -> Tuple[List[MetricDef], List[MetricDef]]:
         metrics_file = files(daemon).joinpath("monitored_aurora_metrics.json")
         with as_file(metrics_file) as file:
             with open(file, "r", encoding="utf8") as data:
