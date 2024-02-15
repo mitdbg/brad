@@ -1,7 +1,10 @@
+import logging
 import sqlite3
 from typing import Any, Optional, List, Iterable
 
 from brad.connection.cursor import Cursor, Row
+
+logger = logging.getLogger(__name__)
 
 
 class SqliteCursor(Cursor):
@@ -27,6 +30,10 @@ class SqliteCursor(Cursor):
         return self.rollback_sync()
 
     def execute_sync(self, query: str) -> None:
+        if query.startswith("SET"):
+            # HACK: To avoid invasive changes.
+            logger.info("SqliteCursor: Skipping query %s", query)
+            return
         self._cursor_impl.execute(query)
 
     def executemany_sync(self, query: str, batch: Iterable[Any]) -> None:

@@ -8,12 +8,13 @@ from .sqlite_cursor import SqliteCursor
 
 class SqliteConnection(Connection):
     @classmethod
-    def connect(cls, db_path: str) -> Connection:
-        return cls.connect_sync(db_path)
+    def connect(cls, db_path: str, autocommit: bool) -> Connection:
+        return cls.connect_sync(db_path, autocommit)
 
     @classmethod
-    def connect_sync(cls, db_path: str) -> Connection:
-        conn = sqlite3.connect(db_path)
+    def connect_sync(cls, db_path: str, autocommit: bool) -> Connection:
+        # Note in Python 3.12, the `autocommit` parameter becomes available.
+        conn = sqlite3.connect(db_path, isolation_level=None if autocommit else "")
         return cls(conn)
 
     def __init__(self, connection_impl: sqlite3.Connection) -> None:

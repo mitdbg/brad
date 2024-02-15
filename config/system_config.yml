@@ -6,7 +6,7 @@
 # listen on successive ports (e.g., 6584, 6585, etc.).
 front_end_interface: "0.0.0.0"
 front_end_port: 6583
-num_front_ends: 3
+num_front_ends: 1
 
 # Logging paths. If the value is in ALL_CAPS (with underscores), it is
 # interpreted as an environment variable (BRAD will log to the path stored in
@@ -56,7 +56,7 @@ epoch_length:
   minutes: 1
 
 # Blueprint planning strategy.
-strategy: query_based_beam
+strategy: fp_query_based_beam
 
 # Used to specify the period of time over which to use data for planning.
 # Currrently, this is a "look behind" window for the workload.

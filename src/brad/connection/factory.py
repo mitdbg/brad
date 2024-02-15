@@ -23,7 +23,7 @@ class ConnectionFactory:
         timeout_s: int = 10,
     ) -> Connection:
         if config.stub_mode_path() is not None:
-            return cls._connect_to_stub(config)
+            return cls.connect_to_stub(config)
 
         connection_details = config.get_connection_details(engine)
         if engine == Engine.Redshift:
@@ -78,7 +78,7 @@ class ConnectionFactory:
         timeout_s: int = 10,
     ) -> Connection:
         if config.stub_mode_path() is not None:
-            return cls._connect_to_stub(config)
+            return cls.connect_to_stub(config)
 
         connection_details = config.get_connection_details(engine)
         if engine == Engine.Redshift:
@@ -120,7 +120,7 @@ class ConnectionFactory:
         cls, schema_name: str, config: ConfigFile
     ) -> Connection:
         if config.stub_mode_path() is not None:
-            return cls._connect_to_stub(config)
+            return cls.connect_to_stub(config)
 
         connection_details = config.get_sidecar_db_details()
         cstr = cls._pg_aurora_odbc_connection_string(
@@ -132,9 +132,9 @@ class ConnectionFactory:
         return await OdbcConnection.connect(cstr, autocommit=True, timeout_s=10)
 
     @classmethod
-    def _connect_to_stub(cls, config: ConfigFile) -> Connection:
+    def connect_to_stub(cls, config: ConfigFile, autocommit: bool = True) -> Connection:
         stub_path = config.stub_db_path()
-        return SqliteConnection.connect_sync(str(stub_path))
+        return SqliteConnection.connect_sync(str(stub_path), autocommit=autocommit)
 
     @staticmethod
     def _pg_aurora_odbc_connection_string(

@@ -21,7 +21,9 @@ class Estimator:
     select, based on the filter predicates applied to the base table).
     """
 
-    async def analyze(self, blueprint: "Blueprint") -> None:
+    async def analyze(
+        self, blueprint: "Blueprint", populate_cache_if_missing: bool = False
+    ) -> None:
         """
         Gathers any statistics needed by the estimator.
         """

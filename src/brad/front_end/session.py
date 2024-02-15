@@ -12,6 +12,7 @@ from brad.front_end.engine_connections import EngineConnections
 from brad.planner.estimator import Estimator
 from brad.routing.policy import RoutingPolicy
 from brad.data_stats.postgres_estimator import PostgresEstimator
+from brad.data_stats.stub_estimator import StubEstimator
 from brad.utils.time_periods import universal_now
 
 logger = logging.getLogger(__name__)
@@ -115,7 +116,12 @@ class SessionManager:
             routing_policy_override == RoutingPolicy.ForestTableSelectivity
             or routing_policy_override == RoutingPolicy.Default
         ):
-            estimator = await PostgresEstimator.connect(self._schema_name, self._config)
+            if self._config.stub_mode_path is None:
+                estimator = await PostgresEstimator.connect(
+                    self._schema_name, self._config
+                )
+            else:
+                estimator = StubEstimator()
             await estimator.analyze(self._blueprint_mgr.get_blueprint())
         else:
             estimator = None

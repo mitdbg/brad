@@ -17,6 +17,7 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.config.system_event import SystemEvent
 from brad.config.temp_config import TempConfig
+from brad.connection.factory import ConnectionFactory
 from brad.daemon.messages import (
     ShutdownFrontEnd,
     Sentinel,
@@ -30,8 +31,10 @@ from brad.daemon.monitor import Monitor
 from brad.daemon.system_event_logger import SystemEventLogger
 from brad.daemon.transition_orchestrator import TransitionOrchestrator
 from brad.daemon.blueprint_watchdog import BlueprintWatchdog
+from brad.daemon.populate_stub import create_tables_in_stub
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
+from brad.data_stats.stub_estimator import StubEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.front_end.start_front_end import start_front_end
 from brad.planner.abstract import BlueprintPlanner
@@ -155,9 +158,18 @@ class BradDaemon:
             logger.info("The BRAD daemon has shut down.")
 
     async def _run_setup(self) -> None:
+        is_stub_mode = self._config.stub_mode_path() is not None
         await self._blueprint_mgr.load()
         logger.info("Current blueprint: %s", self._blueprint_mgr.get_blueprint())
-        logger.info("Current directory: %s", self._blueprint_mgr.get_directory())
+        if not is_stub_mode:
+            logger.info("Current directory: %s", self._blueprint_mgr.get_directory())
+
+        if is_stub_mode:
+            stub_conn = ConnectionFactory.connect_to_stub(self._config)
+            create_tables_in_stub(
+                self._config, stub_conn, self._blueprint_mgr.get_blueprint()
+            )
+            stub_conn.close_sync()
 
         # Initialize the monitor.
         self._monitor.set_up_metrics_sources()
@@ -292,7 +304,12 @@ class BradDaemon:
             or self._config.routing_policy == RoutingPolicy.Default
         ):
             logger.info("Setting up the cardinality estimator...")
-            estimator = await PostgresEstimator.connect(self._schema_name, self._config)
+            if is_stub_mode:
+                estimator: Estimator = StubEstimator()
+            else:
+                estimator = await PostgresEstimator.connect(
+                    self._schema_name, self._config
+                )
             await estimator.analyze(
                 self._blueprint_mgr.get_blueprint(),
                 # N.B. Only the daemon attempts to repopulate the cache.
