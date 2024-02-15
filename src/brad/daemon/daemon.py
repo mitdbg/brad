@@ -408,7 +408,10 @@ class BradDaemon:
         Informs the server about a new blueprint.
         """
 
-        if IGNORE_ALL_BLUEPRINTS_VAR in os.environ:
+        if (
+            IGNORE_ALL_BLUEPRINTS_VAR in os.environ
+            or self._config.stub_mode_path() is not None
+        ):
             logger.info("Skipping all blueprints. Chosen blueprint: %s", blueprint)
             return
 
