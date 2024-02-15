@@ -32,7 +32,7 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
         forecasting_window_size: int,
     ) -> None:
         self._config = config
-        self._in_stub_mode = self._config.stub_mode_path is not None
+        self._in_stub_mode = self._config.stub_mode_path() is not None
         self._blueprint_mgr = blueprint_mgr
         self._metric_defs = self._load_metric_defs()
         self._values = pd.DataFrame(

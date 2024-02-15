@@ -237,6 +237,12 @@ class ConfigFile:
             return None
         return pathlib.Path(self._raw["stub_mode_path"])
 
+    def stub_db_path(self) -> pathlib.Path:
+        if "stub_db_path" not in self._raw:
+            return pathlib.Path("/tmp/brad_db_stub.sqlite")
+        else:
+            return pathlib.Path(self._raw["stub_db_path"])
+
     def _extract_log_path(self, config_key: str) -> Optional[pathlib.Path]:
         if config_key not in self._raw:
             return None
