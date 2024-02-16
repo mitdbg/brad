@@ -31,7 +31,7 @@ from brad.daemon.monitor import Monitor
 from brad.daemon.system_event_logger import SystemEventLogger
 from brad.daemon.transition_orchestrator import TransitionOrchestrator
 from brad.daemon.blueprint_watchdog import BlueprintWatchdog
-from brad.daemon.populate_stub import create_tables_in_stub
+from brad.daemon.populate_stub import create_tables_in_stub, load_tables_in_stub
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_stats.stub_estimator import StubEstimator
@@ -167,6 +167,9 @@ class BradDaemon:
         if is_stub_mode:
             stub_conn = ConnectionFactory.connect_to_stub(self._config)
             create_tables_in_stub(
+                self._config, stub_conn, self._blueprint_mgr.get_blueprint()
+            )
+            load_tables_in_stub(
                 self._config, stub_conn, self._blueprint_mgr.get_blueprint()
             )
             stub_conn.close_sync()

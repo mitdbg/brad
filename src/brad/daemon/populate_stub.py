@@ -1,3 +1,4 @@
+import csv
 import logging
 from brad.blueprint import Blueprint
 from brad.blueprint.sql_gen.table import TableSqlGenerator
@@ -20,11 +21,46 @@ def create_tables_in_stub(
             continue
         except:  # pylint: disable=bare-except
             pass
+        logger.info("Creating stub table %s", table.name)
         queries, _ = sqlgen.generate_create_table_sql(table, location=Engine.Redshift)
         for q in queries:
-            logger.info(table.name)
-            logger.info(q)
             # HACK: To support SQLite DDL syntax.
             if "VARCHAR(MAX)" in q:
                 q = q.replace("VARCHAR(MAX)", "VARCHAR(65535)")
             cursor.execute_sync(q)
+
+
+def load_tables_in_stub(
+    config: ConfigFile, connection: Connection, blueprint: Blueprint
+) -> None:
+    stub_path = config.stub_mode_path()
+    if stub_path is None:
+        return
+
+    cursor = connection.cursor_sync()
+    cursor.execute_sync("BEGIN")
+
+    for table in blueprint.tables():
+        cursor.execute_sync(f"SELECT COUNT(*) FROM {table.name}")
+        rows = cursor.fetchall_sync()
+        if len(rows) > 0 and int(rows[0][0]) > 0:
+            # The table is non-empty.
+            continue
+
+        # Load the raw data.
+        logger.info("Loading stub data into %s", table.name)
+        with open(
+            stub_path / "dataset" / f"{table.name}.csv", "r", encoding="UTF-8"
+        ) as file:
+            reader = csv.reader(file, delimiter="|")
+            ncols = len(table.columns)
+            placeholders = ", ".join(["?"] * ncols)
+            raw_query = f"INSERT INTO {table.name} VALUES ({placeholders})"
+            for idx, row in enumerate(reader):
+                if idx == 0:
+                    continue
+                # Ideally we should insert in batches. But our stub datasets are
+                # very small (~100 rows), so we keep the implementation simple.
+                cursor.executemany_sync(raw_query, [row])
+
+    cursor.execute_sync("COMMIT")
