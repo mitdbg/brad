@@ -3,7 +3,17 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(FetchContent)
+
 project(FlightMinimalExample)
+
+FetchContent_Declare(
+	arrow
+	GIT_REPOSITORY	https://github.com/apache/arrow.git
+	GIT_TAG			apache-arrow-15.0.0
+)
+
+FetchContent_MakeAvailable(arrow)
 
 find_package(Arrow REQUIRED)
 find_package(ArrowFlight REQUIRED)
@@ -12,6 +22,9 @@ find_package(ArrowFlightSql REQUIRED)
 find_package(gflags REQUIRED)
 
 find_package(SQLite3 REQUIRED)
+
+add_executable(my_test my_test.cc)
+target_link_libraries(my_test)
 
 add_executable(flight_sql_example flight_sql_example.cc)
 target_link_libraries(flight_sql_example
