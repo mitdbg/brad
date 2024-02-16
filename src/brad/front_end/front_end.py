@@ -165,6 +165,8 @@ class BradFrontEnd(BradInterface):
         )
         self._ping_watchdog_task: Optional[asyncio.Task[None]] = None
 
+        self._is_stub_mode = self._config.stub_mode_path is not None
+
     async def serve_forever(self):
         await self._run_setup()
         try:
@@ -207,7 +209,8 @@ class BradFrontEnd(BradInterface):
         # Used to handle messages from the daemon.
         self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
 
-        self._qlogger_refresh_task = asyncio.create_task(self._refresh_qlogger())
+        if not self._is_stub_mode:
+            self._qlogger_refresh_task = asyncio.create_task(self._refresh_qlogger())
         self._watchdog.start(asyncio.get_running_loop())
         self._ping_watchdog_task = asyncio.create_task(self._ping_watchdog())
 
@@ -424,12 +427,14 @@ class BradFrontEnd(BradInterface):
             # Decide whether to log the query.
             run_time_s = end - start
             if not transactional_query or (random.random() < self._config.txn_log_prob):
-                self._qlogger.info(
-                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} "
-                    f"Engine: {engine_to_use.value} "
-                    f"Duration (s): {run_time_s.total_seconds()} "
-                    f"IsTransaction: {transactional_query}"
-                )
+                if not self._is_stub_mode:
+                    # Skip logging the query when running in stub mode.
+                    self._qlogger.info(
+                        f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} "
+                        f"Engine: {engine_to_use.value} "
+                        f"Duration (s): {run_time_s.total_seconds()} "
+                        f"IsTransaction: {transactional_query}"
+                    )
                 run_time_s_float = run_time_s.total_seconds()
                 if not transactional_query:
                     self._query_latency_sketch.add(run_time_s_float)

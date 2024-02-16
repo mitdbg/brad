@@ -32,21 +32,28 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
         forecasting_window_size: int,
     ) -> None:
         self._config = config
+        self._in_stub_mode = self._config.stub_mode_path() is not None
         self._blueprint_mgr = blueprint_mgr
         self._metric_defs = self._load_metric_defs()
         self._values = pd.DataFrame(
             columns=CloudWatchClient.metric_names(self._metric_defs)
         )
         self.update_clients()
-        self._logger = MetricsLogger.create_from_config(
-            self._config, "brad_metrics_redshift.log"
-        )
+        if not self._in_stub_mode:
+            self._logger = MetricsLogger.create_from_config(
+                self._config, "brad_metrics_redshift.log"
+            )
+        else:
+            self._logger = None
 
         super().__init__(
             self._config.epoch_length, forecasting_method, forecasting_window_size
         )
 
     def update_clients(self) -> None:
+        if self._in_stub_mode:
+            return
+
         overriden_id = (
             self._blueprint_mgr.get_directory().get_override_redshift_cluster_id()
         )
@@ -64,6 +71,9 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
         )
 
     async def fetch_latest(self) -> None:
+        if self._in_stub_mode:
+            return
+
         loop = asyncio.get_running_loop()
         new_metrics = await loop.run_in_executor(None, self._fetch_cw_metrics, 8)
 
@@ -116,7 +126,8 @@ class RedshiftMetrics(MetricsSourceWithForecasting):
     def _metrics_logger(self) -> Optional[MetricsLogger]:
         return self._logger
 
-    def _load_metric_defs(self) -> List[MetricDef]:
+    @staticmethod
+    def _load_metric_defs() -> List[MetricDef]:
         metrics_file = files(daemon).joinpath("monitored_redshift_metrics.json")
         with as_file(metrics_file) as file:
             with open(file, "r", encoding="utf8") as data:
