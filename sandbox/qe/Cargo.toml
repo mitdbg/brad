@@ -12,6 +12,7 @@ datafusion = "10.0.0"
 futures = "0.3.21"
 arrow = "18.0.0"
 rustyline = "10.0.0"
+rand = { version = "0.8.5", features = ["small_rng"] }
 
 [[bin]]
 name = "brad_qe_repl"

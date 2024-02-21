@@ -2,6 +2,7 @@ use arrow::util::pretty;
 use clap::Parser;
 use datafusion::error::DataFusionError;
 use brad_qe::DB;
+use brad_qe::dataset_gen::DatasetGenerators;
 use rustyline::{error::ReadlineError, Editor};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -16,7 +17,7 @@ enum Command {
     RegisterCsv,
     RegisterParquet,
     RunHardcodedQuery,
-    // Generate,
+    Generate,
 }
 
 impl FromStr for Command {
@@ -29,7 +30,7 @@ impl FromStr for Command {
             ".regcsv" => Ok(Command::RegisterCsv),
             ".regparquet" => Ok(Command::RegisterParquet),
             ".run" => Ok(Command::RunHardcodedQuery),
-            // ".generate" => Ok(Command::Generate),
+            ".generate" => Ok(Command::Generate),
             _ => Err(()),
         }
     }
@@ -128,36 +129,36 @@ async fn handle_command(line: &str, db: &mut DB) -> Result<(), DataFusionError> 
             // }
         }
 
-        // Command::Generate => {
-        //     if args.len() < 3 {
-        //         println!(
-        //             "ERROR: Specify a generator name and scale factor when using '.generate'."
-        //         );
-        //         return Ok(());
-        //     }
-        //     let generator_name = args[1];
-        //     let scale_factor = args[2].parse::<u32>();
-        //     let seed = if args.len() >= 4 {
-        //         args[3].parse::<u32>()
-        //     } else {
-        //         Ok(42)
-        //     };
-        //     let (scale_factor, seed) = match (scale_factor, seed) {
-        //         (Ok(sf), Ok(sd)) => (sf, sd),
-        //         _ => {
-        //             println!("ERROR: The scale factor and seed must be unsigned integers.");
-        //             return Ok(());
-        //         }
-        //     };
-        //     if let Some(generator) = DatasetGenerators::create_from_name(generator_name) {
-        //         let start = Instant::now();
-        //         db.populate_using_generator(generator, scale_factor, seed)?;
-        //         let elapsed_time = start.elapsed();
-        //         println!("Done. (Ran for {:.2?})", elapsed_time);
-        //     } else {
-        //         println!("ERROR: Generator '{}' does not exist.", generator_name);
-        //     }
-        // }
+        Command::Generate => {
+            if args.len() < 3 {
+                println!(
+                    "ERROR: Specify a generator name and scale factor when using '.generate'."
+                );
+                return Ok(());
+            }
+            let generator_name = args[1];
+            let scale_factor = args[2].parse::<u32>();
+            let seed = if args.len() >= 4 {
+                args[3].parse::<u32>()
+            } else {
+                Ok(42)
+            };
+            let (scale_factor, seed) = match (scale_factor, seed) {
+                (Ok(sf), Ok(sd)) => (sf, sd),
+                _ => {
+                    println!("ERROR: The scale factor and seed must be unsigned integers.");
+                    return Ok(());
+                }
+            };
+            if let Some(generator) = DatasetGenerators::create_from_name(generator_name) {
+                let start = Instant::now();
+                db.populate_using_generator(generator, scale_factor, seed)?;
+                let elapsed_time = start.elapsed();
+                println!("Done. (Ran for {:.2?})", elapsed_time);
+            } else {
+                println!("ERROR: Generator '{}' does not exist.", generator_name);
+            }
+        }
     };
 
     Ok(())
