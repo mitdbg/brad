@@ -4,6 +4,7 @@ from .connection import Connection, ConnectionFailed
 from .odbc_connection import OdbcConnection
 from .pyathena_connection import PyAthenaConnection
 from .redshift_connection import RedshiftConnection
+from .sqlite_connection import SqliteConnection
 from brad.config.file import ConfigFile
 from brad.config.engine import Engine
 from brad.provisioning.directory import Directory
@@ -21,6 +22,9 @@ class ConnectionFactory:
         aurora_read_replica: Optional[int] = None,
         timeout_s: int = 10,
     ) -> Connection:
+        if config.stub_mode_path() is not None:
+            return cls.connect_to_stub(config)
+
         connection_details = config.get_connection_details(engine)
         if engine == Engine.Redshift:
             cluster = directory.redshift_cluster()
@@ -73,6 +77,9 @@ class ConnectionFactory:
         aurora_read_replica: Optional[int] = None,
         timeout_s: int = 10,
     ) -> Connection:
+        if config.stub_mode_path() is not None:
+            return cls.connect_to_stub(config)
+
         connection_details = config.get_connection_details(engine)
         if engine == Engine.Redshift:
             cluster = directory.redshift_cluster()
@@ -112,6 +119,9 @@ class ConnectionFactory:
     async def connect_to_sidecar(
         cls, schema_name: str, config: ConfigFile
     ) -> Connection:
+        if config.stub_mode_path() is not None:
+            return cls.connect_to_stub(config)
+
         connection_details = config.get_sidecar_db_details()
         cstr = cls._pg_aurora_odbc_connection_string(
             connection_details["host"],
@@ -120,6 +130,11 @@ class ConnectionFactory:
             schema_name,
         )
         return await OdbcConnection.connect(cstr, autocommit=True, timeout_s=10)
+
+    @classmethod
+    def connect_to_stub(cls, config: ConfigFile, autocommit: bool = True) -> Connection:
+        stub_path = config.stub_db_path()
+        return SqliteConnection.connect_sync(str(stub_path), autocommit=autocommit)
 
     @staticmethod
     def _pg_aurora_odbc_connection_string(

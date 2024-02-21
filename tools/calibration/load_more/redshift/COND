@@ -1,0 +1,52 @@
+include("../common.cond")
+
+CLUSTER_CONFIGS = [
+  ("dc2_large", 2),
+  ("dc2_large", 4),
+  ("dc2_large", 8),
+  ("dc2_large", 16),
+  ("ra3_xlplus", 2),
+  ("ra3_xlplus", 4),
+  ("ra3_xlplus", 8),
+  ("ra3_4xlarge", 2),
+  ("ra3_4xlarge", 4),
+  ("ra3_4xlarge", 8),
+]
+
+for inst, nodes in CLUSTER_CONFIGS:
+  cfg_name = f"{inst}-{nodes}"
+  run_experiment_group(
+    name=cfg_name,
+    run="python3 -m brad.calibration.measure_load",
+    experiments=[
+      ExperimentInstance(
+        name=f"{cfg_name}-1-q{query_idx}",
+        options={
+          "num-clients": 1,
+          "specific-query-idx": query_idx,
+          "run-for-s": RUN_FOR_S,
+          "avg-gap-s": AVG_GAP_S,
+          "wait-before-start": WAIT_BEFORE_START,
+          "query-file": QUERY_BANK,
+          "engine": "redshift",
+        },
+      )
+      for query_idx in range(NUM_QUERIES)
+    ],
+  )
+
+  group(
+    name=f"{cfg_name}-1-of-2",
+    deps=[
+      f":{cfg_name}-1-q{query_idx}"
+      for query_idx in range(NUM_QUERIES) if query_idx % 2 == 0
+    ],
+  )
+
+  group(
+    name=f"{cfg_name}-2-of-2",
+    deps=[
+      f":{cfg_name}-1-q{query_idx}"
+      for query_idx in range(NUM_QUERIES) if query_idx % 2 == 1
+    ],
+  )
