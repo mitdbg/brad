@@ -16,7 +16,7 @@ enum Command {
     ShowSchema,
     RegisterCsv,
     RegisterParquet,
-    RunHardcodedQuery,
+    RunQuery,
     Generate,
 }
 
@@ -29,7 +29,7 @@ impl FromStr for Command {
             ".schema" => Ok(Command::ShowSchema),
             ".regcsv" => Ok(Command::RegisterCsv),
             ".regparquet" => Ok(Command::RegisterParquet),
-            ".run" => Ok(Command::RunHardcodedQuery),
+            ".run" => Ok(Command::RunQuery),
             ".generate" => Ok(Command::Generate),
             _ => Err(()),
         }
@@ -57,7 +57,7 @@ async fn handle_command(line: &str, db: &mut DB) -> Result<(), DataFusionError> 
             println!(".schema <table>\t\tPrint the schema for a table.");
             println!(".regcsv <path>\t\tRegister a CSV file as a table.");
             println!(".regparquet <path>\tRegister a Parquet file as a table.");
-            println!(".run <name> [<table>]\tRun a hardcoded query by name on the specified table. Default table: test");
+            println!(".run <sql>\tRun a given query.");
             println!(".generate <name> <scale factor> [<seed>]\tPopulate the DB using a dataset generator.");
             println!("Hit Ctrl-D to exit.");
         }
@@ -106,27 +106,17 @@ async fn handle_command(line: &str, db: &mut DB) -> Result<(), DataFusionError> 
             println!("Registered {} new table(s).", num_added);
         }
 
-        Command::RunHardcodedQuery => {
-            return Ok(());
+        Command::RunQuery => {
             if args.len() < 2 {
-                println!("ERROR: Specify a query name when running '.run'.");
+                println!("ERROR: Need to provide a query.");
                 return Ok(());
             }
-            let query_name: &str = args[1];
-            let mut table_name: &str = "test";
-            if args.len() >= 3 {
-                table_name = args[2];
-            }
-            // if let Some(provider) = hardcoded_queries::query_by_name(query_name) {
-            //     let query = provider(table_name);
-            //     let start = Instant::now();
-            //     let res = db.execute(query).await?;
-            //     let elapsed_time = start.elapsed();
-            //     pretty::print_batches(&res)?;
-            //     println!("(Ran for {:.2?})", elapsed_time);
-            // } else {
-            //     println!("ERROR: Hardcoded query '{}' does not exist.", query_name);
-            // }
+            let query = args[1..].join(" ");
+            let start = Instant::now();
+            let res = db.execute(&query).await?;
+            let elapsed_time = start.elapsed();
+            pretty::print_batches(&res)?;
+            println!("(Ran for {:.2?})", elapsed_time);
         }
 
         Command::Generate => {
@@ -212,7 +202,7 @@ struct CliArgs {
 #[tokio::main]
 async fn main() -> Result<(), DataFusionError> {
     let args = CliArgs::parse();
-    println!("IOHTAP REPL");
+    println!("BRAD Query Executor REPL");
     println!("Type .help and hit enter for help. Hit Ctrl-D to exit.");
     let mut db = DB::new();
 
