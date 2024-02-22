@@ -13,28 +13,16 @@ pub struct EmpsDeptsGenerator {
     tables: HashMap<String, SchemaRef>,
 }
 
-/*
-pub fn get_emps_table() -> Table {
-    Table {
-        name: Name::from("employees"),
-        columns: vec![
-            Column::new_regular(Name::from("e_id"), Type::Integer),
-            Column::new_regular(Name::from("e_name"), Type::Text),
-            // Days since January 1, 1970.
-            Column::new_regular(Name::from("e_hire_date"), Type::Integer),
-            Column::new_regular(Name::from("e_salary"), Type::Integer),
-            Column::new_regular(Name::from("e_d_id"), Type::Integer),
-        ],
-        primary_key: vec![Name::from("e_id")],
-    }
-}
-*/
-
 impl EmpsDeptsGenerator {
     pub fn new() -> Self {
         // Employees table.
         let columns = vec![
             Field::new("e_id", DataType::Int64, false),
+            Field::new("e_name", DataType::Utf8, false),
+            // Days since January 1, 1970.
+            Field::new("e_hire_date", DataType::Int64, false),
+            Field::new("e_salary", DataType::Int64, false),
+            Field::new("e_d_id", DataType::Int64, false),
         ];
         let emps_table = ("employees".to_string(), Arc::new(Schema::new(columns)));
         let tables = vec![emps_table];
