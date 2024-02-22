@@ -28,3 +28,6 @@ venv
 
 # Used for any scratch data/results that are not meant to be checked in.
 scratch
+
+sandbox/qe/target
+sandbox/qe/.brad_qe_repl_history
