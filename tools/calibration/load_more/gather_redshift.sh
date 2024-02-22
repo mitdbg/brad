@@ -24,6 +24,11 @@ function sync_redshift_resize() {
   target_instance_type=${raw_instance//_/.}
   target_node_count=$2
 
+  if [[ $target_node_count = "2" ]] && [[ $raw_instance = "dc2_large" ]]; then
+    >&2 echo "Skipping initial resize to $raw_instance $target_node_count (special case)"
+    return
+  fi
+
   # Try an elastic resize first.
   >&2 echo "Resizing Redshift cluster to $target_instance_type with $target_node_count nodes (attempt elastic)"
   aws redshift resize-cluster --cluster-identifier "$cluster_identifier" --cluster-type multi-node --node-type "$target_instance_type" --number-of-nodes "$target_node_count" --no-classic --region us-east-1 > /dev/null
