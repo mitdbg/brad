@@ -2,12 +2,15 @@ from typing import Dict, Optional
 
 from .connection import Connection, ConnectionFailed
 from .odbc_connection import OdbcConnection
+from .psycopg_connection import PsycopgConnection
 from .pyathena_connection import PyAthenaConnection
 from .redshift_connection import RedshiftConnection
 from .sqlite_connection import SqliteConnection
 from brad.config.file import ConfigFile
 from brad.config.engine import Engine
 from brad.provisioning.directory import Directory
+
+_USE_PSYCOPG_KEY = "use_psycopg"
 
 
 class ConnectionFactory:
@@ -51,10 +54,24 @@ class ConnectionFactory:
                     )
                 instance = aurora_readers[aurora_read_replica]
                 address, port = instance.endpoint()
-            cstr = cls._pg_aurora_odbc_connection_string(
-                address, port, connection_details, schema_name
-            )
-            return await OdbcConnection.connect(cstr, autocommit, timeout_s)
+            if (
+                _USE_PSYCOPG_KEY in connection_details
+                and connection_details[_USE_PSYCOPG_KEY]
+            ):
+                cstr = cls._pg_aurora_psycopg_connection_string(
+                    address,
+                    port,
+                    connection_details,
+                    schema_name,
+                    timeout_s,
+                    statement_timeout_s=None,
+                )
+                return await PsycopgConnection.connect(cstr, autocommit)
+            else:
+                cstr = cls._pg_aurora_odbc_connection_string(
+                    address, port, connection_details, schema_name
+                )
+                return await OdbcConnection.connect(cstr, autocommit, timeout_s)
         elif engine == Engine.Athena:
             return await PyAthenaConnection.connect(
                 aws_region=connection_details["aws_region"],
@@ -100,10 +117,24 @@ class ConnectionFactory:
                 else directory.aurora_readers()[aurora_read_replica]
             )
             address, port = instance.endpoint()
-            cstr = cls._pg_aurora_odbc_connection_string(
-                address, port, connection_details, schema_name
-            )
-            return OdbcConnection.connect_sync(cstr, autocommit, timeout_s)
+            if (
+                _USE_PSYCOPG_KEY in connection_details
+                and connection_details[_USE_PSYCOPG_KEY]
+            ):
+                cstr = cls._pg_aurora_psycopg_connection_string(
+                    address,
+                    port,
+                    connection_details,
+                    schema_name,
+                    timeout_s,
+                    statement_timeout_s=None,
+                )
+                return PsycopgConnection.connect_sync(cstr, autocommit)
+            else:
+                cstr = cls._pg_aurora_odbc_connection_string(
+                    address, port, connection_details, schema_name
+                )
+                return OdbcConnection.connect_sync(cstr, autocommit, timeout_s)
         elif engine == Engine.Athena:
             return PyAthenaConnection.connect_sync(
                 aws_region=connection_details["aws_region"],
@@ -123,13 +154,27 @@ class ConnectionFactory:
             return cls.connect_to_stub(config)
 
         connection_details = config.get_sidecar_db_details()
-        cstr = cls._pg_aurora_odbc_connection_string(
-            connection_details["host"],
-            int(connection_details["port"]),
-            connection_details,
-            schema_name,
-        )
-        return await OdbcConnection.connect(cstr, autocommit=True, timeout_s=10)
+        if (
+            _USE_PSYCOPG_KEY in connection_details
+            and connection_details[_USE_PSYCOPG_KEY]
+        ):
+            cstr = cls._pg_aurora_psycopg_connection_string(
+                connection_details["host"],
+                int(connection_details["port"]),
+                connection_details,
+                schema_name,
+                timeout_s=10,
+                statement_timeout_s=None,
+            )
+            return await PsycopgConnection.connect(cstr, autocommit=True)
+        else:
+            cstr = cls._pg_aurora_odbc_connection_string(
+                connection_details["host"],
+                int(connection_details["port"]),
+                connection_details,
+                schema_name,
+            )
+            return await OdbcConnection.connect(cstr, autocommit=True, timeout_s=10)
 
     @classmethod
     def connect_to_stub(cls, config: ConfigFile, autocommit: bool = True) -> Connection:
