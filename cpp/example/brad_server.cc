@@ -178,6 +178,20 @@ class BradFlightSqlServer::Impl {
     return DoGetBradQuery(query, SqlSchema::GetDbSchemasSchema());
   }
 
+  arrow::Result<std::unique_ptr<FlightDataStream>> DoGetPreparedStatement(
+      const ServerCallContext& context,
+      const PreparedStatementQuery& command) {
+    const std::string& sql = "SELECT 1";
+
+    std::shared_ptr<BradStatement> statement;
+    ARROW_ASSIGN_OR_RAISE(statement, BradStatement::Create(sql));
+
+    std::shared_ptr<BradStatementBatchReader> reader;
+    ARROW_ASSIGN_OR_RAISE(reader, BradStatementBatchReader::Create(statement));
+
+    return std::make_unique<RecordBatchStream>(reader);
+  }
+
   arrow::Result<std::unique_ptr<FlightInfo>> GetFlightInfoTables(
       const ServerCallContext& context,
       const GetTables& command,
@@ -349,6 +363,12 @@ arrow::Result<std::unique_ptr<FlightInfo>> BradFlightSqlServer::GetFlightInfoSch
 arrow::Result<std::unique_ptr<FlightDataStream>> BradFlightSqlServer::DoGetDbSchemas(
     const ServerCallContext& context, const GetDbSchemas& command) {
   return impl_->DoGetDbSchemas(context, command);
+}
+
+arrow::Result<std::unique_ptr<FlightDataStream>> BradFlightSqlServer::DoGetPreparedStatement(
+    const ServerCallContext& context,
+    const PreparedStatementQuery& command) {
+  return impl_->DoGetPreparedStatement(context, command);
 }
 
 arrow::Result<std::unique_ptr<FlightInfo>> BradFlightSqlServer::GetFlightInfoTables(

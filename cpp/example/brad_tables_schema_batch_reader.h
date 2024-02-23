@@ -33,6 +33,7 @@ class BradTablesWithSchemaBatchReader : public RecordBatchReader {
  private:
   std::shared_ptr<BradStatementBatchReader> reader_;
   std::string main_query_;
+  bool already_executed_;
 
  public:
   /// Constructor for BradTablesWithSchemaBatchReader class

@@ -36,6 +36,11 @@ std::shared_ptr<Schema> BradTablesWithSchemaBatchReader::schema() const {
 
 Status BradTablesWithSchemaBatchReader::ReadNext(
   std::shared_ptr<RecordBatch>* batch) {
+  if (already_executed_) {
+    *batch = NULLPTR;
+    return Status::OK();
+  }
+
   std::shared_ptr<RecordBatch> first_batch;
 
   ARROW_RETURN_NOT_OK(reader_->ReadNext(&first_batch));
@@ -46,6 +51,7 @@ Status BradTablesWithSchemaBatchReader::ReadNext(
   }
 
   *batch = first_batch;
+  already_executed_ = true;
 
   return Status::OK();
 }

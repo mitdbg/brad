@@ -54,8 +54,13 @@ BradStatementBatchReader::Create(
 }
 
 Status BradStatementBatchReader::ReadNext(std::shared_ptr<RecordBatch>* out) {
-  ARROW_ASSIGN_OR_RAISE(*out, statement_->FetchResult());
+  if (already_executed_) {
+    *out = NULLPTR;
+    return Status::OK();
+  }
 
+  ARROW_ASSIGN_OR_RAISE(*out, statement_->FetchResult());
+  already_executed_ = true;
   return Status::OK();
 }
 

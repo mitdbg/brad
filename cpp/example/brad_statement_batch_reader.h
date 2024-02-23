@@ -50,6 +50,7 @@ class BradStatementBatchReader : public RecordBatchReader {
  private:
   std::shared_ptr<BradStatement> statement_;
   std::shared_ptr<Schema> schema_;
+  bool already_executed_;
 
   BradStatementBatchReader(std::shared_ptr<BradStatement> statement,
                            std::shared_ptr<Schema> schema);

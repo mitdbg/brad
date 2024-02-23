@@ -74,9 +74,9 @@ class BradFlightSqlServer : public FlightSqlServerBase {
   //     const PreparedStatementQuery& command,
   //     const FlightDescriptor& descriptor) override;
 
-  // arrow::Result<std::unique_ptr<FlightDataStream>> DoGetPreparedStatement(
-  //     const ServerCallContext& context,
-  //     const PreparedStatementQuery& command) override;
+  arrow::Result<std::unique_ptr<FlightDataStream>> DoGetPreparedStatement(
+      const ServerCallContext& context,
+      const PreparedStatementQuery& command) override;
 
   // Status DoPutPreparedStatementQuery(
   //     const ServerCallContext& context,
