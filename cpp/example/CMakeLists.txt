@@ -12,6 +12,8 @@ find_package(ArrowFlightSql REQUIRED)
 find_package(gflags REQUIRED)
 
 add_executable(brad_example main.cc
+               brad_server.cc
+               brad_server.h
                brad_sql_info.cc
                brad_sql_info.h
                brad_statement.cc
