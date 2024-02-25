@@ -23,7 +23,7 @@
 #include <string>
 
 #include <arrow/flight/server.h>
-#include "example/brad_server.h"
+#include "server/brad_server.h"
 #include <arrow/io/test_common.h>
 #include <arrow/util/logging.h>
 

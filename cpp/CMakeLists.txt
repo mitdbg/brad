@@ -13,50 +13,25 @@ find_package(ArrowFlightSql REQUIRED)
 
 find_package(gflags REQUIRED)
 
-find_package(SQLite3 REQUIRED)
-
 add_executable(flight_sql_example flight_sql_example.cc)
 target_link_libraries(flight_sql_example
                       PRIVATE Arrow::arrow_shared
                       PRIVATE ArrowFlight::arrow_flight_shared
                       PRIVATE ArrowFlightSql::arrow_flight_sql_shared
-                      gflags
-                      ${SQLite3_LIBRARIES})
+                      gflags)
 
-add_executable(flight_sql_test_server test_server_cli.cc
-               example/sqlite_server.cc
-               example/sqlite_server.h
-               example/sqlite_server.cc
-               example/sqlite_server.h
-               example/sqlite_sql_info.cc
-               example/sqlite_sql_info.h
-               example/sqlite_statement_batch_reader.cc
-               example/sqlite_statement_batch_reader.h
-               example/sqlite_statement.cc
-               example/sqlite_statement.h
-               example/sqlite_tables_schema_batch_reader.cc
-               example/sqlite_tables_schema_batch_reader.h
-               example/sqlite_type_info.cc
-               example/sqlite_type_info.h)
-target_link_libraries(flight_sql_test_server
-                      PRIVATE Arrow::arrow_shared
-                      PRIVATE ArrowFlight::arrow_flight_shared
-                      PRIVATE ArrowFlightSql::arrow_flight_sql_shared
-                      gflags
-                      ${SQLite3_LIBRARIES})
-
-add_executable(flight_sql_brad_server brad_server_cli.cc
-               example/brad_server.cc
-               example/brad_server.h
-               example/brad_sql_info.cc
-               example/brad_sql_info.h
-               example/brad_statement_batch_reader.cc
-               example/brad_statement_batch_reader.h
-               example/brad_statement.cc
-               example/brad_statement.h
-               example/brad_tables_schema_batch_reader.cc
-               example/brad_tables_schema_batch_reader.h)
-target_link_libraries(flight_sql_brad_server
+add_executable(flight_sql_server flight_sql_server.cc
+               server/brad_server.cc
+               server/brad_server.h
+               server/brad_sql_info.cc
+               server/brad_sql_info.h
+               server/brad_statement_batch_reader.cc
+               server/brad_statement_batch_reader.h
+               server/brad_statement.cc
+               server/brad_statement.h
+               server/brad_tables_schema_batch_reader.cc
+               server/brad_tables_schema_batch_reader.h)
+target_link_libraries(flight_sql_server
                       PRIVATE Arrow::arrow_shared
                       PRIVATE ArrowFlight::arrow_flight_shared
                       PRIVATE ArrowFlightSql::arrow_flight_sql_shared
