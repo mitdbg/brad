@@ -17,3 +17,7 @@ rand = { version = "0.8.5", features = ["small_rng"] }
 [[bin]]
 name = "brad_qe_repl"
 path = "src/bin/repl.rs"
+
+[[bin]]
+name = "bench_q3"
+path = "src/bin/bench_q3.rs"

@@ -206,7 +206,7 @@ async fn main() -> Result<(), DataFusionError> {
     println!("Type .help and hit enter for help. Hit Ctrl-D to exit.");
     let mut db = DB::new();
 
-    let num_registered_tables = db.register_csvs(args.csv_file).await?;
+    let num_registered_tables = db.register_csvs(args.csv_file, None).await?;
     if num_registered_tables > 0 {
         println!("Registered {} table(s).", num_registered_tables);
     }
