@@ -5,12 +5,12 @@ on:
     branches: [ main ]
     paths-ignore:
     - 'cpp/**'
-    - 'experimental/**'
+    - 'sandbox/**'
   pull_request:
     branches: [ main ]
     paths-ignore:
     - 'cpp/**'
-    - 'experimental/**'
+    - 'sandbox/**'
 
 jobs:
   build:
