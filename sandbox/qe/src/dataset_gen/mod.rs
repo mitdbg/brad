@@ -6,6 +6,8 @@ use std::sync::Arc;
 /// Also see `cirrus::hardcoded_system_plans::emps_depts`.
 mod emps_depts;
 
+mod tpch;
+
 pub trait DatasetGenerator {
     /// Returns the tables in the dataset. Each tuple in the returned vector
     /// contains the table's name and their schema.

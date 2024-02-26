@@ -2,8 +2,8 @@ use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use datafusion::datasource::memory::MemTable;
 use datafusion::error::DataFusionError;
-use datafusion::physical_plan::PhysicalPlanner;
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
+use datafusion::physical_plan::PhysicalPlanner;
 use datafusion::prelude::*;
 use futures::future;
 use std::path::PathBuf;
@@ -30,10 +30,14 @@ impl DB {
     }
 
     pub async fn register_csv(&self, csv_file: PathBuf) -> Result<usize, DataFusionError> {
-        self.register_csvs(vec![csv_file]).await
+        self.register_csvs(vec![csv_file], None).await
     }
 
-    pub async fn register_csvs(&self, csv_files: Vec<PathBuf>) -> Result<usize, DataFusionError> {
+    pub async fn register_csvs<'a>(
+        &self,
+        csv_files: Vec<PathBuf>,
+        options: Option<CsvReadOptions<'a>>,
+    ) -> Result<usize, DataFusionError> {
         let table_paths_and_names = csv_files
             .into_iter()
             .filter_map(|path| {
@@ -48,10 +52,15 @@ impl DB {
             })
             .collect::<Vec<(String, String)>>();
         let num_tables = table_paths_and_names.len();
+        let inner_options = if let Some(inner) = options {
+            inner
+        } else {
+            CsvReadOptions::new()
+        };
         future::try_join_all(table_paths_and_names.iter().map(|(str_path, table_name)| {
             self.dfusion
                 .session_context()
-                .register_csv(table_name, str_path, CsvReadOptions::new())
+                .register_csv(table_name, str_path, inner_options.clone())
         }))
         .await?;
         Ok(num_tables)
@@ -92,16 +101,15 @@ impl DB {
         Ok(num_tables)
     }
 
-    pub async fn execute(
-        &self,
-        query: &String,
-    ) -> Result<Vec<RecordBatch>, DataFusionError> {
+    pub async fn execute(&self, query: &String) -> Result<Vec<RecordBatch>, DataFusionError> {
         // TODO: This uses an internal method. We should use other DataFusion
         // methods to parse a SQL statement into a logical plan.
         let ctx = self.dfusion.session_context();
         let logical_plan = ctx.create_logical_plan(query)?;
         let planner = DefaultPhysicalPlanner::default();
-        let physical_plan = planner.create_physical_plan(&logical_plan, &ctx.state()).await?;
+        let physical_plan = planner
+            .create_physical_plan(&logical_plan, &ctx.state())
+            .await?;
         self.dfusion.execute_datafusion_plan(physical_plan).await
     }
 
