@@ -12,6 +12,7 @@ from brad.blueprint.sql_gen.table import (
     comma_separated_column_names_and_types,
     comma_separated_column_names,
 )
+from brad.blueprint.user import UserProvidedBlueprint
 from brad.connection.connection import Connection
 from brad.config.file import ConfigFile
 from brad.config.engine import Engine
@@ -22,6 +23,8 @@ from brad.config.strings import (
     shadow_table_name,
 )
 from brad.front_end.engine_connections import EngineConnections
+from brad.planner.data import bootstrap_blueprint
+from brad.provisioning.directory import Directory
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +64,16 @@ _ATHENA_CREATE_LOAD_TABLE = """
 def register_admin_action(subparser) -> None:
     parser = subparser.add_parser("bulk_load", help="Bulk load table(s) on BRAD.")
     parser.add_argument(
-        "--config-file",
+        "--physical-config-file",
         type=str,
         required=True,
-        help="Path to BRAD's configuration file.",
+        help="Path to BRAD's physical configuration file.",
+    )
+    parser.add_argument(
+        "--schema-file",
+        type=str,
+        help="Include this only if a blueprint does not exist. "
+        "Only meant to be used if you know what you are doing.",
     )
     parser.add_argument(
         "--manifest-file",
@@ -330,11 +339,21 @@ async def _truncate_aurora_tables(
 
 
 async def bulk_load_impl(args, manifest: Dict[str, Any]) -> None:
-    config = ConfigFile.load(args.config_file)
+    config = ConfigFile.load_from_physical_config(args.physical_config_file)
     assets = AssetManager(config)
-    blueprint_mgr = BlueprintManager(config, assets, manifest["schema_name"])
-    await blueprint_mgr.load()
-    blueprint = blueprint_mgr.get_blueprint()
+    if args.schema_file is None:
+        logger.info("Loading blueprint from S3.")
+        blueprint_mgr = BlueprintManager(config, assets, manifest["schema_name"])
+        await blueprint_mgr.load()
+        blueprint = blueprint_mgr.get_blueprint()
+        directory = blueprint_mgr.get_directory()
+    else:
+        logger.info("Using the schema file to create a bootstrapped blueprint.")
+        user = UserProvidedBlueprint.load_from_yaml_file(args.schema_file)
+        user.validate()
+        blueprint = bootstrap_blueprint(user)
+        directory = Directory(config)
+        await directory.refresh()
 
     # Check for specific engines.
     if args.only_engines is not None and len(args.only_engines) > 0:
@@ -348,7 +367,7 @@ async def bulk_load_impl(args, manifest: Dict[str, Any]) -> None:
         running: List[asyncio.Task[Engine]] = []
         engines = await EngineConnections.connect(
             config,
-            blueprint_mgr.get_directory(),
+            directory,
             manifest["schema_name"],
             specific_engines=engines_filter,
         )
