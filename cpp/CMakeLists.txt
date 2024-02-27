@@ -37,4 +37,19 @@ target_link_libraries(flight_sql_server
                       PRIVATE ArrowFlightSql::arrow_flight_sql_shared
                       gflags)
 
-
+add_executable(brad_front_end brad_front_end.cc
+               server/brad_server.cc
+               server/brad_server.h
+               server/brad_sql_info.cc
+               server/brad_sql_info.h
+               server/brad_statement_batch_reader.cc
+               server/brad_statement_batch_reader.h
+               server/brad_statement.cc
+               server/brad_statement.h
+               server/brad_tables_schema_batch_reader.cc
+               server/brad_tables_schema_batch_reader.h)
+target_link_libraries(brad_front_end
+                      PRIVATE Arrow::arrow_shared
+                      PRIVATE ArrowFlight::arrow_flight_shared
+                      PRIVATE ArrowFlightSql::arrow_flight_sql_shared
+                      gflags)
