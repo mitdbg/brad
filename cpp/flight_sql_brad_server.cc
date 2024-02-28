@@ -34,9 +34,9 @@ arrow::Status RunMain() {
                         arrow::flight::Location::ForGrpcTcp("0.0.0.0", FLAGS_port));
   arrow::flight::FlightServerOptions options(location);
 
-  std::shared_ptr<arrow::flight::sql::brad::BradFlightSqlServer> server;
+  std::shared_ptr<brad::BradFlightSqlServer> server;
   ARROW_ASSIGN_OR_RAISE(server,
-                        arrow::flight::sql::brad::BradFlightSqlServer::Create())
+                        brad::BradFlightSqlServer::Create())
 
   ARROW_CHECK_OK(server->Init(options));
   // Exit with a clean error code (0) on SIGTERM

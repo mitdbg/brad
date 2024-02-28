@@ -20,15 +20,15 @@
 #include <arrow/builder.h>
 #include "brad_statement.h"
 
-namespace arrow {
-namespace flight {
-namespace sql {
 namespace brad {
 
-std::shared_ptr<Schema> BradStatementBatchReader::schema() const { return schema_; }
+std::shared_ptr<arrow::Schema> BradStatementBatchReader::schema() const {
+  return schema_;
+}
 
 BradStatementBatchReader::BradStatementBatchReader(
-    std::shared_ptr<BradStatement> statement, std::shared_ptr<Schema> schema)
+    std::shared_ptr<BradStatement> statement,
+    std::shared_ptr<arrow::Schema> schema)
     : statement_(std::move(statement)),
       schema_(std::move(schema)) {}
 
@@ -46,25 +46,22 @@ BradStatementBatchReader::Create(
 arrow::Result<std::shared_ptr<BradStatementBatchReader>>
 BradStatementBatchReader::Create(
   const std::shared_ptr<BradStatement>& statement,
-  const std::shared_ptr<Schema>& schema) {
+  const std::shared_ptr<arrow::Schema>& schema) {
   std::shared_ptr<BradStatementBatchReader> result(
       new BradStatementBatchReader(statement, schema));
 
   return result;
 }
 
-Status BradStatementBatchReader::ReadNext(std::shared_ptr<RecordBatch>* out) {
+arrow::Status BradStatementBatchReader::ReadNext(std::shared_ptr<arrow::RecordBatch>* out) {
   if (already_executed_) {
     *out = NULLPTR;
-    return Status::OK();
+    return arrow::Status::OK();
   }
 
   ARROW_ASSIGN_OR_RAISE(*out, statement_->FetchResult());
   already_executed_ = true;
-  return Status::OK();
+  return arrow::Status::OK();
 }
 
 }  // namespace brad
-}  // namespace sql
-}  // namespace flight
-}  // namespace arrow

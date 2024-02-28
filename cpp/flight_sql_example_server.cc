@@ -23,14 +23,35 @@
 #include <string>
 
 #include <arrow/flight/server.h>
+#include "sqlite_server/sqlite_server.h"
 #include <arrow/io/test_common.h>
 #include <arrow/util/logging.h>
 
+DEFINE_int32(port, 31337, "Server port to listen on");
+
 arrow::Status RunMain() {
+  ARROW_ASSIGN_OR_RAISE(auto location,
+                        arrow::flight::Location::ForGrpcTcp("0.0.0.0", FLAGS_port));
+  arrow::flight::FlightServerOptions options(location);
+
+  std::shared_ptr<arrow::flight::sql::example::SQLiteFlightSqlServer> server;
+  ARROW_ASSIGN_OR_RAISE(server,
+                        arrow::flight::sql::example::SQLiteFlightSqlServer::Create())
+
+  ARROW_CHECK_OK(server->Init(options));
+  // Exit with a clean error code (0) on SIGTERM
+  ARROW_CHECK_OK(server->SetShutdownOnSignals({SIGTERM}));
+
+  std::cout << "Server listening on localhost:" << server->port() << std::endl;
+  ARROW_CHECK_OK(server->Serve());
+
   return arrow::Status::OK();
 }
 
 int main(int argc, char** argv) {
+  gflags::SetUsageMessage("Integration testing server for Flight SQL.");
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+
   arrow::Status st = RunMain();
   if (!st.ok()) {
     std::cerr << st << std::endl;

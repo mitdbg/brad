@@ -25,38 +25,32 @@
 #include <arrow/ipc/writer.h>
 #include <arrow/record_batch.h>
 
-namespace arrow {
-namespace flight {
-namespace sql {
 namespace brad {
 
-std::shared_ptr<Schema> BradTablesWithSchemaBatchReader::schema() const {
-  return SqlSchema::GetTablesSchemaWithIncludedSchema();
+std::shared_ptr<arrow::Schema> BradTablesWithSchemaBatchReader::schema() const {
+  return arrow::flight::sql::SqlSchema::GetTablesSchemaWithIncludedSchema();
 }
 
-Status BradTablesWithSchemaBatchReader::ReadNext(
-  std::shared_ptr<RecordBatch>* batch) {
+arrow::Status BradTablesWithSchemaBatchReader::ReadNext(
+  std::shared_ptr<arrow::RecordBatch>* batch) {
   if (already_executed_) {
     *batch = NULLPTR;
-    return Status::OK();
+    return arrow::Status::OK();
   }
 
-  std::shared_ptr<RecordBatch> first_batch;
+  std::shared_ptr<arrow::RecordBatch> first_batch;
 
   ARROW_RETURN_NOT_OK(reader_->ReadNext(&first_batch));
 
   if (!first_batch) {
       *batch = NULLPTR;
-      return Status::OK();
+      return arrow::Status::OK();
   }
 
   *batch = first_batch;
   already_executed_ = true;
 
-  return Status::OK();
+  return arrow::Status::OK();
 }
 
 }  // namespace brad
-}  // namespace sql
-}  // namespace flight
-}  // namespace arrow

@@ -20,10 +20,9 @@
 #include <arrow/flight/sql/types.h>
 #include <arrow/util/config.h>
 
-namespace arrow {
-namespace flight {
-namespace sql {
 namespace brad {
+
+using namespace arrow::flight::sql;
 
 /// \brief Gets the mapping from SQL info ids to SqlInfoResult instances.
 /// \return the cache.
@@ -225,6 +224,3 @@ SqlInfoResultMap GetSqlInfoResultMap() {
 }
 
 }  // namespace brad
-}  // namespace sql
-}  // namespace flight
-}  // namespace arrow

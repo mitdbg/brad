@@ -5,7 +5,7 @@
 #include <arrow/flight/client.h>
 #include <arrow/flight/sql/client.h>
 #include <arrow/flight/server.h>
-#include "server/brad_server.h"
+// #include "server/brad_server.h"
 #include <arrow/table.h>
 #include <arrow/util/logging.h>
 
@@ -16,32 +16,13 @@
 namespace flight = arrow::flight;
 namespace flightsql = arrow::flight::sql;
 
+namespace brad {
+
 void BradFrontEnd::AddServer(const std::string &host, int port) {
   ServerInfo server_info{};
   server_info.host = host;
   server_info.port = port;
   server_info_objects_.push_back(server_info);
-}
-
-arrow::Status InitializeServer(const ServerInfo server_info) {
-  const std::string &host = server_info.host;
-  int port = server_info.port;
-
-  ARROW_ASSIGN_OR_RAISE(auto location,
-                        arrow::flight::Location::ForGrpcTcp(host, port));
-  arrow::flight::FlightServerOptions options(location);
-
-  std::shared_ptr<arrow::flight::sql::brad::BradFlightSqlServer> server;
-  ARROW_ASSIGN_OR_RAISE(server,
-                        flightsql::brad::BradFlightSqlServer::Create())
-  ARROW_CHECK_OK(server->Init(options));
-  ARROW_CHECK_OK(server->SetShutdownOnSignals({SIGTERM}));
-
-  std::cout << "Server listening on localhost:" << server->port() << std::endl;
-
-  ARROW_CHECK_OK(server->Serve());
-
-  return arrow::Status::OK();
 }
 
 arrow::Status BradFrontEnd::ExecuteQuery(const std::string &query) {
@@ -100,8 +81,10 @@ arrow::Status BradFrontEnd::ExecuteQuery(const std::string &query) {
   return arrow::Status::OK();
 }
 
+} // namespace brad
+
 arrow::Status Main() {
-  BradFrontEnd front_end_server = BradFrontEnd();
+  brad::BradFrontEnd front_end_server;
   front_end_server.AddServer("localhost", 31337);
 
   std::string query = "SELECT 1";

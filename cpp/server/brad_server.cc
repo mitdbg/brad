@@ -35,12 +35,11 @@
 #include <arrow/util/checked_cast.h>
 #include <arrow/util/logging.h>
 
-namespace arrow {
-namespace flight {
-namespace sql {
 namespace brad {
 
 using arrow::internal::checked_cast;
+using namespace arrow::flight;
+using namespace arrow::flight::sql;
 
 namespace {
 
@@ -49,7 +48,7 @@ std::string PrepareQueryForGetTables(const GetTables& command) {
 }
 
 arrow::Result<std::unique_ptr<FlightDataStream>> DoGetBradQuery(
-    const std::string& query, const std::shared_ptr<Schema>& schema) {
+    const std::string& query, const std::shared_ptr<arrow::Schema>& schema) {
   std::shared_ptr<BradStatement> statement;
 
   ARROW_ASSIGN_OR_RAISE(statement, BradStatement::Create(query));
@@ -62,7 +61,7 @@ arrow::Result<std::unique_ptr<FlightDataStream>> DoGetBradQuery(
 
 arrow::Result<std::unique_ptr<FlightInfo>> GetFlightInfoForCommand(
     const FlightDescriptor& descriptor,
-    const std::shared_ptr<Schema>& schema) {
+    const std::shared_ptr<arrow::Schema>& schema) {
   std::vector<FlightEndpoint> endpoints{
       FlightEndpoint{{descriptor.cmd}, {}, std::nullopt, ""}};
   ARROW_ASSIGN_OR_RAISE(auto result,
@@ -84,7 +83,7 @@ class BradFlightSqlServer::Impl {
     std::lock_guard<std::mutex> guard(mutex_);
     auto search = prepared_statements_.find(handle);
     if (search == prepared_statements_.end()) {
-      return Status::KeyError("Prepared statement not found");
+      return arrow::Status::KeyError("Prepared statement not found");
     }
     return search->second;
   }
@@ -105,7 +104,7 @@ class BradFlightSqlServer::Impl {
       const std::string& ticket) {
     auto divider = ticket.find(':');
     if (divider == std::string::npos) {
-      return Status::Invalid("Malformed ticket");
+      return arrow::Status::Invalid("Malformed ticket");
     }
     std::string transaction_id = ticket.substr(0, divider);
     std::string query = ticket.substr(divider + 1);
@@ -304,12 +303,12 @@ class BradFlightSqlServer::Impl {
   arrow::Result<ActionBeginTransactionResult> BeginTransaction(
       const ServerCallContext& context,
       const ActionBeginTransactionRequest& request) {
-    return Status::OK();
+    return arrow::Status::OK();
   }
 
-  Status EndTransaction(const ServerCallContext& context,
-                        const ActionEndTransactionRequest& request) {
-    return Status::OK();
+  arrow::Status EndTransaction(const ServerCallContext& context,
+                               const ActionEndTransactionRequest& request) {
+    return arrow::Status::OK();
   }
 };
 
@@ -462,13 +461,10 @@ BradFlightSqlServer::BeginTransaction(
   return impl_->BeginTransaction(context, request);
 }
 
-Status BradFlightSqlServer::EndTransaction(
+arrow::Status BradFlightSqlServer::EndTransaction(
     const ServerCallContext& context,
     const ActionEndTransactionRequest& request) {
   return impl_->EndTransaction(context, request);
 }
 
 }  // namespace brad
-}  // namespace sql
-}  // namespace flight
-}  // namespace arrow

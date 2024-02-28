@@ -23,9 +23,6 @@
 #include <arrow/flight/sql/column_metadata.h>
 #include <arrow/type_fwd.h>
 
-namespace arrow {
-namespace flight {
-namespace sql {
 namespace brad {
 
 /// \brief Create an object ColumnMetadata using the column type and
@@ -33,7 +30,7 @@ namespace brad {
 /// \param column_type  The BRAD type.
 /// \param table        The table name.
 /// \return             A Column Metadata object.
-ColumnMetadata GetColumnMetadata(int column_type, const char* table);
+// ColumnMetadata GetColumnMetadata(int column_type, const char* table);
 
 class BradStatement {
  public:
@@ -47,9 +44,9 @@ class BradStatement {
 
   /// \brief Creates an Arrow Schema based on the results of this statement.
   /// \return              The resulting Schema.
-  arrow::Result<std::shared_ptr<Schema>> GetSchema() const;
+  arrow::Result<std::shared_ptr<arrow::Schema>> GetSchema() const;
 
-  arrow::Result<std::shared_ptr<RecordBatch>> FetchResult();
+  arrow::Result<std::shared_ptr<arrow::RecordBatch>> FetchResult();
 
   std::string* GetBradStmt() const;
 
@@ -60,6 +57,3 @@ class BradStatement {
 };
 
 }  // namespace brad
-}  // namespace sql
-}  // namespace flight
-}  // namespace arrow

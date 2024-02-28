@@ -24,12 +24,9 @@
 #include "brad_statement_batch_reader.h"
 #include <arrow/record_batch.h>
 
-namespace arrow {
-namespace flight {
-namespace sql {
 namespace brad {
 
-class BradTablesWithSchemaBatchReader : public RecordBatchReader {
+class BradTablesWithSchemaBatchReader : public arrow::RecordBatchReader {
  private:
   std::shared_ptr<BradStatementBatchReader> reader_;
   std::string main_query_;
@@ -44,12 +41,9 @@ class BradTablesWithSchemaBatchReader : public RecordBatchReader {
       std::string main_query)
       : reader_(std::move(reader)), main_query_(std::move(main_query)) {}
 
-  std::shared_ptr<Schema> schema() const override;
+  std::shared_ptr<arrow::Schema> schema() const override;
 
-  Status ReadNext(std::shared_ptr<RecordBatch>* batch) override;
+  arrow::Status ReadNext(std::shared_ptr<arrow::RecordBatch>* batch) override;
 };
 
 }  // namespace brad
-}  // namespace sql
-}  // namespace flight
-}  // namespace arrow

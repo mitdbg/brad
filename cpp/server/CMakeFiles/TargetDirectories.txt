@@ -1,3 +1,0 @@
-/home/sophiez/brad/cpp/example/CMakeFiles/brad_example.dir
-/home/sophiez/brad/cpp/example/CMakeFiles/edit_cache.dir
-/home/sophiez/brad/cpp/example/CMakeFiles/rebuild_cache.dir

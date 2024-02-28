@@ -30,9 +30,6 @@
 #include <arrow/type.h>
 #include <arrow/util/checked_cast.h>
 
-namespace arrow {
-namespace flight {
-namespace sql {
 namespace brad {
 
 using arrow::internal::checked_cast;
@@ -47,15 +44,15 @@ arrow::Result<std::shared_ptr<BradStatement>> BradStatement::Create(
 BradStatement::~BradStatement() {
 }
 
-arrow::Result<std::shared_ptr<Schema>> BradStatement::GetSchema() const {
-  std::vector<std::shared_ptr<Field>> fields;
+arrow::Result<std::shared_ptr<arrow::Schema>> BradStatement::GetSchema() const {
+  std::vector<std::shared_ptr<arrow::Field>> fields;
   fields.push_back(arrow::field("Day", arrow::int8()));
   fields.push_back(arrow::field("Month", arrow::int8()));
   fields.push_back(arrow::field("Year", arrow::int16()));
   return arrow::schema(fields);
 }
 
-arrow::Result<std::shared_ptr<RecordBatch>> BradStatement::FetchResult() {
+arrow::Result<std::shared_ptr<arrow::RecordBatch>> BradStatement::FetchResult() {
   arrow::Int8Builder int8builder;
   int8_t days_raw[5] = {1, 12, 17, 23, 28};
   ARROW_RETURN_NOT_OK(int8builder.AppendValues(days_raw, 5));
@@ -75,9 +72,9 @@ arrow::Result<std::shared_ptr<RecordBatch>> BradStatement::FetchResult() {
 
   std::shared_ptr<arrow::RecordBatch> record_batch;
 
-  arrow::Result<std::shared_ptr<Schema>> result = GetSchema();
+  arrow::Result<std::shared_ptr<arrow::Schema>> result = GetSchema();
   if (result.ok()) {
-    std::shared_ptr<Schema> schema = result.ValueOrDie();
+    std::shared_ptr<arrow::Schema> schema = result.ValueOrDie();
     record_batch = arrow::RecordBatch::Make(schema,
                                             days->length(),
                                             {days, months, years});
@@ -90,6 +87,3 @@ arrow::Result<std::shared_ptr<RecordBatch>> BradStatement::FetchResult() {
 std::string* BradStatement::GetBradStmt() const { return stmt_; }
 
 }  // namespace brad
-}  // namespace sql
-}  // namespace flight
-}  // namespace arrow
