@@ -102,7 +102,7 @@ async fn main() -> Result<(), DataFusionError> {
         .has_header(true)
         .delimiter(b'|')
         .file_extension(".tbl");
-    db.register_csvs(files, Some(csv_options)).await?;
+    db.register_csvs_as_memtables(files, Some(csv_options)).await?;
     println!("Done!\n");
 
     // Print out tables.
@@ -114,8 +114,8 @@ async fn main() -> Result<(), DataFusionError> {
     //     }
     // }
 
-    _run_query_and_print_results(&db, QUERY_3, true, true).await?;
-    _run_query_and_print_results(&db, QUERY_SIMPLE, true, true).await?;
+    // _run_query_and_print_results(&db, QUERY_3, true, true).await?;
+    _run_query_and_print_results(&db, QUERY_SIMPLE, true, false).await?;
 
     Ok(())
 }

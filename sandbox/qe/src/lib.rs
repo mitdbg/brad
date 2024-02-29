@@ -1,5 +1,6 @@
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
+use datafusion::catalog::TableReference;
 use datafusion::datasource::memory::MemTable;
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::LogicalPlan;
@@ -64,6 +65,49 @@ impl DB {
                 .register_csv(table_name, str_path, inner_options.clone())
         }))
         .await?;
+        Ok(num_tables)
+    }
+
+    pub async fn register_csvs_as_memtables<'a>(
+        &self,
+        csv_files: Vec<PathBuf>,
+        options: Option<CsvReadOptions<'a>>,
+    ) -> Result<usize, DataFusionError> {
+        let table_paths_and_names = csv_files
+            .into_iter()
+            .filter_map(|path| {
+                let mstr_path = path.to_str();
+                let mtable_name = path.file_stem().and_then(|stem| stem.to_str());
+                match (mstr_path, mtable_name) {
+                    (Some(str_path), Some(table_name)) => {
+                        Some((str_path.to_string(), table_name.to_string()))
+                    }
+                    _ => None,
+                }
+            })
+            .collect::<Vec<(String, String)>>();
+        let num_tables = table_paths_and_names.len();
+        let inner_options = if let Some(inner) = options {
+            inner
+        } else {
+            CsvReadOptions::new()
+        };
+        let ctx = self.dfusion.session_context();
+        let schema_provider = self.dfusion.schema_provider();
+        for (str_path, table_name) in table_paths_and_names {
+            println!("Registering {}...", table_name);
+            ctx.register_csv(&table_name, &str_path, inner_options.clone())
+                .await?;
+            let query = format!("SELECT * FROM {}", &table_name);
+            let records = self.execute(&query).await?;
+            let schema = schema_provider.table(&table_name).unwrap().schema();
+            let table_ref = TableReference::Bare { table: &table_name };
+            ctx.deregister_table(table_ref)?;
+
+            // Re-register it but with Arrow data instead.
+            let provider = Arc::new(MemTable::try_new(schema, vec![records])?);
+            schema_provider.register_table(table_name, provider)?;
+        }
         Ok(num_tables)
     }
 
