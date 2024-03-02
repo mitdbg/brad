@@ -7,6 +7,16 @@ add_compile_definitions("RELEASE=$<CONFIG:Release>")
 
 project(brad)
 
+include(FetchContent)
+FetchContent_Declare(
+  pybind11
+  GIT_REPOSITORY https://github.com/pybind/pybind11.git
+  GIT_TAG          v2.11.1
+)
+FetchContent_MakeAvailable(pybind11)
+
+pybind11_add_module(pybind_brad_server pybind/brad_server.cc)
+
 find_package(Arrow REQUIRED)
 find_package(ArrowFlight REQUIRED)
 find_package(ArrowFlightSql REQUIRED)

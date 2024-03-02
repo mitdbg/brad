@@ -55,6 +55,8 @@ from brad.utils.run_time_reservoir import RunTimeReservoir
 from brad.utils.time_periods import universal_now
 from brad.workload_logging.epoch_file_handler import EpochFileHandler
 
+from cpp import pybind_brad_server
+
 logger = logging.getLogger(__name__)
 
 LINESEP = "\n".encode()
@@ -72,6 +74,10 @@ class BradFrontEnd(BradInterface):
         input_queue: mp.Queue,
         output_queue: mp.Queue,
     ):
+        # Initialize mock server
+        server = pybind_brad_server.BradFlightSqlServer()
+        server.Create()
+
         self._fe_index = fe_index
         self._config = config
         self._schema_name = schema_name
