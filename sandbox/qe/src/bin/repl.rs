@@ -79,7 +79,7 @@ async fn handle_command(line: &str, db: &mut DB) -> Result<(), DataFusionError> 
                 return Ok(());
             }
             let table_name = args[1];
-            if let Some(schema) = db.get_schema_for_table(table_name) {
+            if let Some(schema) = db.get_schema_for_table(table_name).await {
                 println!("{:#?}", schema);
             } else {
                 println!("ERROR: Table '{}' does not exist.", table_name);
@@ -140,14 +140,14 @@ async fn handle_command(line: &str, db: &mut DB) -> Result<(), DataFusionError> 
                     return Ok(());
                 }
             };
-            if let Some(generator) = DatasetGenerators::create_from_name(generator_name) {
-                let start = Instant::now();
-                db.populate_using_generator(generator, scale_factor, seed)?;
-                let elapsed_time = start.elapsed();
-                println!("Done. (Ran for {:.2?})", elapsed_time);
-            } else {
-                println!("ERROR: Generator '{}' does not exist.", generator_name);
-            }
+            // if let Some(generator) = DatasetGenerators::create_from_name(generator_name) {
+            //     let start = Instant::now();
+            //     db.populate_using_generator(generator, scale_factor, seed)?;
+            //     let elapsed_time = start.elapsed();
+            //     println!("Done. (Ran for {:.2?})", elapsed_time);
+            // } else {
+            //     println!("ERROR: Generator '{}' does not exist.", generator_name);
+            // }
         }
     };
 
