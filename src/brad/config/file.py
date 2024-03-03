@@ -38,6 +38,15 @@ class ConfigFile:
         return cls(merged)
 
     @classmethod
+    def load_from_physical_config(cls, phys_config: str) -> "ConfigFile":
+        # This implementation is designed to support backward compatibility (to
+        # minimize invasiveness). This should be used when only physical
+        # config values are needed.
+        with open(phys_config, "r", encoding="UTF-8") as file:
+            phys_config_dict = yaml.load(file, Loader=yaml.Loader)
+        return cls(phys_config_dict)
+
+    @classmethod
     def load(cls, file_path: str) -> "ConfigFile":
         with open(file_path, "r", encoding="UTF-8") as file:
             raw = yaml.load(file, Loader=yaml.Loader)
