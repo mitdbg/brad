@@ -140,14 +140,14 @@ async fn handle_command(line: &str, db: &mut DB) -> Result<(), DataFusionError> 
                     return Ok(());
                 }
             };
-            // if let Some(generator) = DatasetGenerators::create_from_name(generator_name) {
-            //     let start = Instant::now();
-            //     db.populate_using_generator(generator, scale_factor, seed)?;
-            //     let elapsed_time = start.elapsed();
-            //     println!("Done. (Ran for {:.2?})", elapsed_time);
-            // } else {
-            //     println!("ERROR: Generator '{}' does not exist.", generator_name);
-            // }
+            if let Some(generator) = DatasetGenerators::create_from_name(generator_name) {
+                let start = Instant::now();
+                db.populate_using_generator(generator, scale_factor, seed)?;
+                let elapsed_time = start.elapsed();
+                println!("Done. (Ran for {:.2?})", elapsed_time);
+            } else {
+                println!("ERROR: Generator '{}' does not exist.", generator_name);
+            }
         }
     };
 

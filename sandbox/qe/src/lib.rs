@@ -8,7 +8,6 @@ use datafusion::prelude::*;
 use futures::future;
 use std::path::PathBuf;
 use std::sync::Arc;
-use futures::FutureExt;
 
 /// Encapsulates DataFusion related state.
 mod datafusion_state;

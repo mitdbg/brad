@@ -1,6 +1,6 @@
 use super::DatasetGenerator;
 use arrow::array::{ArrayRef, GenericStringBuilder, PrimitiveBuilder};
-use arrow::datatypes::{DataType, Field, Schema, Int64Type, SchemaRef};
+use arrow::datatypes::{DataType, Field, Int64Type, Schema, SchemaRef};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use rand::rngs::SmallRng;
@@ -50,18 +50,19 @@ impl EmpsDeptsGenerator {
         let salary_range = 0..1000_i64;
         let d_id_range = 0..(num_depts as i64);
 
-        let mut e_id_builder = PrimitiveBuilder::<Int64Type>::new(num_employees);
-        let mut e_name_builder = GenericStringBuilder::<i32>::new(num_employees);
-        let mut e_hire_date_builder = PrimitiveBuilder::<Int64Type>::new(num_employees);
-        let mut e_salary_builder = PrimitiveBuilder::<Int64Type>::new(num_employees);
-        let mut e_d_id_builder = PrimitiveBuilder::<Int64Type>::new(num_employees);
+        let mut e_id_builder = PrimitiveBuilder::<Int64Type>::with_capacity(num_employees);
+        let mut e_name_builder =
+            GenericStringBuilder::<i32>::with_capacity(num_employees, num_employees * 12);
+        let mut e_hire_date_builder = PrimitiveBuilder::<Int64Type>::with_capacity(num_employees);
+        let mut e_salary_builder = PrimitiveBuilder::<Int64Type>::with_capacity(num_employees);
+        let mut e_d_id_builder = PrimitiveBuilder::<Int64Type>::with_capacity(num_employees);
 
         for i in 0..num_employees {
-            e_id_builder.append_value(i as i64)?;
-            e_name_builder.append_value(format!("E{}", i))?;
-            e_hire_date_builder.append_value(prng.gen_range(hire_date_range.clone()))?;
-            e_salary_builder.append_value(prng.gen_range(salary_range.clone()))?;
-            e_d_id_builder.append_value(prng.gen_range(d_id_range.clone()))?;
+            e_id_builder.append_value(i as i64);
+            e_name_builder.append_value(format!("E{}", i));
+            e_hire_date_builder.append_value(prng.gen_range(hire_date_range.clone()));
+            e_salary_builder.append_value(prng.gen_range(salary_range.clone()));
+            e_d_id_builder.append_value(prng.gen_range(d_id_range.clone()));
         }
 
         let cols: Vec<ArrayRef> = vec![
