@@ -43,12 +43,12 @@ async fn _run_query_and_print_results(
 ) -> Result<(), DataFusionError> {
     let query = query.to_string();
     if debug {
-        let logical_plan = db.to_logical_plan(&query)?;
+        let logical_plan = db.to_logical_plan(&query).await?;
         println!("{:#?}", logical_plan);
 
         let physical_plan = db.to_physical_plan(&query).await?;
         let dpp = displayable(physical_plan.as_ref());
-        println!("\n{}", dpp.indent());
+        println!("\n{}", dpp.indent(false));
     }
     if !skip_execution {
         let results = db.execute(&query).await?;
@@ -57,7 +57,7 @@ async fn _run_query_and_print_results(
     Ok(())
 }
 
-const QUERY_3: &str = "
+const _QUERY_3: &str = "
 SELECT
 	l_orderkey,
 	SUM(l_extendedprice * (1 - l_discount)) AS revenue,

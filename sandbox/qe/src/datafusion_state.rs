@@ -18,18 +18,16 @@ pub struct DataFusionState {
 impl DataFusionState {
     pub fn new() -> Self {
         let config = SessionConfig::new()
-            .with_default_catalog_and_schema(CATALOG_NAME, SCHEMA_NAME)
-            .create_default_catalog_and_schema(true);
+            .with_default_catalog_and_schema(CATALOG_NAME, SCHEMA_NAME);
         Self {
-            ctx: SessionContext::with_config(config),
+            ctx: SessionContext::new_with_config(config),
         }
     }
 
     pub fn schema_provider(&self) -> Arc<dyn SchemaProvider> {
         self.ctx
-            .state
-            .read()
-            .catalog_list
+            .state()
+            .catalog_list()
             .catalog(CATALOG_NAME)
             .unwrap()
             .schema(SCHEMA_NAME)

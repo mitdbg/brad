@@ -79,7 +79,7 @@ async fn handle_command(line: &str, db: &mut DB) -> Result<(), DataFusionError> 
                 return Ok(());
             }
             let table_name = args[1];
-            if let Some(schema) = db.get_schema_for_table(table_name) {
+            if let Some(schema) = db.get_schema_for_table(table_name).await {
                 println!("{:#?}", schema);
             } else {
                 println!("ERROR: Table '{}' does not exist.", table_name);
