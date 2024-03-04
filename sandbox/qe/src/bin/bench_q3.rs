@@ -5,7 +5,9 @@ use datafusion::error::DataFusionError;
 use datafusion::execution::options::CsvReadOptions;
 use datafusion::physical_plan::displayable;
 use std::fs;
+use std::io;
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 #[derive(Parser)]
 struct CliArgs {
@@ -14,8 +16,17 @@ struct CliArgs {
     tpch_txt_dir: PathBuf,
 
     /// Data delimiter used in the data files.
+    /// Default value is `b'|'`
     #[clap(long)]
-    delimiter: Option<char>,
+    delimiter: Option<u8>,
+
+    /// Action to take.
+    #[clap(long)]
+    action: Option<String>,
+
+    // Number of times to run the experiment.
+    #[clap(long)]
+    repetitions: Option<u32>,
 }
 
 fn get_files(data_dir: &PathBuf) -> Vec<PathBuf> {
@@ -35,7 +46,7 @@ fn get_files(data_dir: &PathBuf) -> Vec<PathBuf> {
     }
 }
 
-async fn _run_query_and_print_results(
+async fn run_query_and_print_results(
     db: &DB,
     query: &str,
     debug: bool,
@@ -44,20 +55,48 @@ async fn _run_query_and_print_results(
     let query = query.to_string();
     if debug {
         let logical_plan = db.to_logical_plan(&query).await?;
-        println!("{:#?}", logical_plan);
+        eprintln!("{:#?}", logical_plan);
 
         let physical_plan = db.to_physical_plan(&query).await?;
         let dpp = displayable(physical_plan.as_ref());
-        println!("\n{}", dpp.indent(false));
+        eprintln!("\n{}", dpp.indent(false));
     }
     if !skip_execution {
+        let start = Instant::now();
         let results = db.execute(&query).await?;
+        let elapsed_time = start.elapsed();
         pretty::print_batches(&results)?;
+        eprintln!("Ran for {:.2?}", elapsed_time);
     }
     Ok(())
 }
 
-const _QUERY_3: &str = "
+async fn run_timed_query(db: &DB, query: &String) -> Result<Duration, DataFusionError> {
+    let start = Instant::now();
+    db.execute(query).await?;
+    Ok(start.elapsed())
+}
+
+async fn load_data(db: &DB, args: &CliArgs) -> Result<(), DataFusionError> {
+    let files = get_files(&args.tpch_txt_dir);
+    eprintln!("Detected data files:");
+    for f in &files {
+        eprintln!("{}", f.display());
+    }
+
+    eprintln!("\nLoading data...");
+    let delim = args.delimiter.unwrap_or(b'|');
+    let csv_options = CsvReadOptions::new()
+        .has_header(true)
+        .delimiter(delim)
+        .file_extension(".tbl");
+    db.register_csvs_as_memtables(files, Some(csv_options), true)
+        .await?;
+    eprintln!("Done!\n");
+    Ok(())
+}
+
+const QUERY_3: &str = "
 SELECT
 	l_orderkey,
 	SUM(l_extendedprice * (1 - l_discount)) AS revenue,
@@ -91,19 +130,7 @@ async fn main() -> Result<(), DataFusionError> {
     let args = CliArgs::parse();
     let db = DB::new();
 
-    let files = get_files(&args.tpch_txt_dir);
-    println!("Detected data files:");
-    for f in &files {
-        println!("{}", f.display());
-    }
-
-    println!("\nLoading data...");
-    let csv_options = CsvReadOptions::new()
-        .has_header(true)
-        .delimiter(b'|')
-        .file_extension(".tbl");
-    db.register_csvs_as_memtables(files, Some(csv_options)).await?;
-    println!("Done!\n");
+    load_data(&db, &args).await?;
 
     // Print out tables.
     // let tables = db.get_table_names();
@@ -114,8 +141,30 @@ async fn main() -> Result<(), DataFusionError> {
     //     }
     // }
 
-    // _run_query_and_print_results(&db, QUERY_3, true, true).await?;
-    _run_query_and_print_results(&db, QUERY_SIMPLE, true, false).await?;
+    match args.action {
+        Some(ref s) if s == "q3" => {
+            let repetitions = args.repetitions.unwrap_or(1);
+            let q3 = String::from(QUERY_3);
+            let mut writer = csv::Writer::from_writer(io::stdout());
+            writer
+                .write_record(&["action", "run_time_ms"])
+                .map_err(|e| DataFusionError::External(Box::new(e)))?;
+            for _ in 0..repetitions {
+                let rt = run_timed_query(&db, &q3).await?;
+                writer
+                    .write_record(&["q3", &rt.as_millis().to_string()])
+                    .map_err(|e| DataFusionError::External(Box::new(e)))?;
+            }
+            writer.flush()?;
+        }
+        Some(ref s) if s == "q3_debug" => {
+            run_query_and_print_results(&db, QUERY_3, true, false).await?;
+        }
+        Some(ref s) if s == "qs_debug" => {
+            run_query_and_print_results(&db, QUERY_SIMPLE, true, false).await?;
+        }
+        _ => (),
+    }
 
     Ok(())
 }

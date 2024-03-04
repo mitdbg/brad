@@ -71,6 +71,7 @@ impl DB {
         &self,
         csv_files: Vec<PathBuf>,
         options: Option<CsvReadOptions<'a>>,
+        verbose: bool,
     ) -> Result<usize, DataFusionError> {
         let table_paths_and_names = csv_files
             .into_iter()
@@ -94,7 +95,9 @@ impl DB {
         let ctx = self.dfusion.session_context();
         let schema_provider = self.dfusion.schema_provider();
         for (str_path, table_name) in table_paths_and_names {
-            println!("Registering {}...", table_name);
+            if verbose {
+                eprintln!("Registering {}...", table_name);
+            }
             ctx.register_csv(&table_name, &str_path, inner_options.clone())
                 .await?;
             let query = format!("SELECT * FROM {}", &table_name);
