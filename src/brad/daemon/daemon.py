@@ -65,6 +65,7 @@ from brad.planner.workload.provider import LoggedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
 from brad.row_list import RowList
 from brad.utils.time_periods import period_start, universal_now
+from brad.ui.manager import UiManager
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,7 @@ class BradDaemon:
         schema_name: str,
         path_to_system_config: str,
         debug_mode: bool,
+        start_ui: bool,
     ):
         self._config = config
         self._temp_config = temp_config
@@ -99,6 +101,7 @@ class BradDaemon:
             system_config=path_to_system_config
         )
         self._debug_mode = debug_mode
+        self._start_ui = start_ui
 
         self._assets = AssetManager(self._config)
         self._blueprint_mgr = BlueprintManager(
@@ -126,6 +129,16 @@ class BradDaemon:
 
         self._startup_timestamp = universal_now()
 
+        if self._start_ui and UiManager.is_supported():
+            self._ui_mgr: Optional[UiManager] = UiManager.create(self._config)
+        else:
+            self._ui_mgr = None
+            if self._start_ui:
+                logger.warning(
+                    "Cannot start the BRAD UI because it is not supported. "
+                    "Please make sure you install BRAD with the [ui] option."
+                )
+
     async def run_forever(self) -> None:
         """
         Starts running the daemon.
@@ -139,6 +152,9 @@ class BradDaemon:
                 for fe in self._front_ends
                 if fe.message_reader_task is not None
             ]
+            additional_tasks = []
+            if self._ui_mgr is not None:
+                additional_tasks.append(self._ui_mgr.serve_forever())
             logger.info("The BRAD daemon is running.")
             if self._system_event_logger is not None:
                 self._system_event_logger.log(SystemEvent.StartUp)
@@ -146,6 +162,7 @@ class BradDaemon:
                 self._planner.run_forever(),
                 self._monitor.run_forever(),
                 *message_reader_tasks,
+                *additional_tasks,
             )
         except Exception:
             logger.exception("The BRAD daemon encountered an unexpected exception.")
