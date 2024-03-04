@@ -61,6 +61,12 @@ DEV_REQUIRES = [
     "matplotlib",
 ]
 
+DASHBOARD_REQUIRES = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+]
+
 KEYWORDS = []
 
 CLASSIFIERS = [
@@ -115,6 +121,7 @@ if __name__ == "__main__":
         install_requires=INSTALL_REQUIRES,
         extras_require={
             "dev": DEV_REQUIRES,
+            "dashboard": DASHBOARD_REQUIRES,
         },
         entry_points=ENTRY_POINTS,
         classifiers=CLASSIFIERS,
