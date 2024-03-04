@@ -11,64 +11,66 @@ pub fn inject_tap(
     plan: &Arc<dyn ExecutionPlan>,
     should_inject: &ShouldInject,
 ) -> Result<Option<Arc<dyn ExecutionPlan>>, DataFusionError> {
+    // TODO: We should figure out the idiomatic way of rewriting physical
+    // DataFusion plans. This function implements a manual DFS traversal.
+
     // Plan node, its parent, and visit count.
-    let mut stack: Vec<(
-        &Arc<dyn ExecutionPlan>,
-        Option<&Arc<dyn ExecutionPlan>>,
-        u32,
-    )> = vec![(plan, None, 0)];
+    let mut stack: Vec<(Arc<dyn ExecutionPlan>, Option<Arc<dyn ExecutionPlan>>, u32)> =
+        vec![(plan.clone(), None, 0)];
 
     let mut is_injecting = false;
     let mut injected_plan: Option<Arc<dyn ExecutionPlan>> = None;
-    let mut orig_child: Option<&Arc<dyn ExecutionPlan>> = None;
-    let mut next_parent: Option<&Arc<dyn ExecutionPlan>> = None;
+    let mut orig_child: Option<Arc<dyn ExecutionPlan>> = None;
+    let mut next_parent: Option<Arc<dyn ExecutionPlan>> = None;
 
     while stack.len() > 0 {
         let (node, parent, visit_count) = stack.pop().unwrap();
         if visit_count == 0 {
             // Pre-visit.
-            stack.push((node, parent, 1));
+            stack.push((node.clone(), parent, 1));
             for child in &node.children() {
-                stack.push((&child, Some(node), 0));
+                stack.push((child.clone(), Some(node.clone()), 0));
             }
         } else {
             // Post-visit.
             if !is_injecting {
                 // Check if we want to inject here.
-                if should_inject(node) {
+                if should_inject(&node) {
                     is_injecting = true;
                     let new_node: Arc<dyn ExecutionPlan> = Arc::new(Tap::new(node.clone()));
                     injected_plan = Some(new_node);
-                    next_parent = parent;
-                    orig_child = Some(node);
+                    next_parent = parent.map(|p| p.clone());
+                    orig_child = Some(node.clone());
                 }
             } else {
-                if next_parent.is_none() || orig_child.is_none() {
-                    continue;
-                }
-                let np = next_parent.unwrap();
-                let oc = orig_child.unwrap();
-                if !Arc::ptr_eq(np, node) {
-                    continue;
-                }
-
-                let new_children = node
-                    .children()
-                    .iter()
-                    .map(|child| {
-                        if Arc::ptr_eq(child, oc) {
-                            oc.clone()
-                        } else {
-                            child.clone()
+                let npc = next_parent.clone();
+                let occ = orig_child.clone();
+                match (npc, occ) {
+                    (Some(np), Some(oc)) => {
+                        if !Arc::ptr_eq(&np, &node) {
+                            continue;
                         }
-                    })
-                    .collect::<Vec<Arc<dyn ExecutionPlan>>>();
-                let new_node = node.clone().with_new_children(new_children)?;
 
-                // Adjust bookkeeping.
-                injected_plan = Some(new_node);
-                orig_child = Some(node);
-                next_parent = parent;
+                        let new_children = node
+                            .children()
+                            .iter()
+                            .map(|child| {
+                                if Arc::ptr_eq(child, &oc) {
+                                    oc.clone()
+                                } else {
+                                    child.clone()
+                                }
+                            })
+                            .collect::<Vec<Arc<dyn ExecutionPlan>>>();
+                        let new_node = node.clone().with_new_children(new_children)?;
+
+                        // Adjust bookkeeping.
+                        injected_plan = Some(new_node);
+                        orig_child = Some(node);
+                        next_parent = parent;
+                    }
+                    _ => (),
+                }
             }
         }
     }
