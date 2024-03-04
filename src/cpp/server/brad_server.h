@@ -41,23 +41,22 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
       const arrow::flight::ServerCallContext &context,
       const arrow::flight::sql::StatementQueryTicket &command) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoCatalogs(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::FlightDescriptor& descriptor) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoCatalogs(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::FlightDescriptor& descriptor) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetCatalogs(
-      const arrow::flight::ServerCallContext &context) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetCatalogs(
+  //     const arrow::flight::ServerCallContext &context) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoSchemas(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::sql::GetDbSchemas& command,
-      const arrow::flight::FlightDescriptor& descriptor) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoSchemas(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::sql::GetDbSchemas& command,
+  //     const arrow::flight::FlightDescriptor& descriptor) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetDbSchemas(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::sql::GetDbSchemas& command) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetDbSchemas(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::sql::GetDbSchemas& command) override;
 
-  // TODO: Implement .*PreparedStatement.*
   // arrow::Result<ActionCreatePreparedStatementResult> CreatePreparedStatement(
   //     const ServerCallContext& context,
   //     const ActionCreatePreparedStatementRequest& request) override;
@@ -71,9 +70,9 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
   //     const PreparedStatementQuery& command,
   //     const FlightDescriptor& descriptor) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetPreparedStatement(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::sql::PreparedStatementQuery& command) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetPreparedStatement(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::sql::PreparedStatementQuery& command) override;
 
   // Status DoPutPreparedStatementQuery(
   //     const ServerCallContext& context,
@@ -86,65 +85,65 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
   //     const PreparedStatementUpdate& command,
   //     FlightMessageReader* reader) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoTables(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::sql::GetTables& command,
-      const arrow::flight::FlightDescriptor& descriptor) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoTables(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::sql::GetTables& command,
+  //     const arrow::flight::FlightDescriptor& descriptor) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetTables(
-      const arrow::flight::ServerCallContext &context,
-      const arrow::flight::sql::GetTables &command) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetTables(
+  //     const arrow::flight::ServerCallContext &context,
+  //     const arrow::flight::sql::GetTables &command) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoTableTypes(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::FlightDescriptor& descriptor) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoTableTypes(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::FlightDescriptor& descriptor) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetTableTypes(
-      const arrow::flight::ServerCallContext &context) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetTableTypes(
+  //     const arrow::flight::ServerCallContext &context) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoImportedKeys(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::sql::GetImportedKeys& command,
-      const arrow::flight::FlightDescriptor& descriptor) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoImportedKeys(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::sql::GetImportedKeys& command,
+  //     const arrow::flight::FlightDescriptor& descriptor) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetImportedKeys(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::sql::GetImportedKeys& command) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetImportedKeys(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::sql::GetImportedKeys& command) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoExportedKeys(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::sql::GetExportedKeys& command,
-      const arrow::flight::FlightDescriptor& descriptor) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoExportedKeys(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::sql::GetExportedKeys& command,
+  //     const arrow::flight::FlightDescriptor& descriptor) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetExportedKeys(
-      const arrow::flight::ServerCallContext &context,
-      const arrow::flight::sql::GetExportedKeys &command) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetExportedKeys(
+  //     const arrow::flight::ServerCallContext &context,
+  //     const arrow::flight::sql::GetExportedKeys &command) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoCrossReference(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::sql::GetCrossReference& command,
-      const arrow::flight::FlightDescriptor& descriptor) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoCrossReference(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::sql::GetCrossReference& command,
+  //     const arrow::flight::FlightDescriptor& descriptor) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetCrossReference(
-      const arrow::flight::ServerCallContext &context,
-      const arrow::flight::sql::GetCrossReference &command) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetCrossReference(
+  //     const arrow::flight::ServerCallContext &context,
+  //     const arrow::flight::sql::GetCrossReference &command) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoPrimaryKeys(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::sql::GetPrimaryKeys& command,
-      const arrow::flight::FlightDescriptor& descriptor) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoPrimaryKeys(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::sql::GetPrimaryKeys& command,
+  //     const arrow::flight::FlightDescriptor& descriptor) override;
 
-  arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetPrimaryKeys(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::sql::GetPrimaryKeys& command) override;
+  // arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>> DoGetPrimaryKeys(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::sql::GetPrimaryKeys& command) override;
 
-  arrow::Result<arrow::flight::sql::ActionBeginTransactionResult> BeginTransaction(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::sql::ActionBeginTransactionRequest& request) override;
+  // arrow::Result<arrow::flight::sql::ActionBeginTransactionResult> BeginTransaction(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::sql::ActionBeginTransactionRequest& request) override;
 
-  arrow::Status EndTransaction(
-      const arrow::flight::ServerCallContext& context,
-      const arrow::flight::sql::ActionEndTransactionRequest& request) override;
+  // arrow::Status EndTransaction(
+  //     const arrow::flight::ServerCallContext& context,
+  //     const arrow::flight::sql::ActionEndTransactionRequest& request) override;
 
  private:
   class Impl;
