@@ -9,7 +9,7 @@ pub type ShouldInject = fn(&Arc<dyn ExecutionPlan>) -> bool;
 /// `should_inject` returns true.
 pub fn inject_tap(
     plan: &Arc<dyn ExecutionPlan>,
-    should_inject: &ShouldInject,
+    should_inject: ShouldInject,
 ) -> Result<Option<Arc<dyn ExecutionPlan>>, DataFusionError> {
     // TODO: We should figure out the idiomatic way of rewriting physical
     // DataFusion plans. This function implements a manual DFS traversal.
@@ -45,8 +45,9 @@ pub fn inject_tap(
             } else {
                 let npc = next_parent.clone();
                 let occ = orig_child.clone();
-                match (npc, occ) {
-                    (Some(np), Some(oc)) => {
+                let ipc = injected_plan.clone();
+                match (npc, occ, ipc) {
+                    (Some(np), Some(oc), Some(ip)) => {
                         if !Arc::ptr_eq(&np, &node) {
                             continue;
                         }
@@ -56,7 +57,7 @@ pub fn inject_tap(
                             .iter()
                             .map(|child| {
                                 if Arc::ptr_eq(child, &oc) {
-                                    oc.clone()
+                                    ip.clone()
                                 } else {
                                     child.clone()
                                 }

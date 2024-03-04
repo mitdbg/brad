@@ -1,13 +1,17 @@
 use arrow::util::pretty;
 use brad_qe::DB;
+use brad_qe::rewrite::inject_tap;
 use clap::Parser;
 use datafusion::error::DataFusionError;
 use datafusion::execution::options::CsvReadOptions;
 use datafusion::physical_plan::displayable;
+use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::filter::FilterExec;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
+use std::sync::Arc;
 
 #[derive(Parser)]
 struct CliArgs {
@@ -125,6 +129,12 @@ LIMIT 10;
 const QUERY_SIMPLE: &str =
     "SELECT o_orderkey FROM orders WHERE o_orderdate < date '1995-03-15' LIMIT 10;";
 
+fn qs_inject(node: &Arc<dyn ExecutionPlan>) -> bool {
+    let n = node.clone();
+    // Inject just after the deepest `FilterExec`.
+    n.as_any().downcast_ref::<FilterExec>().is_some()
+}
+
 #[tokio::main]
 async fn main() -> Result<(), DataFusionError> {
     let args = CliArgs::parse();
@@ -162,6 +172,27 @@ async fn main() -> Result<(), DataFusionError> {
         }
         Some(ref s) if s == "qs_debug" => {
             run_query_and_print_results(&db, QUERY_SIMPLE, true, false).await?;
+        }
+        Some(ref s) if s == "qs_tap" => {
+            let query = String::from(QUERY_SIMPLE);
+            let orig_physical_plan = db.to_physical_plan(&query).await?;
+            let dpp = displayable(orig_physical_plan.as_ref());
+            eprintln!("\nOriginal plan\n{}", dpp.indent(false));
+
+            let new_physical_plan = inject_tap(&orig_physical_plan, qs_inject)?;
+            if let Some(npp) = new_physical_plan {
+                let dpp2 = displayable(npp.as_ref());
+                eprintln!("\nAltered plan\n{}", dpp2.indent(false));
+
+                let start = Instant::now();
+                let results = db.execute_physical_plan(npp).await?;
+                let elapsed_time = start.elapsed();
+                pretty::print_batches(&results)?;
+                eprintln!("Ran for {:.2?}", elapsed_time);
+
+            } else {
+                eprintln!("\nNo modifications.");
+            }
         }
         _ => (),
     }
