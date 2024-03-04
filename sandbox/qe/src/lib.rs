@@ -17,6 +17,9 @@ mod datafusion_state;
 pub mod dataset_gen;
 use dataset_gen::DatasetGenerator;
 
+/// Custom DataFusion physical operators (`ExecutionPlan`s).
+pub mod ops;
+
 /// Represents an "open" IOHTAP database. Eventually, the DB should run as a
 /// daemon process. For now it is just an embedded DB (similar to SQLite).
 pub struct DB {
