@@ -15,7 +15,8 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pybind11)
 
-pybind11_add_module(pybind_brad_server pybind/brad_server.cc)
+pybind11_add_module(pybind_brad_server pybind/brad_server.cc
+                                       server/brad_server.h)
 
 find_package(Arrow REQUIRED)
 find_package(ArrowFlight REQUIRED)

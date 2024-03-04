@@ -145,7 +145,7 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
   //     const arrow::flight::ServerCallContext& context,
   //     const arrow::flight::sql::ActionEndTransactionRequest& request) override;
 
- private:
+ // private:
   class Impl;
 
   std::shared_ptr<Impl> impl_;

@@ -76,7 +76,7 @@ class BradFrontEnd(BradInterface):
     ):
         # Initialize mock server
         server = pybind_brad_server.BradFlightSqlServer()
-        server.Create()
+        server.create()
 
         self._fe_index = fe_index
         self._config = config
