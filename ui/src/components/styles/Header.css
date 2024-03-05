@@ -7,24 +7,31 @@
   background-color: white;
   box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
   z-index: 1000;
+
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
 }
 
 .header-inner {
   max-width: 2000px;
-  margin: 0 auto;
+  flex-grow: 1;
+  padding: 0 15px;
+
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
 }
 
 .header-logo {
   display: flex;
   align-items: center;
   align-content: center;
-  margin-left: 15px;
 }
 
 .header-logo-img {
-  margin-top: 5px;
+  margin-top: 10px;
   margin-right: 15px;
-  opacity: 80%;
 }
 
 .header-logo-txt {
