@@ -31,3 +31,7 @@ scratch
 
 sandbox/qe/target
 sandbox/qe/.brad_qe_repl_history
+
+# BRAD UI.
+ui/dist/
+ui/node_modules/
