@@ -1,0 +1,33 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 80px;
+  width: 100%;
+  background-color: white;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.header-inner {
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  align-content: center;
+  margin-left: 15px;
+}
+
+.header-logo-img {
+  margin-top: 5px;
+  margin-right: 15px;
+  opacity: 80%;
+}
+
+.header-logo-txt {
+  font-size: 2.5em;
+  font-weight: 500;
+}

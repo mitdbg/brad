@@ -1,27 +1,26 @@
+import Header from "./components/Header";
+import VirtualInfraView from "./components/VirtualInfraView";
+import BlueprintView from "./components/BlueprintView";
+import PerfView from "./components/PerfView";
+
 import "./App.css";
 
 function App() {
   return (
     <>
-      <div class="header">
-        <div class="header-inner">BRAD</div>
-      </div>
+      <Header />
       <div class="body-container">
         <div class="column">
-          <h2>Data Infrastructure</h2>
+          <h2 class="col-h2">Data Infrastructure</h2>
           <div class="column-inner">
-            <div class="panel">
-              <h2>Virtual Database Engines</h2>
-            </div>
-            <div class="panel">
-              <h2>Current Blueprint (Physical Infrastructure)</h2>
-            </div>
+            <VirtualInfraView />
+            <BlueprintView />
           </div>
         </div>
         <div class="column">
-          <h2>Performance Monitoring</h2>
+          <h2 class="col-h2">Performance Monitoring</h2>
           <div class="column-inner">
-            <div class="panel"></div>
+            <PerfView />
           </div>
         </div>
       </div>

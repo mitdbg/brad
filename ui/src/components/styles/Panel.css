@@ -1,0 +1,13 @@
+.panel {
+  flex-grow: 1;
+  background-color: #fff;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+}
+
+.panel h2 {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.5em;
+}
