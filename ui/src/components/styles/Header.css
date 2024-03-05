@@ -1,0 +1,40 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 80px;
+  width: 100%;
+  background-color: white;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+}
+
+.header-inner {
+  max-width: 2000px;
+  flex-grow: 1;
+  padding: 0 15px;
+
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  align-content: center;
+}
+
+.header-logo-img {
+  margin-top: 10px;
+  margin-right: 15px;
+}
+
+.header-logo-txt {
+  font-size: 2.5em;
+  font-weight: 500;
+}
