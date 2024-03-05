@@ -1,7 +1,7 @@
 import Panel from "./Panel";
 
 function PerfView() {
-  return <Panel></Panel>
+  return <Panel></Panel>;
 }
 
 export default PerfView;
