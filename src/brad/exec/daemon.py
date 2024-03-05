@@ -39,6 +39,9 @@ def register_command(subparsers):
         action="store_true",
         help="Set to enable debug logging.",
     )
+    parser.add_argument(
+        "--ui", action="store_true", help="Set to enable BRAD's user interface."
+    )
     parser.set_defaults(func=main)
 
 
@@ -104,6 +107,7 @@ def main(args):
             args.schema_name,
             args.system_config_file,
             args.debug,
+            args.ui,
         )
         event_loop.create_task(daemon.run_forever())
         event_loop.run_forever()

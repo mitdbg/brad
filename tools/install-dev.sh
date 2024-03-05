@@ -26,9 +26,9 @@ fi
 is_venv=$(python3 -c "import sys; print(sys.prefix != sys.base_prefix)")
 
 if [ $is_venv = "True" ]; then
-  pip3 install --editable ".[dev]"
+  pip3 install --editable ".[dev,ui]"
 else
-  pip3 install --prefix $HOME/.local/ --editable ".[dev]"
+  pip3 install --prefix $HOME/.local/ --editable ".[dev,ui]"
 fi
 
 echo_green "✓ Done"
