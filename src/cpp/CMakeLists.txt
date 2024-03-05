@@ -7,6 +7,12 @@ add_compile_definitions("RELEASE=$<CONFIG:Release>")
 
 project(brad)
 
+find_package(Arrow REQUIRED)
+find_package(ArrowFlight REQUIRED)
+find_package(ArrowFlightSql REQUIRED)
+
+find_package(gflags REQUIRED)
+
 include(FetchContent)
 FetchContent_Declare(
   pybind11
@@ -16,13 +22,13 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(pybind11)
 
 pybind11_add_module(pybind_brad_server pybind/brad_server.cc
-                                       server/brad_server.h)
+                                       server/brad_server_simple.cc)
 
-find_package(Arrow REQUIRED)
-find_package(ArrowFlight REQUIRED)
-find_package(ArrowFlightSql REQUIRED)
-
-find_package(gflags REQUIRED)
+target_link_libraries(pybind_brad_server
+                      PRIVATE Arrow::arrow_shared
+                      PRIVATE ArrowFlight::arrow_flight_shared
+                      PRIVATE ArrowFlightSql::arrow_flight_sql_shared
+                      gflags)
 
 find_package(SQLite3 REQUIRED)
 
