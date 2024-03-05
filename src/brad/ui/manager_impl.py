@@ -1,9 +1,12 @@
 import asyncio
 import uvicorn
 import logging
+import importlib.resources as pkg_resources
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from typing import Optional
 
+import brad.ui.static as brad_app
 from brad.config.file import ConfigFile
 from brad.ui.uvicorn_server import PatchedUvicornServer
 
@@ -24,6 +27,7 @@ class UiManagerImpl:
 
             uvicorn_config = uvicorn.Config(
                 "brad.ui.manager_impl:app",
+                host=self._config.ui_interface(),
                 port=self._config.ui_port(),
                 log_level="info",
             )
@@ -42,7 +46,6 @@ class UiManagerImpl:
 app = FastAPI()
 manager: Optional[UiManagerImpl] = None
 
-
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
+static_files = pkg_resources.files(brad_app)
+with pkg_resources.as_file(static_files) as static_dir:
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")

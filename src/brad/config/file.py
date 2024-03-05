@@ -252,6 +252,12 @@ class ConfigFile:
         else:
             return pathlib.Path(self._raw["stub_db_path"])
 
+    def ui_interface(self) -> str:
+        if "ui_interface" in self._raw:
+            return self._raw["ui_interface"]
+        else:
+            return "0.0.0.0"
+
     def ui_port(self) -> int:
         if "ui_port" in self._raw:
             return self._raw["ui_port"]

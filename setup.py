@@ -16,7 +16,10 @@ META_PATH = os.path.join("src", "brad", "__init__.py")
 README_PATH = "README.md"
 PYTHON_REQUIRES = ">=3.11"
 
-PACKAGE_DATA = {"": ["brad/planner/scoring/data/*.json", "brad/daemon/*.json"]}
+PACKAGE_DATA = {
+    "": ["brad/planner/scoring/data/*.json", "brad/daemon/*.json"],
+    "brad.ui.static": ["*.html", "*.js", "*.css"],
+}
 PACKAGE_DIR = {"": "src"}
 
 ENTRY_POINTS = {
