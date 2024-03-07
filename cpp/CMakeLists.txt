@@ -10,6 +10,7 @@ project(brad)
 find_package(Arrow REQUIRED)
 find_package(ArrowFlight REQUIRED)
 find_package(ArrowFlightSql REQUIRED)
+# find_package(ArrowPython REQUIRED)
 
 find_package(gflags REQUIRED)
 
@@ -22,21 +23,17 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(pybind11)
 
 pybind11_add_module(pybind_brad_server pybind/brad_server.cc
-                                       # server/brad_server_simple.cc)
-                                       server/brad_server.h
-                                       server/brad_sql_info.h
+                                       server/brad_server_simple.cc
                                        server/brad_sql_info.cc
                                        server/brad_statement_batch_reader.cc
-                                       server/brad_statement_batch_reader.h
                                        server/brad_statement.cc
-                                       server/brad_statement.h
-                                       server/brad_tables_schema_batch_reader.cc
-                                       server/brad_tables_schema_batch_reader.h)
+                                       server/brad_tables_schema_batch_reader.cc)
 
 target_link_libraries(pybind_brad_server
                       PRIVATE Arrow::arrow_shared
                       PRIVATE ArrowFlight::arrow_flight_shared
                       PRIVATE ArrowFlightSql::arrow_flight_sql_shared
+                      # PRIVATE ArrowPython::arrow_python_shared
                       gflags)
 
 find_package(SQLite3 REQUIRED)

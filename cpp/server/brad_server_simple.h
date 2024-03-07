@@ -28,23 +28,35 @@ namespace brad {
 
 class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
  public:
+  explicit BradFlightSqlServer();
+
   ~BradFlightSqlServer() override;
 
   static arrow::Result<std::shared_ptr<BradFlightSqlServer>> Create();
 
- // private:
-  class Impl;
+  arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>>
+    GetFlightInfoStatement(
+      const arrow::flight::ServerCallContext &context,
+      const arrow::flight::sql::StatementQuery &command,
+      const arrow::flight::FlightDescriptor &descriptor) override;
 
-  std::shared_ptr<Impl> impl_;
+  arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>>
+    DoGetStatement(
+      const arrow::flight::ServerCallContext &context,
+      const arrow::flight::sql::StatementQueryTicket &command) override;
 
-  explicit BradFlightSqlServer(std::shared_ptr<Impl> impl);
+  // class Impl;
+
+  // std::shared_ptr<Impl> impl_;
+
+  // explicit BradFlightSqlServer(std::shared_ptr<Impl> impl);
 };
 
-class BradFlightSqlServer::Impl {
- public:
-  explicit Impl() {}
-
-  ~Impl() = default;
-};
+// class BradFlightSqlServer::Impl {
+//  public:
+//   explicit Impl() {}
+//
+//   ~Impl() = default;
+// };
 
 }  // namespace brad
