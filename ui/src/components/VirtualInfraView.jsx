@@ -1,10 +1,10 @@
 import Panel from "./Panel";
-import DbCylinder from "./DbCylinder";
+import VdbeView from "./VdbeView";
 
 function VirtualInfraView() {
   return (
     <Panel heading="Virtual Databases">
-      <DbCylinder color="blue">VDBE 1</DbCylinder>
+      <VdbeView name="VDBE 1" />
     </Panel>
   );
 }

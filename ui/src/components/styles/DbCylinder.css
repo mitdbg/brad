@@ -8,7 +8,6 @@
   justify-content: center;
 
   opacity: 0.85;
-  cursor: pointer;
   transition: opacity 0.5s;
 }
 
