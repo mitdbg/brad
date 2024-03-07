@@ -1,0 +1,55 @@
+.db-cylinder {
+  width: 110px;
+  height: 85px;
+  position: relative;
+  margin: 40px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  opacity: 0.85;
+  cursor: pointer;
+  transition: opacity 0.5s;
+}
+
+.db-cylinder:hover {
+  opacity: 1;
+}
+
+.db-cylinder-inner {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin-top: 20px;
+  color: #fff;
+}
+
+.db-cylinder::before,
+.db-cylinder::after {
+  content: "";
+  position: absolute;
+}
+
+.db-cylinder::before {
+  width: 110px;
+  height: 40px;
+  border-radius: 50%;
+  top: -20px;
+  left: 0;
+}
+
+.db-cylinder::after {
+  width: 110px;
+  height: 40px;
+  border-radius: 50%;
+  bottom: -20px;
+  left: 0;
+}
+
+.db-cylinder.blue,
+.db-cylinder.blue::after {
+  background: #386fc7;
+}
+
+.db-cylinder.blue::before {
+  background: #6aa1f7;
+}
