@@ -55,14 +55,25 @@ from brad.utils.run_time_reservoir import RunTimeReservoir
 from brad.utils.time_periods import universal_now
 from brad.workload_logging.epoch_file_handler import EpochFileHandler
 
-import brad.native.pybind_brad_server as brad_server
-
 logger = logging.getLogger(__name__)
 
 LINESEP = "\n".encode()
 
 
 class BradFrontEnd(BradInterface):
+    @staticmethod
+    def native_server_is_supported() -> bool:
+        """
+        If the native pybind_brad_server module built using Arrow Flight SQL
+        exists, this function will return True. Otherwise, it returns False.
+        """
+        try:
+            import brad.native.pybind_brad_server as brad_server
+            global brad_server
+            return True
+        except:
+            return False
+
     def __init__(
         self,
         fe_index: int,
@@ -74,9 +85,10 @@ class BradFrontEnd(BradInterface):
         input_queue: mp.Queue,
         output_queue: mp.Queue,
     ):
-        # Initialize mock server
-        impl = brad_server.Impl()
-        server = brad_server.BradFlightSqlServer(impl)
+        if BradFrontEnd.native_server_is_supported():
+            # Initialize mock server
+            impl = brad_server.Impl()
+            server = brad_server.BradFlightSqlServer(impl)
 
         self._fe_index = fe_index
         self._config = config
