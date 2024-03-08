@@ -5,7 +5,7 @@ import "./styles/VdbeView.css";
 function VdbeView({ name }) {
   return (
     <div class="vdbe-view">
-      <DbCylinder color="blue">{name}</DbCylinder>
+      <DbCylinder color="green">{name}</DbCylinder>
       <div class="vdbe-view-props">
         <ul>
           <li>🌿: Serializable</li>
@@ -13,7 +13,7 @@ function VdbeView({ name }) {
           <li>🗣: PostgreSQL SQL</li>
         </ul>
       </div>
-      <TableView name="Table 1" isWriter={true} color="blue" />
+      <TableView name="Table 1" isWriter={true} color="green" />
       <TableView name="Table 2" />
       <TableView name="Table 3" />
     </div>

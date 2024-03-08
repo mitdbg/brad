@@ -52,3 +52,12 @@
 .db-cylinder.blue::before {
   background: #6aa1f7;
 }
+
+.db-cylinder.green,
+.db-cylinder.green::after {
+  background: #1d8033;
+}
+
+.db-cylinder.green::before {
+  background: #51a965;
+}

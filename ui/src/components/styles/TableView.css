@@ -25,5 +25,9 @@
 }
 
 .db-table-view-writer.blue {
-  background: #386fc7;
+  background-color: #386fc7;
+}
+
+.db-table-view-writer.green {
+  background-color: #51a965;
 }
