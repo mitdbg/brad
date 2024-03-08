@@ -7,19 +7,23 @@ from fastapi.staticfiles import StaticFiles
 from typing import Optional
 
 import brad.ui.static as brad_app
+from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.daemon.monitor import Monitor
 from brad.ui.uvicorn_server import PatchedUvicornServer
-from brad.ui.models import MetricsData, TimestampedMetrics
+from brad.ui.models import MetricsData, TimestampedMetrics, DisplayableBlueprint
 from brad.daemon.front_end_metrics import FrontEndMetric
 
 logger = logging.getLogger(__name__)
 
 
 class UiManagerImpl:
-    def __init__(self, config: ConfigFile, monitor: Monitor) -> None:
+    def __init__(
+        self, config: ConfigFile, monitor: Monitor, blueprint_mgr: BlueprintManager
+    ) -> None:
         self.config = config
         self.monitor = monitor
+        self.blueprint_mgr = blueprint_mgr
 
     async def serve_forever(self) -> None:
         global manager  # pylint: disable=global-statement
@@ -60,6 +64,13 @@ def get_metrics(num_values: int = 3) -> MetricsData:
     return MetricsData(
         named_metrics={FrontEndMetric.QueryLatencySecondP90.value: series}
     )
+
+
+@app.get("/api/1/system_state")
+def get_system_state() -> DisplayableBlueprint:
+    assert manager is not None
+    blueprint = manager.blueprint_mgr.get_blueprint()
+    return DisplayableBlueprint.from_blueprint(blueprint)
 
 
 # Serve the static pages.

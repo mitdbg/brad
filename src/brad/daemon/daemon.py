@@ -131,7 +131,7 @@ class BradDaemon:
 
         if self._start_ui and UiManager.is_supported():
             self._ui_mgr: Optional[UiManager] = UiManager.create(
-                self._config, self._monitor
+                self._config, self._monitor, self._blueprint_mgr
             )
         else:
             self._ui_mgr = None
