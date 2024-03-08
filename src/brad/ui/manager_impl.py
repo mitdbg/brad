@@ -59,10 +59,15 @@ manager: Optional["UiManagerImpl"] = None
 def get_metrics(num_values: int = 3) -> MetricsData:
     assert manager is not None
     metrics = manager.monitor.front_end_metrics().read_k_most_recent(k=num_values)
-    values = metrics[FrontEndMetric.QueryLatencySecondP90.value]
-    series = TimestampedMetrics(timestamps=list(values.index), values=list(values))
+    qlat = metrics[FrontEndMetric.QueryLatencySecondP90.value]
+    qlat_tm = TimestampedMetrics(timestamps=list(qlat.index), values=list(qlat))
+    tlat = metrics[FrontEndMetric.TxnLatencySecondP90.value]
+    tlat_tm = TimestampedMetrics(timestamps=list(tlat.index), values=list(tlat))
     return MetricsData(
-        named_metrics={FrontEndMetric.QueryLatencySecondP90.value: series}
+        named_metrics={
+            FrontEndMetric.QueryLatencySecondP90.value: qlat_tm,
+            FrontEndMetric.TxnLatencySecondP90.value: tlat_tm,
+        }
     )
 
 

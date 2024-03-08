@@ -18,31 +18,31 @@ ChartJS.register(
   LineElement,
 );
 
-const options = {
-  scales: {
-    y: {
-      beginAtZero: true,
-      grace: "10%",
-      title: {
-        display: true,
-        text: "p90 Latency (s)",
+function LatencyPlot({ seriesName, labels, values, xLabel, yLabel }) {
+  const options = {
+    scales: {
+      y: {
+        beginAtZero: true,
+        grace: "10%",
+        title: {
+          display: true,
+          text: yLabel,
+        },
+      },
+      x: {
+        beginAtZero: true,
+        grace: "10%",
+        title: {
+          display: true,
+          text: xLabel,
+        },
       },
     },
-    x: {
-      beginAtZero: true,
-      grace: "10%",
-      title: {
-        display: true,
-        text: "Elapsed Time (mins)",
-      },
+    plugins: {
+      legend: false,
     },
-  },
-  plugins: {
-    legend: false,
-  },
-};
+  };
 
-function LatencyPlot({ seriesName, labels, values }) {
   const data = {
     labels,
     datasets: [

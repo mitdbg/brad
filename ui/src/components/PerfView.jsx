@@ -2,7 +2,10 @@ import Panel from "./Panel";
 import LatencyPlot from "./LatencyPlot";
 import "./styles/PerfView.css";
 
-function extractMetrics(data, metricName) {
+function extractMetrics(data, metricName, multiplier) {
+  if (multiplier == null) {
+    multiplier = 1.0;
+  }
   if (!data.hasOwnProperty(metricName)) {
     return {
       x: [],
@@ -12,22 +15,37 @@ function extractMetrics(data, metricName) {
     const metrics = data[metricName];
     return {
       x: metrics.timestamps.map((_, idx) => idx),
-      y: metrics.values,
+      y: metrics.values.map((val) => val * multiplier),
     };
   }
 }
 
 function PerfView({ metricsData }) {
-  const latencyMetrics = extractMetrics(metricsData, "query_latency_s_p90");
+  const queryLatMetrics = extractMetrics(metricsData, "query_latency_s_p90");
+  const txnLatMetrics = extractMetrics(metricsData, "txn_latency_s_p90");
   return (
     <Panel>
       <div class="perf-view-wrap">
-        <h2>VDBE 1: Query Latency</h2>
-        <LatencyPlot
-          seriesName="VDBE 1"
-          labels={latencyMetrics.x}
-          values={latencyMetrics.y}
-        />
+        <div>
+          <h2>Query Latency</h2>
+          <LatencyPlot
+            seriesName="Query Latency"
+            labels={queryLatMetrics.x}
+            values={queryLatMetrics.y}
+            xLabel="Elapsed Time (minutes)"
+            yLabel="p90 Latency (s)"
+          />
+        </div>
+        <div style={{"marginTop": "30px"}}>
+          <h2>Transaction Latency</h2>
+          <LatencyPlot
+            seriesName="Transaction Latency"
+            labels={txnLatMetrics.x}
+            values={txnLatMetrics.y}
+            xLabel="Elapsed Time (minutes)"
+            yLabel="p90 Latency (ms)"
+          />
+        </div>
       </div>
     </Panel>
   );
