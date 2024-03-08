@@ -42,11 +42,6 @@ using arrow::internal::checked_cast;
 using namespace arrow::flight;
 using namespace arrow::flight::sql;
 
-// BradFlightSqlServer::BradFlightSqlServer(std::shared_ptr<Impl> impl)
-//     : impl_(std::move(impl)) {
-//   std::cout << "Constructed instance of BradFlightSqlServer\n";
-// }
-
 arrow::Result<Ticket> EncodeTransactionQuery(
   const std::string &query,
   const std::string &transaction_id) {
@@ -73,12 +68,13 @@ BradFlightSqlServer::BradFlightSqlServer() = default;
 
 BradFlightSqlServer::~BradFlightSqlServer() = default;
 
-arrow::Result<std::shared_ptr<BradFlightSqlServer>>
+std::shared_ptr<BradFlightSqlServer>
   BradFlightSqlServer::Create() {
     std::shared_ptr<BradFlightSqlServer> result(new BradFlightSqlServer());
     for (const auto &id_to_result : GetSqlInfoResultMap()) {
       result->RegisterSqlInfo(id_to_result.first, id_to_result.second);
     }
+    std::cout << "Created instance of BradFlightSqlServer\n";
     return result;
 }
 

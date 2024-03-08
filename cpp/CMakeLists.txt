@@ -10,7 +10,6 @@ project(brad)
 find_package(Arrow REQUIRED)
 find_package(ArrowFlight REQUIRED)
 find_package(ArrowFlightSql REQUIRED)
-# find_package(ArrowPython REQUIRED)
 
 find_package(gflags REQUIRED)
 
@@ -33,7 +32,6 @@ target_link_libraries(pybind_brad_server
                       PRIVATE Arrow::arrow_shared
                       PRIVATE ArrowFlight::arrow_flight_shared
                       PRIVATE ArrowFlightSql::arrow_flight_sql_shared
-                      # PRIVATE ArrowPython::arrow_python_shared
                       gflags)
 
 find_package(SQLite3 REQUIRED)

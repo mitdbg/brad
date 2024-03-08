@@ -32,7 +32,7 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
 
   ~BradFlightSqlServer() override;
 
-  static arrow::Result<std::shared_ptr<BradFlightSqlServer>> Create();
+  static std::shared_ptr<BradFlightSqlServer> Create();
 
   arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>>
     GetFlightInfoStatement(

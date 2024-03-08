@@ -1,5 +1,4 @@
 #include <pybind11/pybind11.h>
-// #include <arrow/python/pyarrow.h>
 
 #include <iostream>
 
@@ -15,7 +14,4 @@ PYBIND11_MODULE(pybind_brad_server, m) {
   bradServer
     .def(py::init<>())
     .def("create", &brad::BradFlightSqlServer::Create);
-    // .def("get_flight_info_statement",
-    //      &brad::BradFlightSqlServer::GetFlightInfoStatement)
-    // .def("do_get_statement", &brad::BradFlightSqlServer::DoGetStatement);
 }

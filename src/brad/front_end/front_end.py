@@ -87,8 +87,7 @@ class BradFrontEnd(BradInterface):
     ):
         if BradFrontEnd.native_server_is_supported():
             # Initialize mock server
-            server_from_constructor = brad_server.BradFlightSqlServer()
-            # server_from_create = brad_server.BradFlightSqlServer.create()
+            server = brad_server.BradFlightSqlServer.create()
 
         self._fe_index = fe_index
         self._config = config
