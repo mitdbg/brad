@@ -7,7 +7,6 @@
 #include <sstream>
 #include <unordered_map>
 #include <utility>
-#include <iostream>
 
 #include <arrow/array/builder_binary.h>
 #include "brad_sql_info.h"
@@ -142,14 +141,12 @@ arrow::Result<std::unique_ptr<FlightInfo>> BradFlightSqlServer::GetFlightInfoSta
     const ServerCallContext& context,
     const StatementQuery& command,
     const FlightDescriptor& descriptor) {
-  std::cout << "Executed GetFlightInfoStatement\n";
   return impl_->GetFlightInfoStatement(context, command, descriptor);
 }
 
 arrow::Result<std::unique_ptr<FlightDataStream>> BradFlightSqlServer::DoGetStatement(
     const ServerCallContext& context,
     const StatementQueryTicket& command) {
-  std::cout << "Executed DoGetStatement\n";
   return impl_->DoGetStatement(context, command);
 }
 

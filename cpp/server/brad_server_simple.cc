@@ -7,7 +7,6 @@
 #include <sstream>
 #include <unordered_map>
 #include <utility>
-#include <iostream>
 
 #include <arrow/array/builder_binary.h>
 #include "brad_sql_info.h"
@@ -57,7 +56,6 @@ std::shared_ptr<BradFlightSqlServer>
     for (const auto &id_to_result : GetSqlInfoResultMap()) {
       result->RegisterSqlInfo(id_to_result.first, id_to_result.second);
     }
-    std::cout << "Created instance of BradFlightSqlServer\n";
     return result;
 }
 
