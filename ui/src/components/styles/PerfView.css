@@ -1,0 +1,4 @@
+.perf-view-wrap {
+  display: flex;
+  flex-direction: column;
+}
