@@ -134,7 +134,7 @@ class EpochFileHandler(logging.Handler):
             # Ideally we should run these uploads in parallel. However, the
             # boto3 client probably cannot be used across threads, which would
             # increase the complexity of this code.
-            await loop.run_in_executor(None, self._upload_to_s3, to_upload)
+            await loop.run_in_executor(None, self._upload_to_s3, str(to_upload))
 
             # Safe to delete now.
             to_upload.unlink()
