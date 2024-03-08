@@ -19,12 +19,11 @@ body {
   display: flex;
   justify-content: center;
   align-items: stretch;
-  overflow: hidden;
 }
 
 .body-container {
   max-width: 2000px;
-  margin-top: 120px;
+  margin-top: 450px;
   flex-grow: 1;
 
   display: flex;
@@ -67,7 +66,7 @@ body {
 @media only screen and (max-width: 800px) {
   .body-container {
     flex-direction: column;
-    margin-top: 120px;
+    margin-top: 140px;
   }
   .column {
     width: 100%;
