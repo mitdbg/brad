@@ -130,7 +130,9 @@ class BradDaemon:
         self._startup_timestamp = universal_now()
 
         if self._start_ui and UiManager.is_supported():
-            self._ui_mgr: Optional[UiManager] = UiManager.create(self._config)
+            self._ui_mgr: Optional[UiManager] = UiManager.create(
+                self._config, self._monitor
+            )
         else:
             self._ui_mgr = None
             if self._start_ui:

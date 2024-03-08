@@ -1,6 +1,7 @@
 from typing import Any
 
 from brad.config.file import ConfigFile
+from brad.daemon.monitor import Monitor
 
 
 class UiManager:
@@ -24,10 +25,10 @@ class UiManager:
             return False
 
     @classmethod
-    def create(cls, config: ConfigFile) -> "UiManager":
+    def create(cls, config: ConfigFile, monitor: Monitor) -> "UiManager":
         from brad.ui.manager_impl import UiManagerImpl
 
-        return cls(UiManagerImpl(config))
+        return cls(UiManagerImpl(config, monitor))
 
     # We hide away the implementation details to allow external code to import
     # `UiManager` without worrying about import errors (e.g., because the
