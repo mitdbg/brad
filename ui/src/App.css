@@ -19,12 +19,11 @@ body {
   display: flex;
   justify-content: center;
   align-items: stretch;
-  overflow: hidden;
 }
 
 .body-container {
   max-width: 2000px;
-  margin-top: 140px;
+  margin-top: 450px;
   flex-grow: 1;
 
   display: flex;
