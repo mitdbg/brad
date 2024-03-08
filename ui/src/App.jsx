@@ -82,6 +82,7 @@ function mergeMetrics(existingMetrics, fetchedMetrics) {
 }
 
 function mergeAllMetrics(currentMetrics, fetchedMetrics) {
+  let addedNew = false;
   const mergedResults = {};
   // TODO: Handle missing keys on either side. This will remove metrics if
   // `fetchedMetrics` does not have the relevant metric.
@@ -96,9 +97,13 @@ function mergeAllMetrics(currentMetrics, fetchedMetrics) {
       };
     }
     const fetched = metricValues;
-    mergedResults[metricName] = mergeMetrics(current, fetched);
+    const merged = mergeMetrics(current, fetched);
+    mergedResults[metricName] = merged;
+    if (current.timestamps.length < merged.timestamps.length) {
+      addedNew = true;
+    }
   });
-  return mergedResults;
+  return [mergedResults, addedNew];
 }
 
 function App() {
@@ -110,15 +115,19 @@ function App() {
     const refreshData = async () => {
       const resultState = await axios.get(`${API_PREFIX}/system_state`);
       const newSystemState = resultState.data;
+      // TODO: Check for changes before setting the state.
       setSystemState(newSystemState);
 
       const resultMetrics = await axios.get(`${API_PREFIX}/metrics`);
       const rawMetrics = resultMetrics.data;
       const fetchedMetrics = parseMetrics(rawMetrics);
-      console.log("Fetched metrics", fetchedMetrics);
-      const mergedMetrics = mergeAllMetrics(metricsData, fetchedMetrics);
-      setMetricsData(mergedMetrics);
-      console.log("Merged metrics", mergedMetrics);
+      const [mergedMetrics, addedNewMetrics] = mergeAllMetrics(
+        metricsData,
+        fetchedMetrics,
+      );
+      if (addedNewMetrics) {
+        setMetricsData(mergedMetrics);
+      }
 
       timeoutId = setTimeout(refreshData, REFRESH_INTERVAL_MS);
     };
@@ -131,7 +140,7 @@ function App() {
       }
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [metricsData]);
 
   return (
     <>
