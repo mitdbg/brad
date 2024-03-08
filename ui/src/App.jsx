@@ -115,8 +115,10 @@ function App() {
     const refreshData = async () => {
       const resultState = await axios.get(`${API_PREFIX}/system_state`);
       const newSystemState = resultState.data;
-      // TODO: Check for changes before setting the state.
-      setSystemState(newSystemState);
+      // TODO: Not the best way to check for equality.
+      if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
+        setSystemState(newSystemState);
+      }
 
       const resultMetrics = await axios.get(`${API_PREFIX}/metrics`);
       const rawMetrics = resultMetrics.data;
@@ -140,7 +142,7 @@ function App() {
       }
       clearTimeout(timeoutId);
     };
-  }, [metricsData]);
+  }, [metricsData, systemState]);
 
   return (
     <>
