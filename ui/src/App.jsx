@@ -110,6 +110,7 @@ function App() {
   const [metricsData, setMetricsData] = useState({});
   const [systemState, setSystemState] = useState({});
 
+  // Fetch updated system state periodically.
   useEffect(() => {
     let timeoutId = null;
     const refreshData = async () => {
@@ -119,18 +120,6 @@ function App() {
       if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
         setSystemState(newSystemState);
       }
-
-      const resultMetrics = await axios.get(`${API_PREFIX}/metrics`);
-      const rawMetrics = resultMetrics.data;
-      const fetchedMetrics = parseMetrics(rawMetrics);
-      const [mergedMetrics, addedNewMetrics] = mergeAllMetrics(
-        metricsData,
-        fetchedMetrics,
-      );
-      if (addedNewMetrics) {
-        setMetricsData(mergedMetrics);
-      }
-
       timeoutId = setTimeout(refreshData, REFRESH_INTERVAL_MS);
     };
 
@@ -142,7 +131,34 @@ function App() {
       }
       clearTimeout(timeoutId);
     };
-  }, [metricsData, systemState]);
+  }, [systemState]);
+
+  // Fetch updated metrics.
+  useEffect(() => {
+    let timeoutId = null;
+    const refreshData = async () => {
+      const resultMetrics = await axios.get(`${API_PREFIX}/metrics`);
+      const rawMetrics = resultMetrics.data;
+      const fetchedMetrics = parseMetrics(rawMetrics);
+      const [mergedMetrics, addedNewMetrics] = mergeAllMetrics(
+        metricsData,
+        fetchedMetrics,
+      );
+      if (addedNewMetrics) {
+        setMetricsData(mergedMetrics);
+      }
+      timeoutId = setTimeout(refreshData, REFRESH_INTERVAL_MS);
+    };
+
+    // Run first fetch immediately.
+    timeoutId = setTimeout(refreshData, 0);
+    return () => {
+      if (timeoutId === null) {
+        return;
+      }
+      clearTimeout(timeoutId);
+    };
+  }, [metricsData]);
 
   return (
     <>
