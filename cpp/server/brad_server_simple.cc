@@ -52,7 +52,9 @@ BradFlightSqlServer::~BradFlightSqlServer() = default;
 
 std::shared_ptr<BradFlightSqlServer>
   BradFlightSqlServer::Create() {
-    std::shared_ptr<BradFlightSqlServer> result(new BradFlightSqlServer());
+    // std::shared_ptr<BradFlightSqlServer> result(new BradFlightSqlServer());
+    std::shared_ptr<BradFlightSqlServer> result =
+      std::make_shared<BradFlightSqlServer>();
     for (const auto &id_to_result : GetSqlInfoResultMap()) {
       result->RegisterSqlInfo(id_to_result.first, id_to_result.second);
     }

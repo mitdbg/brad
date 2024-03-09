@@ -68,10 +68,11 @@ class BradFrontEnd(BradInterface):
         exists, this function will return True. Otherwise, it returns False.
         """
         try:
+            # pylint: disable-next=import-error,no-name-in-module,unused-import
             import brad.native.pybind_brad_server as brad_server
-            global brad_server
+
             return True
-        except:
+        except ImportError:
             return False
 
     def __init__(
@@ -86,8 +87,12 @@ class BradFrontEnd(BradInterface):
         output_queue: mp.Queue,
     ):
         if BradFrontEnd.native_server_is_supported():
-            # Initialize mock server
-            server = brad_server.BradFlightSqlServer.create()
+            # pylint: disable-next=import-error,no-name-in-module
+            import brad.native.pybind_brad_server as brad_server
+
+            self._flight_sql_server = brad_server.BradFlightSqlServer.create()
+        else:
+            self._flight_sql_server = None
 
         self._fe_index = fe_index
         self._config = config

@@ -31,13 +31,6 @@ add_library(brad_server_lib OBJECT
             server/brad_statement.cc
             server/brad_tables_schema_batch_reader.cc)
 
-add_library(brad_server_lib_with_impl OBJECT
-            server/brad_server.cc
-            server/brad_sql_info.cc
-            server/brad_statement_batch_reader.cc
-            server/brad_statement.cc
-            server/brad_tables_schema_batch_reader.cc)
-
 add_library(sqlite_server_lib OBJECT
             sqlite_server/sqlite_server.cc
             sqlite_server/sqlite_sql_info.cc
@@ -51,8 +44,7 @@ target_link_libraries(pybind_brad_server
                       PRIVATE Arrow::arrow_shared
                       PRIVATE ArrowFlight::arrow_flight_shared
                       PRIVATE ArrowFlightSql::arrow_flight_sql_shared
-                      PRIVATE brad_server_lib
-                      gflags)
+                      PRIVATE brad_server_lib)
 
 add_executable(flight_sql_example_client flight_sql_example_client.cc)
 target_link_libraries(flight_sql_example_client
@@ -75,7 +67,7 @@ target_link_libraries(flight_sql_brad_server
                       PRIVATE Arrow::arrow_shared
                       PRIVATE ArrowFlight::arrow_flight_shared
                       PRIVATE ArrowFlightSql::arrow_flight_sql_shared
-                      PRIVATE brad_server_lib_with_impl
+                      PRIVATE brad_server_lib
                       gflags)
 
 add_executable(brad_front_end brad_front_end.cc)

@@ -9,9 +9,9 @@ namespace py = pybind11;
 PYBIND11_MODULE(pybind_brad_server, m) {
   m.doc() = "BradFlightSqlServer Python bindings";
 
-  py::class_<brad::BradFlightSqlServer> bradServer(m, "BradFlightSqlServer");
+  py::class_<brad::BradFlightSqlServer> brad_server(m, "BradFlightSqlServer");
 
-  bradServer
+  brad_server
     .def(py::init<>())
     .def("create", &brad::BradFlightSqlServer::Create);
 }
