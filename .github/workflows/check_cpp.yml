@@ -1,0 +1,45 @@
+name: Check C++ Code
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+    - 'cpp/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+    - 'cpp/**'
+  workflow_dispatch: {}
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Debug
+
+jobs:
+  build:
+    name: Check C++ Code
+    timeout-minutes: 30
+
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Add Arrow remote package repository
+      run: >-
+        wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb &&
+        sudo apt install ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
+
+    - name: Install Dependencies
+      run: >-
+        sudo apt update &&
+        sudo apt install libarrow-dev libarrow-flight-dev libarrow-flight-sql-dev sqlite3 libboost-all-dev
+      
+    - name: Configure Project using CMake
+      working-directory: ${{github.workspace}}/cpp
+      run: cmake -B ${{github.workspace}}/cpp/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Compile Project 
+      working-directory: ${{github.workspace}}/cpp/build
+      run: make -j
+      timeout-minutes: 15

@@ -1,7 +1,5 @@
 #include "brad_server_simple.h"
 
-#define BOOST_NO_CXX98_FUNCTION_BASE  // ARROW-17805
-#include <boost/algorithm/string.hpp>
 #include <mutex>
 #include <random>
 #include <sstream>
