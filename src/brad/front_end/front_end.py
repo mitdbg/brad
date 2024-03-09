@@ -61,6 +61,20 @@ LINESEP = "\n".encode()
 
 
 class BradFrontEnd(BradInterface):
+    @staticmethod
+    def native_server_is_supported() -> bool:
+        """
+        If the native pybind_brad_server module built using Arrow Flight SQL
+        exists, this function will return True. Otherwise, it returns False.
+        """
+        try:
+            # pylint: disable-next=import-error,no-name-in-module,unused-import
+            import brad.native.pybind_brad_server as brad_server
+
+            return True
+        except ImportError:
+            return False
+
     def __init__(
         self,
         fe_index: int,
@@ -72,6 +86,14 @@ class BradFrontEnd(BradInterface):
         input_queue: mp.Queue,
         output_queue: mp.Queue,
     ):
+        if BradFrontEnd.native_server_is_supported():
+            # pylint: disable-next=import-error,no-name-in-module
+            import brad.native.pybind_brad_server as brad_server
+
+            self._flight_sql_server = brad_server.BradFlightSqlServer.create()
+        else:
+            self._flight_sql_server = None
+
         self._fe_index = fe_index
         self._config = config
         self._schema_name = schema_name

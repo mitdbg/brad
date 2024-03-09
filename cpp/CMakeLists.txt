@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fPIC")
 
 add_compile_definitions("RELEASE=$<CONFIG:Release>")
 
@@ -15,6 +16,36 @@ find_package(gflags REQUIRED)
 
 find_package(SQLite3 REQUIRED)
 
+include(FetchContent)
+FetchContent_Declare(
+  pybind11
+  GIT_REPOSITORY https://github.com/pybind/pybind11.git
+  GIT_TAG          v2.11.1
+)
+FetchContent_MakeAvailable(pybind11)
+
+add_library(brad_server_lib OBJECT
+            server/brad_server_simple.cc
+            server/brad_sql_info.cc
+            server/brad_statement_batch_reader.cc
+            server/brad_statement.cc
+            server/brad_tables_schema_batch_reader.cc)
+
+add_library(sqlite_server_lib OBJECT
+            sqlite_server/sqlite_server.cc
+            sqlite_server/sqlite_sql_info.cc
+            sqlite_server/sqlite_statement_batch_reader.cc
+            sqlite_server/sqlite_statement.cc
+            sqlite_server/sqlite_tables_schema_batch_reader.cc
+            sqlite_server/sqlite_type_info.cc)
+
+pybind11_add_module(pybind_brad_server pybind/brad_server.cc)
+target_link_libraries(pybind_brad_server
+                      PRIVATE Arrow::arrow_shared
+                      PRIVATE ArrowFlight::arrow_flight_shared
+                      PRIVATE ArrowFlightSql::arrow_flight_sql_shared
+                      PRIVATE brad_server_lib)
+
 add_executable(flight_sql_example_client flight_sql_example_client.cc)
 target_link_libraries(flight_sql_example_client
                       PRIVATE Arrow::arrow_shared
@@ -22,41 +53,21 @@ target_link_libraries(flight_sql_example_client
                       PRIVATE ArrowFlightSql::arrow_flight_sql_shared
                       gflags)
 
-add_executable(flight_sql_example_server flight_sql_example_server.cc
-               sqlite_server/sqlite_server.cc
-               sqlite_server/sqlite_server.h
-               sqlite_server/sqlite_sql_info.cc
-               sqlite_server/sqlite_sql_info.h
-               sqlite_server/sqlite_statement_batch_reader.cc
-               sqlite_server/sqlite_statement_batch_reader.h
-               sqlite_server/sqlite_statement.cc
-               sqlite_server/sqlite_statement.h
-               sqlite_server/sqlite_tables_schema_batch_reader.cc
-               sqlite_server/sqlite_tables_schema_batch_reader.h
-               sqlite_server/sqlite_type_info.cc
-               sqlite_server/sqlite_type_info.h)
+add_executable(flight_sql_example_server flight_sql_example_server.cc)
 target_link_libraries(flight_sql_example_server
                       PRIVATE Arrow::arrow_shared
                       PRIVATE ArrowFlight::arrow_flight_shared
                       PRIVATE ArrowFlightSql::arrow_flight_sql_shared
+                      PRIVATE sqlite_server_lib
                       gflags
                       ${SQLite3_LIBRARIES})
 
-add_executable(flight_sql_brad_server flight_sql_brad_server.cc
-               server/brad_server.cc
-               server/brad_server.h
-               server/brad_sql_info.cc
-               server/brad_sql_info.h
-               server/brad_statement_batch_reader.cc
-               server/brad_statement_batch_reader.h
-               server/brad_statement.cc
-               server/brad_statement.h
-               server/brad_tables_schema_batch_reader.cc
-               server/brad_tables_schema_batch_reader.h)
+add_executable(flight_sql_brad_server flight_sql_brad_server.cc)
 target_link_libraries(flight_sql_brad_server
                       PRIVATE Arrow::arrow_shared
                       PRIVATE ArrowFlight::arrow_flight_shared
                       PRIVATE ArrowFlightSql::arrow_flight_sql_shared
+                      PRIVATE brad_server_lib
                       gflags)
 
 add_executable(brad_front_end brad_front_end.cc)
