@@ -11,18 +11,9 @@ project(brad)
 find_package(Arrow REQUIRED)
 find_package(ArrowFlight REQUIRED)
 find_package(ArrowFlightSql REQUIRED)
-
-find_package(gflags REQUIRED)
-
 find_package(SQLite3 REQUIRED)
 
-include(FetchContent)
-FetchContent_Declare(
-  pybind11
-  GIT_REPOSITORY https://github.com/pybind/pybind11.git
-  GIT_TAG          v2.11.1
-)
-FetchContent_MakeAvailable(pybind11)
+add_subdirectory(third_party)
 
 add_library(brad_server_lib OBJECT
             server/brad_server_simple.cc
