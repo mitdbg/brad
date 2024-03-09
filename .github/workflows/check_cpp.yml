@@ -31,7 +31,9 @@ jobs:
         sudo apt install ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
 
     - name: Install Dependencies
-      run: sudo apt update && sudo apt install libarrow-dev libarrow-flight-dev libarrow-flight-sql-dev sqlite3
+      run: >-
+        sudo apt update &&
+        sudo apt install libarrow-dev libarrow-flight-dev libarrow-flight-sql-dev sqlite3 libboost-all-dev
       
     - name: Configure Project using CMake
       working-directory: ${{github.workspace}}/cpp

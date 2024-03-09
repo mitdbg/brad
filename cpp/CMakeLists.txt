@@ -12,6 +12,7 @@ find_package(Arrow REQUIRED)
 find_package(ArrowFlight REQUIRED)
 find_package(ArrowFlightSql REQUIRED)
 find_package(SQLite3 REQUIRED)
+find_package(Boost REQUIRED)
 
 add_subdirectory(third_party)
 
@@ -51,7 +52,8 @@ target_link_libraries(flight_sql_example_server
                       PRIVATE ArrowFlightSql::arrow_flight_sql_shared
                       PRIVATE sqlite_server_lib
                       gflags
-                      ${SQLite3_LIBRARIES})
+                      ${SQLite3_LIBRARIES}
+                      ${Boost_LIBRARIES})
 
 add_executable(flight_sql_brad_server flight_sql_brad_server.cc)
 target_link_libraries(flight_sql_brad_server
