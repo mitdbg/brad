@@ -1,0 +1,44 @@
+name: Check JS Code
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+    - 'ui/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+    - 'ui/**'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    name: Check JS Code
+    timeout-minutes: 30
+
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set Up Node 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Dependencies
+      working-directory: ui
+      run: npm install
+
+    - name: Check Formatting (prettier)
+      working-directory: ui
+      run: npx prettier --check .
+      if: success() || failure()
+
+    - name: Lint (eslint)
+      run: npx eslint .
+      if: success() || failure()
+
+    - name: Run Build (vite)
+      run: npm run build
+      if: success() || failure()
