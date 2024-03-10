@@ -32,13 +32,15 @@ jobs:
 
     - name: Check Formatting (prettier)
       working-directory: ui
-      run: npx prettier --check .
+      run: npm run fcheck
       if: success() || failure()
 
     - name: Lint (eslint)
-      run: npx eslint .
+      working-directory: ui
+      run: npm run lint
       if: success() || failure()
 
     - name: Run Build (vite)
+      working-directory: ui
       run: npm run build
       if: success() || failure()
