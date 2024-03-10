@@ -1,6 +1,6 @@
 import "./styles/TableView.css";
 
-function WriterMarker({color}) {
+function WriterMarker({ color }) {
   return <div class={`db-table-view-writer ${color}`}>W</div>;
 }
 

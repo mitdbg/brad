@@ -36,7 +36,7 @@ function PerfView({ metricsData }) {
             yLabel="p90 Latency (s)"
           />
         </div>
-        <div style={{"marginTop": "30px"}}>
+        <div style={{ marginTop: "30px" }}>
           <h2>Transaction Latency</h2>
           <LatencyPlot
             seriesName="Transaction Latency"
