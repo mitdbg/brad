@@ -17,6 +17,10 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
 
   static std::shared_ptr<BradFlightSqlServer> Create();
 
+  void InitWrapper(const std::string &host, int port);
+
+  void SetShutdownOnSignalsWrapper();
+
   arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>>
     GetFlightInfoStatement(
       const arrow::flight::ServerCallContext &context,

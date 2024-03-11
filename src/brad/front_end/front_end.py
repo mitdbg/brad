@@ -89,8 +89,12 @@ class BradFrontEnd(BradInterface):
         if BradFrontEnd.native_server_is_supported():
             # pylint: disable-next=import-error,no-name-in-module
             import brad.native.pybind_brad_server as brad_server
-
-            self._flight_sql_server = brad_server.BradFlightSqlServer.create()
+            # self._flight_sql_server = brad_server.BradFlightSqlServer.create()
+            self._flight_sql_server = brad_server.BradFlightSqlServer()
+            self._flight_sql_server.init("0.0.0.0", 31337)
+            self._flight_sql_server.set_shutdown()
+            # TODO: create a new Python thread
+            # self._flight_sql_server.serve()
         else:
             self._flight_sql_server = None
 

@@ -5,6 +5,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <utility>
+#include <csignal>
 
 #include <arrow/array/builder_binary.h>
 #include "brad_sql_info.h"
@@ -51,12 +52,22 @@ BradFlightSqlServer::~BradFlightSqlServer() = default;
 std::shared_ptr<BradFlightSqlServer>
   BradFlightSqlServer::Create() {
     // std::shared_ptr<BradFlightSqlServer> result(new BradFlightSqlServer());
-    std::shared_ptr<BradFlightSqlServer> result =
-      std::make_shared<BradFlightSqlServer>();
-    for (const auto &id_to_result : GetSqlInfoResultMap()) {
-      result->RegisterSqlInfo(id_to_result.first, id_to_result.second);
-    }
-    return result;
+  std::shared_ptr<BradFlightSqlServer> result =
+    std::make_shared<BradFlightSqlServer>();
+  for (const auto &id_to_result : GetSqlInfoResultMap()) {
+    result->RegisterSqlInfo(id_to_result.first, id_to_result.second);
+  }
+  return result;
+}
+
+void BradFlightSqlServer::InitWrapper(const std::string &host, int port) {
+  auto location = arrow::flight::Location::ForGrpcTcp(host, port).ValueOrDie();
+  arrow::flight::FlightServerOptions options(location);
+  this->Init(options);
+}
+
+void BradFlightSqlServer::SetShutdownOnSignalsWrapper() {
+  this->SetShutdownOnSignals({SIGTERM});
 }
 
 arrow::Result<std::unique_ptr<FlightInfo>>
