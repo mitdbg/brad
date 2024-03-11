@@ -63,7 +63,7 @@ function WindowSelector({ windowSizeMinutes, onWindowSizeChange }) {
   );
 }
 
-function PerfView() {
+function PerfView({ virtualInfra }) {
   const [windowSizeMinutes, setWindowSizeMinutes] = useState(10);
   const [metricsData, setMetricsData] = useState({
     windowSizeMinutes,
@@ -121,6 +121,17 @@ function PerfView() {
   const queryLatMetrics = extractMetrics(metricsData, "query_latency_s_p90");
   const txnLatMetrics = extractMetrics(metricsData, "txn_latency_s_p90");
 
+  let vdbe1Peak = null;
+  let vdbe2Peak = null;
+  if (virtualInfra?.engines != null) {
+    if (virtualInfra.engines.length > 0) {
+      vdbe1Peak = virtualInfra.engines[0].peak_latency_s;
+    }
+    if (virtualInfra.engines.length > 1) {
+      vdbe2Peak = virtualInfra.engines[1].peak_latency_s;
+    }
+  }
+
   return (
     <div class="column" style={{ flexGrow: 2 }}>
       <div class="perf-view-heading">
@@ -141,6 +152,7 @@ function PerfView() {
                 values={txnLatMetrics.y}
                 xLabel="Time"
                 yLabel="p90 Latency (s)"
+                shadeSeconds={vdbe1Peak}
               />
             </div>
             <div class="perf-view-plot-wrap" style={{ marginTop: "30px" }}>
@@ -151,6 +163,7 @@ function PerfView() {
                 values={queryLatMetrics.y}
                 xLabel="Time"
                 yLabel="p90 Latency (s)"
+                shadeSeconds={vdbe2Peak}
               />
             </div>
           </div>

@@ -98,7 +98,7 @@ def get_system_state() -> SystemState:
         index=1,
         freshness="Serializable",
         dialect="PostgreSQL SQL",
-        performance="≤ 30 ms",
+        peak_latency_s=0.030,
         tables=[
             DisplayableTable(name=name, is_writer=True, mapped_to=["Aurora"])
             for name in [
@@ -115,7 +115,7 @@ def get_system_state() -> SystemState:
         index=2,
         freshness="≤ 10 minutes stale",
         dialect="PostgreSQL SQL",
-        performance="≤ 30 s",
+        peak_latency_s=30.0,
         tables=[
             DisplayableTable(name=table.name, is_writer=False, mapped_to=[])
             for table in blueprint.tables()

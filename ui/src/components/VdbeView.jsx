@@ -2,14 +2,14 @@ import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
 import "./styles/VdbeView.css";
 
-function VdbeView({ name, freshness, dialect, performance, tables }) {
+function VdbeView({ name, freshness, dialect, peak_latency_s, tables }) {
   return (
     <div class="vdbe-view">
       <DbCylinder color="green">{name}</DbCylinder>
       <div class="vdbe-view-props">
         <ul>
           <li>🌿: {freshness}</li>
-          <li>⏱️: Query Latency {performance}</li>
+          {peak_latency_s && <li>⏱️: Query Latency ≤ {peak_latency_s} s</li>}
           <li>🗣: {dialect}</li>
         </ul>
       </div>

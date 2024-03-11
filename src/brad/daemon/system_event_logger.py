@@ -39,11 +39,11 @@ class SystemEventLogger:
             self._logged_header = True
 
         now = universal_now()
-        row = [
+        row = (
             now,
             event,
             extra_details if extra_details is not None else "",
-        ]
+        )
 
         if len(self._memlog) == self._memlog_maxlen:
             self._memlog.popleft()

@@ -87,8 +87,8 @@ class DisplayableVirtualEngine(BaseModel):
     index: int
     freshness: str
     dialect: str
-    performance: str
-    tables: List[DisplayableTable]
+    peak_latency_s: Optional[float] = None
+    tables: List[DisplayableTable] = []
 
 
 class VirtualInfrastructure(BaseModel):

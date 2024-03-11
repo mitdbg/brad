@@ -6,6 +6,7 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 
@@ -16,9 +17,17 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  Filler,
 );
 
-function LatencyPlot({ seriesName, labels, values, xLabel, yLabel }) {
+function LatencyPlot({
+  seriesName,
+  labels,
+  values,
+  xLabel,
+  yLabel,
+  shadeSeconds,
+}) {
   const labelSize = 14;
   const options = {
     scales: {
@@ -66,6 +75,15 @@ function LatencyPlot({ seriesName, labels, values, xLabel, yLabel }) {
       },
     ],
   };
+
+  if (shadeSeconds != null) {
+    data.datasets.push({
+      data: labels.map(() => shadeSeconds),
+      fill: true,
+      backgroundColor: "rgba(0, 0, 0, 0.025)",
+      pointRadius: 0,
+    });
+  }
 
   return <Line data={data} options={options} />;
 }

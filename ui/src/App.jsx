@@ -48,7 +48,7 @@ function App() {
             <BlueprintView blueprint={systemState.blueprint} />
           </div>
         </div>
-        <PerfView />
+        <PerfView virtualInfra={systemState.virtual_infra} />
       </div>
     </>
   );
