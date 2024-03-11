@@ -34,3 +34,7 @@
   background-color: #e0e0e0;
   border: 1px solid #aaa;
 }
+
+.perf-view-plot-wrap h2 {
+  margin-bottom: 15px;
+}

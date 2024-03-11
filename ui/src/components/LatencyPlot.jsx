@@ -19,6 +19,7 @@ ChartJS.register(
 );
 
 function LatencyPlot({ seriesName, labels, values, xLabel, yLabel }) {
+  const labelSize = 14;
   const options = {
     scales: {
       y: {
@@ -27,6 +28,9 @@ function LatencyPlot({ seriesName, labels, values, xLabel, yLabel }) {
         title: {
           display: true,
           text: yLabel,
+          font: {
+            size: labelSize,
+          },
         },
       },
       x: {
@@ -35,6 +39,9 @@ function LatencyPlot({ seriesName, labels, values, xLabel, yLabel }) {
         title: {
           display: true,
           text: xLabel,
+          font: {
+            size: labelSize,
+          },
         },
         ticks: {
           minRotation: 45,
@@ -54,8 +61,8 @@ function LatencyPlot({ seriesName, labels, values, xLabel, yLabel }) {
       {
         label: seriesName,
         data: values,
-        borderColor: "rgb(255, 99, 132)",
-        backgroundColor: "rgba(255, 99, 132, 0.5)",
+        backgroundColor: "rgb(29, 128, 51)",
+        borderColor: "rgba(29, 128, 51, 0.8)",
       },
     ],
   };

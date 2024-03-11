@@ -119,11 +119,7 @@ function PerfView() {
   }
 
   const queryLatMetrics = extractMetrics(metricsData, "query_latency_s_p90");
-  const txnLatMetrics = extractMetrics(
-    metricsData,
-    "txn_latency_s_p90",
-    /*multiplier=*/ 1000,
-  );
+  const txnLatMetrics = extractMetrics(metricsData, "txn_latency_s_p90");
 
   return (
     <div class="column">
@@ -137,24 +133,24 @@ function PerfView() {
       <div class="column-inner">
         <Panel>
           <div class="perf-view-wrap">
-            <div>
+            <div class="perf-view-plot-wrap">
               <h2>Query Latency</h2>
               <LatencyPlot
                 seriesName="Query Latency"
                 labels={queryLatMetrics.x}
                 values={queryLatMetrics.y}
-                xLabel="Elapsed Time (minutes)"
+                xLabel="Time"
                 yLabel="p90 Latency (s)"
               />
             </div>
-            <div style={{ marginTop: "30px" }}>
+            <div class="perf-view-plot-wrap" style={{ marginTop: "30px" }}>
               <h2>Transaction Latency</h2>
               <LatencyPlot
                 seriesName="Transaction Latency"
                 labels={txnLatMetrics.x}
                 values={txnLatMetrics.y}
-                xLabel="Elapsed Time (minutes)"
-                yLabel="p90 Latency (ms)"
+                xLabel="Time"
+                yLabel="p90 Latency (s)"
               />
             </div>
           </div>
