@@ -104,6 +104,7 @@ def get_system_state() -> SystemState:
             ]
         ],
     )
+    vdbe1.tables.sort(key=lambda t: t.name)
     vdbe2 = DisplayableVirtualEngine(
         index=2,
         freshness="≤ 10 minutes stale",
@@ -115,6 +116,7 @@ def get_system_state() -> SystemState:
             if table.name not in txn_only
         ],
     )
+    vdbe2.tables.sort(key=lambda t: t.name)
     for engine in dbp.engines:
         if engine.name != "Aurora":
             continue

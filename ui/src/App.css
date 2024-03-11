@@ -27,7 +27,7 @@ body {
 }
 
 .body-container {
-  max-width: 2000px;
+  max-width: 2100px;
   margin-top: 120px;
   flex-grow: 1;
 
@@ -37,7 +37,7 @@ body {
 }
 
 .column {
-  flex-basis: calc(50% - 15px);
+  flex-basis: 0;
   padding: 0 20px;
 
   display: flex;

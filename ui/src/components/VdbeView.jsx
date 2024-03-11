@@ -13,9 +13,16 @@ function VdbeView({ name, freshness, dialect, performance, tables }) {
           <li>🗣: {dialect}</li>
         </ul>
       </div>
-      {tables.map(({ name, is_writer }) => (
-        <TableView key={name} name={name} isWriter={is_writer} color="green" />
-      ))}
+      <div class="db-table-set">
+        {tables.map(({ name, is_writer }) => (
+          <TableView
+            key={name}
+            name={name}
+            isWriter={is_writer}
+            color="green"
+          />
+        ))}
+      </div>
     </div>
   );
 }

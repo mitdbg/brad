@@ -41,7 +41,7 @@ function App() {
     <>
       <Header />
       <div class="body-container">
-        <div class="column">
+        <div class="column" style={{ flexGrow: 3 }}>
           <h2 class="col-h2">Data Infrastructure</h2>
           <div class="column-inner">
             <VirtualInfraView virtualInfra={systemState.virtual_infra} />

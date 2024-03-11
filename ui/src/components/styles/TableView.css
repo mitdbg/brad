@@ -1,6 +1,15 @@
+.db-table-set {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 340px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
 .db-table-view {
-  min-width: 170px;
-  min-height: 35px;
+  width: 160px;
+  height: 35px;
   background-color: #ededed;
   text-align: center;
   line-height: 35px;

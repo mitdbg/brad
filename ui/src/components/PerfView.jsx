@@ -122,7 +122,7 @@ function PerfView() {
   const txnLatMetrics = extractMetrics(metricsData, "txn_latency_s_p90");
 
   return (
-    <div class="column">
+    <div class="column" style={{ flexGrow: 2 }}>
       <div class="perf-view-heading">
         <h2 class="col-h2">Performance Monitoring</h2>
         <WindowSelector
