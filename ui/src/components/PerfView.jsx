@@ -134,21 +134,21 @@ function PerfView() {
         <Panel>
           <div class="perf-view-wrap">
             <div class="perf-view-plot-wrap">
-              <h2>Query Latency</h2>
+              <h2>VDBE 1 Query Latency</h2>
               <LatencyPlot
-                seriesName="Query Latency"
-                labels={queryLatMetrics.x}
-                values={queryLatMetrics.y}
+                seriesName="VDBE 1 Query Latency"
+                labels={txnLatMetrics.x}
+                values={txnLatMetrics.y}
                 xLabel="Time"
                 yLabel="p90 Latency (s)"
               />
             </div>
             <div class="perf-view-plot-wrap" style={{ marginTop: "30px" }}>
-              <h2>Transaction Latency</h2>
+              <h2>VDBE 2 Query Latency</h2>
               <LatencyPlot
-                seriesName="Transaction Latency"
-                labels={txnLatMetrics.x}
-                values={txnLatMetrics.y}
+                seriesName="VDBE 2 Query Latency"
+                labels={queryLatMetrics.x}
+                values={queryLatMetrics.y}
                 xLabel="Time"
                 yLabel="p90 Latency (s)"
               />

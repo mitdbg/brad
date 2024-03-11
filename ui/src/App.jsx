@@ -10,7 +10,10 @@ import "./App.css";
 const REFRESH_INTERVAL_MS = 30 * 1000;
 
 function App() {
-  const [systemState, setSystemState] = useState({});
+  const [systemState, setSystemState] = useState({
+    blueprint: null,
+    virtual_infra: null,
+  });
 
   // Fetch updated system state periodically.
   useEffect(() => {
@@ -41,8 +44,8 @@ function App() {
         <div class="column">
           <h2 class="col-h2">Data Infrastructure</h2>
           <div class="column-inner">
-            <VirtualInfraView systemState={systemState} />
-            <BlueprintView systemState={systemState} />
+            <VirtualInfraView virtualInfra={systemState.virtual_infra} />
+            <BlueprintView blueprint={systemState.blueprint} />
           </div>
         </div>
         <PerfView />

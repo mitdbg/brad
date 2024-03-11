@@ -11,7 +11,15 @@ from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
 from brad.daemon.monitor import Monitor
 from brad.ui.uvicorn_server import PatchedUvicornServer
-from brad.ui.models import MetricsData, TimestampedMetrics, DisplayableBlueprint
+from brad.ui.models import (
+    MetricsData,
+    TimestampedMetrics,
+    DisplayableBlueprint,
+    SystemState,
+    DisplayableVirtualEngine,
+    VirtualInfrastructure,
+    DisplayableTable,
+)
 from brad.daemon.front_end_metrics import FrontEndMetric
 
 logger = logging.getLogger(__name__)
@@ -72,10 +80,50 @@ def get_metrics(num_values: int = 3) -> MetricsData:
 
 
 @app.get("/api/1/system_state")
-def get_system_state() -> DisplayableBlueprint:
+def get_system_state() -> SystemState:
     assert manager is not None
     blueprint = manager.blueprint_mgr.get_blueprint()
-    return DisplayableBlueprint.from_blueprint(blueprint)
+    dbp = DisplayableBlueprint.from_blueprint(blueprint)
+
+    # TODO: Hardcoded virtualized infrasturcture and writers.
+    txn_tables = ["theatres", "showings", "ticket_orders", "movie_info", "aka_title"]
+    txn_only = ["theatres", "showings", "ticket_orders"]
+    vdbe1 = DisplayableVirtualEngine(
+        index=1,
+        freshness="Serializable",
+        dialect="PostgreSQL SQL",
+        performance="≤ 30 ms",
+        tables=[
+            DisplayableTable(name=name, is_writer=True, mapped_to=["Aurora"])
+            for name in [
+                "theatres",
+                "showings",
+                "ticket_orders",
+                "movie_info",
+                "aka_title",
+            ]
+        ],
+    )
+    vdbe2 = DisplayableVirtualEngine(
+        index=2,
+        freshness="≤ 10 minutes stale",
+        dialect="PostgreSQL SQL",
+        performance="≤ 30 s",
+        tables=[
+            DisplayableTable(name=table.name, is_writer=False, mapped_to=[])
+            for table in blueprint.tables()
+            if table.name not in txn_only
+        ],
+    )
+    for engine in dbp.engines:
+        if engine.name != "Aurora":
+            continue
+        for t in engine.tables:
+            if t.name in txn_tables:
+                t.is_writer = True
+    virtual_infra = VirtualInfrastructure(engines=[vdbe1, vdbe2])
+
+    return SystemState(virtual_infra=virtual_infra, blueprint=dbp)
 
 
 # Serve the static pages.
