@@ -1,10 +1,14 @@
 import csv
 import pathlib
-from typing import Optional
+from datetime import datetime
+from typing import Optional, Deque, Tuple, List
+from collections import deque
 
 from brad.config.file import ConfigFile
 from brad.config.system_event import SystemEvent
 from brad.utils.time_periods import universal_now
+
+SystemEventRecord = Tuple[datetime, SystemEvent, str]
 
 
 class SystemEventLogger:
@@ -26,6 +30,8 @@ class SystemEventLogger:
         self._file = open(self._log_path, "a", encoding="UTF-8")
         self._csv_writer = csv.writer(self._file)
         self._logged_header = False
+        self._memlog: Deque[Tuple[datetime, SystemEvent, str]] = deque()
+        self._memlog_maxlen = 100
 
     def log(self, event: SystemEvent, extra_details: Optional[str] = None) -> None:
         if not self._logged_header:
@@ -33,11 +39,27 @@ class SystemEventLogger:
             self._logged_header = True
 
         now = universal_now()
+        row = [
+            now,
+            event,
+            extra_details if extra_details is not None else "",
+        ]
+
+        if len(self._memlog) == self._memlog_maxlen:
+            self._memlog.popleft()
+        self._memlog.append(row)
+
         self._csv_writer.writerow(
             [
-                now.strftime("%Y-%m-%d %H:%M:%S"),
-                event.value,
-                extra_details if extra_details is not None else "",
+                row[0].strftime("%Y-%m-%d %H:%M:%S"),
+                row[1].value,
+                row[2],
             ]
         )
         self._file.flush()
+
+    def current_memlog(self) -> List[SystemEventRecord]:
+        """
+        Used for retrieving the system event log.
+        """
+        return list(self._memlog)

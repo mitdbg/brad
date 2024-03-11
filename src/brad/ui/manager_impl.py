@@ -4,7 +4,7 @@ import logging
 import importlib.resources as pkg_resources
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from typing import Optional
+from typing import Optional, List
 
 import brad.ui.static as brad_app
 from brad.blueprint.manager import BlueprintManager
@@ -21,17 +21,23 @@ from brad.ui.models import (
     DisplayableTable,
 )
 from brad.daemon.front_end_metrics import FrontEndMetric
+from brad.daemon.system_event_logger import SystemEventLogger, SystemEventRecord
 
 logger = logging.getLogger(__name__)
 
 
 class UiManagerImpl:
     def __init__(
-        self, config: ConfigFile, monitor: Monitor, blueprint_mgr: BlueprintManager
+        self,
+        config: ConfigFile,
+        monitor: Monitor,
+        blueprint_mgr: BlueprintManager,
+        system_event_logger: Optional[SystemEventLogger],
     ) -> None:
         self.config = config
         self.monitor = monitor
         self.blueprint_mgr = blueprint_mgr
+        self.system_event_logger = system_event_logger
 
     async def serve_forever(self) -> None:
         global manager  # pylint: disable=global-statement
@@ -126,6 +132,16 @@ def get_system_state() -> SystemState:
     virtual_infra = VirtualInfrastructure(engines=[vdbe1, vdbe2])
 
     return SystemState(virtual_infra=virtual_infra, blueprint=dbp)
+
+
+@app.get("/api/1/system_events")
+def get_system_events() -> List[SystemEventRecord]:
+    assert manager is not None
+    return (
+        manager.system_event_logger.current_memlog()
+        if manager.system_event_logger is not None
+        else []
+    )
 
 
 # Serve the static pages.
