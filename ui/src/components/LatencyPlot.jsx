@@ -36,6 +36,11 @@ function LatencyPlot({ seriesName, labels, values, xLabel, yLabel }) {
           display: true,
           text: xLabel,
         },
+        ticks: {
+          minRotation: 45,
+          maxRotation: 45,
+          maxTicksLimit: 10,
+        },
       },
     },
     plugins: {
