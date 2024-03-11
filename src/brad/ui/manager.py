@@ -1,8 +1,9 @@
-from typing import Any
+from typing import Any, Optional
 
 from brad.config.file import ConfigFile
 from brad.daemon.monitor import Monitor
 from brad.blueprint.manager import BlueprintManager
+from brad.daemon.system_event_logger import SystemEventLogger
 
 
 class UiManager:
@@ -27,11 +28,15 @@ class UiManager:
 
     @classmethod
     def create(
-        cls, config: ConfigFile, monitor: Monitor, blueprint_mgr: BlueprintManager
+        cls,
+        config: ConfigFile,
+        monitor: Monitor,
+        blueprint_mgr: BlueprintManager,
+        system_event_logger: Optional[SystemEventLogger],
     ) -> "UiManager":
         from brad.ui.manager_impl import UiManagerImpl
 
-        return cls(UiManagerImpl(config, monitor, blueprint_mgr))
+        return cls(UiManagerImpl(config, monitor, blueprint_mgr, system_event_logger))
 
     # We hide away the implementation details to allow external code to import
     # `UiManager` without worrying about import errors (e.g., because the

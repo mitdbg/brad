@@ -14,10 +14,16 @@ class MetricsData(BaseModel):
     named_metrics: Dict[str, TimestampedMetrics]
 
 
+class DisplayableTable(BaseModel):
+    name: str
+    is_writer: bool = False
+    mapped_to: List[str] = []
+
+
 class DisplayablePhysicalEngine(BaseModel):
     name: str
     provisioning: Optional[str]
-    tables: List[str]
+    tables: List[DisplayableTable]
 
 
 class DisplayableBlueprint(BaseModel):
@@ -29,11 +35,12 @@ class DisplayableBlueprint(BaseModel):
         aurora = blueprint.aurora_provisioning()
         if aurora.num_nodes() > 0:
             aurora_tables = [
-                table.name
+                # TODO: Hardcoded Aurora writer. This will change down the road.
+                DisplayableTable(name=table.name, is_writer=False)
                 for table, locations in blueprint.tables_with_locations()
                 if Engine.Aurora in locations
             ]
-            aurora_tables.sort()
+            aurora_tables.sort(key=lambda t: t.name)
             engines.append(
                 DisplayablePhysicalEngine(
                     name="Aurora",
@@ -45,11 +52,12 @@ class DisplayableBlueprint(BaseModel):
         redshift = blueprint.redshift_provisioning()
         if redshift.num_nodes() > 0:
             redshift_tables = [
-                table.name
+                # TODO: Hardcoded Redshift writer. This will change down the road.
+                DisplayableTable(name=table.name, is_writer=False)
                 for table, locations in blueprint.tables_with_locations()
                 if Engine.Redshift in locations
             ]
-            redshift_tables.sort()
+            redshift_tables.sort(key=lambda t: t.name)
             engines.append(
                 DisplayablePhysicalEngine(
                     name="Redshift",
@@ -59,11 +67,12 @@ class DisplayableBlueprint(BaseModel):
             )
 
         athena_tables = [
-            table.name
+            # TODO: Hardcoded Athena writer. This will change down the road.
+            DisplayableTable(name=table.name, is_writer=False)
             for table, locations in blueprint.tables_with_locations()
             if Engine.Athena in locations
         ]
-        athena_tables.sort()
+        athena_tables.sort(key=lambda t: t.name)
         if len(athena_tables) > 0:
             engines.append(
                 DisplayablePhysicalEngine(
@@ -72,3 +81,20 @@ class DisplayableBlueprint(BaseModel):
             )
 
         return cls(engines=engines)
+
+
+class DisplayableVirtualEngine(BaseModel):
+    index: int
+    freshness: str
+    dialect: str
+    peak_latency_s: Optional[float] = None
+    tables: List[DisplayableTable] = []
+
+
+class VirtualInfrastructure(BaseModel):
+    engines: List[DisplayableVirtualEngine]
+
+
+class SystemState(BaseModel):
+    virtual_infra: VirtualInfrastructure
+    blueprint: DisplayableBlueprint

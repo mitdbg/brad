@@ -6,6 +6,7 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 
@@ -16,9 +17,18 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  Filler,
 );
 
-function LatencyPlot({ seriesName, labels, values, xLabel, yLabel }) {
+function LatencyPlot({
+  seriesName,
+  labels,
+  values,
+  xLabel,
+  yLabel,
+  shadeSeconds,
+}) {
+  const labelSize = 14;
   const options = {
     scales: {
       y: {
@@ -27,6 +37,9 @@ function LatencyPlot({ seriesName, labels, values, xLabel, yLabel }) {
         title: {
           display: true,
           text: yLabel,
+          font: {
+            size: labelSize,
+          },
         },
       },
       x: {
@@ -35,6 +48,14 @@ function LatencyPlot({ seriesName, labels, values, xLabel, yLabel }) {
         title: {
           display: true,
           text: xLabel,
+          font: {
+            size: labelSize,
+          },
+        },
+        ticks: {
+          minRotation: 45,
+          maxRotation: 45,
+          maxTicksLimit: 10,
         },
       },
     },
@@ -49,11 +70,20 @@ function LatencyPlot({ seriesName, labels, values, xLabel, yLabel }) {
       {
         label: seriesName,
         data: values,
-        borderColor: "rgb(255, 99, 132)",
-        backgroundColor: "rgba(255, 99, 132, 0.5)",
+        backgroundColor: "rgb(29, 128, 51)",
+        borderColor: "rgba(29, 128, 51, 0.8)",
       },
     ],
   };
+
+  if (shadeSeconds != null) {
+    data.datasets.push({
+      data: labels.map(() => shadeSeconds),
+      fill: true,
+      backgroundColor: "rgba(0, 0, 0, 0.025)",
+      pointRadius: 0,
+    });
+  }
 
   return <Line data={data} options={options} />;
 }
