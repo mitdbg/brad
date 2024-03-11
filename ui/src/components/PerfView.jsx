@@ -7,20 +7,20 @@ import "./styles/PerfView.css";
 
 const REFRESH_INTERVAL_MS = 30 * 1000;
 
-function extractMetrics(data, metricName, multiplier) {
+function extractMetrics({ metrics }, metricName, multiplier) {
   if (multiplier == null) {
     multiplier = 1.0;
   }
-  if (!data.hasOwnProperty(metricName)) {
+  if (!metrics.hasOwnProperty(metricName)) {
     return {
       x: [],
       y: [],
     };
   } else {
-    const metrics = data[metricName];
+    const innerMetrics = metrics[metricName];
     return {
-      x: metrics.timestamps.map((val) => val.toLocaleTimeString("en-US")),
-      y: metrics.values.map((val) => val * multiplier),
+      x: innerMetrics.timestamps.map((val) => val.toLocaleTimeString("en-US")),
+      y: innerMetrics.values.map((val) => val * multiplier),
     };
   }
 }
@@ -39,9 +39,37 @@ function parseMetrics({ named_metrics }) {
   return result;
 }
 
+function WindowSelector({ windowSizeMinutes, onWindowSizeChange }) {
+  function className(windowSizeOption) {
+    return `perf-view-winsel-button ${windowSizeOption === windowSizeMinutes ? "selected" : ""}`;
+  }
+  return (
+    <div class="perf-view-winsel">
+      Show metrics for last
+      <button
+        class={className(10)}
+        style={{ marginLeft: "20px" }}
+        onClick={() => onWindowSizeChange(10)}
+      >
+        10 mins
+      </button>
+      <button class={className(30)} onClick={() => onWindowSizeChange(30)}>
+        30 mins
+      </button>
+      <button class={className(60)} onClick={() => onWindowSizeChange(60)}>
+        60 mins
+      </button>
+    </div>
+  );
+}
+
 function PerfView() {
-  const [windowSize, setWindowSize] = useState(10);
-  const [metricsData, setMetricsData] = useState({});
+  const [windowSizeMinutes, setWindowSizeMinutes] = useState(10);
+  const [metricsData, setMetricsData] = useState({
+    windowSizeMinutes,
+    metrics: {},
+  });
+
   const metricsManagerRef = useRef(null);
   function getMetricsManager() {
     if (metricsManagerRef.current == null) {
@@ -58,12 +86,13 @@ function PerfView() {
       const metricsManager = getMetricsManager();
       const addedNewMetrics = metricsManager.mergeInMetrics(fetchedMetrics);
       if (addedNewMetrics) {
-        setMetricsData(
-          metricsManager.getMetricsInWindow(
-            windowSize,
+        setMetricsData({
+          windowSizeMinutes,
+          metrics: metricsManager.getMetricsInWindow(
+            windowSizeMinutes,
             /*extendForward=*/ true,
           ),
-        );
+        });
       }
       timeoutId = setTimeout(refreshData, REFRESH_INTERVAL_MS);
     };
@@ -76,7 +105,18 @@ function PerfView() {
       }
       clearTimeout(timeoutId);
     };
-  }, [metricsData, windowSize]);
+  }, [metricsData, windowSizeMinutes]);
+
+  if (metricsData.windowSizeMinutes !== windowSizeMinutes) {
+    const metricsManager = getMetricsManager();
+    setMetricsData({
+      windowSizeMinutes,
+      metrics: metricsManager.getMetricsInWindow(
+        windowSizeMinutes,
+        /*extendForward=*/ true,
+      ),
+    });
+  }
 
   const queryLatMetrics = extractMetrics(metricsData, "query_latency_s_p90");
   const txnLatMetrics = extractMetrics(
@@ -86,30 +126,41 @@ function PerfView() {
   );
 
   return (
-    <Panel>
-      <div class="perf-view-wrap">
-        <div>
-          <h2>Query Latency</h2>
-          <LatencyPlot
-            seriesName="Query Latency"
-            labels={queryLatMetrics.x}
-            values={queryLatMetrics.y}
-            xLabel="Elapsed Time (minutes)"
-            yLabel="p90 Latency (s)"
-          />
-        </div>
-        <div style={{ marginTop: "30px" }}>
-          <h2>Transaction Latency</h2>
-          <LatencyPlot
-            seriesName="Transaction Latency"
-            labels={txnLatMetrics.x}
-            values={txnLatMetrics.y}
-            xLabel="Elapsed Time (minutes)"
-            yLabel="p90 Latency (ms)"
-          />
-        </div>
+    <div class="column">
+      <div class="perf-view-heading">
+        <h2 class="col-h2">Performance Monitoring</h2>
+        <WindowSelector
+          windowSizeMinutes={windowSizeMinutes}
+          onWindowSizeChange={setWindowSizeMinutes}
+        />
       </div>
-    </Panel>
+      <div class="column-inner">
+        <Panel>
+          <div class="perf-view-wrap">
+            <div>
+              <h2>Query Latency</h2>
+              <LatencyPlot
+                seriesName="Query Latency"
+                labels={queryLatMetrics.x}
+                values={queryLatMetrics.y}
+                xLabel="Elapsed Time (minutes)"
+                yLabel="p90 Latency (s)"
+              />
+            </div>
+            <div style={{ marginTop: "30px" }}>
+              <h2>Transaction Latency</h2>
+              <LatencyPlot
+                seriesName="Transaction Latency"
+                labels={txnLatMetrics.x}
+                values={txnLatMetrics.y}
+                xLabel="Elapsed Time (minutes)"
+                yLabel="p90 Latency (ms)"
+              />
+            </div>
+          </div>
+        </Panel>
+      </div>
+    </div>
   );
 }
 

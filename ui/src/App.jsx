@@ -45,12 +45,7 @@ function App() {
             <BlueprintView systemState={systemState} />
           </div>
         </div>
-        <div class="column">
-          <h2 class="col-h2">Performance Monitoring</h2>
-          <div class="column-inner">
-            <PerfView />
-          </div>
-        </div>
+        <PerfView />
       </div>
     </>
   );
