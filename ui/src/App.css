@@ -10,6 +10,11 @@ body {
   font-style: normal;
 }
 
+body {
+  justify-content: center !important;
+  align-items: flex-start !important;
+}
+
 #root {
   width: 100%;
   height: auto;
@@ -23,7 +28,7 @@ body {
 
 .body-container {
   max-width: 2000px;
-  margin-top: 450px;
+  margin-top: 120px;
   flex-grow: 1;
 
   display: flex;
