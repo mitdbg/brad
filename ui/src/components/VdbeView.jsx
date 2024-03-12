@@ -1,6 +1,7 @@
 import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
 import "./styles/VdbeView.css";
+import { highlightTableViewClass } from "../highlight";
 
 function VdbeView({
   name,
@@ -11,22 +12,12 @@ function VdbeView({
   highlight,
   onTableHoverEnter,
   onTableHoverExit,
-  index,
 }) {
-  const virtualEngineIndex = index.toString();
-  function shouldHighlight(tableName) {
-    return highlight.virtualEngines[virtualEngineIndex] === tableName;
-  }
-  function inHighlightMode() {
-    return (
-      Object.keys(highlight.virtualEngines).length > 0 ||
-      Object.keys(highlight.physicalEngines).length > 0
-    );
-  }
+  const vengName = name;
 
   return (
-    <div class={`vdbe-view ${inHighlightMode() ? "highlight-mode" : ""}`}>
-      <DbCylinder color="green">{name}</DbCylinder>
+    <div class="vdbe-view">
+      <DbCylinder color="green">{vengName}</DbCylinder>
       <div class="vdbe-view-props">
         <ul>
           <li>🌿: {freshness}</li>
@@ -41,9 +32,14 @@ function VdbeView({
             name={name}
             isWriter={is_writer}
             color="green"
-            isHighlighted={shouldHighlight(name)}
+            highlightClass={highlightTableViewClass(
+              highlight,
+              vengName,
+              name,
+              true,
+            )}
             onTableHoverEnter={() =>
-              onTableHoverEnter(virtualEngineIndex, name, true, mapped_to)
+              onTableHoverEnter(vengName, name, true, mapped_to)
             }
             onTableHoverExit={onTableHoverExit}
           />

@@ -13,11 +13,10 @@ function VirtualInfraView({
       <div class="vdbe-view-wrap">
         {virtualInfra &&
           virtualInfra.engines &&
-          virtualInfra.engines.map(({ index, ...props }) => (
+          virtualInfra.engines.map(({ name, ...props }) => (
             <VdbeView
-              key={index}
-              name={`VDBE ${index}`}
-              index={index}
+              key={name}
+              name={name}
               highlight={highlight}
               onTableHoverEnter={onTableHoverEnter}
               onTableHoverExit={onTableHoverExit}

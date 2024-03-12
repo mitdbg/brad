@@ -97,7 +97,7 @@ def get_system_state() -> SystemState:
     txn_tables = ["theatres", "showings", "ticket_orders", "movie_info", "aka_title"]
     txn_only = ["theatres", "showings", "ticket_orders"]
     vdbe1 = DisplayableVirtualEngine(
-        index=1,
+        name="VDBE 1",
         freshness="Serializable",
         dialect="PostgreSQL SQL",
         peak_latency_s=0.030,
@@ -114,7 +114,7 @@ def get_system_state() -> SystemState:
     )
     vdbe1.tables.sort(key=lambda t: t.name)
     vdbe2 = DisplayableVirtualEngine(
-        index=2,
+        name="VDBE 2",
         freshness="≤ 10 minutes stale",
         dialect="PostgreSQL SQL",
         peak_latency_s=30.0,
@@ -158,14 +158,14 @@ def _add_reverse_mapping_temp(system_state: SystemState) -> None:
     veng_tables = {}
     for veng in system_state.virtual_infra.engines:
         table_names = {table.name for table in veng.tables}
-        veng_tables[veng.index] = table_names
+        veng_tables[veng.name] = table_names
 
     for engine in system_state.blueprint.engines:
         for table in engine.tables:
             name = table.name
-            for index, tables in veng_tables.items():
+            for veng_name, tables in veng_tables.items():
                 if name in tables:
-                    table.mapped_to.append(str(index))
+                    table.mapped_to.append(veng_name)
 
 
 @app.get("/api/1/system_events")

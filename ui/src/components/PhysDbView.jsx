@@ -1,6 +1,7 @@
 import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
 import "./styles/PhysDbView.css";
+import { highlightTableViewClass } from "../highlight";
 
 function PhysDbView({
   name,
@@ -11,18 +12,9 @@ function PhysDbView({
   onTableHoverExit,
 }) {
   const physDbName = name;
-  function shouldHighlight(tableName) {
-    return highlight.physicalEngines[name] === tableName;
-  }
-  function inHighlightMode() {
-    return (
-      Object.keys(highlight.virtualEngines).length > 0 ||
-      Object.keys(highlight.physicalEngines).length > 0
-    );
-  }
 
   return (
-    <div class={`physdb-view ${inHighlightMode() ? "highlight-mode" : ""}`}>
+    <div class="physdb-view">
       <DbCylinder color="blue">{name}</DbCylinder>
       <div class="physdb-view-prov">{provisioning}</div>
       <div class="db-table-set">
@@ -32,7 +24,12 @@ function PhysDbView({
             name={name}
             isWriter={is_writer}
             color="blue"
-            isHighlighted={shouldHighlight(name)}
+            highlightClass={highlightTableViewClass(
+              highlight,
+              physDbName,
+              name,
+              false,
+            )}
             onTableHoverEnter={() =>
               onTableHoverEnter(physDbName, name, false, mapped_to)
             }

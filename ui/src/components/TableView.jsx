@@ -10,11 +10,11 @@ function TableView({
   color,
   onTableHoverEnter,
   onTableHoverExit,
-  isHighlighted,
+  highlightClass,
 }) {
   return (
     <div
-      class={`db-table-view ${isHighlighted ? "highlight" : ""}`}
+      class={`db-table-view ${highlightClass}`}
       onMouseEnter={onTableHoverEnter}
       onMouseLeave={onTableHoverExit}
     >
