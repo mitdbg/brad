@@ -20,6 +20,7 @@
   transition: opacity 0.3s;
 }
 
+/*
 .db-table-view.dim {
   opacity: 0.5;
 }
@@ -27,6 +28,7 @@
 .db-table-view.highlight {
   opacity: 1 !important;
 }
+*/
 
 .db-table-view-writer {
   border-radius: 50%;
