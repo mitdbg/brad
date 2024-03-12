@@ -17,6 +17,19 @@
   border-radius: 3px;
   margin: 8px 0;
   position: relative;
+  transition: opacity 0.3s;
+}
+
+.highlight-mode .db-table-view {
+  opacity: 0.5;
+}
+
+.db-table-view:hover {
+  opacity: 1 !important;
+}
+
+.db-table-view.highlight {
+  opacity: 1 !important;
 }
 
 .db-table-view-writer {
