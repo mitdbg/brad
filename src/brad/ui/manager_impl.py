@@ -7,7 +7,9 @@ from fastapi.staticfiles import StaticFiles
 from typing import Optional, List
 
 import brad.ui.static as brad_app
+from brad.blueprint import Blueprint
 from brad.blueprint.manager import BlueprintManager
+from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.monitor import Monitor
 from brad.ui.uvicorn_server import PatchedUvicornServer
@@ -117,7 +119,11 @@ def get_system_state() -> SystemState:
         dialect="PostgreSQL SQL",
         peak_latency_s=30.0,
         tables=[
-            DisplayableTable(name=table.name, is_writer=False, mapped_to=[])
+            DisplayableTable(
+                name=table.name,
+                is_writer=False,
+                mapped_to=_analytics_table_mapper_temp(table.name, blueprint),
+            )
             for table in blueprint.tables()
             if table.name not in txn_only
         ],
@@ -130,8 +136,36 @@ def get_system_state() -> SystemState:
             if t.name in txn_tables:
                 t.is_writer = True
     virtual_infra = VirtualInfrastructure(engines=[vdbe1, vdbe2])
+    system_state = SystemState(virtual_infra=virtual_infra, blueprint=dbp)
+    _add_reverse_mapping_temp(system_state)
+    return system_state
 
-    return SystemState(virtual_infra=virtual_infra, blueprint=dbp)
+
+def _analytics_table_mapper_temp(table_name: str, blueprint: Blueprint) -> List[str]:
+    # TODO: This is a hard-coded heurstic for the mock up only.
+    locations = blueprint.get_table_locations(table_name)
+    names = []
+    if Engine.Redshift in locations:
+        names.append("Redshift")
+    if Engine.Athena in locations:
+        names.append("Athena")
+    return names
+
+
+def _add_reverse_mapping_temp(system_state: SystemState) -> None:
+    # TODO: This is a hard-coded heuristic for the mock up only.
+    # This mutates the passed-in object.
+    veng_tables = {}
+    for veng in system_state.virtual_infra.engines:
+        table_names = {table.name for table in veng.tables}
+        veng_tables[veng.index] = table_names
+
+    for engine in system_state.blueprint.engines:
+        for table in engine.tables:
+            name = table.name
+            for index, tables in veng_tables.items():
+                if name in tables:
+                    table.mapped_to.append(str(index))
 
 
 @app.get("/api/1/system_events")
