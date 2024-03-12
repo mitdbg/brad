@@ -89,12 +89,9 @@ class BradFrontEnd(BradInterface):
         if BradFrontEnd.native_server_is_supported():
             # pylint: disable-next=import-error,no-name-in-module
             import brad.native.pybind_brad_server as brad_server
-            # self._flight_sql_server = brad_server.BradFlightSqlServer.create()
             self._flight_sql_server = brad_server.BradFlightSqlServer()
             self._flight_sql_server.init("0.0.0.0", 31337)
             self._flight_sql_server.set_shutdown()
-            # TODO: create a new Python thread
-            # self._flight_sql_server.serve()
         else:
             self._flight_sql_server = None
 
@@ -192,6 +189,9 @@ class BradFrontEnd(BradInterface):
         self._ping_watchdog_task: Optional[asyncio.Task[None]] = None
 
         self._is_stub_mode = self._config.stub_mode_path is not None
+
+    async def _start_native_server(self):
+        await self._flight_sql_server.serve()
 
     async def serve_forever(self):
         await self._run_setup()
