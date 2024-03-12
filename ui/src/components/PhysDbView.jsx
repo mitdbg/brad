@@ -1,7 +1,11 @@
 import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
 import "./styles/PhysDbView.css";
-import { highlightTableViewClass, sortTablesToHoist } from "../highlight";
+import {
+  highlightTableViewClass,
+  highlightEngineViewClass,
+  sortTablesToHoist,
+} from "../highlight";
 
 function PhysDbView({
   name,
@@ -13,10 +17,11 @@ function PhysDbView({
 }) {
   const physDbName = name;
   const sortedTables = sortTablesToHoist(highlight, physDbName, false, tables);
-  console.log(sortedTables.map((t) => t.name));
 
   return (
-    <div class="physdb-view">
+    <div
+      class={`physdb-view ${highlightEngineViewClass(highlight, physDbName, false)}`}
+    >
       <DbCylinder color="blue">{name}</DbCylinder>
       <div class="physdb-view-prov">{provisioning}</div>
       <div class="db-table-set">

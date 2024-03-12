@@ -1,7 +1,11 @@
 import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
 import "./styles/VdbeView.css";
-import { highlightTableViewClass, sortTablesToHoist } from "../highlight";
+import {
+  highlightTableViewClass,
+  highlightEngineViewClass,
+  sortTablesToHoist,
+} from "../highlight";
 
 function VdbeView({
   name,
@@ -17,7 +21,9 @@ function VdbeView({
   const sortedTables = sortTablesToHoist(highlight, vengName, true, tables);
 
   return (
-    <div class="vdbe-view">
+    <div
+      class={`vdbe-view ${highlightEngineViewClass(highlight, vengName, true)}`}
+    >
       <DbCylinder color="green">{vengName}</DbCylinder>
       <div class="vdbe-view-props">
         <ul>

@@ -9,6 +9,8 @@
 
   opacity: 0.85;
   transition: opacity 0.5s;
+
+  cursor: default;
 }
 
 .db-cylinder:hover {

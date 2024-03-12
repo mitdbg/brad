@@ -22,6 +22,23 @@ function highlightTableViewClass(
   }
 }
 
+function highlightEngineViewClass(highlightState, engineName, isVirtual) {
+  if (highlightState.hoverEngine == null) {
+    return "";
+  }
+  const relevantState = isVirtual
+    ? highlightState.virtualEngines
+    : highlightState.physicalEngines;
+  const shouldHighlight =
+    relevantState[engineName] != null ||
+    highlightState.hoverEngine === engineName;
+  if (shouldHighlight) {
+    return "highlight";
+  } else {
+    return "dim";
+  }
+}
+
 function sortTablesToHoist(highlightState, currentEngine, isVirtual, tables) {
   const tableCopy = tables.slice();
   if (
@@ -42,7 +59,7 @@ function sortTablesToHoist(highlightState, currentEngine, isVirtual, tables) {
   }
 
   let hoistIndex = null;
-  tableCopy.forEach(({name}, index) => {
+  tableCopy.forEach(({ name }, index) => {
     if (name === relTables[currentEngine]) {
       hoistIndex = index;
     }
@@ -55,4 +72,4 @@ function sortTablesToHoist(highlightState, currentEngine, isVirtual, tables) {
   return tableCopy;
 }
 
-export { highlightTableViewClass, sortTablesToHoist };
+export { highlightTableViewClass, highlightEngineViewClass, sortTablesToHoist };
