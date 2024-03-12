@@ -1,7 +1,7 @@
 import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
 import "./styles/VdbeView.css";
-import { highlightTableViewClass } from "../highlight";
+import { highlightTableViewClass, sortTablesToHoist } from "../highlight";
 
 function VdbeView({
   name,
@@ -14,6 +14,7 @@ function VdbeView({
   onTableHoverExit,
 }) {
   const vengName = name;
+  const sortedTables = sortTablesToHoist(highlight, vengName, true, tables);
 
   return (
     <div class="vdbe-view">
@@ -26,7 +27,7 @@ function VdbeView({
         </ul>
       </div>
       <div class="db-table-set">
-        {tables.map(({ name, is_writer, mapped_to }) => (
+        {sortedTables.map(({ name, is_writer, mapped_to }) => (
           <TableView
             key={name}
             name={name}

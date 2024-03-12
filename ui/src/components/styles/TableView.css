@@ -22,7 +22,7 @@
 }
 
 .db-table-view.dim {
-  opacity: 0.3;
+  opacity: 0.2;
 }
 
 .db-table-view.highlight {
@@ -30,9 +30,7 @@
 }
 
 .db-table-view.hidden {
-  visibility: hidden;
-  margin: 0;
-  height: 0;
+  opacity: 0.2;
 }
 
 .db-table-view-writer {
