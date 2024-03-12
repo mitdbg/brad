@@ -24,16 +24,15 @@ function App() {
     const physicalEngines = {};
     if (isVirtual) {
       virtualEngines[engineMarker] = tableName;
-      for (const physMarker in mappedTo) {
+      for (const physMarker of mappedTo) {
         physicalEngines[physMarker] = tableName;
       }
     } else {
       physicalEngines[engineMarker] = tableName;
-      for (const virtMarker in mappedTo) {
+      for (const virtMarker of mappedTo) {
         virtualEngines[virtMarker] = tableName;
       }
     }
-    console.log(virtualEngines, physicalEngines);
     setHighlight({
       virtualEngines,
       physicalEngines,
