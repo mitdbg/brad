@@ -12,3 +12,8 @@
   font-weight: 600;
   height: 30px;
 }
+
+.physdb-view.dim .db-cylinder,
+.physdb-view.dim .physdb-view-prov {
+  opacity: 0.3;
+}

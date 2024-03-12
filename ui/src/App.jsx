@@ -14,6 +14,40 @@ function App() {
     blueprint: null,
     virtual_infra: null,
   });
+  const [highlight, setHighlight] = useState({
+    hoverEngine: null,
+    virtualEngines: {},
+    physicalEngines: {},
+  });
+
+  const onTableHoverEnter = (engineMarker, tableName, isVirtual, mappedTo) => {
+    const virtualEngines = {};
+    const physicalEngines = {};
+    if (isVirtual) {
+      virtualEngines[engineMarker] = tableName;
+      for (const physMarker of mappedTo) {
+        physicalEngines[physMarker] = tableName;
+      }
+    } else {
+      physicalEngines[engineMarker] = tableName;
+      for (const virtMarker of mappedTo) {
+        virtualEngines[virtMarker] = tableName;
+      }
+    }
+    setHighlight({
+      hoverEngine: engineMarker,
+      virtualEngines,
+      physicalEngines,
+    });
+  };
+
+  const onTableHoverExit = () => {
+    setHighlight({
+      hoverEngine: null,
+      virtualEngines: {},
+      physicalEngines: {},
+    });
+  };
 
   // Fetch updated system state periodically.
   useEffect(() => {
@@ -44,8 +78,18 @@ function App() {
         <div class="column" style={{ flexGrow: 3 }}>
           <h2 class="col-h2">Data Infrastructure</h2>
           <div class="column-inner">
-            <VirtualInfraView virtualInfra={systemState.virtual_infra} />
-            <BlueprintView blueprint={systemState.blueprint} />
+            <VirtualInfraView
+              virtualInfra={systemState.virtual_infra}
+              highlight={highlight}
+              onTableHoverEnter={onTableHoverEnter}
+              onTableHoverExit={onTableHoverExit}
+            />
+            <BlueprintView
+              blueprint={systemState.blueprint}
+              highlight={highlight}
+              onTableHoverEnter={onTableHoverEnter}
+              onTableHoverExit={onTableHoverExit}
+            />
           </div>
         </div>
         <PerfView virtualInfra={systemState.virtual_infra} />

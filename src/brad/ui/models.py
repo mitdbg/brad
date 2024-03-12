@@ -84,7 +84,7 @@ class DisplayableBlueprint(BaseModel):
 
 
 class DisplayableVirtualEngine(BaseModel):
-    index: int
+    name: str
     freshness: str
     dialect: str
     peak_latency_s: Optional[float] = None

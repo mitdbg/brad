@@ -17,6 +17,24 @@
   border-radius: 3px;
   margin: 8px 0;
   position: relative;
+  transition:
+    opacity 0.3s,
+    margin 0.2s,
+    height 0.2s,
+    visibility 0s;
+  cursor: default;
+}
+
+.db-table-view.dim {
+  opacity: 0.2;
+}
+
+.db-table-view.highlight {
+  opacity: 1;
+}
+
+.db-table-view.hidden {
+  opacity: 0.2;
 }
 
 .db-table-view-writer {
