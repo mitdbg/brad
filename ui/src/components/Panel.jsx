@@ -1,8 +1,8 @@
 import "./styles/Panel.css";
 
-function Panel({ heading, children }) {
+function Panel({ heading, children, className }) {
   return (
-    <div class="panel">
+    <div class={`panel ${className != null ? className : ""}`}>
       {heading && <h2>{heading}</h2>}
       {children}
     </div>

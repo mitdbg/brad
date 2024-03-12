@@ -4,10 +4,7 @@ function highlightTableViewClass(
   tableName,
   isVirtual,
 ) {
-  const somethingHovered =
-    Object.keys(highlightState.virtualEngines).length > 0 ||
-    Object.keys(highlightState.physicalEngines).length > 0;
-  if (!somethingHovered) {
+  if (highlightState.hoverEngine == null) {
     return "";
   }
   const relevantState = isVirtual
@@ -17,7 +14,11 @@ function highlightTableViewClass(
   if (shouldHighlight) {
     return "highlight";
   } else {
-    return "dim";
+    if (highlightState.hoverEngine === engineName) {
+      return "dim";
+    } else {
+      return "hidden";
+    }
   }
 }
 

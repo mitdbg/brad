@@ -9,20 +9,18 @@ function VirtualInfraView({
   onTableHoverExit,
 }) {
   return (
-    <Panel heading="Virtual Database Engines">
+    <Panel heading="Virtual Database Engines" className="infra-column-panel">
       <div class="vdbe-view-wrap">
-        {virtualInfra &&
-          virtualInfra.engines &&
-          virtualInfra.engines.map(({ name, ...props }) => (
-            <VdbeView
-              key={name}
-              name={name}
-              highlight={highlight}
-              onTableHoverEnter={onTableHoverEnter}
-              onTableHoverExit={onTableHoverExit}
-              {...props}
-            />
-          ))}
+        {virtualInfra?.engines?.map(({ name, ...props }) => (
+          <VdbeView
+            key={name}
+            name={name}
+            highlight={highlight}
+            onTableHoverEnter={onTableHoverEnter}
+            onTableHoverExit={onTableHoverExit}
+            {...props}
+          />
+        ))}
       </div>
     </Panel>
   );

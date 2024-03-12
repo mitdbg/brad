@@ -67,6 +67,11 @@ body {
   box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
 }
 
+.infra-column-panel {
+  flex-basis: 50%;
+  flex-grow: 1;
+}
+
 /* Responsive layout */
 @media only screen and (max-width: 800px) {
   .body-container {

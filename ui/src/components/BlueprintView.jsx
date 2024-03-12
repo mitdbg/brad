@@ -9,7 +9,7 @@ function BlueprintView({
   onTableHoverExit,
 }) {
   return (
-    <Panel heading="Current Blueprint (Physical Infrastructure)">
+    <Panel heading="Current Blueprint (Physical Infrastructure)" className="infra-column-panel">
       <div class="bp-view-wrap">
         {blueprint &&
           blueprint.engines &&

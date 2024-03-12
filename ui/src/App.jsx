@@ -15,6 +15,7 @@ function App() {
     virtual_infra: null,
   });
   const [highlight, setHighlight] = useState({
+    hoverEngine: null,
     virtualEngines: {},
     physicalEngines: {},
   });
@@ -34,6 +35,7 @@ function App() {
       }
     }
     setHighlight({
+      hoverEngine: engineMarker,
       virtualEngines,
       physicalEngines,
     });
@@ -41,6 +43,7 @@ function App() {
 
   const onTableHoverExit = () => {
     setHighlight({
+      hoverEngine: null,
       virtualEngines: {},
       physicalEngines: {},
     });
