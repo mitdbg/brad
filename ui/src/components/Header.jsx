@@ -34,10 +34,7 @@ function Header() {
             <strong>BRAD</strong> Dashboard
           </div>
         </div>
-        <StatusIndicator
-          status="Running normally"
-          schema="imdb_extended_100g"
-        />
+        <StatusIndicator status="Running" schema="imdb_extended_100g" />
       </div>
     </div>
   );
