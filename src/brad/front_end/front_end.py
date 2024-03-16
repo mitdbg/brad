@@ -8,7 +8,7 @@ import multiprocessing as mp
 import redshift_connector.error as redshift_errors
 import psycopg
 import struct
-from typing import AsyncIterable, Optional, Dict, Any, Union
+from typing import AsyncIterable, Optional, Dict, Any
 from datetime import timedelta
 from ddsketch import DDSketch
 
@@ -89,10 +89,9 @@ class BradFrontEnd(BradInterface):
         if BradFrontEnd.native_server_is_supported():
             from brad.front_end.flight_sql_server import BradFlightSqlServer
 
-            self._flight_sql_server: Union[BradFlightSqlServer, None] = (
+            self._flight_sql_server: Optional[BradFlightSqlServer] = (
                 BradFlightSqlServer(host="0.0.0.0", port=31337)
             )
-            self._flight_sql_server.start()
         else:
             self._flight_sql_server = None
 
@@ -193,6 +192,10 @@ class BradFrontEnd(BradInterface):
 
     async def serve_forever(self):
         await self._run_setup()
+
+        # Start FlightSQL server
+        self._flight_sql_server.start()
+
         try:
             grpc_server = grpc.aio.server()
             brad_grpc.add_BradServicer_to_server(BradGrpc(self), grpc_server)
