@@ -66,8 +66,12 @@ void BradFlightSqlServer::InitWrapper(const std::string &host, int port) {
   this->Init(options);
 }
 
-void BradFlightSqlServer::SetShutdownOnSignalsWrapper() {
-  this->SetShutdownOnSignals({SIGTERM});
+void BradFlightSqlServer::ServeWrapper() {
+  this->Serve();
+}
+
+void BradFlightSqlServer::ShutdownWrapper() {
+  this->Shutdown(nullptr);
 }
 
 arrow::Result<std::unique_ptr<FlightInfo>>

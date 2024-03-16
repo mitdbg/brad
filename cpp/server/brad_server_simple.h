@@ -19,7 +19,9 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
 
   void InitWrapper(const std::string &host, int port);
 
-  void SetShutdownOnSignalsWrapper();
+  void ServeWrapper();
+
+  void ShutdownWrapper();
 
   arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>>
     GetFlightInfoStatement(
