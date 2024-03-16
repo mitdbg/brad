@@ -5,7 +5,6 @@
 #include <sstream>
 #include <unordered_map>
 #include <utility>
-#include <csignal>
 
 #include <arrow/array/builder_binary.h>
 #include "brad_sql_info.h"
