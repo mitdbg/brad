@@ -87,10 +87,11 @@ class BradFrontEnd(BradInterface):
         output_queue: mp.Queue,
     ):
         if BradFrontEnd.native_server_is_supported():
-            # pylint: disable-next=import-error,no-name-in-module
-            import brad.native.pybind_brad_server as brad_server
+            from brad.front_end.flight_sql_server import BradFlightSqlServer
 
-            self._flight_sql_server = brad_server.BradFlightSqlServer.create()
+            self._flight_sql_server: Optional[BradFlightSqlServer] = (
+                BradFlightSqlServer(host="0.0.0.0", port=31337)
+            )
         else:
             self._flight_sql_server = None
 
@@ -191,6 +192,10 @@ class BradFrontEnd(BradInterface):
 
     async def serve_forever(self):
         await self._run_setup()
+
+        # Start FlightSQL server
+        self._flight_sql_server.start()
+
         try:
             grpc_server = grpc.aio.server()
             brad_grpc.add_BradServicer_to_server(BradGrpc(self), grpc_server)
@@ -281,6 +286,11 @@ class BradFrontEnd(BradInterface):
 
     async def _run_teardown(self):
         logger.debug("Starting BRAD front end _run_teardown()")
+
+        # Shutdown FlightSQL server
+        if self._flight_sql_server:
+            self._flight_sql_server.stop()
+
         await self._sessions.end_all_sessions()
 
         # Important for unblocking our message reader thread.

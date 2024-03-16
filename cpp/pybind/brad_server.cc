@@ -13,5 +13,10 @@ PYBIND11_MODULE(pybind_brad_server, m) {
 
   brad_server
     .def(py::init<>())
-    .def("create", &brad::BradFlightSqlServer::Create);
+    .def("create", &brad::BradFlightSqlServer::Create)
+    .def("init", &brad::BradFlightSqlServer::InitWrapper)
+    .def("serve",
+         &brad::BradFlightSqlServer::ServeWrapper,
+         py::call_guard<py::gil_scoped_release>())
+    .def("shutdown", &brad::BradFlightSqlServer::ShutdownWrapper);
 }
