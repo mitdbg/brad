@@ -8,7 +8,7 @@ import multiprocessing as mp
 import redshift_connector.error as redshift_errors
 import psycopg
 import struct
-from typing import AsyncIterable, Optional, Dict, Any
+from typing import AsyncIterable, Optional, Dict, Any, Union
 from datetime import timedelta
 from ddsketch import DDSketch
 
