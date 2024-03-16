@@ -1,6 +1,7 @@
 import logging
 import threading
 
+# pylint: disable-next=import-error,no-name-in-module,unused-import
 import brad.native.pybind_brad_server as brad_server
 
 logger = logging.getLogger(__name__)

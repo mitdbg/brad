@@ -87,11 +87,11 @@ class BradFrontEnd(BradInterface):
         output_queue: mp.Queue,
     ):
         if BradFrontEnd.native_server_is_supported():
-            # pylint: disable-next=import-error,no-name-in-module
-            import brad.native.pybind_brad_server as brad_server
             from brad.front_end.flight_sql_server import BradFlightSqlServer
-            self._flight_sql_server = BradFlightSqlServer(host="0.0.0.0",
-                                                          port=31337)
+
+            self._flight_sql_server: Union[BradFlightSqlServer, None] = (
+                BradFlightSqlServer(host="0.0.0.0", port=31337)
+            )
             self._flight_sql_server.start()
         else:
             self._flight_sql_server = None
