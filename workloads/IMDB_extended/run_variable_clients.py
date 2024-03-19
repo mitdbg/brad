@@ -414,15 +414,15 @@ class PauseController:
     def __init__(
         self,
         total_num_clients: int,
-        pause_semaphore: mp.Semaphore,  # type: ignore
-        resume_semaphore: mp.Semaphore,  # type: ignore
+        pause_semaphore: List[mp.Semaphore],  # type: ignore
+        resume_semaphore: List[mp.Semaphore],  # type: ignore
     ):
         self.total_num_clients = total_num_clients
         self.pause_semaphore = pause_semaphore
         self.resume_semaphore = resume_semaphore
-        self.paused_clients = []
-        self.running_clients = list(range(total_num_clients))
-        self.num_running_clients = total_num_clients
+        self.paused_clients: List[int] = []
+        self.running_clients: List[int]  = list(range(total_num_clients))
+        self.num_running_clients: int = total_num_clients
 
     def adjust_num_running_clients(
         self, num_clients: int, verbose: bool = True
