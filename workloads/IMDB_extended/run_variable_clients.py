@@ -421,7 +421,7 @@ class PauseController:
         self.pause_semaphore = pause_semaphore
         self.resume_semaphore = resume_semaphore
         self.paused_clients: List[int] = []
-        self.running_clients: List[int]  = list(range(total_num_clients))
+        self.running_clients: List[int] = list(range(total_num_clients))
         self.num_running_clients: int = total_num_clients
 
     def adjust_num_running_clients(
