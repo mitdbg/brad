@@ -443,7 +443,7 @@ class PauseController:
             for i in pause_clients:
                 assert (
                     i not in self.paused_clients
-                ), f"trying to pause a client that is already paused"
+                ), f"trying to pause a client that is already paused: {i}"
                 if verbose:
                     print(f"pausing client {i}")
                 self.pause_semaphore[i].release()
@@ -460,7 +460,7 @@ class PauseController:
             for i in resume_clients:
                 assert (
                     i not in self.running_clients
-                ), f"trying to resume a running client"
+                ), f"trying to resume a running client: {i}"
                 if verbose:
                     print(f"resuming client {i}")
                 self.resume_semaphore[i].release()
@@ -711,7 +711,9 @@ def main():
     # N.B. `value = 0` since we use this for synchronization, not mutual exclusion.
     # pylint: disable-next=no-member
     control_semaphore = [mgr.Semaphore(value=0) for _ in range(args.num_clients)]
+    # pylint: disable-next=no-member
     pause_semaphore = [mgr.Semaphore(value=0) for _ in range(args.num_clients)]
+    # pylint: disable-next=no-member
     resume_semaphore = [mgr.Semaphore(value=0) for _ in range(args.num_clients)]
 
     if args.run_simulation:
