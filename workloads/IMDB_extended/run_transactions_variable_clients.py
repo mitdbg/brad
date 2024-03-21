@@ -247,6 +247,7 @@ def runner(
 def simulation_runner(
     args,
     worker_idx: int,
+    directory: Optional[Directory],
     start_queue: mp.Queue,
     control_semaphore: mp.Semaphore,  # type: ignore
     pause_semaphore: mp.Semaphore,  # type: ignore
@@ -310,6 +311,7 @@ def simulation_runner(
 
     txn_exec_count = 0
     rand_backoff = None
+    overall_start = time.time()
 
     latency_file = open(
         out_dir / "oltp_latency_{}.csv".format(worker_idx), "w", encoding="UTF-8"
@@ -339,7 +341,7 @@ def simulation_runner(
 
         now = datetime.now().astimezone(pytz.utc)
 
-        succeeded = np.random.choice([True, False], p=[0.95, 0.05])
+        succeeded = np.random.choice([True, False], p=[0.8, 0.2])
 
         if rand_backoff is not None:
             logger.info("[T %d] Continued after transient errors.", worker_idx)
@@ -598,6 +600,7 @@ def main():
                 args=(
                     args,
                     idx,
+                    directory,
                     start_queue[idx],
                     control_semaphore[idx],
                     pause_semaphore[idx],
