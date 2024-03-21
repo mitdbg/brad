@@ -247,7 +247,6 @@ def runner(
 def simulation_runner(
     args,
     worker_idx: int,
-    directory: Optional[Directory],
     start_queue: mp.Queue,
     control_semaphore: mp.Semaphore,  # type: ignore
     pause_semaphore: mp.Semaphore,  # type: ignore
@@ -284,7 +283,6 @@ def simulation_runner(
         0.20,
         0.10,
     ]
-    lookup_theatre_id_by_name = 0.8
     txn_indexes = list(range(len(transactions)))
     commits = [0 for _ in range(len(transactions))]
     aborts = [0 for _ in range(len(transactions))]
@@ -311,7 +309,6 @@ def simulation_runner(
 
     txn_exec_count = 0
     rand_backoff = None
-    overall_start = time.time()
 
     latency_file = open(
         out_dir / "oltp_latency_{}.csv".format(worker_idx), "w", encoding="UTF-8"
@@ -600,7 +597,6 @@ def main():
                 args=(
                     args,
                     idx,
-                    directory,
                     start_queue[idx],
                     control_semaphore[idx],
                     pause_semaphore[idx],

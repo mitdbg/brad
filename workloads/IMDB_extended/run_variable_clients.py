@@ -283,7 +283,6 @@ def simulation_runner(
         0.20,
         0.10,
     ]
-    lookup_theatre_id_by_name = 0.8
     txn_indexes = list(range(len(transactions)))
     commits = [0 for _ in range(len(transactions))]
     aborts = [0 for _ in range(len(transactions))]
