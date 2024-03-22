@@ -96,14 +96,37 @@ def get_metrics(num_values: int = 3, use_generated: bool = False) -> MetricsData
 
 
 @app.get("/api/1/system_state")
-def get_system_state() -> SystemState:
+def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
     assert manager is not None
     blueprint = manager.blueprint_mgr.get_blueprint()
-    dbp = DisplayableBlueprint.from_blueprint(blueprint)
 
     # TODO: Hardcoded virtualized infrasturcture and writers.
     txn_tables = ["theatres", "showings", "ticket_orders", "movie_info", "aka_title"]
     txn_only = ["theatres", "showings", "ticket_orders"]
+
+    if filter_tables_for_demo:
+        # To improve how the UI looks in a screenshot, we filter out some tables
+        # to reduce the amount of information shown. We keep up to 5 +
+        # len(txn_tables) around (upper bound).
+        relevant_tables = []
+        max_tables = min(5, len(blueprint.tables()))
+        for table in blueprint.tables():
+            if table.name in txn_tables or len(relevant_tables) < max_tables:
+                relevant_tables.append(table)
+
+        new_locations = {}
+        for table in relevant_tables:
+            new_locations[table.name] = blueprint.get_table_locations(table.name)
+        blueprint = Blueprint(
+            schema_name=blueprint.schema_name(),
+            table_schemas=relevant_tables,
+            table_locations=new_locations,
+            aurora_provisioning=blueprint.aurora_provisioning(),
+            redshift_provisioning=blueprint.redshift_provisioning(),
+            full_routing_policy=blueprint.get_routing_policy(),
+        )
+
+    dbp = DisplayableBlueprint.from_blueprint(blueprint)
     vdbe1 = DisplayableVirtualEngine(
         name="VDBE 1",
         freshness="No staleness (SI)",
