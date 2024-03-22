@@ -194,7 +194,8 @@ class BradFrontEnd(BradInterface):
         await self._run_setup()
 
         # Start FlightSQL server
-        self._flight_sql_server.start()
+        if self._flight_sql_server is not None:
+            self._flight_sql_server.start()
 
         try:
             grpc_server = grpc.aio.server()
@@ -288,7 +289,7 @@ class BradFrontEnd(BradInterface):
         logger.debug("Starting BRAD front end _run_teardown()")
 
         # Shutdown FlightSQL server
-        if self._flight_sql_server:
+        if self._flight_sql_server is not None:
             self._flight_sql_server.stop()
 
         await self._sessions.end_all_sessions()

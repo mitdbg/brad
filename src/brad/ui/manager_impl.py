@@ -2,12 +2,14 @@ import asyncio
 import uvicorn
 import logging
 import importlib.resources as pkg_resources
+import numpy as np
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from typing import Optional, List
 
 import brad.ui.static as brad_app
 from brad.blueprint import Blueprint
+from brad.blueprint.table import Table
 from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
@@ -72,13 +74,20 @@ manager: Optional["UiManagerImpl"] = None
 
 
 @app.get("/api/1/metrics")
-def get_metrics(num_values: int = 3) -> MetricsData:
+def get_metrics(num_values: int = 3, use_generated: bool = False) -> MetricsData:
     assert manager is not None
     metrics = manager.monitor.front_end_metrics().read_k_most_recent(k=num_values)
     qlat = metrics[FrontEndMetric.QueryLatencySecondP90.value]
     qlat_tm = TimestampedMetrics(timestamps=list(qlat.index), values=list(qlat))
     tlat = metrics[FrontEndMetric.TxnLatencySecondP90.value]
     tlat_tm = TimestampedMetrics(timestamps=list(tlat.index), values=list(tlat))
+
+    if use_generated:
+        qlat_gen = np.random.normal(loc=15.0, scale=5.0, size=len(qlat))
+        tlat_gen = np.random.normal(loc=0.015, scale=0.005, size=len(tlat))
+        qlat_tm.values = list(qlat_gen)
+        tlat_tm.values = list(tlat_gen)
+
     return MetricsData(
         named_metrics={
             FrontEndMetric.QueryLatencySecondP90.value: qlat_tm,
@@ -88,17 +97,40 @@ def get_metrics(num_values: int = 3) -> MetricsData:
 
 
 @app.get("/api/1/system_state")
-def get_system_state() -> SystemState:
+def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
     assert manager is not None
     blueprint = manager.blueprint_mgr.get_blueprint()
-    dbp = DisplayableBlueprint.from_blueprint(blueprint)
 
     # TODO: Hardcoded virtualized infrasturcture and writers.
     txn_tables = ["theatres", "showings", "ticket_orders", "movie_info", "aka_title"]
     txn_only = ["theatres", "showings", "ticket_orders"]
+
+    if filter_tables_for_demo:
+        # To improve how the UI looks in a screenshot, we filter out some tables
+        # to reduce the amount of information shown. We keep up to 5 +
+        # len(txn_tables) around (upper bound).
+        relevant_tables: List[Table] = []
+        max_tables = min(5, len(blueprint.tables()))
+        for table in blueprint.tables():
+            if table.name in txn_tables or len(relevant_tables) < max_tables:
+                relevant_tables.append(table)
+
+        new_locations = {}
+        for table in relevant_tables:
+            new_locations[table.name] = blueprint.get_table_locations(table.name)
+        blueprint = Blueprint(
+            schema_name=blueprint.schema_name(),
+            table_schemas=relevant_tables,
+            table_locations=new_locations,
+            aurora_provisioning=blueprint.aurora_provisioning(),
+            redshift_provisioning=blueprint.redshift_provisioning(),
+            full_routing_policy=blueprint.get_routing_policy(),
+        )
+
+    dbp = DisplayableBlueprint.from_blueprint(blueprint)
     vdbe1 = DisplayableVirtualEngine(
         name="VDBE 1",
-        freshness="Serializable",
+        freshness="No staleness (SI)",
         dialect="PostgreSQL SQL",
         peak_latency_s=0.030,
         tables=[
@@ -115,7 +147,7 @@ def get_system_state() -> SystemState:
     vdbe1.tables.sort(key=lambda t: t.name)
     vdbe2 = DisplayableVirtualEngine(
         name="VDBE 2",
-        freshness="≤ 10 minutes stale",
+        freshness="≤ 10 minutes stale (SI)",
         dialect="PostgreSQL SQL",
         peak_latency_s=30.0,
         tables=[

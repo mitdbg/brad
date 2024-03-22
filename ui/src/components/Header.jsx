@@ -1,5 +1,5 @@
 import "./styles/Header.css";
-import dbLogo from "../assets/db.svg";
+import bradLogo from "../assets/brad_logo.png";
 
 function StatusText({ status, schema }) {
   if (!!schema) {
@@ -28,7 +28,7 @@ function Header() {
       <div class="header-inner">
         <div class="header-logo">
           <div class="header-logo-img">
-            <img src={dbLogo} style={{ width: "60px", height: "60px" }} />
+            <img src={bradLogo} />
           </div>
           <div class="header-logo-txt">
             <strong>BRAD</strong> Dashboard
