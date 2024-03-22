@@ -12,9 +12,9 @@ function formatLatencySeconds(latencySeconds) {
   if (latencySeconds < 1.0) {
     // Use milliseconds.
     const latencyMs = latencySeconds * 1000;
-    return `${latencyMs.toFixed(precision)} ms`
+    return `${latencyMs.toFixed(precision)} ms`;
   }
-  return `${latencySeconds.toFixed(precision)} s`
+  return `${latencySeconds.toFixed(precision)} s`;
 }
 
 function VdbeView({
@@ -38,7 +38,9 @@ function VdbeView({
       <div class="vdbe-view-props">
         <ul>
           <li>🌿: {freshness}</li>
-          {peak_latency_s && <li>⏱️: Query Latency ≤ {formatLatencySeconds(peak_latency_s)}</li>}
+          {peak_latency_s && (
+            <li>⏱️: Query Latency ≤ {formatLatencySeconds(peak_latency_s)}</li>
+          )}
           <li>🗣: {dialect}</li>
         </ul>
       </div>

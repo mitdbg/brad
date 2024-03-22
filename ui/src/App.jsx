@@ -53,7 +53,9 @@ function App() {
   useEffect(() => {
     let timeoutId = null;
     const refreshData = async () => {
-      const newSystemState = await fetchSystemState(/*filterTablesForDemo=*/true);
+      const newSystemState = await fetchSystemState(
+        /*filterTablesForDemo=*/ true,
+      );
       // TODO: Not the best way to check for equality.
       if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
         setSystemState(newSystemState);
