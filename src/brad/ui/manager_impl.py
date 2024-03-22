@@ -9,6 +9,7 @@ from typing import Optional, List
 
 import brad.ui.static as brad_app
 from brad.blueprint import Blueprint
+from brad.blueprint.table import Table
 from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
@@ -108,7 +109,7 @@ def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
         # To improve how the UI looks in a screenshot, we filter out some tables
         # to reduce the amount of information shown. We keep up to 5 +
         # len(txn_tables) around (upper bound).
-        relevant_tables = []
+        relevant_tables: List[Table] = []
         max_tables = min(5, len(blueprint.tables()))
         for table in blueprint.tables():
             if table.name in txn_tables or len(relevant_tables) < max_tables:
