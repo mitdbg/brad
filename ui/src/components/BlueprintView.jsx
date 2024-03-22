@@ -10,7 +10,7 @@ function BlueprintView({
 }) {
   return (
     <Panel
-      heading="Current Blueprint (Physical Infrastructure)"
+      heading="Physical Infrastructure"
       className="infra-column-panel"
     >
       <div class="bp-view-wrap">

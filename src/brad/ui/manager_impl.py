@@ -2,6 +2,7 @@ import asyncio
 import uvicorn
 import logging
 import importlib.resources as pkg_resources
+import numpy as np
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from typing import Optional, List
@@ -72,13 +73,20 @@ manager: Optional["UiManagerImpl"] = None
 
 
 @app.get("/api/1/metrics")
-def get_metrics(num_values: int = 3) -> MetricsData:
+def get_metrics(num_values: int = 3, use_generated: bool = False) -> MetricsData:
     assert manager is not None
     metrics = manager.monitor.front_end_metrics().read_k_most_recent(k=num_values)
     qlat = metrics[FrontEndMetric.QueryLatencySecondP90.value]
     qlat_tm = TimestampedMetrics(timestamps=list(qlat.index), values=list(qlat))
     tlat = metrics[FrontEndMetric.TxnLatencySecondP90.value]
     tlat_tm = TimestampedMetrics(timestamps=list(tlat.index), values=list(tlat))
+
+    if use_generated:
+        qlat_gen = np.random.normal(loc=15.0, scale=5.0, size=len(qlat))
+        tlat_gen = np.random.normal(loc=0.015, scale=0.005, size=len(tlat))
+        qlat_tm.values = list(qlat_gen)
+        tlat_tm.values = list(tlat_gen)
+
     return MetricsData(
         named_metrics={
             FrontEndMetric.QueryLatencySecondP90.value: qlat_tm,
@@ -98,7 +106,7 @@ def get_system_state() -> SystemState:
     txn_only = ["theatres", "showings", "ticket_orders"]
     vdbe1 = DisplayableVirtualEngine(
         name="VDBE 1",
-        freshness="Serializable",
+        freshness="No staleness (SI)",
         dialect="PostgreSQL SQL",
         peak_latency_s=0.030,
         tables=[
@@ -115,7 +123,7 @@ def get_system_state() -> SystemState:
     vdbe1.tables.sort(key=lambda t: t.name)
     vdbe2 = DisplayableVirtualEngine(
         name="VDBE 2",
-        freshness="≤ 10 minutes stale",
+        freshness="≤ 10 minutes stale (SI)",
         dialect="PostgreSQL SQL",
         peak_latency_s=30.0,
         tables=[

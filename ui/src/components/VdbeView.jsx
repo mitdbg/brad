@@ -7,6 +7,16 @@ import {
   sortTablesToHoist,
 } from "../highlight";
 
+function formatLatencySeconds(latencySeconds) {
+  const precision = 1;
+  if (latencySeconds < 1.0) {
+    // Use milliseconds.
+    const latencyMs = latencySeconds * 1000;
+    return `${latencyMs.toFixed(precision)} ms`
+  }
+  return `${latencySeconds.toFixed(precision)} s`
+}
+
 function VdbeView({
   name,
   freshness,
@@ -28,7 +38,7 @@ function VdbeView({
       <div class="vdbe-view-props">
         <ul>
           <li>🌿: {freshness}</li>
-          {peak_latency_s && <li>⏱️: Query Latency ≤ {peak_latency_s} s</li>}
+          {peak_latency_s && <li>⏱️: Query Latency ≤ {formatLatencySeconds(peak_latency_s)}</li>}
           <li>🗣: {dialect}</li>
         </ul>
       </div>
