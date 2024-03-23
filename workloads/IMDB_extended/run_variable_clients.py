@@ -3,21 +3,20 @@ import copy
 import multiprocessing as mp
 import time
 import os
-import pickle
 import numpy as np
 import pathlib
 import random
 import sys
-import threading
 import signal
 import pytz
 import logging
-import asyncio
 from typing import List, Optional
 import numpy.typing as npt
 from datetime import datetime, timedelta
 
 from workload_utils.connect import connect_to_db
+from workload_utils.pause_controller import PauseController, get_command_line_input
+from workload_utils.change_clients_api import serve
 from brad.config.engine import Engine
 from brad.grpc_client import BradClientError
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
@@ -409,67 +408,6 @@ def simulation_runner(
             )
 
 
-class PauseController:
-    # controlling the pause and resume of clients
-    def __init__(
-        self,
-        total_num_clients: int,
-        pause_semaphore: List[mp.Semaphore],  # type: ignore
-        resume_semaphore: List[mp.Semaphore],  # type: ignore
-    ):
-        self.total_num_clients = total_num_clients
-        self.pause_semaphore = pause_semaphore
-        self.resume_semaphore = resume_semaphore
-        self.paused_clients: List[int] = []
-        self.running_clients: List[int] = list(range(total_num_clients))
-        self.num_running_clients: int = total_num_clients
-
-    def adjust_num_running_clients(
-        self, num_clients: int, verbose: bool = True
-    ) -> None:
-        if num_clients > self.total_num_clients:
-            print(
-                f"invalid input number of clients {num_clients}, larger than total number of clients"
-            )
-            return
-        if num_clients == self.num_running_clients:
-            return
-        elif num_clients < self.num_running_clients:
-            pause_clients = np.random.choice(
-                self.running_clients,
-                size=self.num_running_clients - num_clients,
-                replace=False,
-            )
-            for i in pause_clients:
-                assert (
-                    i not in self.paused_clients
-                ), f"trying to pause a client that is already paused: {i}"
-                if verbose:
-                    print(f"pausing client {i}")
-                self.pause_semaphore[i].release()
-                self.pause_semaphore[i].release()
-                self.paused_clients.append(i)
-                self.running_clients.remove(i)
-                self.num_running_clients -= 1
-        else:
-            resume_clients = np.random.choice(
-                self.paused_clients,
-                size=num_clients - self.num_running_clients,
-                replace=False,
-            )
-            for i in resume_clients:
-                assert (
-                    i not in self.running_clients
-                ), f"trying to resume a running client: {i}"
-                if verbose:
-                    print(f"resuming client {i}")
-                self.resume_semaphore[i].release()
-                self.resume_semaphore[i].release()
-                self.paused_clients.remove(i)
-                self.running_clients.append(i)
-                self.num_running_clients += 1
-
-
 def run_warmup(args, query_bank: List[str], queries: List[int]):
     if args.engine is not None:
         engine = Engine.from_str(args.engine)
@@ -548,19 +486,6 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
                             )
     finally:
         database.close_sync()
-
-
-async def get_command_line_input(pause_controller: PauseController) -> None:
-    while True:
-        try:
-            user_input = input()
-            if user_input.isnumeric():
-                num_client = int(user_input)
-                pause_controller.adjust_num_running_clients(num_client)
-            elif user_input == "exit":
-                break
-        except KeyboardInterrupt:
-            break
 
 
 def main():
@@ -647,6 +572,8 @@ def main():
         type=int,
         help="Start the client trace at the given number of clients. Used for debugging only.",
     )
+    parser.add_argument("--adjust-clients-port", type=int, default=8586)
+    parser.add_argument("--interactive", action="store_true")
     args = parser.parse_args()
 
     set_up_logging()
@@ -671,17 +598,7 @@ def main():
         query_frequency = None
 
     execution_gap_dist = None
-
-    if (
-        args.num_client_path is not None
-        and os.path.exists(args.num_client_path)
-        and args.time_scale_factor is not None
-    ):
-        # we can only set the num_concurrent_query trace in presence of time_scale_factor
-        with open(args.num_client_path, "rb") as f:
-            num_client_trace = pickle.load(f)
-    else:
-        num_client_trace = None
+    num_client_trace = None
 
     if args.query_indexes is None:
         queries = list(range(len(query_bank)))
@@ -799,28 +716,19 @@ def main():
         args.num_clients, pause_semaphore, resume_semaphore
     )
 
-    if args.run_for_s is not None and num_client_trace is None:
-        logger.info("[RA] Waiting for %d seconds...", args.run_for_s)
-        asyncio.run(get_command_line_input(pause_controller))
-        time.sleep(args.run_for_s)
-    elif num_client_trace is None:
-        # Wait until requested to stop.
-        logger.info(
-            "Repeating analytics waiting until requested to stop... (hit Ctrl-C)",
-        )
+    # Wait until requested to stop.
+
+    if args.interactive:
         logger.info(
             "type in an integer smaller than total number of clients and press enter to change number of running client, type in exit to stop dynamically adjusting number of clients...",
         )
-        asyncio.run(get_command_line_input(pause_controller))
-        should_shutdown = threading.Event()
-
-        def signal_handler(_signal, _frame):
-            should_shutdown.set()
-
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-
-        should_shutdown.wait()
+        get_command_line_input(pause_controller)
+    else:
+        logger.info(
+            "Repeating analytics listening on %d until requested to stop... (hit Ctrl-C)",
+            args.adjust_clients_port,
+        )
+        serve(pause_controller, port=args.adjust_clients_port)
 
     logger.info("[RA] Stopping all clients...")
     for i in range(args.num_clients):
