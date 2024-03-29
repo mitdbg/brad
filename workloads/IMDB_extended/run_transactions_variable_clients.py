@@ -1,10 +1,8 @@
 import asyncio
 import argparse
 import pathlib
-import pickle
 import random
 import signal
-import threading
 import time
 import numpy as np
 import os
@@ -12,17 +10,18 @@ import pytz
 import multiprocessing as mp
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional
 
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.grpc_client import BradClientError
 from brad.provisioning.directory import Directory
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
-from brad.utils.time_periods import universal_now
 from brad.utils import set_up_logging, create_custom_logger
 from workload_utils.connect import connect_to_db
 from workload_utils.transaction_worker import TransactionWorker
+from workload_utils.pause_controller import PauseController, get_command_line_input
+from workload_utils.change_clients_api import serve
 
 logger = logging.getLogger(__name__)
 STARTUP_FAILED = "startup_failed"
@@ -376,80 +375,6 @@ def simulation_runner(
     latency_file.close()
 
 
-class PauseController:
-    # controlling the pause and resume of clients
-    def __init__(
-        self,
-        total_num_clients: int,
-        pause_semaphore: List[mp.Semaphore],  # type: ignore
-        resume_semaphore: List[mp.Semaphore],  # type: ignore
-    ):
-        self.total_num_clients = total_num_clients
-        self.pause_semaphore = pause_semaphore
-        self.resume_semaphore = resume_semaphore
-        self.paused_clients: List[int] = []
-        self.running_clients: List[int] = list(range(total_num_clients))
-        self.num_running_clients: int = total_num_clients
-
-    def adjust_num_running_clients(
-        self, num_clients: int, verbose: bool = True
-    ) -> None:
-        if num_clients > self.total_num_clients:
-            print(
-                f"invalid input number of clients {num_clients}, larger than total number of clients"
-            )
-            return
-        if num_clients == self.num_running_clients:
-            return
-        elif num_clients < self.num_running_clients:
-            pause_clients = np.random.choice(
-                self.running_clients,
-                size=self.num_running_clients - num_clients,
-                replace=False,
-            )
-            for i in pause_clients:
-                assert (
-                    i not in self.paused_clients
-                ), f"trying to pause a client that is already paused: {i}"
-                if verbose:
-                    print(f"pausing client {i}")
-                self.pause_semaphore[i].release()
-                self.pause_semaphore[i].release()
-                self.paused_clients.append(i)
-                self.running_clients.remove(i)
-                self.num_running_clients -= 1
-        else:
-            resume_clients = np.random.choice(
-                self.paused_clients,
-                size=num_clients - self.num_running_clients,
-                replace=False,
-            )
-            for i in resume_clients:
-                assert (
-                    i not in self.running_clients
-                ), f"trying to resume a running client: {i}"
-                if verbose:
-                    print(f"resuming client {i}")
-                self.resume_semaphore[i].release()
-                self.resume_semaphore[i].release()
-                self.paused_clients.remove(i)
-                self.running_clients.append(i)
-                self.num_running_clients += 1
-
-
-async def get_command_line_input(pause_controller: PauseController) -> None:
-    while True:
-        try:
-            user_input = input()
-            if user_input.isnumeric():
-                num_client = int(user_input)
-                pause_controller.adjust_num_running_clients(num_client)
-            elif user_input == "exit":
-                break
-        except KeyboardInterrupt:
-            break
-
-
 def main():
     parser = argparse.ArgumentParser(
         "Tool used to run IMDB-extended transactions against BRAD or an ODBC database."
@@ -532,44 +457,16 @@ def main():
         help="The alpha parameter for the Zipfian distribution. Only used if "
         "--use-zipfian-ids is `True`. Must be strictly greater than 1. ",
     )
-    # These three arguments are used for the day long experiment.
-    parser.add_argument(
-        "--num-client-path",
-        type=str,
-        default=None,
-        help="Path to the distribution of number of clients for each period of a day",
-    )
-    parser.add_argument(
-        "--num-client-multiplier",
-        type=int,
-        default=1,
-        help="The multiplier to the number of clients for each period of a day",
-    )
-    parser.add_argument(
-        "--time-scale-factor",
-        type=int,
-        default=100,
-        help="trace 1s of simulation as X seconds in real-time to match the num-concurrent-query",
-    )
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)
     parser.add_argument("--num-front-ends", type=int, default=1)
+    parser.add_argument("--adjust-clients-port", type=int, default=8585)
+    parser.add_argument("--interactive", action="store_true")
+    parser.add_argument("--starting-clients", type=int)
     args = parser.parse_args()
 
     set_up_logging()
-
-    if (
-        args.num_client_path is not None
-        and os.path.exists(args.num_client_path)
-        and args.time_scale_factor is not None
-    ):
-        # we can only set the num_concurrent_query trace in presence of time_scale_factor
-        with open(args.num_client_path, "rb") as f:
-            num_client_trace = pickle.load(f)
-        logger.info("[T] Preparing to run a time varying workload")
-    else:
-        num_client_trace = None
-        logger.info("[T] Preparing to run a steady workload")
+    logger.info("[T] Preparing to run a steady workload")
 
     mgr = mp.Manager()
     start_queue = [mgr.Queue() for _ in range(args.num_clients)]
@@ -641,100 +538,28 @@ def main():
         logger.info("Transactional client abort complete.")
         return
 
-    if num_client_trace is not None:
-        logger.info("[T] Scaling number of clients by %d", args.num_client_multiplier)
-        for k in num_client_trace.keys():
-            num_client_trace[k] *= args.num_client_multiplier
-
-        assert args.time_scale_factor is not None, "Need to set --time-scale-factor"
-        assert args.run_for_s is not None, "Need to set --run-for-s"
-
-        execute_start_time = universal_now()
-        num_running_client = 0
-        num_client_required = min(num_client_trace[0], args.num_clients)
-        for add_client in range(num_running_client, num_client_required):
-            logger.info("[T] Telling client no. %d to start.", add_client)
-            control_semaphore[add_client].release()
-            num_running_client += 1
-
-        finished_one_day = True
-        curr_day_start_time = datetime.now().astimezone(pytz.utc)
-        for time_of_day, num_expected_clients in num_client_trace.items():
-            if time_of_day == 0:
-                continue
-            # at this time_of_day start/shut-down more clients
-            time_in_s = time_of_day / args.time_scale_factor
-            now = datetime.now().astimezone(pytz.utc)
-            curr_time_in_s = (now - curr_day_start_time).total_seconds()
-            total_exec_time_in_s = (now - execute_start_time).total_seconds()
-            if args.run_for_s <= total_exec_time_in_s:
-                finished_one_day = False
-                break
-            if args.run_for_s - total_exec_time_in_s <= (time_in_s - curr_time_in_s):
-                wait_time = args.run_for_s - total_exec_time_in_s
-                if wait_time > 0:
-                    time.sleep(wait_time)
-                finished_one_day = False
-                break
-            time.sleep(time_in_s - curr_time_in_s)
-            num_client_required = min(num_expected_clients, args.num_clients)
-            if num_client_required > num_running_client:
-                # starting additional clients
-                for add_client in range(num_running_client, num_client_required):
-                    logger.info("[T] Telling client no. %d to start.", add_client)
-                    control_semaphore[add_client].release()
-                    num_running_client += 1
-            elif num_running_client > num_client_required:
-                # shutting down clients
-                for delete_client in range(num_running_client, num_client_required, -1):
-                    logger.info(
-                        "[T] Telling client no. %d to stop.", (delete_client - 1)
-                    )
-                    control_semaphore[delete_client - 1].release()
-                    num_running_client -= 1
-        now = datetime.now().astimezone(pytz.utc)
-        total_exec_time_in_s = (now - execute_start_time).total_seconds()
-        if finished_one_day:
-            logger.info(
-                "[T] Finished executing one day of workload in %d s, will ignore the rest of "
-                "pre-set execution time %d s",
-                total_exec_time_in_s,
-                args.run_for_s,
-            )
-        else:
-            logger.info(
-                "[T] Executed ended but unable to finish executing the trace of a full day within %d s",
-                args.run_for_s,
-            )
-
-    else:
-        logger.info("[T] Telling all %d clients to start.", args.num_clients)
-        for idx in range(args.num_clients):
-            control_semaphore[idx].release()
+    logger.info("[T] Telling all %d clients to start.", args.num_clients)
+    for idx in range(args.num_clients):
+        control_semaphore[idx].release()
 
     pause_controller = PauseController(
         args.num_clients, pause_semaphore, resume_semaphore
     )
 
-    if args.run_for_s is not None and num_client_trace is None:
-        logger.info("[T] Letting the experiment run for %d seconds...", args.run_for_s)
-        time.sleep(args.run_for_s)
+    if args.starting_clients is not None:
+        pause_controller.adjust_num_running_clients(args.starting_clients)
 
-    elif num_client_trace is None:
-        logger.info("[T] Waiting until requested to stop... (hit Ctrl-C)")
+    if args.interactive:
         logger.info(
-            "type in an integer smaller than total number of clients and press enter to change number of running client, type in exit to stop dynamically adjusting number of clients...",
+            "[T] type in an integer smaller than total number of clients and press enter to change number of running client, type in exit to stop dynamically adjusting number of clients...",
         )
-        asyncio.run(get_command_line_input(pause_controller))
-        should_shutdown = threading.Event()
-
-        def signal_handler(_signal, _frame):
-            should_shutdown.set()
-
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-
-        should_shutdown.wait()
+        get_command_line_input(pause_controller)
+    else:
+        logger.info(
+            "[T] Listening on %d until requested to stop... (hit Ctrl-C)",
+            args.adjust_clients_port,
+        )
+        serve(pause_controller, port=args.adjust_clients_port)
 
     logger.info("[T] Stopping clients...")
     for idx in range(args.num_clients):
