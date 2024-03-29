@@ -11,6 +11,10 @@ class ClientState(BaseModel):
     curr_clients: int
 
 
+class SetClientState(BaseModel):
+    curr_clients: int
+
+
 class Manager:
     def __init__(self, pc: PauseController) -> None:
         self.pc = pc
@@ -31,7 +35,7 @@ def get_clients() -> ClientState:
 
 
 @app.post("/clients")
-def set_clients(set_state: ClientState) -> ClientState:
+def set_clients(set_state: SetClientState) -> ClientState:
     global manager  # pylint: disable=global-variable-not-assigned
     assert manager is not None
     manager.pc.adjust_num_running_clients(set_state.curr_clients, verbose=True)
