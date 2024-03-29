@@ -21,10 +21,6 @@ function App() {
     physicalEngines: {},
   });
   const [endpoints, setEndpoints] = useState({
-    brad: {
-      host: "localhost",
-      port: 7583,
-    },
     workloadRunners: [
       {
         host: "localhost",

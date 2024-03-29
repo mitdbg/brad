@@ -23,18 +23,11 @@ function EndpointInput({ name, host, port, onChange }) {
 }
 
 function SystemConfig({ endpoints, open, onCloseClick, onChange }) {
-  const { brad, workloadRunners } = endpoints;
+  const { workloadRunners } = endpoints;
   return (
     <Modal open={open}>
       <div class="system-config-modal">
         <h2>Dashboard Configuration</h2>
-        <EndpointInput
-          name="BRAD"
-          {...brad}
-          onChange={(newEndpoint) =>
-            onChange({ field: "brad", value: newEndpoint })
-          }
-        />
         {workloadRunners.map((endpoint, index) => (
           <EndpointInput
             key={index}
