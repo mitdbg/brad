@@ -41,10 +41,17 @@ def set_clients(set_state: ClientState) -> ClientState:
     )
 
 
-def serve(pc: PauseController, port: int, log_level: str = "info") -> None:
+def serve(
+    pc: PauseController, port: int, host: str = "0.0.0.0", log_level: str = "info"
+) -> None:
     try:
         global manager
         manager = Manager(pc)
-        uvicorn.run("workload_utils.change_clients_api:app", port=port, log_level=log_level)
+        uvicorn.run(
+            "workload_utils.change_clients_api:app",
+            host=host,
+            port=port,
+            log_level=log_level,
+        )
     finally:
         manager = None

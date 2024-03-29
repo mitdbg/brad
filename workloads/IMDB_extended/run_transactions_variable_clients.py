@@ -462,6 +462,7 @@ def main():
     parser.add_argument("--num-front-ends", type=int, default=1)
     parser.add_argument("--adjust-clients-port", type=int, default=8585)
     parser.add_argument("--interactive", action="store_true")
+    parser.add_argument("--starting-clients", type=int)
     args = parser.parse_args()
 
     set_up_logging()
@@ -544,6 +545,9 @@ def main():
     pause_controller = PauseController(
         args.num_clients, pause_semaphore, resume_semaphore
     )
+
+    if args.starting_clients is not None:
+        pause_controller.adjust_num_running_clients(args.starting_clients)
 
     if args.interactive:
         logger.info(
