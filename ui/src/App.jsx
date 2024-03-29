@@ -24,13 +24,13 @@ function App() {
     workloadRunners: [
       {
         host: "localhost",
-        // port: 8585,
-        port: 7583,
+        port: 8585,
+        // port: 7583,
       },
       {
         host: "localhost",
-        // port: 8586,
-        port: 7583,
+        port: 8586,
+        // port: 7583,
       },
     ],
   });
