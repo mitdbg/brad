@@ -7,7 +7,7 @@ import {
   highlightEngineViewClass,
   sortTablesToHoist,
 } from "../highlight";
-import {useState, useCallback} from "react";
+import { useState, useCallback } from "react";
 
 function formatLatencySeconds(latencySeconds) {
   const precision = 1;
@@ -52,7 +52,9 @@ function VdbeView({
           debounceMs={2000}
         />
       )}
-      <DbCylinder color="green" onClick={toggleWorkloadAdjuster}>{vengName}</DbCylinder>
+      <DbCylinder color="green" onClick={toggleWorkloadAdjuster}>
+        {vengName}
+      </DbCylinder>
       <div class="vdbe-view-props">
         <ul>
           <li>🌿: {freshness}</li>
