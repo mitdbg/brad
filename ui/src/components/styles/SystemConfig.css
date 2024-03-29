@@ -1,0 +1,14 @@
+.system-config-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    max-width: 500px;
+    background-color: #fff;
+    border: 2px solid #000;
+    z-index: 100;
+    padding: 20px;
+}
+
+.system-config-modal .endpoint-input {
+    margin: 20px 0;
+}

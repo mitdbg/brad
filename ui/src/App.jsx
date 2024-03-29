@@ -3,6 +3,7 @@ import Header from "./components/Header";
 import VirtualInfraView from "./components/VirtualInfraView";
 import BlueprintView from "./components/BlueprintView";
 import PerfView from "./components/PerfView";
+import SystemConfig from "./components/SystemConfig";
 import { fetchSystemState } from "./api";
 
 import "./App.css";
@@ -18,6 +19,22 @@ function App() {
     hoverEngine: null,
     virtualEngines: {},
     physicalEngines: {},
+  });
+  const [endpoints, setEndpoints] = useState({
+    brad: {
+      host: "localhost",
+      port: 7583,
+    },
+    workloadRunners: [
+      {
+        host: "localhost",
+        port: 8585,
+      },
+      {
+        host: "localhost",
+        port: 8586,
+      },
+    ],
   });
 
   const onTableHoverEnter = (engineMarker, tableName, isVirtual, mappedTo) => {
@@ -95,6 +112,7 @@ function App() {
           </div>
         </div>
         <PerfView virtualInfra={systemState.virtual_infra} />
+        <SystemConfig endpoints={endpoints} />
       </div>
     </>
   );
