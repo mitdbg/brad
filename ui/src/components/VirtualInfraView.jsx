@@ -46,7 +46,7 @@ function VirtualInfraView({
         ),
       );
     },
-    [endpoints],
+    [endpoints, workloadStates],
   );
 
   useEffect(async () => {
@@ -54,12 +54,8 @@ function VirtualInfraView({
     const promises = workloadRunners
       .map(baseEndpointFromObj)
       .map((baseEndpoint) => axios.get(`${baseEndpoint}/clients`));
-    try {
-      const results = await Promise.all(promises);
-      setWorkloadStates(results.map(({ data }) => data));
-    } catch (e) {
-      console.error("Loading error", e);
-    }
+    const results = await Promise.all(promises);
+    setWorkloadStates(results.map(({ data }) => data));
   }, [endpoints]);
 
   return (

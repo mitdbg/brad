@@ -7,6 +7,7 @@ import {
   highlightEngineViewClass,
   sortTablesToHoist,
 } from "../highlight";
+import {useState, useCallback} from "react";
 
 function formatLatencySeconds(latencySeconds) {
   const precision = 1;
@@ -33,11 +34,16 @@ function VdbeView({
   const vengName = name;
   const sortedTables = sortTablesToHoist(highlight, vengName, true, tables);
 
+  const [showWorkloadAdjuster, setShowWorkloadAdjuster] = useState(false);
+  const toggleWorkloadAdjuster = useCallback(() => {
+    setShowWorkloadAdjuster(!showWorkloadAdjuster);
+  }, [showWorkloadAdjuster]);
+
   return (
     <div
       class={`vdbe-view ${highlightEngineViewClass(highlight, vengName, true)}`}
     >
-      {workloadState && (
+      {workloadState && showWorkloadAdjuster && (
         <WorkloadAdjuster
           min={0}
           max={workloadState.max_clients}
@@ -46,7 +52,7 @@ function VdbeView({
           debounceMs={2000}
         />
       )}
-      <DbCylinder color="green">{vengName}</DbCylinder>
+      <DbCylinder color="green" onClick={toggleWorkloadAdjuster}>{vengName}</DbCylinder>
       <div class="vdbe-view-props">
         <ul>
           <li>🌿: {freshness}</li>

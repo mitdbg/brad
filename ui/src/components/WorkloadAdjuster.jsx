@@ -14,7 +14,7 @@ function WorkloadAdjuster({ min, max, value, onChange, debounceMs }) {
 
   return (
     <div class="workload-adjuster">
-      <h3>Number of Clients ({currentValue})</h3>
+      <h3>Number of Workload Clients ({currentValue})</h3>
       <Slider
         value={currentValue}
         marks={[
