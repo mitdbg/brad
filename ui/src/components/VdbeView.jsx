@@ -1,5 +1,6 @@
 import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
+import WorkloadAdjuster from "./WorkloadAdjuster";
 import "./styles/VdbeView.css";
 import {
   highlightTableViewClass,
@@ -34,6 +35,7 @@ function VdbeView({
     <div
       class={`vdbe-view ${highlightEngineViewClass(highlight, vengName, true)}`}
     >
+      <WorkloadAdjuster min={0} max={12} value={4} />
       <DbCylinder color="green">{vengName}</DbCylinder>
       <div class="vdbe-view-props">
         <ul>
