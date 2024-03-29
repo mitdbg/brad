@@ -24,11 +24,13 @@ function App() {
     workloadRunners: [
       {
         host: "localhost",
-        port: 8585,
+        // port: 8585,
+        port: 7583,
       },
       {
         host: "localhost",
-        port: 8586,
+        // port: 8586,
+        port: 7583,
       },
     ],
   });
@@ -123,6 +125,7 @@ function App() {
               highlight={highlight}
               onTableHoverEnter={onTableHoverEnter}
               onTableHoverExit={onTableHoverExit}
+              endpoints={endpoints}
             />
             <BlueprintView
               blueprint={systemState.blueprint}

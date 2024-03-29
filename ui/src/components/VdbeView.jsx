@@ -27,6 +27,8 @@ function VdbeView({
   highlight,
   onTableHoverEnter,
   onTableHoverExit,
+  workloadState,
+  updateWorkloadNumClients,
 }) {
   const vengName = name;
   const sortedTables = sortTablesToHoist(highlight, vengName, true, tables);
@@ -35,7 +37,15 @@ function VdbeView({
     <div
       class={`vdbe-view ${highlightEngineViewClass(highlight, vengName, true)}`}
     >
-      <WorkloadAdjuster min={0} max={12} value={4} />
+      {workloadState && (
+        <WorkloadAdjuster
+          min={0}
+          max={workloadState.max_clients}
+          value={workloadState.curr_clients}
+          onChange={updateWorkloadNumClients}
+          debounceMs={2000}
+        />
+      )}
       <DbCylinder color="green">{vengName}</DbCylinder>
       <div class="vdbe-view-props">
         <ul>
