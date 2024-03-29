@@ -574,6 +574,7 @@ def main():
     )
     parser.add_argument("--adjust-clients-port", type=int, default=8586)
     parser.add_argument("--interactive", action="store_true")
+    parser.add_argument("--starting-clients", type=int)
     args = parser.parse_args()
 
     set_up_logging()
@@ -598,7 +599,6 @@ def main():
         query_frequency = None
 
     execution_gap_dist = None
-    num_client_trace = None
 
     if args.query_indexes is None:
         queries = list(range(len(query_bank)))
@@ -715,6 +715,9 @@ def main():
     pause_controller = PauseController(
         args.num_clients, pause_semaphore, resume_semaphore
     )
+
+    if args.starting_clients is not None:
+        pause_controller.adjust_num_running_clients(args.starting_clients)
 
     # Wait until requested to stop.
 

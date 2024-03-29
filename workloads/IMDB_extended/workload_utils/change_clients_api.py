@@ -22,7 +22,7 @@ manager: Optional[Manager] = None
 
 @app.get("/clients")
 def get_clients() -> ClientState:
-    global manager
+    global manager  # pylint: disable=global-variable-not-assigned
     assert manager is not None
     return ClientState(
         curr_clients=manager.pc.num_running_clients,
@@ -32,7 +32,7 @@ def get_clients() -> ClientState:
 
 @app.post("/clients")
 def set_clients(set_state: ClientState) -> ClientState:
-    global manager
+    global manager  # pylint: disable=global-variable-not-assigned
     assert manager is not None
     manager.pc.adjust_num_running_clients(set_state.curr_clients, verbose=True)
     return ClientState(
@@ -45,7 +45,7 @@ def serve(
     pc: PauseController, port: int, host: str = "0.0.0.0", log_level: str = "info"
 ) -> None:
     try:
-        global manager
+        global manager  # pylint: disable=global-statement
         manager = Manager(pc)
         uvicorn.run(
             "workload_utils.change_clients_api:app",
