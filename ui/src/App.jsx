@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import Header from "./components/Header";
 import VirtualInfraView from "./components/VirtualInfraView";
 import BlueprintView from "./components/BlueprintView";
@@ -36,6 +36,7 @@ function App() {
       },
     ],
   });
+  const [configModalOpen, setConfigModalOpen] = useState(false);
 
   const onTableHoverEnter = (engineMarker, tableName, isVirtual, mappedTo) => {
     const virtualEngines = {};
@@ -90,6 +91,30 @@ function App() {
     };
   }, [systemState]);
 
+  // Bind keyboard shortcut for internal config menu.
+  const handleKeyPress = useCallback(
+    (event) => {
+      if (event.key === "d" && !configModalOpen) {
+        setConfigModalOpen(true);
+      }
+    },
+    [configModalOpen],
+  );
+
+  useEffect(() => {
+    document.addEventListener("keyup", handleKeyPress);
+    return () => {
+      document.removeEventListener("keyup", handleKeyPress);
+    };
+  }, [handleKeyPress]);
+
+  const handleSystemConfigChange = useCallback(
+    ({ field, value }) => {
+      setEndpoints({ ...endpoints, [field]: value });
+    },
+    [endpoints],
+  );
+
   return (
     <>
       <Header />
@@ -112,7 +137,12 @@ function App() {
           </div>
         </div>
         <PerfView virtualInfra={systemState.virtual_infra} />
-        <SystemConfig endpoints={endpoints} />
+        <SystemConfig
+          endpoints={endpoints}
+          open={configModalOpen}
+          onCloseClick={() => setConfigModalOpen(false)}
+          onChange={handleSystemConfigChange}
+        />
       </div>
     </>
   );
