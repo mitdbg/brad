@@ -1,3 +1,4 @@
+import enum
 from typing import List, Dict, Optional
 from pydantic import BaseModel, AwareDatetime
 
@@ -95,6 +96,14 @@ class VirtualInfrastructure(BaseModel):
     engines: List[DisplayableVirtualEngine]
 
 
+class Status(enum.Enum):
+    Running = "running"
+    Planning = "planning"
+    Transitioning = "transitioning"
+
+
 class SystemState(BaseModel):
+    status: Status
     virtual_infra: VirtualInfrastructure
     blueprint: DisplayableBlueprint
+    next_blueprint: Optional[DisplayableBlueprint]

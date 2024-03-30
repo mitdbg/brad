@@ -2,8 +2,19 @@ import Panel from "./Panel";
 import PhysDbView from "./PhysDbView";
 import "./styles/BlueprintView.css";
 
+function findNextEngine(engineName, nextBlueprint) {
+  if (nextBlueprint == null) return null;
+  for (const engine of nextBlueprint.engines) {
+    if (engine.name === engineName) {
+      return engine;
+    }
+  }
+  return null;
+}
+
 function BlueprintView({
   blueprint,
+  nextBlueprint,
   highlight,
   onTableHoverEnter,
   onTableHoverExit,
@@ -21,6 +32,7 @@ function BlueprintView({
               highlight={highlight}
               onTableHoverEnter={onTableHoverEnter}
               onTableHoverExit={onTableHoverExit}
+              nextEngine={findNextEngine(name, nextBlueprint)}
             />
           ))}
       </div>
