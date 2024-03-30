@@ -7,6 +7,20 @@ import {
   sortTablesToHoist,
 } from "../highlight";
 
+function addedTables(tables, nextEngine) {
+  if (nextEngine == null) return [];
+  const added = [];
+  const currTableSet = new Set();
+  for (const currTable of tables) {
+    currTableSet.add(currTable.name);
+  }
+  for (const table of nextEngine.tables) {
+    if (currTableSet.has(table.name)) continue;
+    added.push(table);
+  }
+  return added;
+}
+
 function PhysDbView({
   name,
   provisioning,
@@ -18,6 +32,7 @@ function PhysDbView({
 }) {
   const physDbName = name;
   const sortedTables = sortTablesToHoist(highlight, physDbName, false, tables);
+  const addedTablesList = addedTables(tables, nextEngine);
 
   return (
     <div
@@ -48,6 +63,17 @@ function PhysDbView({
               onTableHoverEnter(physDbName, name, false, mapped_to)
             }
             onTableHoverExit={onTableHoverExit}
+          />
+        ))}
+        {addedTablesList.map(({ name, is_writer }) => (
+          <TableView
+            key={name}
+            name={name}
+            isWriter={is_writer}
+            color="blue"
+            highlightClass="dim"
+            onTableHoverEnter={() => {}}
+            onTableHoverExit={() => {}}
           />
         ))}
       </div>
