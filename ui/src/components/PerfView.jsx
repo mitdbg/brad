@@ -81,7 +81,7 @@ function PerfView({ virtualInfra }) {
   useEffect(() => {
     let timeoutId = null;
     const refreshData = async () => {
-      const rawMetrics = await fetchMetrics(60, /*useGenerated=*/ true);
+      const rawMetrics = await fetchMetrics(60, /*useGenerated=*/ false);
       const fetchedMetrics = parseMetrics(rawMetrics);
       const metricsManager = getMetricsManager();
       const addedNewMetrics = metricsManager.mergeInMetrics(fetchedMetrics);

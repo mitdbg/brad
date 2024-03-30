@@ -49,7 +49,7 @@ function VdbeView({
           max={workloadState.max_clients}
           value={workloadState.curr_clients}
           onChange={updateWorkloadNumClients}
-          debounceMs={2000}
+          debounceMs={800}
         />
       )}
       <DbCylinder color="green" onClick={toggleWorkloadAdjuster}>

@@ -20,4 +20,24 @@ async function fetchSystemState(filterTablesForDemo) {
   return result.data;
 }
 
-export { fetchMetrics, fetchSystemState };
+async function fetchWorkloadClients(port) {
+  const args = port != null ? { params: { runner_port: port } } : {};
+  const result = await axios.get(`${API_PREFIX}/clients`, args);
+  return result.data;
+}
+
+async function setWorkloadClients(port, numClients) {
+  const args = { curr_clients: numClients };
+  if (port != null) {
+    args.runner_port = port;
+  }
+  const result = await axios.post(`${API_PREFIX}/clients`, args);
+  return result.data;
+}
+
+export {
+  fetchMetrics,
+  fetchSystemState,
+  fetchWorkloadClients,
+  setWorkloadClients,
+};

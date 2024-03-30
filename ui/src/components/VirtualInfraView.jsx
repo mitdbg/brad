@@ -1,12 +1,8 @@
-import axios from "axios";
 import Panel from "./Panel";
 import VdbeView from "./VdbeView";
 import "./styles/VirtualInfraView.css";
 import { useEffect, useState, useCallback } from "react";
-
-function baseEndpointFromObj({ host, port }) {
-  return `http://${host}:${port}`;
-}
+import { fetchWorkloadClients, setWorkloadClients } from "../api";
 
 function VirtualInfraView({
   virtualInfra,
@@ -25,11 +21,11 @@ function VirtualInfraView({
       ) {
         return;
       }
-      const baseEndpoint = baseEndpointFromObj(workloadRunners[vdbeIndex]);
-      const result = await axios.post(`${baseEndpoint}/clients`, {
-        curr_clients: numClients,
-      });
-      const newWorkloadState = result.data;
+      const endpoint = workloadRunners[vdbeIndex];
+      const newWorkloadState = await setWorkloadClients(
+        endpoint.port,
+        numClients,
+      );
 
       // Skip the state update if there was no change.
       const existingWorkloadState = workloadStates[vdbeIndex];
@@ -51,11 +47,11 @@ function VirtualInfraView({
 
   useEffect(async () => {
     const { workloadRunners } = endpoints;
-    const promises = workloadRunners
-      .map(baseEndpointFromObj)
-      .map((baseEndpoint) => axios.get(`${baseEndpoint}/clients`));
+    const promises = workloadRunners.map((endpoint) =>
+      fetchWorkloadClients(endpoint.port),
+    );
     const results = await Promise.all(promises);
-    setWorkloadStates(results.map(({ data }) => data));
+    setWorkloadStates(results);
   }, [endpoints]);
 
   return (

@@ -107,3 +107,13 @@ class SystemState(BaseModel):
     virtual_infra: VirtualInfrastructure
     blueprint: DisplayableBlueprint
     next_blueprint: Optional[DisplayableBlueprint]
+
+
+class ClientState(BaseModel):
+    max_clients: int
+    curr_clients: int
+
+
+class SetClientState(BaseModel):
+    runner_port: Optional[int] = None
+    curr_clients: int

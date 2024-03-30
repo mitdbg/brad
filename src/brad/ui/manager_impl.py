@@ -3,10 +3,10 @@ import uvicorn
 import logging
 import importlib.resources as pkg_resources
 import numpy as np
-from fastapi import FastAPI
+import requests
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from typing import Optional, List
-from pydantic import BaseModel
 
 import brad.ui.static as brad_app
 from brad.blueprint import Blueprint
@@ -26,6 +26,8 @@ from brad.ui.models import (
     VirtualInfrastructure,
     DisplayableTable,
     Status,
+    ClientState,
+    SetClientState,
 )
 from brad.daemon.front_end_metrics import FrontEndMetric
 from brad.daemon.system_event_logger import SystemEventLogger, SystemEventRecord
@@ -190,25 +192,44 @@ def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
     return system_state
 
 
-class ClientState(BaseModel):
-    max_clients: int
-    curr_clients: int
+@app.get("/api/1/clients")
+def get_workload_clients(runner_port: Optional[int] = None) -> ClientState:
+    # This proxies the request to the runner, which runs as a different process
+    # and listens for requests on a different port. We require a proxy to avoid
+    # CORS restrictions.
+    if runner_port is None:
+        # Used for debugging without starting the variable client runner.
+        return ClientState(max_clients=12, curr_clients=3)
+    else:
+        try:
+            r = requests.get(f"http://localhost:{runner_port}/clients", timeout=2)
+            if r.status_code != 200:
+                raise HTTPException(r.status_code, r.reason)
+            return ClientState(**r.json())
+        except requests.ConnectionError as ex:
+            raise HTTPException(400, f"Unable to connect to port {runner_port}") from ex
 
 
-class SetClientState(BaseModel):
-    curr_clients: int
-
-
-@app.get("/clients")
-def get_clients_dummy() -> ClientState:
-    # Used for debugging without starting the variable client runner.
-    return ClientState(max_clients=12, curr_clients=3)
-
-
-@app.post("/clients")
-def set_clients_dummy(clients: SetClientState) -> ClientState:
-    # Used for debugging without starting the variable client runner.
-    return ClientState(max_clients=12, curr_clients=clients.curr_clients)
+@app.post("/api/1/clients")
+def set_clients(clients: SetClientState) -> ClientState:
+    # This proxies the request to the runner, which runs as a different process
+    # and listens for requests on a different port. We require a proxy to avoid
+    # CORS restrictions.
+    if clients.runner_port is None:
+        # Used for debugging without starting the variable client runner.
+        return ClientState(max_clients=12, curr_clients=clients.curr_clients)
+    else:
+        try:
+            r = requests.post(
+                f"http://localhost:{clients.runner_port}/clients", timeout=2
+            )
+            if r.status_code != 200:
+                raise HTTPException(r.status_code, r.reason)
+            return ClientState(**r.json())
+        except requests.ConnectionError as ex:
+            raise HTTPException(
+                400, f"Unable to connect to port {clients.runner_port}"
+            ) from ex
 
 
 def _analytics_table_mapper_temp(table_name: str, blueprint: Blueprint) -> List[str]:
