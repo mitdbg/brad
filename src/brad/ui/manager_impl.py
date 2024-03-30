@@ -181,7 +181,7 @@ def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
     else:
         next_dbp = None
     system_state = SystemState(
-        status=_determine_current_status(manager),
+        status=status,
         virtual_infra=virtual_infra,
         blueprint=dbp,
         next_blueprint=next_dbp,

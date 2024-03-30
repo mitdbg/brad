@@ -131,6 +131,7 @@ function App() {
             />
             <BlueprintView
               blueprint={systemState.blueprint}
+              nextBlueprint={systemState.next_blueprint}
               highlight={highlight}
               onTableHoverEnter={onTableHoverEnter}
               onTableHoverExit={onTableHoverExit}

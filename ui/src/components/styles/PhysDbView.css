@@ -13,6 +13,10 @@
   height: 30px;
 }
 
+.physdb-view-prov.transition {
+  color: #888;
+}
+
 .physdb-view.dim .db-cylinder,
 .physdb-view.dim .physdb-view-prov {
   opacity: 0.3;

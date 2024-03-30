@@ -14,6 +14,7 @@ function PhysDbView({
   highlight,
   onTableHoverEnter,
   onTableHoverExit,
+  nextEngine,
 }) {
   const physDbName = name;
   const sortedTables = sortTablesToHoist(highlight, physDbName, false, tables);
@@ -24,6 +25,12 @@ function PhysDbView({
     >
       <DbCylinder color="blue">{name}</DbCylinder>
       <div class="physdb-view-prov">{provisioning}</div>
+      {nextEngine && (
+        <div class="physdb-view-prov transition">
+          {nextEngine.provisioning ? "→ " : ""}
+          {nextEngine.provisioning}
+        </div>
+      )}
       <div class="db-table-set">
         {sortedTables.map(({ name, is_writer, mapped_to }) => (
           <TableView
