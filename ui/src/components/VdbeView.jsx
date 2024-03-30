@@ -1,11 +1,13 @@
 import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
+import WorkloadAdjuster from "./WorkloadAdjuster";
 import "./styles/VdbeView.css";
 import {
   highlightTableViewClass,
   highlightEngineViewClass,
   sortTablesToHoist,
 } from "../highlight";
+import { useState, useCallback } from "react";
 
 function formatLatencySeconds(latencySeconds) {
   const precision = 1;
@@ -26,15 +28,33 @@ function VdbeView({
   highlight,
   onTableHoverEnter,
   onTableHoverExit,
+  workloadState,
+  updateWorkloadNumClients,
 }) {
   const vengName = name;
   const sortedTables = sortTablesToHoist(highlight, vengName, true, tables);
+
+  const [showWorkloadAdjuster, setShowWorkloadAdjuster] = useState(false);
+  const toggleWorkloadAdjuster = useCallback(() => {
+    setShowWorkloadAdjuster(!showWorkloadAdjuster);
+  }, [showWorkloadAdjuster]);
 
   return (
     <div
       class={`vdbe-view ${highlightEngineViewClass(highlight, vengName, true)}`}
     >
-      <DbCylinder color="green">{vengName}</DbCylinder>
+      {workloadState && showWorkloadAdjuster && (
+        <WorkloadAdjuster
+          min={0}
+          max={workloadState.max_clients}
+          value={workloadState.curr_clients}
+          onChange={updateWorkloadNumClients}
+          debounceMs={2000}
+        />
+      )}
+      <DbCylinder color="green" onClick={toggleWorkloadAdjuster}>
+        {vengName}
+      </DbCylinder>
       <div class="vdbe-view-props">
         <ul>
           <li>🌿: {freshness}</li>

@@ -6,6 +6,7 @@ import numpy as np
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from typing import Optional, List
+from pydantic import BaseModel
 
 import brad.ui.static as brad_app
 from brad.blueprint import Blueprint
@@ -171,6 +172,27 @@ def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
     system_state = SystemState(virtual_infra=virtual_infra, blueprint=dbp)
     _add_reverse_mapping_temp(system_state)
     return system_state
+
+
+class ClientState(BaseModel):
+    max_clients: int
+    curr_clients: int
+
+
+class SetClientState(BaseModel):
+    curr_clients: int
+
+
+@app.get("/clients")
+def get_clients_dummy() -> ClientState:
+    # Used for debugging without starting the variable client runner.
+    return ClientState(max_clients=12, curr_clients=3)
+
+
+@app.post("/clients")
+def set_clients_dummy(clients: SetClientState) -> ClientState:
+    # Used for debugging without starting the variable client runner.
+    return ClientState(max_clients=12, curr_clients=clients.curr_clients)
 
 
 def _analytics_table_mapper_temp(table_name: str, blueprint: Blueprint) -> List[str]:

@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import Header from "./components/Header";
 import VirtualInfraView from "./components/VirtualInfraView";
 import BlueprintView from "./components/BlueprintView";
 import PerfView from "./components/PerfView";
+import SystemConfig from "./components/SystemConfig";
 import { fetchSystemState } from "./api";
 
 import "./App.css";
@@ -19,6 +20,21 @@ function App() {
     virtualEngines: {},
     physicalEngines: {},
   });
+  const [endpoints, setEndpoints] = useState({
+    workloadRunners: [
+      {
+        host: "localhost",
+        port: 8585,
+        // port: 7583,
+      },
+      {
+        host: "localhost",
+        port: 8586,
+        // port: 7583,
+      },
+    ],
+  });
+  const [configModalOpen, setConfigModalOpen] = useState(false);
 
   const onTableHoverEnter = (engineMarker, tableName, isVirtual, mappedTo) => {
     const virtualEngines = {};
@@ -73,6 +89,30 @@ function App() {
     };
   }, [systemState]);
 
+  // Bind keyboard shortcut for internal config menu.
+  const handleKeyPress = useCallback(
+    (event) => {
+      if (event.key === "d" && !configModalOpen) {
+        setConfigModalOpen(true);
+      }
+    },
+    [configModalOpen],
+  );
+
+  useEffect(() => {
+    document.addEventListener("keyup", handleKeyPress);
+    return () => {
+      document.removeEventListener("keyup", handleKeyPress);
+    };
+  }, [handleKeyPress]);
+
+  const handleSystemConfigChange = useCallback(
+    ({ field, value }) => {
+      setEndpoints({ ...endpoints, [field]: value });
+    },
+    [endpoints],
+  );
+
   return (
     <>
       <Header />
@@ -85,6 +125,7 @@ function App() {
               highlight={highlight}
               onTableHoverEnter={onTableHoverEnter}
               onTableHoverExit={onTableHoverExit}
+              endpoints={endpoints}
             />
             <BlueprintView
               blueprint={systemState.blueprint}
@@ -95,6 +136,12 @@ function App() {
           </div>
         </div>
         <PerfView virtualInfra={systemState.virtual_infra} />
+        <SystemConfig
+          endpoints={endpoints}
+          open={configModalOpen}
+          onCloseClick={() => setConfigModalOpen(false)}
+          onChange={handleSystemConfigChange}
+        />
       </div>
     </>
   );

@@ -13,6 +13,10 @@
   cursor: default;
 }
 
+.db-cylinder.clickable {
+  cursor: pointer;
+}
+
 .db-cylinder:hover {
   opacity: 1;
 }
