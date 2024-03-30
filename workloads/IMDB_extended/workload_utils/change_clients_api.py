@@ -1,18 +1,9 @@
 import uvicorn
 from fastapi import FastAPI
-from pydantic import BaseModel
 from typing import Optional
 
+from brad.ui.models import ClientState, SetClientState
 from .pause_controller import PauseController
-
-
-class ClientState(BaseModel):
-    max_clients: int
-    curr_clients: int
-
-
-class SetClientState(BaseModel):
-    curr_clients: int
 
 
 class Manager:
