@@ -221,7 +221,9 @@ def set_clients(clients: SetClientState) -> ClientState:
     else:
         try:
             r = requests.post(
-                f"http://localhost:{clients.runner_port}/clients", timeout=2
+                f"http://localhost:{clients.runner_port}/clients",
+                json=clients.dict(),
+                timeout=2,
             )
             if r.status_code != 200:
                 raise HTTPException(r.status_code, r.reason)

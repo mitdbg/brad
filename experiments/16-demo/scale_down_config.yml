@@ -6,7 +6,7 @@
 # listen on successive ports (e.g., 6584, 6585, etc.).
 front_end_interface: "0.0.0.0"
 front_end_port: 6583
-num_front_ends: 12
+num_front_ends: 24
 
 # Logging paths. If the value is in ALL_CAPS (with underscores), it is
 # interpreted as an environment variable (BRAD will log to the path stored in
@@ -128,9 +128,9 @@ std_datasets:
 # Blueprint planning trigger configs.
 
 triggers:
-  enabled: false  # Change to true when running.
+  enabled: true  # Change to true when running.
   check_period_s: 90  # Triggers are checked every X seconds.
-  check_period_offset_s: 360  # Wait 6 mins before starting.
+  check_period_offset_s: 120  # Wait 2 mins before starting.
   observe_new_blueprint_mins: 3
 
   elapsed_time:
