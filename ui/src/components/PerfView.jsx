@@ -78,8 +78,7 @@ function PerfView({ virtualInfra }) {
     return metricsManagerRef.current;
   }
 
-  useEffect(() => {
-    let timeoutId = null;
+  useEffect(async () => {
     const refreshData = async () => {
       const rawMetrics = await fetchMetrics(60, /*useGenerated=*/ false);
       const fetchedMetrics = parseMetrics(rawMetrics);
@@ -94,16 +93,16 @@ function PerfView({ virtualInfra }) {
           ),
         });
       }
-      timeoutId = setTimeout(refreshData, REFRESH_INTERVAL_MS);
     };
 
     // Run first fetch immediately.
-    timeoutId = setTimeout(refreshData, 0);
+    await refreshData();
+    const intervalId = setInterval(refreshData, REFRESH_INTERVAL_MS);
     return () => {
-      if (timeoutId === null) {
+      if (intervalId === null) {
         return;
       }
-      clearTimeout(timeoutId);
+      clearInterval(intervalId);
     };
   }, [metricsData, windowSizeMinutes]);
 

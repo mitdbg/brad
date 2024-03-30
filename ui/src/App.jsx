@@ -66,8 +66,7 @@ function App() {
   };
 
   // Fetch updated system state periodically.
-  useEffect(() => {
-    let timeoutId = null;
+  useEffect(async () => {
     const refreshData = async () => {
       const newSystemState = await fetchSystemState(
         /*filterTablesForDemo=*/ false,
@@ -76,16 +75,16 @@ function App() {
       if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
         setSystemState(newSystemState);
       }
-      timeoutId = setTimeout(refreshData, REFRESH_INTERVAL_MS);
     };
 
     // Run first fetch immediately.
-    timeoutId = setTimeout(refreshData, 0);
+    await refreshData();
+    const intervalId = setInterval(refreshData, REFRESH_INTERVAL_MS);
     return () => {
-      if (timeoutId === null) {
+      if (intervalId === null) {
         return;
       }
-      clearTimeout(timeoutId);
+      clearInterval(intervalId);
     };
   }, [systemState]);
 
