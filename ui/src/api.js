@@ -21,7 +21,7 @@ async function fetchSystemState(filterTablesForDemo) {
 }
 
 async function fetchWorkloadClients(port) {
-  const args = port != null ? {runner_port: port} : {};
+  const args = port != null ? {params: {runner_port: port}} : {};
   const result = await axios.get(`${API_PREFIX}/clients`, args);
   return result.data;
 }

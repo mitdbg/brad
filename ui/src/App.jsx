@@ -27,12 +27,10 @@ function App() {
       {
         host: "localhost",
         port: 8585,
-        // port: 7583,
       },
       {
         host: "localhost",
         port: 8586,
-        // port: 7583,
       },
     ],
   });
@@ -72,7 +70,7 @@ function App() {
     let timeoutId = null;
     const refreshData = async () => {
       const newSystemState = await fetchSystemState(
-        /*filterTablesForDemo=*/ true,
+        /*filterTablesForDemo=*/ false,
       );
       // TODO: Not the best way to check for equality.
       if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
