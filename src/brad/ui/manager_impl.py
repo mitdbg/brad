@@ -201,7 +201,7 @@ def get_workload_clients(runner_port: Optional[int] = None) -> ClientState:
         # Used for debugging without starting the variable client runner.
         return ClientState(max_clients=12, curr_clients=3)
     else:
-        r = requests.get(f"http://localhost:{runner_port}/clients")
+        r = requests.get(f"http://localhost:{runner_port}/clients", timeout=2)
         if r.status_code != 200:
             raise HTTPException(r.status_code, r.reason)
         return ClientState(**r.json())
@@ -216,7 +216,7 @@ def set_clients(clients: SetClientState) -> ClientState:
         # Used for debugging without starting the variable client runner.
         return ClientState(max_clients=12, curr_clients=clients.curr_clients)
     else:
-        r = requests.post(f"http://localhost:{clients.runner_port}/clients")
+        r = requests.post(f"http://localhost:{clients.runner_port}/clients", timeout=2)
         if r.status_code != 200:
             raise HTTPException(r.status_code, r.reason)
         return ClientState(**r.json())
