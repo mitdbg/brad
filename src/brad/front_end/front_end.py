@@ -188,7 +188,7 @@ class BradFrontEnd(BradInterface):
         )
         self._ping_watchdog_task: Optional[asyncio.Task[None]] = None
 
-        self._is_stub_mode = self._config.stub_mode_path is not None
+        self._is_stub_mode = self._config.stub_mode_path() is not None
 
     async def serve_forever(self):
         await self._run_setup()

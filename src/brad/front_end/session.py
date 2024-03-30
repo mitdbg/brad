@@ -116,7 +116,7 @@ class SessionManager:
             routing_policy_override == RoutingPolicy.ForestTableSelectivity
             or routing_policy_override == RoutingPolicy.Default
         ):
-            if self._config.stub_mode_path is None:
+            if self._config.stub_mode_path() is not None:
                 estimator = await PostgresEstimator.connect(
                     self._schema_name, self._config
                 )
