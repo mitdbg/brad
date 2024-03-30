@@ -22,7 +22,10 @@ function VirtualInfraView({
         return;
       }
       const endpoint = workloadRunners[vdbeIndex];
-      const newWorkloadState = await setWorkloadClients(endpoint.port, numClients);
+      const newWorkloadState = await setWorkloadClients(
+        endpoint.port,
+        numClients,
+      );
 
       // Skip the state update if there was no change.
       const existingWorkloadState = workloadStates[vdbeIndex];
@@ -44,8 +47,9 @@ function VirtualInfraView({
 
   useEffect(async () => {
     const { workloadRunners } = endpoints;
-    const promises = workloadRunners
-      .map((endpoint) => fetchWorkloadClients(endpoint.port));
+    const promises = workloadRunners.map((endpoint) =>
+      fetchWorkloadClients(endpoint.port),
+    );
     const results = await Promise.all(promises);
     setWorkloadStates(results);
   }, [endpoints]);

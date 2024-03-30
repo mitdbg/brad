@@ -206,8 +206,8 @@ def get_workload_clients(runner_port: Optional[int] = None) -> ClientState:
             if r.status_code != 200:
                 raise HTTPException(r.status_code, r.reason)
             return ClientState(**r.json())
-        except requests.ConnectionError:
-            raise HTTPException(400, f"Unable to connect to port {runner_port}")
+        except requests.ConnectionError as ex:
+            raise HTTPException(400, f"Unable to connect to port {runner_port}") from ex
 
 
 @app.post("/api/1/clients")
@@ -220,12 +220,16 @@ def set_clients(clients: SetClientState) -> ClientState:
         return ClientState(max_clients=12, curr_clients=clients.curr_clients)
     else:
         try:
-            r = requests.post(f"http://localhost:{clients.runner_port}/clients", timeout=2)
+            r = requests.post(
+                f"http://localhost:{clients.runner_port}/clients", timeout=2
+            )
             if r.status_code != 200:
                 raise HTTPException(r.status_code, r.reason)
             return ClientState(**r.json())
-        except requests.ConnectionError:
-            raise HTTPException(400, f"Unable to connect to port {clients.runner_port}")
+        except requests.ConnectionError as ex:
+            raise HTTPException(
+                400, f"Unable to connect to port {clients.runner_port}"
+            ) from ex
 
 
 def _analytics_table_mapper_temp(table_name: str, blueprint: Blueprint) -> List[str]:
