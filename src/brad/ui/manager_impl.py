@@ -12,6 +12,7 @@ import brad.ui.static as brad_app
 from brad.blueprint import Blueprint
 from brad.blueprint.table import Table
 from brad.blueprint.manager import BlueprintManager
+from brad.planner.abstract import BlueprintPlanner
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.monitor import Monitor
@@ -24,6 +25,7 @@ from brad.ui.models import (
     DisplayableVirtualEngine,
     VirtualInfrastructure,
     DisplayableTable,
+    Status,
 )
 from brad.daemon.front_end_metrics import FrontEndMetric
 from brad.daemon.system_event_logger import SystemEventLogger, SystemEventRecord
@@ -43,6 +45,7 @@ class UiManagerImpl:
         self.monitor = monitor
         self.blueprint_mgr = blueprint_mgr
         self.system_event_logger = system_event_logger
+        self.planner: Optional[BlueprintPlanner] = None
 
     async def serve_forever(self) -> None:
         global manager  # pylint: disable=global-statement
@@ -169,7 +172,20 @@ def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
             if t.name in txn_tables:
                 t.is_writer = True
     virtual_infra = VirtualInfrastructure(engines=[vdbe1, vdbe2])
-    system_state = SystemState(virtual_infra=virtual_infra, blueprint=dbp)
+
+    status = _determine_current_status(manager)
+    if status is Status.Transitioning:
+        next_blueprint = manager.blueprint_mgr.get_transition_metadata().next_blueprint
+        assert next_blueprint is not None
+        next_dbp = DisplayableBlueprint.from_blueprint(next_blueprint)
+    else:
+        next_dbp = None
+    system_state = SystemState(
+        status=_determine_current_status(manager),
+        virtual_infra=virtual_infra,
+        blueprint=dbp,
+        next_blueprint=next_dbp,
+    )
     _add_reverse_mapping_temp(system_state)
     return system_state
 
@@ -220,6 +236,14 @@ def _add_reverse_mapping_temp(system_state: SystemState) -> None:
             for veng_name, tables in veng_tables.items():
                 if name in tables:
                     table.mapped_to.append(veng_name)
+
+
+def _determine_current_status(manager_impl: UiManagerImpl) -> Status:
+    if manager_impl.planner is not None and manager_impl.planner.replan_in_progress():
+        return Status.Planning
+    if manager_impl.blueprint_mgr.get_transition_metadata().next_blueprint is not None:
+        return Status.Transitioning
+    return Status.Running
 
 
 @app.get("/api/1/system_events")

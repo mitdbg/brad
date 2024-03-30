@@ -12,8 +12,10 @@ const REFRESH_INTERVAL_MS = 30 * 1000;
 
 function App() {
   const [systemState, setSystemState] = useState({
+    status: "running",
     blueprint: null,
     virtual_infra: null,
+    next_blueprint: null,
   });
   const [highlight, setHighlight] = useState({
     hoverEngine: null,
@@ -115,7 +117,7 @@ function App() {
 
   return (
     <>
-      <Header />
+      <Header status={systemState.status} />
       <div class="body-container">
         <div class="column" style={{ flexGrow: 3 }}>
           <h2 class="col-h2">Data Infrastructure</h2>

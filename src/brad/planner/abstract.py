@@ -179,3 +179,6 @@ class BlueprintPlanner:
         for callback in self._callbacks:
             tasks.append(asyncio.create_task(callback(blueprint, score, trigger)))
         await asyncio.gather(*tasks)
+
+    def replan_in_progress(self) -> bool:
+        return self._replan_in_progress

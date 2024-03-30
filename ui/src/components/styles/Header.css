@@ -62,6 +62,19 @@
   height: 12px;
   border-radius: 50%;
   margin: -2px 15px 0 0;
+}
+
+.header-status-icon.running {
   background-color: #51a965;
   box-shadow: 0 0 5px #51a965;
+}
+
+.header-status-icon.transitioning {
+  background-color: #ec8405;
+  box-shadow: 0 0 5px #ec8405;
+}
+
+.header-status-icon.planning {
+  background-color: #517aa9;
+  box-shadow: 0 0 5px #517aa9;
 }
