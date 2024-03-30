@@ -4,6 +4,7 @@ from brad.config.file import ConfigFile
 from brad.daemon.monitor import Monitor
 from brad.blueprint.manager import BlueprintManager
 from brad.daemon.system_event_logger import SystemEventLogger
+from brad.planner.abstract import BlueprintPlanner
 
 
 class UiManager:
@@ -46,6 +47,9 @@ class UiManager:
         from brad.ui.manager_impl import UiManagerImpl
 
         self._impl: UiManagerImpl = impl
+
+    def set_planner(self, planner: BlueprintPlanner) -> None:
+        self._impl.planner = planner
 
     async def serve_forever(self) -> None:
         await self._impl.serve_forever()

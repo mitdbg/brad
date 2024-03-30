@@ -159,6 +159,7 @@ class BradDaemon:
             ]
             additional_tasks = []
             if self._ui_mgr is not None:
+                self._ui_mgr.set_planner(self._planner)
                 additional_tasks.append(self._ui_mgr.serve_forever())
             logger.info("The BRAD daemon is running.")
             if self._system_event_logger is not None:
