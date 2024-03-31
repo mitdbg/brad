@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <functional>
+#include <any>
 
 #include <arrow/flight/sql/server.h>
 #include <arrow/result.h>
@@ -17,7 +19,9 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
 
   static std::shared_ptr<BradFlightSqlServer> Create();
 
-  void InitWrapper(const std::string &host, int port);
+  void InitWrapper(const std::string &host,
+                   int port,
+                   std::function<std::vector<std::tuple<int>>(std::string)>);
 
   void ServeWrapper();
 
@@ -33,6 +37,8 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
     DoGetStatement(
       const arrow::flight::ServerCallContext &context,
       const arrow::flight::sql::StatementQueryTicket &command) override;
+
+  std::function<std::vector<std::tuple<int>>(std::string)> _handle_query;
 };
 
 }  // namespace brad

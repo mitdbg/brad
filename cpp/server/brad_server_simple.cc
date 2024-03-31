@@ -5,6 +5,9 @@
 #include <sstream>
 #include <unordered_map>
 #include <utility>
+#include <iostream>
+#include <functional>
+#include <any>
 
 #include <arrow/array/builder_binary.h>
 #include "brad_sql_info.h"
@@ -59,9 +62,15 @@ std::shared_ptr<BradFlightSqlServer>
   return result;
 }
 
-void BradFlightSqlServer::InitWrapper(const std::string &host, int port) {
+void BradFlightSqlServer::InitWrapper(
+  const std::string &host,
+  int port,
+  std::function<std::vector<std::tuple<int>>(std::string)> handle_query) {
   auto location = arrow::flight::Location::ForGrpcTcp(host, port).ValueOrDie();
   arrow::flight::FlightServerOptions options(location);
+
+  _handle_query = handle_query;
+
   this->Init(options);
 }
 
@@ -79,6 +88,9 @@ arrow::Result<std::unique_ptr<FlightInfo>>
     const StatementQuery &command,
     const FlightDescriptor &descriptor) {
   const std::string &query = command.query;
+
+  _handle_query(query);
+
   ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(query));
   ARROW_ASSIGN_OR_RAISE(auto schema, statement->GetSchema());
   ARROW_ASSIGN_OR_RAISE(auto ticket,

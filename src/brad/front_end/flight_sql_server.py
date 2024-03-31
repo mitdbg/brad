@@ -8,9 +8,9 @@ logger = logging.getLogger(__name__)
 
 
 class BradFlightSqlServer:
-    def __init__(self, host: str, port: int) -> None:
+    def __init__(self, host: str, port: int, callback) -> None:
         self._flight_sql_server = brad_server.BradFlightSqlServer()
-        self._flight_sql_server.init(host, port)
+        self._flight_sql_server.init(host, port, callback)
         self._thread = threading.Thread(name="BradFlightSqlServer", target=self._serve)
 
     def start(self) -> None:

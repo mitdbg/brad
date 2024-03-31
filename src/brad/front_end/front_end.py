@@ -45,7 +45,7 @@ from brad.routing.rule_based import RuleBased
 from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
 from brad.routing.tree_based.forest_policy import ForestPolicy
-from brad.row_list import RowList
+from brad.row_list import RowList, FixedRowList
 from brad.utils import log_verbose, create_custom_logger
 from brad.utils.counter import Counter
 from brad.utils.json_decimal_encoder import DecimalEncoder
@@ -58,7 +58,6 @@ from brad.workload_logging.epoch_file_handler import EpochFileHandler
 logger = logging.getLogger(__name__)
 
 LINESEP = "\n".encode()
-
 
 class BradFrontEnd(BradInterface):
     @staticmethod
@@ -90,7 +89,9 @@ class BradFrontEnd(BradInterface):
             from brad.front_end.flight_sql_server import BradFlightSqlServer
 
             self._flight_sql_server: Optional[BradFlightSqlServer] = (
-                BradFlightSqlServer(host="0.0.0.0", port=31337)
+                BradFlightSqlServer(host="0.0.0.0",
+                                    port=31337,
+                                    callback=self._handle_query_from_flight_sql)
             )
         else:
             self._flight_sql_server = None
@@ -190,11 +191,21 @@ class BradFrontEnd(BradInterface):
 
         self._is_stub_mode = self._config.stub_mode_path is not None
 
+    def _handle_query_from_flight_sql(self, query: str) -> FixedRowList:
+        future = asyncio.run_coroutine_threadsafe(
+            self._run_query_impl(self._flight_sql_server_session_id, query, {}),
+            self._main_thread_loop
+        )
+        row_result = future.result()
+
+        return row_result
+
     async def serve_forever(self):
         await self._run_setup()
 
         # Start FlightSQL server
         if self._flight_sql_server is not None:
+            self._flight_sql_server_session_id = await self.start_session()
             self._flight_sql_server.start()
 
         try:
@@ -219,6 +230,8 @@ class BradFrontEnd(BradInterface):
             logger.debug("BRAD front end _run_teardown() complete.")
 
     async def _run_setup(self) -> None:
+        self._main_thread_loop = asyncio.get_running_loop()
+
         # The directory will have been populated by the daemon.
         await self._blueprint_mgr.load(skip_directory_refresh=True)
         logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
@@ -239,7 +252,8 @@ class BradFrontEnd(BradInterface):
 
         if not self._is_stub_mode:
             self._qlogger_refresh_task = asyncio.create_task(self._refresh_qlogger())
-        self._watchdog.start(asyncio.get_running_loop())
+
+        self._watchdog.start(self._main_thread_loop)
         self._ping_watchdog_task = asyncio.create_task(self._ping_watchdog())
 
     async def _set_up_router(self) -> None:
