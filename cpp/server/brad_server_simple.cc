@@ -36,6 +36,12 @@ arrow::Result<Ticket> EncodeTransactionQuery(
   return Ticket{std::move(ticket_string)};
 }
 
+std::string GetQueryTicket(
+  const std::string &query,
+  const std::string &transaction_id) {
+  return transaction_id + ':' + query;
+}
+
 arrow::Result<std::pair<std::string, std::string>> DecodeTransactionQuery(
   const std::string &ticket) {
   auto divider = ticket.find(':');
@@ -89,12 +95,15 @@ arrow::Result<std::unique_ptr<FlightInfo>>
     const FlightDescriptor &descriptor) {
   const std::string &query = command.query;
 
-  _handle_query(query);
-
   ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(query));
   ARROW_ASSIGN_OR_RAISE(auto schema, statement->GetSchema());
   ARROW_ASSIGN_OR_RAISE(auto ticket,
                         EncodeTransactionQuery(query, command.transaction_id));
+
+  const std::string &query_ticket = GetQueryTicket(query, command.transaction_id);
+  const auto query_result = _handle_query(query);
+  _query_data.insert({query_ticket, query_result});
+
   std::vector<FlightEndpoint> endpoints{
     FlightEndpoint{std::move(ticket), {}, std::nullopt, ""}};
 
@@ -117,6 +126,9 @@ arrow::Result<std::unique_ptr<FlightDataStream>>
                         DecodeTransactionQuery(command.statement_handle));
   const std::string &sql = pair.first;
   const std::string transaction_id = pair.second;
+
+  const std::string &query_ticket = transaction_id + ':' + sql;
+  const auto query_result = _query_data.at(query_ticket);
 
   std::shared_ptr<BradStatement> statement;
   ARROW_ASSIGN_OR_RAISE(statement, BradStatement::Create(sql));

@@ -38,7 +38,10 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
       const arrow::flight::ServerCallContext &context,
       const arrow::flight::sql::StatementQueryTicket &command) override;
 
+  // TODO: Create and reuse type for RowList
   std::function<std::vector<std::tuple<int>>(std::string)> _handle_query;
+
+  std::unordered_map<std::string, std::vector<std::tuple<int>>> _query_data;
 };
 
 }  // namespace brad
