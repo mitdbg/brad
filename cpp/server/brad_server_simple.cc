@@ -95,14 +95,17 @@ arrow::Result<std::unique_ptr<FlightInfo>>
     const FlightDescriptor &descriptor) {
   const std::string &query = command.query;
 
-  ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(query));
-  ARROW_ASSIGN_OR_RAISE(auto schema, statement->GetSchema());
+  // ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(query));
+  // ARROW_ASSIGN_OR_RAISE(auto schema, statement->GetSchema());
   ARROW_ASSIGN_OR_RAISE(auto ticket,
                         EncodeTransactionQuery(query, command.transaction_id));
 
   const std::string &query_ticket = GetQueryTicket(query, command.transaction_id);
   const auto query_result = _handle_query(query);
   _query_data.insert({query_ticket, query_result});
+
+  ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(query_result));
+  ARROW_ASSIGN_OR_RAISE(auto schema, statement->GetSchema());
 
   std::vector<FlightEndpoint> endpoints{
     FlightEndpoint{std::move(ticket), {}, std::nullopt, ""}};
@@ -131,7 +134,8 @@ arrow::Result<std::unique_ptr<FlightDataStream>>
   const auto query_result = _query_data.at(query_ticket);
 
   std::shared_ptr<BradStatement> statement;
-  ARROW_ASSIGN_OR_RAISE(statement, BradStatement::Create(sql));
+  // ARROW_ASSIGN_OR_RAISE(statement, BradStatement::Create(sql));
+  ARROW_ASSIGN_OR_RAISE(statement, BradStatement::Create(query_result));
 
   std::shared_ptr<BradStatementBatchReader> reader;
   ARROW_ASSIGN_OR_RAISE(reader, BradStatementBatchReader::Create(statement));

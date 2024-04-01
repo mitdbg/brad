@@ -23,6 +23,11 @@ class BradStatement {
   static arrow::Result<std::shared_ptr<BradStatement>> Create(
     const std::string& sql);
 
+  static arrow::Result<std::shared_ptr<BradStatement>> Create(
+    const std::vector<std::tuple<int>>);
+
+  BradStatement(std::vector<std::tuple<int>>);
+
   ~BradStatement();
 
   /// \brief Creates an Arrow Schema based on the results of this statement.
@@ -32,6 +37,8 @@ class BradStatement {
   arrow::Result<std::shared_ptr<arrow::RecordBatch>> FetchResult();
 
   std::string* GetBradStmt() const;
+
+  std::vector<std::tuple<int>> query_result_;
 
  private:
   std::string* stmt_;

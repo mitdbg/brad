@@ -13,6 +13,9 @@
 #include <arrow/type.h>
 #include <arrow/util/checked_cast.h>
 
+#include <iostream>
+#include <typeinfo>
+
 namespace brad {
 
 using arrow::internal::checked_cast;
@@ -24,14 +27,31 @@ arrow::Result<std::shared_ptr<BradStatement>> BradStatement::Create(
   return result;
 }
 
+arrow::Result<std::shared_ptr<BradStatement>> BradStatement::Create(
+  std::vector<std::tuple<int>> query_result) {
+  std::shared_ptr<BradStatement> result(
+    new BradStatement(query_result));
+  return result;
+}
+
+BradStatement::BradStatement(std::vector<std::tuple<int>> query_result) {
+  query_result_ = query_result;
+}
+
 BradStatement::~BradStatement() {
 }
 
 arrow::Result<std::shared_ptr<arrow::Schema>> BradStatement::GetSchema() const {
   std::vector<std::shared_ptr<arrow::Field>> fields;
-  fields.push_back(arrow::field("Day", arrow::int8()));
-  fields.push_back(arrow::field("Month", arrow::int8()));
-  fields.push_back(arrow::field("Year", arrow::int16()));
+  const auto row = query_result_[0];
+  std::string field_type = typeid(std::get<0>(row)).name();
+
+  if (field_type == "i") {
+    fields.push_back(arrow::field("Field 1", arrow::int8()));
+  } else {
+    fields.push_back(arrow::field("Field 1", arrow::int16()));
+  }
+
   return arrow::schema(fields);
 }
 
@@ -56,6 +76,7 @@ arrow::Result<std::shared_ptr<arrow::RecordBatch>> BradStatement::FetchResult() 
   std::shared_ptr<arrow::RecordBatch> record_batch;
 
   arrow::Result<std::shared_ptr<arrow::Schema>> result = GetSchema();
+
   if (result.ok()) {
     std::shared_ptr<arrow::Schema> schema = result.ValueOrDie();
     record_batch = arrow::RecordBatch::Make(schema,
