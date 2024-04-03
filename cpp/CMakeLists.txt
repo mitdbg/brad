@@ -16,13 +16,6 @@ find_package(Boost REQUIRED)
 
 add_subdirectory(third_party)
 
-add_library(brad_server_lib OBJECT
-            server/brad_server_simple.cc
-            server/brad_sql_info.cc
-            server/brad_statement_batch_reader.cc
-            server/brad_statement.cc
-            server/brad_tables_schema_batch_reader.cc)
-
 add_library(sqlite_server_lib OBJECT
             sqlite_server/sqlite_server.cc
             sqlite_server/sqlite_sql_info.cc
@@ -31,12 +24,18 @@ add_library(sqlite_server_lib OBJECT
             sqlite_server/sqlite_tables_schema_batch_reader.cc
             sqlite_server/sqlite_type_info.cc)
 
-pybind11_add_module(pybind_brad_server pybind/brad_server.cc)
+pybind11_add_module(pybind_brad_server pybind/brad_server.cc
+                                       server/brad_server_simple.cc
+                                       server/brad_sql_info.cc
+                                       server/brad_statement_batch_reader.cc
+                                       server/brad_statement.cc
+                                       server/brad_tables_schema_batch_reader.cc)
+
+
 target_link_libraries(pybind_brad_server
                       PRIVATE Arrow::arrow_shared
                       PRIVATE ArrowFlight::arrow_flight_shared
-                      PRIVATE ArrowFlightSql::arrow_flight_sql_shared
-                      PRIVATE brad_server_lib)
+                      PRIVATE ArrowFlightSql::arrow_flight_sql_shared)
 
 add_executable(flight_sql_example_client flight_sql_example_client.cc)
 target_link_libraries(flight_sql_example_client
@@ -54,14 +53,6 @@ target_link_libraries(flight_sql_example_server
                       gflags
                       ${SQLite3_LIBRARIES}
                       ${Boost_LIBRARIES})
-
-add_executable(flight_sql_brad_server flight_sql_brad_server.cc)
-target_link_libraries(flight_sql_brad_server
-                      PRIVATE Arrow::arrow_shared
-                      PRIVATE ArrowFlight::arrow_flight_shared
-                      PRIVATE ArrowFlightSql::arrow_flight_sql_shared
-                      PRIVATE brad_server_lib
-                      gflags)
 
 add_executable(brad_front_end brad_front_end.cc)
 target_link_libraries(brad_front_end

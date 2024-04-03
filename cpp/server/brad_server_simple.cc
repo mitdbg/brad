@@ -19,6 +19,10 @@
 #include <arrow/util/checked_cast.h>
 #include <arrow/util/logging.h>
 
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+
 namespace brad {
 
 using arrow::internal::checked_cast;
@@ -101,8 +105,18 @@ arrow::Result<std::unique_ptr<FlightInfo>>
                         EncodeTransactionQuery(query, command.transaction_id));
 
   const std::string &query_ticket = GetQueryTicket(query, command.transaction_id);
-  const auto query_result = _handle_query(query);
-  _query_data.insert({query_ticket, query_result});
+
+  std::vector<std::tuple<int>> query_result;
+
+  { 
+    py::gil_scoped_acquire guard;
+    query_result = _handle_query(query);
+  }
+
+  {
+    std::scoped_lock guard(_query_data_mutex);
+    _query_data.insert({query_ticket, query_result});
+  } 
 
   ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(query_result));
   ARROW_ASSIGN_OR_RAISE(auto schema, statement->GetSchema());
