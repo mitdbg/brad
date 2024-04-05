@@ -5,6 +5,7 @@
 #include <string>
 #include <functional>
 #include <any>
+#include <atomic>
 #include <mutex>
 
 #include <arrow/flight/sql/server.h>
@@ -44,6 +45,8 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
 
   std::unordered_map<std::string, std::vector<std::tuple<int>>> _query_data;
   std::mutex _query_data_mutex;
+
+  std::atomic<uint64_t> _autoincrement_id;
 };
 
 }  // namespace brad

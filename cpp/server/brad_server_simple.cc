@@ -30,15 +30,22 @@ using namespace arrow::flight;
 using namespace arrow::flight::sql;
 
 arrow::Result<Ticket> EncodeTransactionQuery(
-  const std::string &query,
-  const std::string &transaction_id) {
-  std::string transaction_query = transaction_id;
-  transaction_query += ':';
-  transaction_query += query;
+  const std::string &query_ticket) {
   ARROW_ASSIGN_OR_RAISE(auto ticket_string,
-                        CreateStatementQueryTicket(transaction_query));
+                        CreateStatementQueryTicket(query_ticket));
   return Ticket{std::move(ticket_string)};
 }
+
+// arrow::Result<Ticket> EncodeTransactionQuery(
+//   const std::string &query,
+//   const std::string &transaction_id) {
+//   std::string transaction_query = transaction_id;
+//   transaction_query += ':';
+//   transaction_query += query;
+//   ARROW_ASSIGN_OR_RAISE(auto ticket_string,
+//                         CreateStatementQueryTicket(transaction_query));
+//   return Ticket{std::move(ticket_string)};
+// }
 
 std::string GetQueryTicket(
   const std::string &query,
@@ -53,8 +60,8 @@ arrow::Result<std::pair<std::string, std::string>> DecodeTransactionQuery(
     return arrow::Status::Invalid("Malformed ticket");
   }
   std::string transaction_id = ticket.substr(0, divider);
-  std::string query = ticket.substr(divider + 1);
-  return std::make_pair(std::move(query), std::move(transaction_id));
+  std::string autoincrement_id = ticket.substr(divider + 1);
+  return std::make_pair(std::move(autoincrement_id), std::move(transaction_id));
 }
 
 BradFlightSqlServer::BradFlightSqlServer() = default;
@@ -101,10 +108,12 @@ arrow::Result<std::unique_ptr<FlightInfo>>
 
   // ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(query));
   // ARROW_ASSIGN_OR_RAISE(auto schema, statement->GetSchema());
+  const std::string &autoincrement_id = std::to_string(++_autoincrement_id);
+  const std::string &query_ticket = GetQueryTicket(autoincrement_id, command.transaction_id);
+  // ARROW_ASSIGN_OR_RAISE(auto ticket,
+  //                       EncodeTransactionQuery(autoincrement_id, command.transaction_id));
   ARROW_ASSIGN_OR_RAISE(auto ticket,
-                        EncodeTransactionQuery(query, command.transaction_id));
-
-  const std::string &query_ticket = GetQueryTicket(query, command.transaction_id);
+                        EncodeTransactionQuery(query_ticket));
 
   std::vector<std::tuple<int>> query_result;
 
@@ -141,10 +150,10 @@ arrow::Result<std::unique_ptr<FlightDataStream>>
     const StatementQueryTicket &command) {
   ARROW_ASSIGN_OR_RAISE(auto pair,
                         DecodeTransactionQuery(command.statement_handle));
-  const std::string &sql = pair.first;
+  const std::string &autoincrement_id = pair.first;
   const std::string transaction_id = pair.second;
 
-  const std::string &query_ticket = transaction_id + ':' + sql;
+  const std::string &query_ticket = transaction_id + ':' + autoincrement_id;
   const auto query_result = _query_data.at(query_ticket);
 
   std::shared_ptr<BradStatement> statement;
