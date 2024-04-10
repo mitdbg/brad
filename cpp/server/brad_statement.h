@@ -1,10 +1,16 @@
 #pragma once
 
 #include <memory>
+#include <any>
 #include <string>
 
 #include <arrow/flight/sql/column_metadata.h>
 #include <arrow/type_fwd.h>
+
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+using namespace pybind11::literals;
 
 namespace brad {
 
@@ -24,9 +30,9 @@ class BradStatement {
     const std::string& sql);
 
   static arrow::Result<std::shared_ptr<BradStatement>> Create(
-    const std::vector<std::tuple<int>>);
+    const std::vector<std::any>);
 
-  BradStatement(std::vector<std::tuple<int>>);
+  BradStatement(std::vector<std::any>);
 
   ~BradStatement();
 
@@ -38,7 +44,7 @@ class BradStatement {
 
   std::string* GetBradStmt() const;
 
-  std::vector<std::tuple<int>> query_result_;
+  std::vector<std::any> query_result_;
 
  private:
   std::string* stmt_;

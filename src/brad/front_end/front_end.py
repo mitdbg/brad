@@ -45,7 +45,7 @@ from brad.routing.rule_based import RuleBased
 from brad.routing.policy import RoutingPolicy
 from brad.routing.router import Router
 from brad.routing.tree_based.forest_policy import ForestPolicy
-from brad.row_list import RowList, FixedRowList
+from brad.row_list import RowList
 from brad.utils import log_verbose, create_custom_logger
 from brad.utils.counter import Counter
 from brad.utils.json_decimal_encoder import DecimalEncoder
@@ -191,7 +191,7 @@ class BradFrontEnd(BradInterface):
 
         self._is_stub_mode = self._config.stub_mode_path is not None
 
-    def _handle_query_from_flight_sql(self, query: str) -> FixedRowList:
+    def _handle_query_from_flight_sql(self, query: str) -> RowList:
         future = asyncio.run_coroutine_threadsafe(
             self._run_query_impl(self._flight_sql_server_session_id, query, {}),
             self._main_thread_loop

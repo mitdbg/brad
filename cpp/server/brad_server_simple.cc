@@ -36,17 +36,6 @@ arrow::Result<Ticket> EncodeTransactionQuery(
   return Ticket{std::move(ticket_string)};
 }
 
-// arrow::Result<Ticket> EncodeTransactionQuery(
-//   const std::string &query,
-//   const std::string &transaction_id) {
-//   std::string transaction_query = transaction_id;
-//   transaction_query += ':';
-//   transaction_query += query;
-//   ARROW_ASSIGN_OR_RAISE(auto ticket_string,
-//                         CreateStatementQueryTicket(transaction_query));
-//   return Ticket{std::move(ticket_string)};
-// }
-
 std::string GetQueryTicket(
   const std::string &query,
   const std::string &transaction_id) {
@@ -70,7 +59,6 @@ BradFlightSqlServer::~BradFlightSqlServer() = default;
 
 std::shared_ptr<BradFlightSqlServer>
   BradFlightSqlServer::Create() {
-    // std::shared_ptr<BradFlightSqlServer> result(new BradFlightSqlServer());
   std::shared_ptr<BradFlightSqlServer> result =
     std::make_shared<BradFlightSqlServer>();
   for (const auto &id_to_result : GetSqlInfoResultMap()) {
@@ -82,7 +70,7 @@ std::shared_ptr<BradFlightSqlServer>
 void BradFlightSqlServer::InitWrapper(
   const std::string &host,
   int port,
-  std::function<std::vector<std::tuple<int>>(std::string)> handle_query) {
+  std::function<std::vector<py::tuple>(std::string)> handle_query) {
   auto location = arrow::flight::Location::ForGrpcTcp(host, port).ValueOrDie();
   arrow::flight::FlightServerOptions options(location);
 
@@ -106,28 +94,29 @@ arrow::Result<std::unique_ptr<FlightInfo>>
     const FlightDescriptor &descriptor) {
   const std::string &query = command.query;
 
-  // ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(query));
-  // ARROW_ASSIGN_OR_RAISE(auto schema, statement->GetSchema());
   const std::string &autoincrement_id = std::to_string(++_autoincrement_id);
   const std::string &query_ticket = GetQueryTicket(autoincrement_id, command.transaction_id);
-  // ARROW_ASSIGN_OR_RAISE(auto ticket,
-  //                       EncodeTransactionQuery(autoincrement_id, command.transaction_id));
   ARROW_ASSIGN_OR_RAISE(auto ticket,
                         EncodeTransactionQuery(query_ticket));
 
-  std::vector<std::tuple<int>> query_result;
-
   { 
     py::gil_scoped_acquire guard;
+    // TODO: define function to convert py::tuple to std::any
+    std::vector<py::tuple> query_result;
     query_result = _handle_query(query);
   }
 
+  // TODO: remove
+  std::vector<std::any> dummy_result;
   {
     std::scoped_lock guard(_query_data_mutex);
-    _query_data.insert({query_ticket, query_result});
-  } 
+    // TODO: replace with query_result
+    dummy_result.push_back(8);
+    _query_data.insert({query_ticket, dummy_result});
+  }
 
-  ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(query_result));
+  // TODO: Replace with query_result
+  ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(dummy_result));
   ARROW_ASSIGN_OR_RAISE(auto schema, statement->GetSchema());
 
   std::vector<FlightEndpoint> endpoints{
@@ -157,7 +146,6 @@ arrow::Result<std::unique_ptr<FlightDataStream>>
   const auto query_result = _query_data.at(query_ticket);
 
   std::shared_ptr<BradStatement> statement;
-  // ARROW_ASSIGN_OR_RAISE(statement, BradStatement::Create(sql));
   ARROW_ASSIGN_OR_RAISE(statement, BradStatement::Create(query_result));
 
   std::shared_ptr<BradStatementBatchReader> reader;

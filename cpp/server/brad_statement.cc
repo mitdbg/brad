@@ -16,6 +16,11 @@
 #include <iostream>
 #include <typeinfo>
 
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+using namespace pybind11::literals;
+
 namespace brad {
 
 using arrow::internal::checked_cast;
@@ -28,14 +33,14 @@ arrow::Result<std::shared_ptr<BradStatement>> BradStatement::Create(
 }
 
 arrow::Result<std::shared_ptr<BradStatement>> BradStatement::Create(
-  std::vector<std::tuple<int>> query_result) {
+  std::vector<std::any> query_result) {
   std::shared_ptr<BradStatement> result(
     new BradStatement(query_result));
   return result;
 }
 
-BradStatement::BradStatement(std::vector<std::tuple<int>> query_result) {
-  query_result_ = query_result;
+BradStatement::BradStatement(std::vector<std::any> query_result) {
+    query_result_ = query_result;
 }
 
 BradStatement::~BradStatement() {
@@ -43,14 +48,16 @@ BradStatement::~BradStatement() {
 
 arrow::Result<std::shared_ptr<arrow::Schema>> BradStatement::GetSchema() const {
   std::vector<std::shared_ptr<arrow::Field>> fields;
-  const auto row = query_result_[0];
-  std::string field_type = typeid(std::get<0>(row)).name();
+  // const auto row = query_result_[0];
+  // std::string field_type = typeid(std::get<0>(row)).name();
 
-  if (field_type == "i") {
-    fields.push_back(arrow::field("Field 1", arrow::int8()));
-  } else {
-    fields.push_back(arrow::field("Field 1", arrow::int16()));
-  }
+  // std::string field_type = typeid(row[0]).name();
+
+  // if (field_type == "i") {
+  //   fields.push_back(arrow::field("Field 1", arrow::int8()));
+  // } else {
+  //   fields.push_back(arrow::field("Field 1", arrow::int16()));
+  // }
 
   return arrow::schema(fields);
 }

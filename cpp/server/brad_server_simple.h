@@ -11,6 +11,11 @@
 #include <arrow/flight/sql/server.h>
 #include <arrow/result.h>
 
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+using namespace pybind11::literals;
+
 namespace brad {
 
 class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
@@ -23,7 +28,7 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
 
   void InitWrapper(const std::string &host,
                    int port,
-                   std::function<std::vector<std::tuple<int>>(std::string)>);
+                   std::function<std::vector<py::tuple>(std::string)>);
 
   void ServeWrapper();
 
@@ -40,10 +45,9 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
       const arrow::flight::ServerCallContext &context,
       const arrow::flight::sql::StatementQueryTicket &command) override;
 
-  // TODO: Create and reuse type for RowList
-  std::function<std::vector<std::tuple<int>>(std::string)> _handle_query;
+  std::function<std::vector<py::tuple>(std::string)> _handle_query;
 
-  std::unordered_map<std::string, std::vector<std::tuple<int>>> _query_data;
+  std::unordered_map<std::string, std::vector<std::any>> _query_data;
   std::mutex _query_data_mutex;
 
   std::atomic<uint64_t> _autoincrement_id;
