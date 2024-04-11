@@ -47,7 +47,7 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
 
   std::function<std::vector<py::tuple>(std::string)> _handle_query;
 
-  std::unordered_map<std::string, std::vector<std::any>> _query_data;
+  std::unordered_map<std::string, std::vector<std::vector<std::any>>> _query_data;
   std::mutex _query_data_mutex;
 
   std::atomic<uint64_t> _autoincrement_id;

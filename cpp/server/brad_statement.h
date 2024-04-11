@@ -30,9 +30,9 @@ class BradStatement {
     const std::string& sql);
 
   static arrow::Result<std::shared_ptr<BradStatement>> Create(
-    const std::vector<std::any>);
+    const std::vector<std::vector<std::any>>);
 
-  BradStatement(std::vector<std::any>);
+  BradStatement(std::vector<std::vector<std::any>>);
 
   ~BradStatement();
 
@@ -44,7 +44,7 @@ class BradStatement {
 
   std::string* GetBradStmt() const;
 
-  std::vector<std::any> query_result_;
+  std::vector<std::vector<std::any>> query_result_;
 
  private:
   std::string* stmt_;

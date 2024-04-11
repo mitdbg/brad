@@ -33,13 +33,13 @@ arrow::Result<std::shared_ptr<BradStatement>> BradStatement::Create(
 }
 
 arrow::Result<std::shared_ptr<BradStatement>> BradStatement::Create(
-  std::vector<std::any> query_result) {
+  std::vector<std::vector<std::any>> query_result) {
   std::shared_ptr<BradStatement> result(
     new BradStatement(query_result));
   return result;
 }
 
-BradStatement::BradStatement(std::vector<std::any> query_result) {
+BradStatement::BradStatement(std::vector<std::vector<std::any>> query_result) {
     query_result_ = query_result;
 }
 

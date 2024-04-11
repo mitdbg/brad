@@ -53,6 +53,19 @@ arrow::Result<std::pair<std::string, std::string>> DecodeTransactionQuery(
   return std::make_pair(std::move(autoincrement_id), std::move(transaction_id));
 }
 
+std::vector<std::vector<std::any>> TransformQueryResult(
+  std::vector<py::tuple> query_result) {
+  std::vector<std::vector<std::any>> transformed_query_result;
+  for (const auto &tup : query_result) {
+    std::vector<std::any> transformed_tup{};
+    for (const auto &elt : tup) {
+      transformed_tup.push_back(elt);
+    }
+    transformed_query_result.push_back(transformed_tup);
+  }
+  return transformed_query_result;  
+}
+
 BradFlightSqlServer::BradFlightSqlServer() = default;
 
 BradFlightSqlServer::~BradFlightSqlServer() = default;
@@ -99,24 +112,21 @@ arrow::Result<std::unique_ptr<FlightInfo>>
   ARROW_ASSIGN_OR_RAISE(auto ticket,
                         EncodeTransactionQuery(query_ticket));
 
+  std::vector<std::vector<std::any>> transformed_query_result;
+
   { 
     py::gil_scoped_acquire guard;
-    // TODO: define function to convert py::tuple to std::any
     std::vector<py::tuple> query_result;
     query_result = _handle_query(query);
+    transformed_query_result = TransformQueryResult(query_result);
   }
 
-  // TODO: remove
-  std::vector<std::any> dummy_result;
   {
     std::scoped_lock guard(_query_data_mutex);
-    // TODO: replace with query_result
-    dummy_result.push_back(8);
-    _query_data.insert({query_ticket, dummy_result});
+    _query_data.insert({query_ticket, transformed_query_result});
   }
 
-  // TODO: Replace with query_result
-  ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(dummy_result));
+  ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(transformed_query_result));
   ARROW_ASSIGN_OR_RAISE(auto schema, statement->GetSchema());
 
   std::vector<FlightEndpoint> endpoints{
