@@ -2,11 +2,13 @@ import pandas as pd
 import os
 import sys
 
+
 def csv_to_parquet(path, input_file, output_dir):
     if input_file[-4:] != ".csv":
         return
     df = pd.read_csv(os.path.join(path, input_file))
     df.to_parquet(os.path.join(output_dir, input_file[:-4] + ".parquet"))
+
 
 if __name__ == "__main__":
     path = sys.argv[1]
