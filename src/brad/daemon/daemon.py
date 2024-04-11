@@ -59,6 +59,8 @@ from brad.planner.scoring.performance.precomputed_predictions import (
 )
 from brad.planner.triggers.provider import ConfigDefinedTriggers
 from brad.planner.triggers.trigger import Trigger
+from brad.planner.triggers.query_latency_ceiling import QueryLatencyCeiling
+from brad.planner.triggers.txn_latency_ceiling import TransactionLatencyCeiling
 from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import LoggedWorkloadProvider
@@ -733,8 +735,10 @@ class BradDaemon:
                 return [("Cannot change SLOs because TempConfig is missing.",)]
             if len(parts) <= 3:
                 return [("Need to specify query and txn p90 SLOs",)]
+
             query_p90_s = float(parts[1])
             txn_p90_s = float(parts[2])
+
             # The planner asks for a new comparator from the provider on each
             # run. So if we swap out the provider here, we will get a comparator
             # with the updated SLOs on the next planning run.
@@ -742,6 +746,17 @@ class BradDaemon:
             self._providers.comparator_provider = self._get_comparator_provider(
                 query_p90_s, txn_p90_s
             )
+
+            # Adjust triggers if applicable. This works because `get_triggers()`
+            # returns references to the actual triggers (i.e., it is not a
+            # read-only copy of the triggers).
+            assert self._planner is not None
+            for t in self._planner.get_triggers():
+                if isinstance(t, QueryLatencyCeiling):
+                    t.set_latency_ceiling(query_p90_s)
+                elif isinstance(t, TransactionLatencyCeiling):
+                    t.set_latency_ceiling(txn_p90_s)
+
             return [
                 (
                     f"p90 SLOs changed to (query {query_p90_s:.3f} s), (txn {txn_p90_s:.3f} s)",
