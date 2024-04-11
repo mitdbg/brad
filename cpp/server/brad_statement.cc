@@ -15,6 +15,7 @@
 
 #include <iostream>
 #include <typeinfo>
+#include <type_traits>
 
 #include <pybind11/pybind11.h>
 
@@ -48,16 +49,15 @@ BradStatement::~BradStatement() {
 
 arrow::Result<std::shared_ptr<arrow::Schema>> BradStatement::GetSchema() const {
   std::vector<std::shared_ptr<arrow::Field>> fields;
-  // const auto row = query_result_[0];
-  // std::string field_type = typeid(std::get<0>(row)).name();
+  const std::vector<std::any> &row = query_result_[0];
 
-  // std::string field_type = typeid(row[0]).name();
-
-  // if (field_type == "i") {
-  //   fields.push_back(arrow::field("Field 1", arrow::int8()));
-  // } else {
-  //   fields.push_back(arrow::field("Field 1", arrow::int16()));
-  // }
+  for (const auto &elt : row) {
+    if (std::is_floating_point<decltype(elt)>::value) {
+      fields.push_back(arrow::field("FLOAT FIELD", arrow::int16()));
+    } else {
+      fields.push_back(arrow::field("INT FIELD", arrow::int8()));
+    }
+  }
 
   return arrow::schema(fields);
 }
