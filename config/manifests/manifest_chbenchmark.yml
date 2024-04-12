@@ -5,72 +5,84 @@ schema_name: chbenchmark
 tables:
   - table_name: warehouse
     s3_path: chbenchmark/warehouse/warehouse.tbl
-    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: DELIMITER '|' BLANKSASNULL
+    aurora_options: FORMAT CSV, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: item
     s3_path: chbenchmark/item/item.tbl
-    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: DELIMITER '|' BLANKSASNULL
+    aurora_options: FORMAT CSV, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: stock
     s3_path: chbenchmark/stock/stock.tbl
-    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: DELIMITER '|' BLANKSASNULL
+    aurora_options: FORMAT CSV, HEADER, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: district
     s3_path: chbenchmark/district/district.tbl
-    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: DELIMITER '|' BLANKSASNULL
+    aurora_options: FORMAT CSV, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: customer
     s3_path: chbenchmark/customer/customer.tbl
-    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: DELIMITER '|' BLANKSASNULL
+    aurora_options: FORMAT CSV, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: history
     s3_path: chbenchmark/history/history.tbl
-    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: DELIMITER '|' BLANKSASNULL
+    aurora_options: FORMAT CSV, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE1
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: orders
     s3_path: chbenchmark/orders/orders.tbl
-    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: DELIMITER '|' BLANKSASNULL
+    aurora_options: FORMAT CSV, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: new_order
     s3_path: chbenchmark/new_order/new_order.tbl
-    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: DELIMITER '|' BLANKSASNULL
+    aurora_options: FORMAT CSV, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: order_line
     s3_path: chbenchmark/order_line/order_line.tbl
-    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: DELIMITER '|' BLANKSASNULL
+    aurora_options: FORMAT CSV, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: supplier
     s3_path: chbenchmark/supplier/supplier.tbl
-    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: DELIMITER '|' BLANKSASNULL
+    aurora_options: FORMAT CSV, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: nation
     s3_path: chbenchmark/nation/nation.tbl
-    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: DELIMITER '|' BLANKSASNULL
+    aurora_options: FORMAT CSV, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: region
     s3_path: chbenchmark/region/region.tbl
-    aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
-    redshift_options: DELIMITER '|' BLANKSASNULL
+    aurora_options: FORMAT CSV, HEADER true, ESCAPE ''\'', DELIMITER ''|''
+    redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
+    athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
