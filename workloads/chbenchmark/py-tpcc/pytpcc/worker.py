@@ -33,24 +33,27 @@ import logging
 import re
 import argparse
 import glob
-import time 
+import time
 import message
 import pickle
 import traceback
-from pprint import pprint,pformat
+from pprint import pprint, pformat
 
 from util import *
 from runtime import *
 import drivers
+
 
 ## ==============================================
 ## createDriverClass
 ## ==============================================
 def createDriverClass(name):
     full_name = "%sDriver" % name.title()
-    mod = __import__('drivers.%s' % full_name.lower(), globals(), locals(), [full_name])
+    mod = __import__("drivers.%s" % full_name.lower(), globals(), locals(), [full_name])
     klass = getattr(mod, full_name)
     return klass
+
+
 ## DEF
 
 
@@ -58,29 +61,32 @@ def createDriverClass(name):
 ## loaderFunc
 ## ==============================================
 def loaderFunc(driverClass, scaleParameters, args, config, w_ids, debug):
-    driver = driverClass(args['ddl'])
+    driver = driverClass(args["ddl"])
     assert driver != None
-    logging.debug("Starting client execution: %s [warehouses=%d]" % (driver, len(w_ids)))
+    logging.debug(
+        "Starting client execution: %s [warehouses=%d]" % (driver, len(w_ids))
+    )
 
-    config['load'] = True
-    config['execute'] = False
-    config['reset'] = False
+    config["load"] = True
+    config["execute"] = False
+    config["reset"] = False
     driver.loadConfig(config)
 
     try:
-        loadItems = (1 in w_ids)
+        loadItems = 1 in w_ids
         l = loader.Loader(driver, scaleParameters, w_ids, loadItems)
         driver.loadStart()
         l.execute()
-        driver.loadFinish()   
+        driver.loadFinish()
     except KeyboardInterrupt:
-            return -1
+        return -1
     except (Exception, AssertionError) as ex:
         logging.warn("Failed to load data: %s" % (ex))
-        #if debug:
+        # if debug:
         traceback.print_exc(file=sys.stdout)
         raise
-        
+
+
 ## DEF
 
 
@@ -88,24 +94,26 @@ def loaderFunc(driverClass, scaleParameters, args, config, w_ids, debug):
 ## executorFunc
 ## ==============================================
 def executorFunc(driverClass, scaleParameters, args, config, debug):
-    driver = driverClass(args['ddl'])
+    driver = driverClass(args["ddl"])
     assert driver != None
     logging.debug("Starting client execution: %s" % driver)
 
-    config['execute'] = True
-    config['reset'] = False
+    config["execute"] = True
+    config["reset"] = False
     driver.loadConfig(config)
 
-    e = executor.Executor(driver, scaleParameters, stop_on_error=args['stop_on_error'])
+    e = executor.Executor(driver, scaleParameters, stop_on_error=args["stop_on_error"])
     driver.executeStart()
-    results = e.execute(args['duration'])
+    results = e.execute(args["duration"])
     driver.executeFinish()
 
     return results
+
+
 ## DEF
 
 ## MAIN
-if __name__=='__channelexec__':
+if __name__ == "__channelexec__":
 
     driverClass = None
     for item in channel:
@@ -116,31 +124,31 @@ if __name__=='__channelexec__':
             config = command.data[2]
             w_ids = command.data[3]
 
-	        ## Create a handle to the target client driver at the client side
-            driverClass = createDriverClass(args['system'])
-            assert driverClass != None, "Failed to find '%s' class" % args['system']
-            driver = driverClass(args['ddl'])
-            assert driver != None, "Failed to create '%s' driver" % args['system']
+            ## Create a handle to the target client driver at the client side
+            driverClass = createDriverClass(args["system"])
+            assert driverClass != None, "Failed to find '%s' class" % args["system"]
+            driver = driverClass(args["ddl"])
+            assert driver != None, "Failed to create '%s' driver" % args["system"]
 
-            loaderFunc(driverClass,scaleParameters,args,config,w_ids,True)
+            loaderFunc(driverClass, scaleParameters, args, config, w_ids, True)
             m = message.Message(header=message.LOAD_COMPLETED)
-            channel.send(pickle.dumps(m,-1))
+            channel.send(pickle.dumps(m, -1))
 
         elif command.header == message.CMD_EXECUTE:
             scaleParameters = command.data[0]
             args = command.data[1]
             config = command.data[2]
 
-	    ## Create a handle to the target client driver at the client side
+        ## Create a handle to the target client driver at the client side
         if driverClass == None:
-            driverClass = createDriverClass(args['system'])
-            assert driverClass != None, "Failed to find '%s' class" % args['system']
-            driver = driverClass(args['ddl'])
-            assert driver != None, "Failed to create '%s' driver" % args['system']
+            driverClass = createDriverClass(args["system"])
+            assert driverClass != None, "Failed to find '%s' class" % args["system"]
+            driver = driverClass(args["ddl"])
+            assert driver != None, "Failed to create '%s' driver" % args["system"]
 
-            results=executorFunc(driverClass,scaleParameters,args,config,True)
-            m=message.Message(header=message.EXECUTE_COMPLETED,data=results)
-            channel.send(pickle.dumps(m,-1))
+            results = executorFunc(driverClass, scaleParameters, args, config, True)
+            m = message.Message(header=message.EXECUTE_COMPLETED, data=results)
+            channel.send(pickle.dumps(m, -1))
 
-        elif command.header==message.CMD_STOP:
-	        pass
+        elif command.header == message.CMD_STOP:
+            pass
