@@ -42,7 +42,7 @@ tables:
     s3_path: chbenchmark/history/history.tbl
     aurora_options: FORMAT CSV, HEADER true, ESCAPE ''\'', DELIMITER ''|''
     redshift_options: CSV IGNOREHEADER 1 DELIMITER '|' BLANKSASNULL
-    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE1
+    athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
     athena_options2: TBLPROPERTIES ('skip.header.line.count' = '1')
 
   - table_name: orders
