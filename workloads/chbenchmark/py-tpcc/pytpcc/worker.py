@@ -61,12 +61,12 @@ def loaderFunc(driverClass, scaleParameters, args, config, w_ids, debug):
     driver = driverClass(args['ddl'])
     assert driver != None
     logging.debug("Starting client execution: %s [warehouses=%d]" % (driver, len(w_ids)))
-    
+
     config['load'] = True
     config['execute'] = False
     config['reset'] = False
     driver.loadConfig(config)
-   
+
     try:
         loadItems = (1 in w_ids)
         l = loader.Loader(driver, scaleParameters, w_ids, loadItems)
@@ -75,7 +75,7 @@ def loaderFunc(driverClass, scaleParameters, args, config, w_ids, debug):
         driver.loadFinish()   
     except KeyboardInterrupt:
             return -1
-    except (Exception, AssertionError), ex:
+    except (Exception, AssertionError) as ex:
         logging.warn("Failed to load data: %s" % (ex))
         #if debug:
         traceback.print_exc(file=sys.stdout)
@@ -91,7 +91,7 @@ def executorFunc(driverClass, scaleParameters, args, config, debug):
     driver = driverClass(args['ddl'])
     assert driver != None
     logging.debug("Starting client execution: %s" % driver)
-    
+
     config['execute'] = True
     config['reset'] = False
     driver.loadConfig(config)
@@ -100,48 +100,47 @@ def executorFunc(driverClass, scaleParameters, args, config, debug):
     driver.executeStart()
     results = e.execute(args['duration'])
     driver.executeFinish()
-    
+
     return results
 ## DEF
 
 ## MAIN
 if __name__=='__channelexec__':
-    driverClass=None
+
+    driverClass = None
     for item in channel:
-       command=pickle.loads(item)
-       if command.header==message.CMD_LOAD:
-	   scaleParameters=command.data[0]
-	   args=command.data[1]
-	   config=command.data[2]
-	   w_ids=command.data[3]
-	   
-	   ## Create a handle to the target client driver at the client side
-           driverClass = createDriverClass(args['system'])
-           assert driverClass != None, "Failed to find '%s' class" % args['system']
-           driver = driverClass(args['ddl'])
-           assert driver != None, "Failed to create '%s' driver" % args['system']
-        
-           loaderFunc(driverClass,scaleParameters,args,config,w_ids,True)
-	   m=message.Message(header=message.LOAD_COMPLETED)
-           channel.send(pickle.dumps(m,-1))          
-       elif command.header==message.CMD_EXECUTE:
-	   scaleParameters=command.data[0]
-	   args=command.data[1]
-	   config=command.data[2]
-	  
-	   ## Create a handle to the target client driver at the client side
-	   if driverClass==None:
-               driverClass = createDriverClass(args['system'])
-               assert driverClass != None, "Failed to find '%s' class" % args['system']
-               driver = driverClass(args['ddl'])
-               assert driver != None, "Failed to create '%s' driver" % args['system']
-           
-           results=executorFunc(driverClass,scaleParameters,args,config,True)
-           m=message.Message(header=message.EXECUTE_COMPLETED,data=results)
-           channel.send(pickle.dumps(m,-1))
-           
-       elif command.header==message.CMD_STOP:
-	   pass
-       else:
-	   pass
-	 
+        command = pickle.loads(item)
+        if command.header == message.CMD_LOAD:
+            scaleParameters = command.data[0]
+            args = command.data[1]
+            config = command.data[2]
+            w_ids = command.data[3]
+
+	        ## Create a handle to the target client driver at the client side
+            driverClass = createDriverClass(args['system'])
+            assert driverClass != None, "Failed to find '%s' class" % args['system']
+            driver = driverClass(args['ddl'])
+            assert driver != None, "Failed to create '%s' driver" % args['system']
+
+            loaderFunc(driverClass,scaleParameters,args,config,w_ids,True)
+            m = message.Message(header=message.LOAD_COMPLETED)
+            channel.send(pickle.dumps(m,-1))
+
+        elif command.header == message.CMD_EXECUTE:
+            scaleParameters = command.data[0]
+            args = command.data[1]
+            config = command.data[2]
+
+	    ## Create a handle to the target client driver at the client side
+        if driverClass == None:
+            driverClass = createDriverClass(args['system'])
+            assert driverClass != None, "Failed to find '%s' class" % args['system']
+            driver = driverClass(args['ddl'])
+            assert driver != None, "Failed to create '%s' driver" % args['system']
+
+            results=executorFunc(driverClass,scaleParameters,args,config,True)
+            m=message.Message(header=message.EXECUTE_COMPLETED,data=results)
+            channel.send(pickle.dumps(m,-1))
+
+        elif command.header==message.CMD_STOP:
+	        pass

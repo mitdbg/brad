@@ -80,7 +80,7 @@ def startLoading(scalParameters,args,config,channels):
     for w_id in range(scaleParameters.starting_warehouse, scaleParameters.ending_warehouse+1):
         idx = w_id % procs
         w_ids[idx].append(w_id)
-    print w_ids
+    print(w_ids)
         
     load_start=time.time()
     for i in range(len(channels)):
@@ -157,7 +157,7 @@ if __name__ == '__main__':
     assert driver != None, "Failed to create '%s' driver" % args['system']
     if args['print_config']:
         config = driver.makeDefaultConfig()
-        print driver.formatConfig(config)
+        print(driver.formatConfig(config))
         print
         sys.exit(0)
 
@@ -212,7 +212,7 @@ if __name__ == '__main__':
     if not args['no_execute']:
         results = startExecution(scaleParameters, args, config,channels)
         assert results
-        print results.show(load_time)
+        print(results.show(load_time))
     ## IF
     
 ## MAIN

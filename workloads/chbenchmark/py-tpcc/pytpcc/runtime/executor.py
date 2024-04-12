@@ -66,7 +66,7 @@ class Executor:
                 val = self.driver.executeTransaction(txn, params)
             except KeyboardInterrupt:
                 return -1
-            except (Exception, AssertionError), ex:
+            except (Exception, AssertionError) as ex:
                 logging.warn("Failed to execute Transaction '%s': %s" % (txn, ex))
                 if debug: traceback.print_exc(file=sys.stdout)
                 if self.stop_on_error: raise
