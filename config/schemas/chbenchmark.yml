@@ -151,11 +151,17 @@ tables:
         data_type: CHAR(2)
       - name: c_data
         data_type: VARCHAR(500)
-  indexes:
-    - c_w_id, c_d_id, c_last, c_first
+    indexes:
+      - c_w_id, c_d_id, c_last, c_first
 
   - table_name: history
     columns:
+      # N.B. The history table in TPC-C does not have a primary key. But our
+      # current code assumes the presence of a primary key. So we add in this
+      # column to simplify the implementation.
+      - name: h_id
+        data_type: SERIAL
+        primary_key: true
       - name: h_c_id
         data_type: INT
       - name: h_c_d_id
@@ -173,7 +179,7 @@ tables:
       - name: h_data
         data_type: VARCHAR(24)
 
-  - table_name: order
+  - table_name: orders
     columns:
       - name: o_w_id
         data_type: INT
@@ -271,6 +277,6 @@ tables:
       - name: su_phone
         data_type: CHAR(15)
       - name: su_acctbal
-        data_type: NUMERIC(12, 2)
+        data_type: DECIMAL(12, 2)
       - name: su_comment
         data_type: CHAR(101)

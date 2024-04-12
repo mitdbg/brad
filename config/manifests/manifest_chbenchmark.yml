@@ -39,8 +39,8 @@ tables:
     redshift_options: DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE1
 
-  - table_name: order
-    s3_path: chbenchmark/order/order.tbl
+  - table_name: orders
+    s3_path: chbenchmark/orders/orders.tbl
     aurora_options: FORMAT CSV, ESCAPE ''\'', DELIMITER ''|''
     redshift_options: DELIMITER '|' BLANKSASNULL
     athena_options1: ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' NULL DEFINED AS '' STORED AS TEXTFILE
