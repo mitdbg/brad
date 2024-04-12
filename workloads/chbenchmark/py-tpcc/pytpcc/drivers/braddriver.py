@@ -34,33 +34,33 @@ TXN_QUERIES = {
         "createOrderLine": "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {}, {})",  # o_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info
     },
     "ORDER_STATUS": {
-        "getCustomerByCustomerId": "SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_BALANCE FROM CUSTOMER WHERE C_W_ID = ? AND C_D_ID = ? AND C_ID = ?",  # w_id, d_id, c_id
-        "getCustomersByLastName": "SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_BALANCE FROM CUSTOMER WHERE C_W_ID = ? AND C_D_ID = ? AND C_LAST = ? ORDER BY C_FIRST",  # w_id, d_id, c_last
-        "getLastOrder": "SELECT O_ID, O_CARRIER_ID, O_ENTRY_D FROM ORDERS WHERE O_W_ID = ? AND O_D_ID = ? AND O_C_ID = ? ORDER BY O_ID DESC LIMIT 1",  # w_id, d_id, c_id
-        "getOrderLines": "SELECT OL_SUPPLY_W_ID, OL_I_ID, OL_QUANTITY, OL_AMOUNT, OL_DELIVERY_D FROM ORDER_LINE WHERE OL_W_ID = ? AND OL_D_ID = ? AND OL_O_ID = ?",  # w_id, d_id, o_id
+        "getCustomerByCustomerId": "SELECT c_id, c_first, c_middle, c_last, c_balance FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # w_id, d_id, c_id
+        "getCustomersByLastName": "SELECT c_id, c_first, c_middle, c_last, c_balance FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_last = {} ORDER BY c_first",  # w_id, d_id, c_last
+        "getLastOrder": "SELECT o_id, o_carrier_id, o_entry_d FROM orders WHERE o_w_id = ? AND o_d_id = ? AND o_c_id = ? ORDER BY o_id DESC LIMIT 1",  # w_id, d_id, c_id
+        "getOrderLines": "SELECT ol_supply_w_id, ol_i_id, ol_quantity, ol_amount, ol_delivery_d FROM order_line WHERE ol_w_id = ? AND ol_d_id = ? AND ol_o_id = ?",  # w_id, d_id, o_id
     },
     "PAYMENT": {
-        "getWarehouse": "SELECT W_NAME, W_STREET_1, W_STREET_2, W_CITY, W_STATE, W_ZIP FROM WAREHOUSE WHERE W_ID = ?",  # w_id
-        "updateWarehouseBalance": "UPDATE WAREHOUSE SET W_YTD = W_YTD + ? WHERE W_ID = ?",  # h_amount, w_id
-        "getDistrict": "SELECT D_NAME, D_STREET_1, D_STREET_2, D_CITY, D_STATE, D_ZIP FROM DISTRICT WHERE D_W_ID = ? AND D_ID = ?",  # w_id, d_id
-        "updateDistrictBalance": "UPDATE DISTRICT SET D_YTD = D_YTD + ? WHERE D_W_ID  = ? AND D_ID = ?",  # h_amount, d_w_id, d_id
-        "getCustomerByCustomerId": "SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_DATA FROM CUSTOMER WHERE C_W_ID = ? AND C_D_ID = ? AND C_ID = ?",  # w_id, d_id, c_id
-        "getCustomersByLastName": "SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_DATA FROM CUSTOMER WHERE C_W_ID = ? AND C_D_ID = ? AND C_LAST = ? ORDER BY C_FIRST",  # w_id, d_id, c_last
-        "updateBCCustomer": "UPDATE CUSTOMER SET C_BALANCE = ?, C_YTD_PAYMENT = ?, C_PAYMENT_CNT = ?, C_DATA = ? WHERE C_W_ID = ? AND C_D_ID = ? AND C_ID = ?",  # c_balance, c_ytd_payment, c_payment_cnt, c_data, c_w_id, c_d_id, c_id
-        "updateGCCustomer": "UPDATE CUSTOMER SET C_BALANCE = ?, C_YTD_PAYMENT = ?, C_PAYMENT_CNT = ? WHERE C_W_ID = ? AND C_D_ID = ? AND C_ID = ?",  # c_balance, c_ytd_payment, c_payment_cnt, c_w_id, c_d_id, c_id
-        "insertHistory": "INSERT INTO HISTORY VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "getWarehouse": "SELECT w_name, w_street_1, w_street_2, w_city, w_state, w_zip FROM warehouse WHERE w_id = {}",  # w_id
+        "updateWarehouseBalance": "UPDATE warehouse SET w_ytd = w_ytd + {} WHERE w_id = {}",  # h_amount, w_id
+        "getDistrict": "SELECT d_name, d_street_1, d_street_2, d_city, d_state, d_zip FROM district WHERE d_w_id = {} AND d_id = {}",  # w_id, d_id
+        "updateDistrictBalance": "UPDATE district SET d_ytd = d_ytd + {} WHERE d_w_id = {} AND d_id = {}",  # h_amount, d_w_id, d_id
+        "getCustomerByCustomerId": "SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_since, c_credit, c_credit_lim, c_discount, c_balance, c_ytd_payment, c_payment_cnt, c_data FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # w_id, d_id, c_id
+        "getCustomersByLastName": "SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_since, c_credit, c_credit_lim, c_discount, c_balance, c_ytd_payment, c_payment_cnt, c_data FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_last = {} ORDER BY c_first",  # w_id, d_id, c_last
+        "updateBCCustomer": "UPDATE customer SET c_balance = {}, c_ytd_payment = {}, c_payment_cnt = {}, c_data = {} WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # c_balance, c_ytd_payment, c_payment_cnt, c_data, c_w_id, c_d_id, c_id
+        "updateGCCustomer": "UPDATE customer SET c_balance = {}, c_ytd_payment = {}, c_payment_cnt = {} WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # c_balance, c_ytd_payment, c_payment_cnt, c_w_id, c_d_id, c_id
+        "insertHistory": "INSERT INTO history VALUES ({}, {}, {}, {}, {}, {}, {}, {})",
     },
     "STOCK_LEVEL": {
-        "getOId": "SELECT D_NEXT_O_ID FROM DISTRICT WHERE D_W_ID = ? AND D_ID = ?",
+        "getOId": "SELECT d_next_o_id FROM district WHERE d_w_id = {} AND d_id = {}",
         "getStockCount": """
-            SELECT COUNT(DISTINCT(OL_I_ID)) FROM ORDER_LINE, STOCK
-            WHERE OL_W_ID = ?
-              AND OL_D_ID = ?
-              AND OL_O_ID < ?
-              AND OL_O_ID >= ?
-              AND S_W_ID = ?
-              AND S_I_ID = OL_I_ID
-              AND S_QUANTITY < ?
+            SELECT COUNT(DISTINCT(ol_i_id)) FROM order_line, stock
+            WHERE ol_w_id = {}
+              AND ol_d_id = {}
+              AND ol_o_id < {}
+              AND ol_o_id >= {}
+              AND s_w_id = {}
+              AND s_i_id = ol_i_id
+              AND s_quantity < {}
         """,
     },
 }
@@ -310,3 +310,160 @@ class BradDriver(AbstractDriver):
         misc = [(w_tax, d_tax, d_next_o_id, total)]
 
         return [customer_info, misc, item_data]
+
+    def doOrderStatus(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
+        assert self._client is not None
+
+        q = TXN_QUERIES["ORDER_STATUS"]
+        w_id = params["w_id"]
+        d_id = params["d_id"]
+        c_id = params["c_id"]
+        c_last = params["c_last"]
+
+        self._client.run_query_json("BEGIN")
+        if c_id != None:
+            r, _ = self._client.run_query_json(
+                q["getCustomerByCustomerId"].format(w_id, d_id, c_id)
+            )
+            customer = r[0]
+        else:
+            # Get the midpoint customer's id
+            r, _ = self._client.run_query_json(
+                q["getCustomersByLastName"].format(w_id, d_id, c_last)
+            )
+            all_customers = r
+            assert len(all_customers) > 0
+            namecnt = len(all_customers)
+            index = (namecnt - 1) / 2
+            customer = all_customers[index]
+            c_id = customer[0]
+        assert len(customer) > 0
+        assert c_id != None
+
+        r, _ = self._client.run_query_json(q["getLastOrder"].format(w_id, d_id, c_id))
+        order = r[0]
+        if order:
+            r, _ = self._client.run_query_json(
+                q["getOrderLines"].format(w_id, d_id, order[0])
+            )
+            orderLines = r
+        else:
+            orderLines = []
+
+        self._client.run_query_json("COMMIT")
+        return [customer, order, orderLines]
+
+    def doPayment(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
+        assert self._client is not None
+
+        q = TXN_QUERIES["PAYMENT"]
+        w_id = params["w_id"]
+        d_id = params["d_id"]
+        h_amount = params["h_amount"]
+        c_w_id = params["c_w_id"]
+        c_d_id = params["c_d_id"]
+        c_id = params["c_id"]
+        c_last = params["c_last"]
+        h_date = params["h_date"]
+
+        self._client.run_query_json("BEGIN")
+        if c_id != None:
+            r, _ = self._client.run_query_json(
+                q["getCustomerByCustomerId"].format(w_id, d_id, c_id)
+            )
+            customer = r[0]
+        else:
+            # Get the midpoint customer's id
+            r, _ = self._client.run_query_json(
+                q["getCustomersByLastName"].format(w_id, d_id, c_last)
+            )
+            all_customers = r
+            assert len(all_customers) > 0
+            namecnt = len(all_customers)
+            index = (namecnt - 1) / 2
+            customer = all_customers[index]
+            c_id = customer[0]
+        assert len(customer) > 0
+        c_balance = customer[14] - h_amount
+        c_ytd_payment = customer[15] + h_amount
+        c_payment_cnt = customer[16] + 1
+        c_data = customer[17]
+
+        r, _ = self._client.run_query_json(q["getWarehouse"].format(w_id))
+        warehouse = r[0]
+
+        r, _ = self._client.run_query_json(q["getDistrict"].format(w_id, d_id))
+        district = r[0]
+
+        self._client.run_query_json(q["updateWarehouseBalance"].format(h_amount, w_id))
+        self._client.run_query_json(
+            q["updateDistrictBalance"].format(h_amount, w_id, d_id)
+        )
+
+        # Customer Credit Information
+        if customer[11] == constants.BAD_CREDIT:
+            newData = " ".join(map(str, [c_id, c_d_id, c_w_id, d_id, w_id, h_amount]))
+            c_data = newData + "|" + c_data
+            if len(c_data) > constants.MAX_C_DATA:
+                c_data = c_data[: constants.MAX_C_DATA]
+            self._client.run_query_json(
+                q["updateBCCustomer"].format(
+                    c_balance,
+                    c_ytd_payment,
+                    c_payment_cnt,
+                    c_data,
+                    c_w_id,
+                    c_d_id,
+                    c_id,
+                ),
+            )
+        else:
+            c_data = ""
+            self._client.run_query_json(
+                q["updateGCCustomer"].format(
+                    c_balance, c_ytd_payment, c_payment_cnt, c_w_id, c_d_id, c_id
+                ),
+            )
+
+        # Concatenate w_name, four spaces, d_name
+        h_data = "%s    %s" % (warehouse[0], district[0])
+        # Create the history record
+        self._client.run_query_json(
+            q["insertHistory"].format(
+                c_id, c_d_id, c_w_id, d_id, w_id, h_date, h_amount, h_data
+            ),
+        )
+
+        self._client.run_query_json("COMMIT")
+
+        # TPC-C 2.5.3.3: Must display the following fields:
+        # W_ID, D_ID, C_ID, C_D_ID, C_W_ID, W_STREET_1, W_STREET_2, W_CITY, W_STATE, W_ZIP,
+        # D_STREET_1, D_STREET_2, D_CITY, D_STATE, D_ZIP, C_FIRST, C_MIDDLE, C_LAST, C_STREET_1,
+        # C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM,
+        # C_DISCOUNT, C_BALANCE, the first 200 characters of C_DATA (only if C_CREDIT = "BC"),
+        # H_AMOUNT, and H_DATE.
+
+        # Hand back all the warehouse, district, and customer data
+        return [warehouse, district, customer]
+
+    def doStockLevel(self, params: Dict[str, Any]) -> int:
+        assert self._client is not None
+
+        q = TXN_QUERIES["STOCK_LEVEL"]
+        w_id = params["w_id"]
+        d_id = params["d_id"]
+        threshold = params["threshold"]
+
+        self._client.run_query_json("BEGIN")
+        r, _ = self._client.run_query_json(["getOId"].format(w_id, d_id))
+        result = r[0]
+        assert result
+        o_id = result[0]
+
+        r, _ = self._client.run_query_json(
+            q["getStockCount"].format(w_id, d_id, o_id, (o_id - 20), w_id, threshold)
+        )
+        result = r[0]
+
+        self._client.run_query_json("COMMIT")
+        return int(result[0])
