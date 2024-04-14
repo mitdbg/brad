@@ -87,7 +87,7 @@ void BradFlightSqlServer::InitWrapper(
   auto location = arrow::flight::Location::ForGrpcTcp(host, port).ValueOrDie();
   arrow::flight::FlightServerOptions options(location);
 
-  _handle_query = handle_query;
+  handle_query_ = handle_query;
 
   this->Init(options);
 }
@@ -107,7 +107,7 @@ arrow::Result<std::unique_ptr<FlightInfo>>
     const FlightDescriptor &descriptor) {
   const std::string &query = command.query;
 
-  const std::string &autoincrement_id = std::to_string(++_autoincrement_id);
+  const std::string &autoincrement_id = std::to_string(++autoincrement_id_);
   const std::string &query_ticket = GetQueryTicket(autoincrement_id, command.transaction_id);
   ARROW_ASSIGN_OR_RAISE(auto ticket,
                         EncodeTransactionQuery(query_ticket));
@@ -117,13 +117,13 @@ arrow::Result<std::unique_ptr<FlightInfo>>
   { 
     py::gil_scoped_acquire guard;
     std::vector<py::tuple> query_result;
-    query_result = _handle_query(query);
+    query_result = handle_query_(query);
     transformed_query_result = TransformQueryResult(query_result);
   }
 
   {
-    std::scoped_lock guard(_query_data_mutex);
-    _query_data.insert({query_ticket, transformed_query_result});
+    std::scoped_lock guard(query_data_mutex_);
+    query_data_.insert({query_ticket, transformed_query_result});
   }
 
   ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(transformed_query_result));
@@ -153,7 +153,7 @@ arrow::Result<std::unique_ptr<FlightDataStream>>
   const std::string transaction_id = pair.second;
 
   const std::string &query_ticket = transaction_id + ':' + autoincrement_id;
-  const auto query_result = _query_data.at(query_ticket);
+  const auto query_result = query_data_.at(query_ticket);
 
   std::shared_ptr<BradStatement> statement;
   ARROW_ASSIGN_OR_RAISE(statement, BradStatement::Create(query_result));

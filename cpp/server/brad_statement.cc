@@ -53,7 +53,7 @@ arrow::Result<std::shared_ptr<arrow::Schema>> BradStatement::GetSchema() const {
 
   for (const auto &elt : row) {
     if (std::is_floating_point<decltype(elt)>::value) {
-      fields.push_back(arrow::field("FLOAT FIELD", arrow::int16()));
+      fields.push_back(arrow::field("FLOAT FIELD", arrow::float16()));
     } else {
       fields.push_back(arrow::field("INT FIELD", arrow::int8()));
     }

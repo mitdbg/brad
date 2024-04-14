@@ -45,12 +45,12 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
       const arrow::flight::ServerCallContext &context,
       const arrow::flight::sql::StatementQueryTicket &command) override;
 
-  std::function<std::vector<py::tuple>(std::string)> _handle_query;
+  std::function<std::vector<py::tuple>(std::string)> handle_query_;
 
-  std::unordered_map<std::string, std::vector<std::vector<std::any>>> _query_data;
-  std::mutex _query_data_mutex;
+  std::unordered_map<std::string, std::vector<std::vector<std::any>>> query_data_;
+  std::mutex query_data_mutex_;
 
-  std::atomic<uint64_t> _autoincrement_id;
+  std::atomic<uint64_t> autoincrement_id_;
 };
 
 }  // namespace brad
