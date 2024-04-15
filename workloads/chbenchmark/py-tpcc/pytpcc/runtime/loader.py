@@ -37,8 +37,8 @@ from datetime import datetime
 from random import shuffle
 from pprint import pprint, pformat
 
-import constants
-from util import *
+from .. import constants
+from ..util import *
 
 
 class Loader:

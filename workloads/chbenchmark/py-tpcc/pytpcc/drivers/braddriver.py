@@ -1,8 +1,8 @@
 import logging
 from typing import Dict, Tuple, Any, Optional, List
 
-from abstractdriver import *
-import constants
+from .abstractdriver import *
+from .. import constants
 
 from brad.grpc_client import BradGrpcClient
 

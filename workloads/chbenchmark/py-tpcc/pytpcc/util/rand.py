@@ -30,7 +30,7 @@
 # -----------------------------------------------------------------------
 
 import random
-import nurand
+from . import nurand
 
 SYLLABLES = [
     "BAR",

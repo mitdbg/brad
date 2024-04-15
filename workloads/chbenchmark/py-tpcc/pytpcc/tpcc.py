@@ -35,12 +35,13 @@ import argparse
 import glob
 import time
 import multiprocessing
-from ConfigParser import SafeConfigParser
+import pathlib
+from configparser import SafeConfigParser
 from pprint import pprint, pformat
 
-from util import *
-from runtime import *
-import drivers
+from .util import *
+from .runtime import *
+from .drivers.braddriver import BradDriver
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,10 +55,9 @@ logging.basicConfig(
 ## createDriverClass
 ## ==============================================
 def createDriverClass(name):
-    full_name = "%sDriver" % name.title()
-    mod = __import__("drivers.%s" % full_name.lower(), globals(), locals(), [full_name])
-    klass = getattr(mod, full_name)
-    return klass
+    if name != "brad":
+        raise NotImplementedError
+    return BradDriver
 
 
 ## DEF
@@ -70,7 +70,7 @@ def getDrivers():
     drivers = []
     for f in map(
         lambda x: os.path.basename(x).replace("driver.py", ""),
-        glob.glob("./drivers/*driver.py"),
+        glob.glob(str(pathlib.Path(__file__).parent.resolve()) + "/drivers/*driver.py"),
     ):
         if f != "abstract":
             drivers.append(f)
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     )
     aparser.add_argument("system", choices=getDrivers(), help="Target system driver")
     aparser.add_argument(
-        "--config", type=file, help="Path to driver configuration file"
+        "--config", type=str, help="Path to driver configuration file"
     )
     aparser.add_argument(
         "--reset",
@@ -291,7 +291,6 @@ if __name__ == "__main__":
     if args["print_config"]:
         config = driver.makeDefaultConfig()
         print(driver.formatConfig(config))
-        print
         sys.exit(0)
 
     ## Load Configuration file
