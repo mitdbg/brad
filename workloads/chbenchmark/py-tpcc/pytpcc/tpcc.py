@@ -217,9 +217,7 @@ if __name__ == "__main__":
         description="Python implementation of the TPC-C Benchmark"
     )
     aparser.add_argument("system", choices=getDrivers(), help="Target system driver")
-    aparser.add_argument(
-        "--config", type=str, help="Path to driver configuration file"
-    )
+    aparser.add_argument("--config", type=str, help="Path to driver configuration file")
     aparser.add_argument(
         "--reset",
         action="store_true",
