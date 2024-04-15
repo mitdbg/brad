@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 def register_admin_action(subparser) -> None:
     parser = subparser.add_parser("drop_schema", help="Drop a schema from BRAD.")
     parser.add_argument(
-        "--config-file",
+        "--physical-config-file",
         type=str,
         required=True,
-        help="Path to BRAD's configuration file.",
+        help="Path to BRAD's physical configuration file.",
     )
     parser.add_argument(
         "--schema-name",
@@ -33,7 +33,7 @@ def register_admin_action(subparser) -> None:
 # This method is called by `brad.exec.admin.main`.
 def drop_schema(args):
     # 1. Load the config and blueprint.
-    config = ConfigFile.load(args.config_file)
+    config = ConfigFile.load_from_physical_config(args.physical_config_file)
 
     # 2. Connect to the underlying engines without an explicit database.
     directory = Directory(config)
