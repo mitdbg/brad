@@ -52,10 +52,13 @@ arrow::Result<std::shared_ptr<arrow::Schema>> BradStatement::GetSchema() const {
   const std::vector<std::any> &row = query_result_[0];
 
   for (const auto &elt : row) {
-    if (std::is_floating_point<decltype(elt)>::value) {
+    std::string elt_type = elt.type().name();
+    if (elt_type == "i") {
+      fields.push_back(arrow::field("INT FIELD", arrow::int8()));
+    } else if (elt_type == "f") {
       fields.push_back(arrow::field("FLOAT FIELD", arrow::float16()));
     } else {
-      fields.push_back(arrow::field("INT FIELD", arrow::int8()));
+      fields.push_back(arrow::field("STRING FIELD", arrow::utf8()));
     }
   }
 

@@ -59,7 +59,13 @@ std::vector<std::vector<std::any>> TransformQueryResult(
   for (const auto &tup : query_result) {
     std::vector<std::any> transformed_tup{};
     for (const auto &elt : tup) {
-      transformed_tup.push_back(elt);
+      if (py::isinstance<py::int_>(elt)) {
+        transformed_tup.push_back(std::make_any<int>(py::cast<int>(elt)));
+      } else if (py::isinstance<py::float_>(elt)) {
+        transformed_tup.push_back(std::make_any<float>(py::cast<float>(elt)));
+      } else {
+        transformed_tup.push_back(std::make_any<std::string>(py::cast<std::string>(elt)));
+      }
     }
     transformed_query_result.push_back(transformed_tup);
   }
