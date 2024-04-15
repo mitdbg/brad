@@ -36,7 +36,7 @@ import glob
 import time
 import multiprocessing
 import pathlib
-from configparser import SafeConfigParser
+from configparser import ConfigParser
 from pprint import pprint, pformat
 
 from .util import *
@@ -296,8 +296,8 @@ if __name__ == "__main__":
     ## Load Configuration file
     if args["config"]:
         logging.debug("Loading configuration file '%s'" % args["config"])
-        cparser = SafeConfigParser()
-        cparser.read(os.path.realpath(args["config"].name))
+        cparser = ConfigParser()
+        cparser.read(os.path.realpath(args["config"]))
         config = dict(cparser.items(args["system"]))
     else:
         logging.debug("Using default configuration for %s" % args["system"])

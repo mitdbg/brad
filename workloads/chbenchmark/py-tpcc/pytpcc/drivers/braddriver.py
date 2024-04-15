@@ -73,7 +73,7 @@ class BradDriver(AbstractDriver):
     }
 
     def __init__(self, ddl: str) -> None:
-        super().__init__("BradDriver", ddl)
+        super().__init__("brad", ddl)
         self._client: Optional[BradGrpcClient] = None
 
     def makeDefaultConfig(self) -> Config:
