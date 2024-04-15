@@ -1,4 +1,6 @@
 import logging
+import traceback
+import decimal
 from typing import Dict, Tuple, Any, Optional, List
 
 from .abstractdriver import *
@@ -35,7 +37,7 @@ TXN_QUERIES = {
     },
     "ORDER_STATUS": {
         "getCustomerByCustomerId": "SELECT c_id, c_first, c_middle, c_last, c_balance FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # w_id, d_id, c_id
-        "getCustomersByLastName": "SELECT c_id, c_first, c_middle, c_last, c_balance FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_last = {} ORDER BY c_first",  # w_id, d_id, c_last
+        "getCustomersByLastName": "SELECT c_id, c_first, c_middle, c_last, c_balance FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_last = '{}' ORDER BY c_first",  # w_id, d_id, c_last
         "getLastOrder": "SELECT o_id, o_carrier_id, o_entry_d FROM orders WHERE o_w_id = ? AND o_d_id = ? AND o_c_id = ? ORDER BY o_id DESC LIMIT 1",  # w_id, d_id, c_id
         "getOrderLines": "SELECT ol_supply_w_id, ol_i_id, ol_quantity, ol_amount, ol_delivery_d FROM order_line WHERE ol_w_id = ? AND ol_d_id = ? AND ol_o_id = ?",  # w_id, d_id, o_id
     },
@@ -45,10 +47,10 @@ TXN_QUERIES = {
         "getDistrict": "SELECT d_name, d_street_1, d_street_2, d_city, d_state, d_zip FROM district WHERE d_w_id = {} AND d_id = {}",  # w_id, d_id
         "updateDistrictBalance": "UPDATE district SET d_ytd = d_ytd + {} WHERE d_w_id = {} AND d_id = {}",  # h_amount, d_w_id, d_id
         "getCustomerByCustomerId": "SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_since, c_credit, c_credit_lim, c_discount, c_balance, c_ytd_payment, c_payment_cnt, c_data FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # w_id, d_id, c_id
-        "getCustomersByLastName": "SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_since, c_credit, c_credit_lim, c_discount, c_balance, c_ytd_payment, c_payment_cnt, c_data FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_last = {} ORDER BY c_first",  # w_id, d_id, c_last
-        "updateBCCustomer": "UPDATE customer SET c_balance = {}, c_ytd_payment = {}, c_payment_cnt = {}, c_data = {} WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # c_balance, c_ytd_payment, c_payment_cnt, c_data, c_w_id, c_d_id, c_id
+        "getCustomersByLastName": "SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_since, c_credit, c_credit_lim, c_discount, c_balance, c_ytd_payment, c_payment_cnt, c_data FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_last = '{}' ORDER BY c_first",  # w_id, d_id, c_last
+        "updateBCCustomer": "UPDATE customer SET c_balance = {}, c_ytd_payment = {}, c_payment_cnt = {}, c_data = '{}' WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # c_balance, c_ytd_payment, c_payment_cnt, c_data, c_w_id, c_d_id, c_id
         "updateGCCustomer": "UPDATE customer SET c_balance = {}, c_ytd_payment = {}, c_payment_cnt = {} WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # c_balance, c_ytd_payment, c_payment_cnt, c_w_id, c_d_id, c_id
-        "insertHistory": "INSERT INTO history VALUES ({}, {}, {}, {}, {}, {}, {}, {})",
+        "insertHistory": "INSERT INTO history (h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_date, h_amount, h_data) VALUES ({}, {}, {}, {}, {}, '{}', {}, '{}')",
     },
     "STOCK_LEVEL": {
         "getOId": "SELECT d_next_o_id FROM district WHERE d_w_id = {} AND d_id = {}",
@@ -139,177 +141,189 @@ class BradDriver(AbstractDriver):
         return result
 
     def doNewOrder(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
-        assert self._client is not None
+        try:
+            assert self._client is not None
 
-        q = TXN_QUERIES["NEW_ORDER"]
-        w_id = params["w_id"]
-        d_id = params["d_id"]
-        c_id = params["c_id"]
-        o_entry_d = params["o_entry_d"]
-        i_ids = params["i_ids"]
-        i_w_ids = params["i_w_ids"]
-        i_qtys = params["i_qtys"]
+            q = TXN_QUERIES["NEW_ORDER"]
+            w_id = params["w_id"]
+            d_id = params["d_id"]
+            c_id = params["c_id"]
+            o_entry_d = params["o_entry_d"]
+            i_ids = params["i_ids"]
+            i_w_ids = params["i_w_ids"]
+            i_qtys = params["i_qtys"]
 
-        assert len(i_ids) > 0
-        assert len(i_ids) == len(i_w_ids)
-        assert len(i_ids) == len(i_qtys)
+            assert len(i_ids) > 0
+            assert len(i_ids) == len(i_w_ids)
+            assert len(i_ids) == len(i_qtys)
 
-        self._client.run_query_json("BEGIN")
-        all_local = True
-        items = []
-        for i in range(len(i_ids)):
-            ## Determine if this is an all local order or not
-            all_local = all_local and i_w_ids[i] == w_id
-            r, _ = self._client.run_query_json(q["getItemInfo"].format(i_ids[i]))
-            items.append(r[0])
-        assert len(items) == len(i_ids)
+            self._client.run_query_json("BEGIN")
+            all_local = True
+            items = []
+            for i in range(len(i_ids)):
+                ## Determine if this is an all local order or not
+                all_local = all_local and i_w_ids[i] == w_id
+                r, _ = self._client.run_query_json(q["getItemInfo"].format(i_ids[i]))
+                items.append(r[0])
+            assert len(items) == len(i_ids)
 
-        ## TPCC defines 1% of neworder gives a wrong itemid, causing rollback.
-        ## Note that this will happen with 1% of transactions on purpose.
-        for item in items:
-            if len(item) == 0:
-                self._client.run_query_json("ROLLBACK")
-                return
-        ## FOR
+            ## TPCC defines 1% of neworder gives a wrong itemid, causing rollback.
+            ## Note that this will happen with 1% of transactions on purpose.
+            for item in items:
+                if len(item) == 0:
+                    self._client.run_query_json("ROLLBACK")
+                    return
+            ## FOR
 
-        ## ----------------
-        ## Collect Information from WAREHOUSE, DISTRICT, and CUSTOMER
-        ## ----------------
-        r, _ = self._client.run_query_json(q["getWarehouseTaxRate"].format(w_id))
-        w_tax = r[0][0]
+            ## ----------------
+            ## Collect Information from WAREHOUSE, DISTRICT, and CUSTOMER
+            ## ----------------
+            r, _ = self._client.run_query_json(q["getWarehouseTaxRate"].format(w_id))
+            w_tax = r[0][0]
 
-        r, _ = self._client.run_query_json(q["getDistrict"].format(d_id, w_id))
-        district_info = r[0]
-        d_tax = district_info[0]
-        d_next_o_id = district_info[1]
+            r, _ = self._client.run_query_json(q["getDistrict"].format(d_id, w_id))
+            district_info = r[0]
+            d_tax = district_info[0]
+            d_next_o_id = district_info[1]
 
-        r, _ = self._client.run_query_json(q["getCustomer"].format(w_id, d_id, c_id))
-        customer_info = r[0]
-        c_discount = customer_info[0]
-
-        ## ----------------
-        ## Insert Order Information
-        ## ----------------
-        ol_cnt = len(i_ids)
-        o_carrier_id = constants.NULL_CARRIER_ID
-
-        self._client.run_query_json(
-            q["incrementNextOrderId"].format(d_next_o_id + 1, d_id, w_id)
-        )
-        self._client.run_query_json(
-            q["createOrder"].format(
-                d_next_o_id,
-                d_id,
-                w_id,
-                c_id,
-                o_entry_d,
-                o_carrier_id,
-                ol_cnt,
-                all_local,
-            ),
-        )
-        self._client.run_query_json(q["createNewOrder"].format(d_next_o_id, d_id, w_id))
-
-        ## ----------------
-        ## Insert Order Item Information
-        ## ----------------
-        item_data = []
-        total = 0
-        for i in range(len(i_ids)):
-            ol_number = i + 1
-            ol_supply_w_id = i_w_ids[i]
-            ol_i_id = i_ids[i]
-            ol_quantity = i_qtys[i]
-
-            itemInfo = items[i]
-            i_name = itemInfo[1]
-            i_data = itemInfo[2]
-            i_price = itemInfo[0]
-
-            self._client.run_query_json(
-                q["getStockInfo"].format(d_id, ol_i_id, ol_supply_w_id)
+            r, _ = self._client.run_query_json(
+                q["getCustomer"].format(w_id, d_id, c_id)
             )
-            stockInfo = self.cursor.fetchone()
-            if len(stockInfo) == 0:
-                logger.warning(
-                    "No STOCK record for (ol_i_id=%d, ol_supply_w_id=%d)",
-                    ol_i_id,
-                    ol_supply_w_id,
-                )
-                continue
-            s_quantity = stockInfo[0]
-            s_ytd = stockInfo[2]
-            s_order_cnt = stockInfo[3]
-            s_remote_cnt = stockInfo[4]
-            s_data = stockInfo[1]
-            s_dist_xx = stockInfo[5]  # Fetches data from the s_dist_[d_id] column
+            customer_info = r[0]
+            c_discount = customer_info[0]
 
-            ## Update stock
-            s_ytd += ol_quantity
-            if s_quantity >= ol_quantity + 10:
-                s_quantity = s_quantity - ol_quantity
-            else:
-                s_quantity = s_quantity + 91 - ol_quantity
-            s_order_cnt += 1
-
-            if ol_supply_w_id != w_id:
-                s_remote_cnt += 1
+            ## ----------------
+            ## Insert Order Information
+            ## ----------------
+            ol_cnt = len(i_ids)
+            o_carrier_id = constants.NULL_CARRIER_ID
 
             self._client.run_query_json(
-                q["updateStock"].format(
-                    s_quantity,
-                    s_ytd,
-                    s_order_cnt,
-                    s_remote_cnt,
-                    ol_i_id,
-                    ol_supply_w_id,
-                ),
+                q["incrementNextOrderId"].format(d_next_o_id + 1, d_id, w_id)
             )
-
-            if (
-                i_data.find(constants.ORIGINAL_STRING) != -1
-                and s_data.find(constants.ORIGINAL_STRING) != -1
-            ):
-                brand_generic = "B"
-            else:
-                brand_generic = "G"
-
-            ## Transaction profile states to use "ol_quantity * i_price"
-            ol_amount = ol_quantity * i_price
-            total += ol_amount
-
             self._client.run_query_json(
-                q["createOrderLine"].format(
+                q["createOrder"].format(
                     d_next_o_id,
                     d_id,
                     w_id,
-                    ol_number,
-                    ol_i_id,
-                    ol_supply_w_id,
+                    c_id,
                     o_entry_d,
-                    ol_quantity,
-                    ol_amount,
-                    s_dist_xx,
+                    o_carrier_id,
+                    ol_cnt,
+                    all_local,
                 ),
             )
+            self._client.run_query_json(
+                q["createNewOrder"].format(d_next_o_id, d_id, w_id)
+            )
 
-            ## Add the info to be returned
-            item_data.append((i_name, s_quantity, brand_generic, i_price, ol_amount))
-        ## FOR
+            ## ----------------
+            ## Insert Order Item Information
+            ## ----------------
+            item_data = []
+            total = 0
+            for i in range(len(i_ids)):
+                ol_number = i + 1
+                ol_supply_w_id = i_w_ids[i]
+                ol_i_id = i_ids[i]
+                ol_quantity = i_qtys[i]
 
-        ## Commit!
-        self._client.run_query_json("COMMIT")
+                itemInfo = items[i]
+                i_name = itemInfo[1]
+                i_data = itemInfo[2]
+                i_price = itemInfo[0]
 
-        ## Adjust the total for the discount
-        # print "c_discount:", c_discount, type(c_discount)
-        # print "w_tax:", w_tax, type(w_tax)
-        # print "d_tax:", d_tax, type(d_tax)
-        total *= (1 - c_discount) * (1 + w_tax + d_tax)
+                self._client.run_query_json(
+                    q["getStockInfo"].format(d_id, ol_i_id, ol_supply_w_id)
+                )
+                stockInfo = self.cursor.fetchone()
+                if len(stockInfo) == 0:
+                    logger.warning(
+                        "No STOCK record for (ol_i_id=%d, ol_supply_w_id=%d)",
+                        ol_i_id,
+                        ol_supply_w_id,
+                    )
+                    continue
+                s_quantity = stockInfo[0]
+                s_ytd = stockInfo[2]
+                s_order_cnt = stockInfo[3]
+                s_remote_cnt = stockInfo[4]
+                s_data = stockInfo[1]
+                s_dist_xx = stockInfo[5]  # Fetches data from the s_dist_[d_id] column
 
-        ## Pack up values the client is missing (see TPC-C 2.4.3.5)
-        misc = [(w_tax, d_tax, d_next_o_id, total)]
+                ## Update stock
+                s_ytd += ol_quantity
+                if s_quantity >= ol_quantity + 10:
+                    s_quantity = s_quantity - ol_quantity
+                else:
+                    s_quantity = s_quantity + 91 - ol_quantity
+                s_order_cnt += 1
 
-        return [customer_info, misc, item_data]
+                if ol_supply_w_id != w_id:
+                    s_remote_cnt += 1
+
+                self._client.run_query_json(
+                    q["updateStock"].format(
+                        s_quantity,
+                        s_ytd,
+                        s_order_cnt,
+                        s_remote_cnt,
+                        ol_i_id,
+                        ol_supply_w_id,
+                    ),
+                )
+
+                if (
+                    i_data.find(constants.ORIGINAL_STRING) != -1
+                    and s_data.find(constants.ORIGINAL_STRING) != -1
+                ):
+                    brand_generic = "B"
+                else:
+                    brand_generic = "G"
+
+                ## Transaction profile states to use "ol_quantity * i_price"
+                ol_amount = ol_quantity * i_price
+                total += ol_amount
+
+                self._client.run_query_json(
+                    q["createOrderLine"].format(
+                        d_next_o_id,
+                        d_id,
+                        w_id,
+                        ol_number,
+                        ol_i_id,
+                        ol_supply_w_id,
+                        o_entry_d,
+                        ol_quantity,
+                        ol_amount,
+                        s_dist_xx,
+                    ),
+                )
+
+                ## Add the info to be returned
+                item_data.append(
+                    (i_name, s_quantity, brand_generic, i_price, ol_amount)
+                )
+            ## FOR
+
+            ## Commit!
+            self._client.run_query_json("COMMIT")
+
+            ## Adjust the total for the discount
+            # print "c_discount:", c_discount, type(c_discount)
+            # print "w_tax:", w_tax, type(w_tax)
+            # print "d_tax:", d_tax, type(d_tax)
+            total *= (1 - c_discount) * (1 + w_tax + d_tax)
+
+            ## Pack up values the client is missing (see TPC-C 2.4.3.5)
+            misc = [(w_tax, d_tax, d_next_o_id, total)]
+
+            return [customer_info, misc, item_data]
+
+        except Exception as ex:
+            print("Error in NEWORDER", str(ex))
+            print(traceback.format_exc())
+            raise
 
     def doOrderStatus(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
         assert self._client is not None
@@ -354,60 +368,64 @@ class BradDriver(AbstractDriver):
         return [customer, order, orderLines]
 
     def doPayment(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
-        assert self._client is not None
+        try:
+            assert self._client is not None
 
-        q = TXN_QUERIES["PAYMENT"]
-        w_id = params["w_id"]
-        d_id = params["d_id"]
-        h_amount = params["h_amount"]
-        c_w_id = params["c_w_id"]
-        c_d_id = params["c_d_id"]
-        c_id = params["c_id"]
-        c_last = params["c_last"]
-        h_date = params["h_date"]
+            q = TXN_QUERIES["PAYMENT"]
+            w_id = params["w_id"]
+            d_id = params["d_id"]
+            h_amount = decimal.Decimal(params["h_amount"])
+            c_w_id = params["c_w_id"]
+            c_d_id = params["c_d_id"]
+            c_id = params["c_id"]
+            c_last = params["c_last"]
+            h_date = params["h_date"]  # Python datetime
 
-        self._client.run_query_json("BEGIN")
-        if c_id != None:
-            r, _ = self._client.run_query_json(
-                q["getCustomerByCustomerId"].format(w_id, d_id, c_id)
-            )
-            customer = r[0]
-        else:
-            # Get the midpoint customer's id
-            r, _ = self._client.run_query_json(
-                q["getCustomersByLastName"].format(w_id, d_id, c_last)
-            )
-            all_customers = r
-            assert len(all_customers) > 0
-            namecnt = len(all_customers)
-            index = (namecnt - 1) / 2
-            customer = all_customers[index]
-            c_id = customer[0]
-        assert len(customer) > 0
-        c_balance = customer[14] - h_amount
-        c_ytd_payment = customer[15] + h_amount
-        c_payment_cnt = customer[16] + 1
-        c_data = customer[17]
+            self._client.run_query_json("BEGIN")
+            if c_id != None:
+                r, _ = self._client.run_query_json(
+                    q["getCustomerByCustomerId"].format(w_id, d_id, c_id)
+                )
+                customer = r[0]
+            else:
+                # Get the midpoint customer's id
+                r, _ = self._client.run_query_json(
+                    q["getCustomersByLastName"].format(w_id, d_id, c_last)
+                )
+                all_customers = r
+                assert len(all_customers) > 0
+                namecnt = len(all_customers)
+                index = (namecnt - 1) // 2
+                customer = all_customers[index]
+                c_id = customer[0]
+            assert len(customer) > 0
+            c_balance = decimal.Decimal(customer[14]) - h_amount
+            c_ytd_payment = decimal.Decimal(customer[15]) + h_amount
+            c_payment_cnt = int(customer[16]) + 1
+            c_data = customer[17]
 
-        r, _ = self._client.run_query_json(q["getWarehouse"].format(w_id))
-        warehouse = r[0]
+            r, _ = self._client.run_query_json(q["getWarehouse"].format(w_id))
+            warehouse = r[0]
 
-        r, _ = self._client.run_query_json(q["getDistrict"].format(w_id, d_id))
-        district = r[0]
+            r, _ = self._client.run_query_json(q["getDistrict"].format(w_id, d_id))
+            district = r[0]
 
-        self._client.run_query_json(q["updateWarehouseBalance"].format(h_amount, w_id))
-        self._client.run_query_json(
-            q["updateDistrictBalance"].format(h_amount, w_id, d_id)
-        )
-
-        # Customer Credit Information
-        if customer[11] == constants.BAD_CREDIT:
-            newData = " ".join(map(str, [c_id, c_d_id, c_w_id, d_id, w_id, h_amount]))
-            c_data = newData + "|" + c_data
-            if len(c_data) > constants.MAX_C_DATA:
-                c_data = c_data[: constants.MAX_C_DATA]
             self._client.run_query_json(
-                q["updateBCCustomer"].format(
+                q["updateWarehouseBalance"].format(h_amount, w_id)
+            )
+            self._client.run_query_json(
+                q["updateDistrictBalance"].format(h_amount, w_id, d_id)
+            )
+
+            # Customer Credit Information
+            if customer[11] == constants.BAD_CREDIT:
+                newData = " ".join(
+                    map(str, [c_id, c_d_id, c_w_id, d_id, w_id, h_amount])
+                )
+                c_data = newData + "|" + c_data
+                if len(c_data) > constants.MAX_C_DATA:
+                    c_data = c_data[: constants.MAX_C_DATA]
+                updateCustomer = q["updateBCCustomer"].format(
                     c_balance,
                     c_ytd_payment,
                     c_payment_cnt,
@@ -415,36 +433,47 @@ class BradDriver(AbstractDriver):
                     c_w_id,
                     c_d_id,
                     c_id,
-                ),
+                )
+                self._client.run_query_json(updateCustomer)
+            else:
+                c_data = ""
+                self._client.run_query_json(
+                    q["updateGCCustomer"].format(
+                        c_balance, c_ytd_payment, c_payment_cnt, c_w_id, c_d_id, c_id
+                    ),
+                )
+
+            # Concatenate w_name, four spaces, d_name
+            h_data = "%s    %s" % (warehouse[0], district[0])
+            # Create the history record
+            insertHistory = q["insertHistory"].format(
+                c_id,
+                c_d_id,
+                c_w_id,
+                d_id,
+                w_id,
+                h_date.strftime("%Y-%m-%d %H:%M:%S"),
+                h_amount.quantize(decimal.Decimal("1.00")),
+                h_data,
             )
-        else:
-            c_data = ""
-            self._client.run_query_json(
-                q["updateGCCustomer"].format(
-                    c_balance, c_ytd_payment, c_payment_cnt, c_w_id, c_d_id, c_id
-                ),
-            )
+            self._client.run_query_json(insertHistory)
 
-        # Concatenate w_name, four spaces, d_name
-        h_data = "%s    %s" % (warehouse[0], district[0])
-        # Create the history record
-        self._client.run_query_json(
-            q["insertHistory"].format(
-                c_id, c_d_id, c_w_id, d_id, w_id, h_date, h_amount, h_data
-            ),
-        )
+            self._client.run_query_json("COMMIT")
 
-        self._client.run_query_json("COMMIT")
+            # TPC-C 2.5.3.3: Must display the following fields:
+            # W_ID, D_ID, C_ID, C_D_ID, C_W_ID, W_STREET_1, W_STREET_2, W_CITY, W_STATE, W_ZIP,
+            # D_STREET_1, D_STREET_2, D_CITY, D_STATE, D_ZIP, C_FIRST, C_MIDDLE, C_LAST, C_STREET_1,
+            # C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM,
+            # C_DISCOUNT, C_BALANCE, the first 200 characters of C_DATA (only if C_CREDIT = "BC"),
+            # H_AMOUNT, and H_DATE.
 
-        # TPC-C 2.5.3.3: Must display the following fields:
-        # W_ID, D_ID, C_ID, C_D_ID, C_W_ID, W_STREET_1, W_STREET_2, W_CITY, W_STATE, W_ZIP,
-        # D_STREET_1, D_STREET_2, D_CITY, D_STATE, D_ZIP, C_FIRST, C_MIDDLE, C_LAST, C_STREET_1,
-        # C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM,
-        # C_DISCOUNT, C_BALANCE, the first 200 characters of C_DATA (only if C_CREDIT = "BC"),
-        # H_AMOUNT, and H_DATE.
+            # Hand back all the warehouse, district, and customer data
+            return [warehouse, district, customer]
 
-        # Hand back all the warehouse, district, and customer data
-        return [warehouse, district, customer]
+        except Exception as ex:
+            print("Error in PAYMENT", str(ex))
+            print(traceback.format_exc())
+            raise
 
     def doStockLevel(self, params: Dict[str, Any]) -> int:
         assert self._client is not None

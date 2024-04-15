@@ -352,7 +352,10 @@ if __name__ == "__main__":
         else:
             results = startExecution(driverClass, scaleParameters, args, config)
         assert results
-        print(results.show(load_time))
+        if isinstance(results, int):
+            print("Result:", results)
+        else:
+            print(results.show(load_time))
     ## IF
 
 ## MAIN
