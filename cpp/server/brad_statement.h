@@ -40,8 +40,6 @@ class BradStatement {
   /// \return              The resulting Schema.
   arrow::Result<std::shared_ptr<arrow::Schema>> GetSchema() const;
 
-  arrow::Result<std::shared_ptr<arrow::RecordBatch>> FetchResult();
-
   std::string* GetBradStmt() const;
 
   std::vector<std::vector<std::any>> query_result_;

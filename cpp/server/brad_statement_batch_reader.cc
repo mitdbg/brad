@@ -2,6 +2,7 @@
 
 #include <arrow/builder.h>
 #include "brad_statement.h"
+#include <iostream>
 
 namespace brad {
 
@@ -42,7 +43,7 @@ arrow::Status BradStatementBatchReader::ReadNext(std::shared_ptr<arrow::RecordBa
     return arrow::Status::OK();
   }
 
-  ARROW_ASSIGN_OR_RAISE(*out, statement_->FetchResult());
+  // ARROW_ASSIGN_OR_RAISE(*out, statement_->FetchResult());
   already_executed_ = true;
   return arrow::Status::OK();
 }

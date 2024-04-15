@@ -11,6 +11,8 @@
 #include <arrow/flight/sql/server.h>
 #include <arrow/result.h>
 
+#include "libcuckoo/cuckoohash_map.hh"
+
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -47,7 +49,7 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
 
   std::function<std::vector<py::tuple>(std::string)> handle_query_;
 
-  std::unordered_map<std::string, std::vector<std::vector<std::any>>> query_data_;
+  libcuckoo::cuckoohash_map<std::string, std::vector<std::vector<std::any>>> query_data_;
   std::mutex query_data_mutex_;
 
   std::atomic<uint64_t> autoincrement_id_;
