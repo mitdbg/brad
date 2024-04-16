@@ -38,8 +38,8 @@ TXN_QUERIES = {
     "ORDER_STATUS": {
         "getCustomerByCustomerId": "SELECT c_id, c_first, c_middle, c_last, c_balance FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # w_id, d_id, c_id
         "getCustomersByLastName": "SELECT c_id, c_first, c_middle, c_last, c_balance FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_last = '{}' ORDER BY c_first",  # w_id, d_id, c_last
-        "getLastOrder": "SELECT o_id, o_carrier_id, o_entry_d FROM orders WHERE o_w_id = ? AND o_d_id = ? AND o_c_id = ? ORDER BY o_id DESC LIMIT 1",  # w_id, d_id, c_id
-        "getOrderLines": "SELECT ol_supply_w_id, ol_i_id, ol_quantity, ol_amount, ol_delivery_d FROM order_line WHERE ol_w_id = ? AND ol_d_id = ? AND ol_o_id = ?",  # w_id, d_id, o_id
+        "getLastOrder": "SELECT o_id, o_carrier_id, o_entry_d FROM orders WHERE o_w_id = {} AND o_d_id = {} AND o_c_id = {} ORDER BY o_id DESC LIMIT 1",  # w_id, d_id, c_id
+        "getOrderLines": "SELECT ol_supply_w_id, ol_i_id, ol_quantity, ol_amount, ol_delivery_d FROM order_line WHERE ol_w_id = {} AND ol_d_id = {} AND ol_o_id = {}",  # w_id, d_id, o_id
     },
     "PAYMENT": {
         "getWarehouse": "SELECT w_name, w_street_1, w_street_2, w_city, w_state, w_zip FROM warehouse WHERE w_id = {}",  # w_id
@@ -328,46 +328,54 @@ class BradDriver(AbstractDriver):
             raise
 
     def doOrderStatus(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
-        assert self._client is not None
+        try:
+            assert self._client is not None
 
-        q = TXN_QUERIES["ORDER_STATUS"]
-        w_id = params["w_id"]
-        d_id = params["d_id"]
-        c_id = params["c_id"]
-        c_last = params["c_last"]
+            q = TXN_QUERIES["ORDER_STATUS"]
+            w_id = params["w_id"]
+            d_id = params["d_id"]
+            c_id = params["c_id"]
+            c_last = params["c_last"]
 
-        self._client.run_query_json("BEGIN")
-        if c_id != None:
-            r, _ = self._client.run_query_json(
-                q["getCustomerByCustomerId"].format(w_id, d_id, c_id)
-            )
-            customer = r[0]
-        else:
-            # Get the midpoint customer's id
-            r, _ = self._client.run_query_json(
-                q["getCustomersByLastName"].format(w_id, d_id, c_last)
-            )
-            all_customers = r
-            assert len(all_customers) > 0
-            namecnt = len(all_customers)
-            index = (namecnt - 1) / 2
-            customer = all_customers[index]
-            c_id = customer[0]
-        assert len(customer) > 0
-        assert c_id != None
+            self._client.run_query_json("BEGIN")
+            if c_id != None:
+                r, _ = self._client.run_query_json(
+                    q["getCustomerByCustomerId"].format(w_id, d_id, c_id)
+                )
+                customer = r[0]
+            else:
+                # Get the midpoint customer's id
+                r, _ = self._client.run_query_json(
+                    q["getCustomersByLastName"].format(w_id, d_id, c_last)
+                )
+                all_customers = r
+                assert len(all_customers) > 0
+                namecnt = len(all_customers)
+                index = (namecnt - 1) // 2
+                customer = all_customers[index]
+                c_id = customer[0]
+            assert len(customer) > 0
+            assert c_id != None
 
-        r, _ = self._client.run_query_json(q["getLastOrder"].format(w_id, d_id, c_id))
-        order = r[0]
-        if order:
-            r, _ = self._client.run_query_json(
-                q["getOrderLines"].format(w_id, d_id, order[0])
-            )
-            orderLines = r
-        else:
-            orderLines = []
+            getLastOrder = q["getLastOrder"].format(w_id, d_id, c_id)
+            print("#@!@#", getLastOrder)
+            r, _ = self._client.run_query_json(getLastOrder)
+            order = r[0]
+            if order:
+                r, _ = self._client.run_query_json(
+                    q["getOrderLines"].format(w_id, d_id, order[0])
+                )
+                orderLines = r
+            else:
+                orderLines = []
 
-        self._client.run_query_json("COMMIT")
-        return [customer, order, orderLines]
+            self._client.run_query_json("COMMIT")
+            return [customer, order, orderLines]
+
+        except Exception as ex:
+            print("Error in ORDER_STATUS", str(ex))
+            print(traceback.format_exc())
+            raise
 
     def doPayment(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
         try:
