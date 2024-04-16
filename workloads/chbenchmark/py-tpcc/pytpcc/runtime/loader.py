@@ -37,8 +37,8 @@ from datetime import datetime
 from random import shuffle
 from pprint import pprint, pformat
 
-import constants
-from util import *
+from .. import constants
+from ..util import *
 
 
 class Loader:
@@ -75,7 +75,7 @@ class Loader:
     def loadItems(self):
         ## Select 10% of the rows to be marked "original"
         originalRows = rand.selectUniqueIds(
-            self.scaleParameters.items / 10, 1, self.scaleParameters.items
+            self.scaleParameters.items // 10, 1, self.scaleParameters.items
         )
 
         ## Load all of the items
@@ -130,7 +130,7 @@ class Loader:
 
             ## Select 10% of the customers to have bad credit
             selectedRows = rand.selectUniqueIds(
-                self.scaleParameters.customersPerDistrict / 10,
+                self.scaleParameters.customersPerDistrict // 10,
                 1,
                 self.scaleParameters.customersPerDistrict,
             )
@@ -204,7 +204,7 @@ class Loader:
         ## Select 10% of the stock to be marked "original"
         s_tuples = []
         selectedRows = rand.selectUniqueIds(
-            self.scaleParameters.items / 10, 1, self.scaleParameters.items
+            self.scaleParameters.items // 10, 1, self.scaleParameters.items
         )
         total_tuples = 0
         for i_id in range(1, self.scaleParameters.items + 1):

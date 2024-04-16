@@ -35,12 +35,13 @@ import argparse
 import glob
 import time
 import multiprocessing
-from ConfigParser import SafeConfigParser
+import pathlib
+from configparser import ConfigParser
 from pprint import pprint, pformat
 
-from util import *
-from runtime import *
-import drivers
+from .util import *
+from .runtime import *
+from .drivers.braddriver import BradDriver
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,10 +55,9 @@ logging.basicConfig(
 ## createDriverClass
 ## ==============================================
 def createDriverClass(name):
-    full_name = "%sDriver" % name.title()
-    mod = __import__("drivers.%s" % full_name.lower(), globals(), locals(), [full_name])
-    klass = getattr(mod, full_name)
-    return klass
+    if name != "brad":
+        raise NotImplementedError
+    return BradDriver
 
 
 ## DEF
@@ -70,7 +70,7 @@ def getDrivers():
     drivers = []
     for f in map(
         lambda x: os.path.basename(x).replace("driver.py", ""),
-        glob.glob("./drivers/*driver.py"),
+        glob.glob(str(pathlib.Path(__file__).parent.resolve()) + "/drivers/*driver.py"),
     ):
         if f != "abstract":
             drivers.append(f)
@@ -217,9 +217,7 @@ if __name__ == "__main__":
         description="Python implementation of the TPC-C Benchmark"
     )
     aparser.add_argument("system", choices=getDrivers(), help="Target system driver")
-    aparser.add_argument(
-        "--config", type=file, help="Path to driver configuration file"
-    )
+    aparser.add_argument("--config", type=str, help="Path to driver configuration file")
     aparser.add_argument(
         "--reset",
         action="store_true",
@@ -291,14 +289,13 @@ if __name__ == "__main__":
     if args["print_config"]:
         config = driver.makeDefaultConfig()
         print(driver.formatConfig(config))
-        print
         sys.exit(0)
 
     ## Load Configuration file
     if args["config"]:
         logging.debug("Loading configuration file '%s'" % args["config"])
-        cparser = SafeConfigParser()
-        cparser.read(os.path.realpath(args["config"].name))
+        cparser = ConfigParser()
+        cparser.read(os.path.realpath(args["config"]))
         config = dict(cparser.items(args["system"]))
     else:
         logging.debug("Using default configuration for %s" % args["system"])
@@ -355,7 +352,10 @@ if __name__ == "__main__":
         else:
             results = startExecution(driverClass, scaleParameters, args, config)
         assert results
-        print(results.show(load_time))
+        if isinstance(results, int):
+            print("Result:", results)
+        else:
+            print(results.show(load_time))
     ## IF
 
 ## MAIN

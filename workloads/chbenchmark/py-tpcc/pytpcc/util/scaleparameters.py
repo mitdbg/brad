@@ -30,7 +30,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 # -----------------------------------------------------------------------
 
-import constants
+from .. import constants
 
 
 def makeDefault(warehouses):
