@@ -90,12 +90,17 @@ class BradFrontEnd(BradInterface):
             from brad.front_end.flight_sql_server import BradFlightSqlServer
 
             self._flight_sql_server: Optional[BradFlightSqlServer] = (
-                BradFlightSqlServer(host="0.0.0.0",
-                                    port=31337,
-                                    callback=self._handle_query_from_flight_sql)
+                BradFlightSqlServer(
+                    host="0.0.0.0",
+                    port=31337,
+                    callback=self._handle_query_from_flight_sql,
+                )
             )
+            self._flight_sql_server_session_id = None
         else:
             self._flight_sql_server = None
+
+        self._main_thread_loop = None
 
         self._fe_index = fe_index
         self._config = config
@@ -195,7 +200,7 @@ class BradFrontEnd(BradInterface):
     def _handle_query_from_flight_sql(self, query: str) -> RowList:
         future = asyncio.run_coroutine_threadsafe(
             self._run_query_impl(self._flight_sql_server_session_id, query, {}),
-            self._main_thread_loop
+            self._main_thread_loop,
         )
         row_result = future.result()
 
