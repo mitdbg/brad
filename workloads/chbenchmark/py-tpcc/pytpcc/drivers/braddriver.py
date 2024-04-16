@@ -499,23 +499,29 @@ class BradDriver(AbstractDriver):
             raise
 
     def doStockLevel(self, params: Dict[str, Any]) -> int:
-        assert self._client is not None
+        try:
+            assert self._client is not None
 
-        q = TXN_QUERIES["STOCK_LEVEL"]
-        w_id = params["w_id"]
-        d_id = params["d_id"]
-        threshold = params["threshold"]
+            q = TXN_QUERIES["STOCK_LEVEL"]
+            w_id = params["w_id"]
+            d_id = params["d_id"]
+            threshold = params["threshold"]
 
-        self._client.run_query_json("BEGIN")
-        r, _ = self._client.run_query_json(["getOId"].format(w_id, d_id))
-        result = r[0]
-        assert result
-        o_id = result[0]
+            self._client.run_query_json("BEGIN")
+            r, _ = self._client.run_query_json(q["getOId"].format(w_id, d_id))
+            result = r[0]
+            assert result
+            o_id = result[0]
 
-        r, _ = self._client.run_query_json(
-            q["getStockCount"].format(w_id, d_id, o_id, (o_id - 20), w_id, threshold)
-        )
-        result = r[0]
+            r, _ = self._client.run_query_json(
+                q["getStockCount"].format(w_id, d_id, o_id, (o_id - 20), w_id, threshold)
+            )
+            result = r[0]
 
-        self._client.run_query_json("COMMIT")
-        return int(result[0])
+            self._client.run_query_json("COMMIT")
+            return int(result[0])
+
+        except Exception as ex:
+            print("Error in STOCK_LEVEL", str(ex))
+            print(traceback.format_exc())
+            raise
