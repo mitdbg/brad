@@ -96,11 +96,11 @@ class BradFrontEnd(BradInterface):
                     callback=self._handle_query_from_flight_sql,
                 )
             )
-            self._flight_sql_server_session_id = None
+            self._flight_sql_server_session_id: Optional[SessionId] = None
         else:
             self._flight_sql_server = None
 
-        self._main_thread_loop = None
+        self._main_thread_loop: Optional[AbstractEventLoop] = None
 
         self._fe_index = fe_index
         self._config = config
@@ -198,6 +198,8 @@ class BradFrontEnd(BradInterface):
         self._is_stub_mode = self._config.stub_mode_path is not None
 
     def _handle_query_from_flight_sql(self, query: str) -> RowList:
+        assert self._flight_sql_server_session_id is not None
+
         future = asyncio.run_coroutine_threadsafe(
             self._run_query_impl(self._flight_sql_server_session_id, query, {}),
             self._main_thread_loop,
