@@ -514,7 +514,9 @@ class BradDriver(AbstractDriver):
             o_id = result[0]
 
             r, _ = self._client.run_query_json(
-                q["getStockCount"].format(w_id, d_id, o_id, (o_id - 20), w_id, threshold)
+                q["getStockCount"].format(
+                    w_id, d_id, o_id, (o_id - 20), w_id, threshold
+                )
             )
             result = r[0]
 
