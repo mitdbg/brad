@@ -28,12 +28,12 @@ TXN_QUERIES = {
         "getDistrict": "SELECT d_tax, d_next_o_id FROM district WHERE d_id = {} AND d_w_id = {}",  # d_id, w_id
         "incrementNextOrderId": "UPDATE district SET d_next_o_id = {} WHERE d_id = {} AND d_w_id = {}",  # d_next_o_id, d_id, w_id
         "getCustomer": "SELECT c_discount, c_last, c_credit FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # w_id, d_id, c_id
-        "createOrder": "INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_carrier_id, o_ol_cnt, o_all_local) VALUES ({}, {}, {}, {}, {}, {}, {}, {})",  # d_next_o_id, d_id, w_id, c_id, o_entry_d, o_carrier_id, o_ol_cnt, o_all_local
+        "createOrder": "INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_carrier_id, o_ol_cnt, o_all_local) VALUES ({}, {}, {}, {}, '{}', {}, {}, {})",  # d_next_o_id, d_id, w_id, c_id, o_entry_d, o_carrier_id, o_ol_cnt, o_all_local
         "createNewOrder": "INSERT INTO new_order (no_o_id, no_d_id, no_w_id) VALUES ({}, {}, {})",  # o_id, d_id, w_id
         "getItemInfo": "SELECT i_price, i_name, i_data FROM item WHERE i_id = {}",  # ol_i_id
         "getStockInfo": "SELECT s_quantity, s_data, s_ytd, s_order_cnt, s_remote_cnt, s_dist_{:02d} FROM stock WHERE s_i_id = {} AND s_w_id = {}",  # d_id, ol_i_id, ol_supply_w_id
         "updateStock": "UPDATE stock SET s_quantity = {}, s_ytd = {}, s_order_cnt = {}, s_remote_cnt = {} WHERE s_i_id = {} AND s_w_id = {}",  # s_quantity, s_order_cnt, s_remote_cnt, ol_i_id, ol_supply_w_id
-        "createOrderLine": "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {}, {})",  # o_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info
+        "createOrderLine": "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES ({}, {}, {}, {}, {}, {}, '{}', {}, {}, '{}')",  # o_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info
     },
     "ORDER_STATUS": {
         "getCustomerByCustomerId": "SELECT c_id, c_first, c_middle, c_last, c_balance FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # w_id, d_id, c_id
@@ -201,18 +201,17 @@ class BradDriver(AbstractDriver):
             self._client.run_query_json(
                 q["incrementNextOrderId"].format(d_next_o_id + 1, d_id, w_id)
             )
-            self._client.run_query_json(
-                q["createOrder"].format(
-                    d_next_o_id,
-                    d_id,
-                    w_id,
-                    c_id,
-                    o_entry_d,
-                    o_carrier_id,
-                    ol_cnt,
-                    all_local,
-                ),
+            createOrder = q["createOrder"].format(
+                d_next_o_id,
+                d_id,
+                w_id,
+                c_id,
+                o_entry_d.strftime("%Y-%m-%d %H:%M:%S"),
+                o_carrier_id,
+                ol_cnt,
+                1 if all_local else 0,
             )
+            self._client.run_query_json(createOrder)
             self._client.run_query_json(
                 q["createNewOrder"].format(d_next_o_id, d_id, w_id)
             )
@@ -231,23 +230,23 @@ class BradDriver(AbstractDriver):
                 itemInfo = items[i]
                 i_name = itemInfo[1]
                 i_data = itemInfo[2]
-                i_price = itemInfo[0]
+                i_price = decimal.Decimal(itemInfo[0])
 
-                self._client.run_query_json(
+                r, _ = self._client.run_query_json(
                     q["getStockInfo"].format(d_id, ol_i_id, ol_supply_w_id)
                 )
-                stockInfo = self.cursor.fetchone()
-                if len(stockInfo) == 0:
+                if len(r) == 0:
                     logger.warning(
                         "No STOCK record for (ol_i_id=%d, ol_supply_w_id=%d)",
                         ol_i_id,
                         ol_supply_w_id,
                     )
                     continue
+                stockInfo = r[0]
                 s_quantity = stockInfo[0]
-                s_ytd = stockInfo[2]
-                s_order_cnt = stockInfo[3]
-                s_remote_cnt = stockInfo[4]
+                s_ytd = decimal.Decimal(stockInfo[2])
+                s_order_cnt = int(stockInfo[3])
+                s_remote_cnt = int(stockInfo[4])
                 s_data = stockInfo[1]
                 s_dist_xx = stockInfo[5]  # Fetches data from the s_dist_[d_id] column
 
@@ -265,7 +264,7 @@ class BradDriver(AbstractDriver):
                 self._client.run_query_json(
                     q["updateStock"].format(
                         s_quantity,
-                        s_ytd,
+                        s_ytd.quantize(decimal.Decimal("1.00")),
                         s_order_cnt,
                         s_remote_cnt,
                         ol_i_id,
@@ -285,20 +284,19 @@ class BradDriver(AbstractDriver):
                 ol_amount = ol_quantity * i_price
                 total += ol_amount
 
-                self._client.run_query_json(
-                    q["createOrderLine"].format(
-                        d_next_o_id,
-                        d_id,
-                        w_id,
-                        ol_number,
-                        ol_i_id,
-                        ol_supply_w_id,
-                        o_entry_d,
-                        ol_quantity,
-                        ol_amount,
-                        s_dist_xx,
-                    ),
+                createOrderLine = q["createOrderLine"].format(
+                    d_next_o_id,
+                    d_id,
+                    w_id,
+                    ol_number,
+                    ol_i_id,
+                    ol_supply_w_id,
+                    o_entry_d.strftime("%Y-%m-%d %H:%M:%S"),
+                    ol_quantity,
+                    ol_amount,
+                    s_dist_xx,
                 )
+                self._client.run_query_json(createOrderLine)
 
                 ## Add the info to be returned
                 item_data.append(
@@ -313,7 +311,11 @@ class BradDriver(AbstractDriver):
             # print "c_discount:", c_discount, type(c_discount)
             # print "w_tax:", w_tax, type(w_tax)
             # print "d_tax:", d_tax, type(d_tax)
-            total *= (1 - c_discount) * (1 + w_tax + d_tax)
+            total = int(
+                total
+                * (1 - decimal.Decimal(c_discount))
+                * (1 + decimal.Decimal(w_tax) + decimal.Decimal(d_tax))
+            )
 
             ## Pack up values the client is missing (see TPC-C 2.4.3.5)
             misc = [(w_tax, d_tax, d_next_o_id, total)]
