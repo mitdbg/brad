@@ -39,7 +39,6 @@ pybind11_add_module(pybind_brad_server pybind/brad_server.cc
                                        server/brad_statement.cc
                                        server/brad_tables_schema_batch_reader.cc)
 
-
 target_link_libraries(pybind_brad_server
                       PRIVATE Arrow::arrow_shared
                       PRIVATE ArrowFlight::arrow_flight_shared

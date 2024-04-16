@@ -59,6 +59,7 @@ logger = logging.getLogger(__name__)
 
 LINESEP = "\n".encode()
 
+
 class BradFrontEnd(BradInterface):
     @staticmethod
     def native_server_is_supported() -> bool:
@@ -252,7 +253,6 @@ class BradFrontEnd(BradInterface):
 
         if not self._is_stub_mode:
             self._qlogger_refresh_task = asyncio.create_task(self._refresh_qlogger())
-
         self._watchdog.start(self._main_thread_loop)
         self._ping_watchdog_task = asyncio.create_task(self._ping_watchdog())
 

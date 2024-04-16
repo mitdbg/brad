@@ -2,7 +2,6 @@
 
 #include <arrow/builder.h>
 #include "brad_statement.h"
-#include <iostream>
 
 namespace brad {
 

@@ -5,7 +5,6 @@
 #include <sstream>
 #include <unordered_map>
 #include <utility>
-#include <iostream>
 #include <functional>
 #include <any>
 
@@ -29,17 +28,17 @@ using arrow::internal::checked_cast;
 using namespace arrow::flight;
 using namespace arrow::flight::sql;
 
+std::string GetQueryTicket(
+  const std::string &autoincrement_id,
+  const std::string &transaction_id) {
+  return transaction_id + ':' + autoincrement_id;
+}
+
 arrow::Result<Ticket> EncodeTransactionQuery(
   const std::string &query_ticket) {
   ARROW_ASSIGN_OR_RAISE(auto ticket_string,
                         CreateStatementQueryTicket(query_ticket));
   return Ticket{std::move(ticket_string)};
-}
-
-std::string GetQueryTicket(
-  const std::string &query,
-  const std::string &transaction_id) {
-  return transaction_id + ':' + query;
 }
 
 arrow::Result<std::pair<std::string, std::string>> DecodeTransactionQuery(
@@ -122,8 +121,7 @@ arrow::Result<std::unique_ptr<FlightInfo>>
 
   { 
     py::gil_scoped_acquire guard;
-    std::vector<py::tuple> query_result;
-    query_result = handle_query_(query);
+    std::vector<py::tuple> query_result = handle_query_(query);
     transformed_query_result = TransformQueryResult(query_result);
   }
 
