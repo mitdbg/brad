@@ -19,7 +19,7 @@ TXN_QUERIES = {
         "deleteNewOrder": "DELETE FROM new_order WHERE no_d_id = {} AND no_w_id = {} AND no_o_id = {}",  # d_id, w_id, no_o_id
         "getCId": "SELECT o_c_id FROM orders WHERE o_id = {} AND o_d_id = {} AND o_w_id = {}",  # no_o_id, d_id, w_id
         "updateOrders": "UPDATE orders SET o_carrier_id = {} WHERE o_id = {} AND o_d_id = {} AND o_w_id = {}",  # o_carrier_id, no_o_id, d_id, w_id
-        "updateOrderLine": "UPDATE order_line SET ol_delivery_d = {} WHERE ol_o_id = {} AND ol_d_id = {} AND ol_w_id = {}",  # o_entry_d, no_o_id, d_id, w_id
+        "updateOrderLine": "UPDATE order_line SET ol_delivery_d = '{}' WHERE ol_o_id = {} AND ol_d_id = {} AND ol_w_id = {}",  # o_entry_d, no_o_id, d_id, w_id
         "sumOLAmount": "SELECT SUM(ol_amount) FROM order_line WHERE ol_o_id = {} AND ol_d_id = {} AND ol_w_id = {}",  # no_o_id, d_id, w_id
         "updateCustomer": "UPDATE customer SET c_balance = c_balance + {} WHERE c_id = {} AND c_d_id = {} AND c_w_id = {}",  # ol_total, c_id, d_id, w_id
     },
@@ -90,55 +90,69 @@ class BradDriver(AbstractDriver):
         pass
 
     def doDelivery(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
-        assert self._client is not None
+        try:
+            assert self._client is not None
 
-        q = TXN_QUERIES["DELIVERY"]
-        w_id = params["w_id"]
-        o_carrier_id = params["o_carrier_id"]
-        ol_delivery_d = params["ol_delivery_d"]
+            q = TXN_QUERIES["DELIVERY"]
+            w_id = params["w_id"]
+            o_carrier_id = params["o_carrier_id"]
+            ol_delivery_d = params["ol_delivery_d"]
 
-        result = []
-        self._client.run_query_json("BEGIN")
-        for d_id in range(1, constants.DISTRICTS_PER_WAREHOUSE + 1):
-            r, _ = self._client.run_query_json(q["getNewOrder"].format(d_id, w_id))
-            if len(r) == 0:
-                ## No orders for this district: skip it. Note: This must be reported if > 1%
-                continue
-            no_o_id = r[0][0]
+            result: List[Tuple[Any, ...]] = []
+            self._client.run_query_json("BEGIN")
+            for d_id in range(1, constants.DISTRICTS_PER_WAREHOUSE + 1):
+                r, _ = self._client.run_query_json(q["getNewOrder"].format(d_id, w_id))
+                if len(r) == 0:
+                    ## No orders for this district: skip it. Note: This must be reported if > 1%
+                    continue
+                no_o_id = r[0][0]
 
-            r, _ = self._client.run_query_json(q["getCId"].format(no_o_id, d_id, w_id))
-            c_id = r[0][0]
+                r, _ = self._client.run_query_json(
+                    q["getCId"].format(no_o_id, d_id, w_id)
+                )
+                c_id = r[0][0]
 
-            r, _ = self._client.run_query_json(
-                q["sumOLAmount"].format(no_o_id, d_id, w_id)
-            )
-            ol_total = r[0][0]
+                r, _ = self._client.run_query_json(
+                    q["sumOLAmount"].format(no_o_id, d_id, w_id)
+                )
+                ol_total = decimal.Decimal(r[0][0])
 
-            self._client.run_query_json(q["deleteNewOrder"].format(d_id, w_id, no_o_id))
-            self._client.run_query_json(
-                q["updateOrders"].format(o_carrier_id, no_o_id, d_id, w_id)
-            )
-            self._client.run_query_json(
-                q["updateOrderLine"].format(ol_delivery_d, no_o_id, d_id, w_id)
-            )
+                self._client.run_query_json(
+                    q["deleteNewOrder"].format(d_id, w_id, no_o_id)
+                )
+                updateOrders = q["updateOrders"].format(
+                    o_carrier_id, no_o_id, d_id, w_id
+                )
+                self._client.run_query_json(updateOrders)
+                updateOrderLine = q["updateOrderLine"].format(
+                    ol_delivery_d.strftime("%Y-%m-%d %H:%M:%S"), no_o_id, d_id, w_id
+                )
+                self._client.run_query_json(updateOrderLine)
 
-            # These must be logged in the "result file" according to TPC-C 2.7.2.2 (page 39)
-            # We remove the queued time, completed time, w_id, and o_carrier_id: the client can figure
-            # them out
-            # If there are no order lines, SUM returns null. There should always be order lines.
-            assert (
-                ol_total != None
-            ), "ol_total is NULL: there are no order lines. This should not happen"
-            assert ol_total > 0.0
+                # These must be logged in the "result file" according to TPC-C 2.7.2.2 (page 39)
+                # We remove the queued time, completed time, w_id, and o_carrier_id: the client can figure
+                # them out
+                # If there are no order lines, SUM returns null. There should always be order lines.
+                assert (
+                    ol_total != None
+                ), "ol_total is NULL: there are no order lines. This should not happen"
+                assert ol_total > 0.0
 
-            self._client.run_query_json(
-                q["updateCustomer"].format(ol_total, c_id, d_id, w_id)
-            )
+                self._client.run_query_json(
+                    q["updateCustomer"].format(
+                        ol_total.quantize(decimal.Decimal("1.00")), c_id, d_id, w_id
+                    )
+                )
 
-            result.append((d_id, no_o_id))
+                result.append((d_id, no_o_id))
 
-        self._client.run_query_json("COMMIT")
-        return result
+            self._client.run_query_json("COMMIT")
+            return result
+
+        except Exception as ex:
+            print("Error in DELIVERY", str(ex))
+            print(traceback.format_exc())
+            raise
 
     def doNewOrder(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
         try:
@@ -358,7 +372,6 @@ class BradDriver(AbstractDriver):
             assert c_id != None
 
             getLastOrder = q["getLastOrder"].format(w_id, d_id, c_id)
-            print("#@!@#", getLastOrder)
             r, _ = self._client.run_query_json(getLastOrder)
             order = r[0]
             if order:
