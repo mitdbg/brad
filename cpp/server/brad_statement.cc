@@ -13,11 +13,6 @@
 #include <arrow/type.h>
 #include <arrow/util/checked_cast.h>
 
-#include <pybind11/pybind11.h>
-
-namespace py = pybind11;
-using namespace pybind11::literals;
-
 namespace brad {
 
 using arrow::internal::checked_cast;

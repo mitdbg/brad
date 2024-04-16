@@ -5,8 +5,6 @@
 #include <sstream>
 #include <unordered_map>
 #include <utility>
-#include <functional>
-#include <any>
 
 #include <arrow/array/builder_binary.h>
 #include "brad_sql_info.h"
@@ -17,10 +15,6 @@
 #include <arrow/scalar.h>
 #include <arrow/util/checked_cast.h>
 #include <arrow/util/logging.h>
-
-#include <pybind11/pybind11.h>
-
-namespace py = pybind11;
 
 namespace brad {
 
@@ -55,18 +49,18 @@ arrow::Result<std::pair<std::string, std::string>> DecodeTransactionQuery(
 std::vector<std::vector<std::any>> TransformQueryResult(
   std::vector<py::tuple> query_result) {
   std::vector<std::vector<std::any>> transformed_query_result;
-  for (const auto &tup : query_result) {
-    std::vector<std::any> transformed_tup{};
-    for (const auto &elt : tup) {
-      if (py::isinstance<py::int_>(elt)) {
-        transformed_tup.push_back(std::make_any<int>(py::cast<int>(elt)));
-      } else if (py::isinstance<py::float_>(elt)) {
-        transformed_tup.push_back(std::make_any<float>(py::cast<float>(elt)));
+  for (const auto &row : query_result) {
+    std::vector<std::any> transformed_row{};
+    for (const auto &field : row) {
+      if (py::isinstance<py::int_>(field)) {
+        transformed_row.push_back(std::make_any<int>(py::cast<int>(field)));
+      } else if (py::isinstance<py::float_>(field)) {
+        transformed_row.push_back(std::make_any<float>(py::cast<float>(field)));
       } else {
-        transformed_tup.push_back(std::make_any<std::string>(py::cast<std::string>(elt)));
+        transformed_row.push_back(std::make_any<std::string>(py::cast<std::string>(field)));
       }
     }
-    transformed_query_result.push_back(transformed_tup);
+    transformed_query_result.push_back(transformed_row);
   }
   return transformed_query_result;  
 }
