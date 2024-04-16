@@ -85,22 +85,19 @@ async fn run_query_and_print_results(
 async fn run_tpch_queries(db: &DB, repetitions: u32) -> Result<(), DataFusionError> {
     let mut writer = csv::Writer::from_writer(io::stdout());
     writer
-        .write_record(&["query", "avg_run_time_ms"])
+        .write_record(&["query", "run_time_ms"])
         .map_err(|e| DataFusionError::External(Box::new(e)))?;
     for q in 1..23 {
         let path = format!("./tpch/queries/{q}.sql");
         let query = fs::read_to_string(path)?;
-        let mut total_time = 0;
         // Discard first run to allow for caching/initialization overhead
         run_timed_query(&db, &query).await?;
         for _ in 0..repetitions {
             let rt = run_timed_query(&db, &query).await?;
-            total_time += &rt.as_millis();
+            writer
+            .write_record(&[&q.to_string(), &rt.as_millis().to_string()])
+            .map_err(|e| DataFusionError::External(Box::new(e)))?;
         }
-        let avg_time = total_time / (repetitions as u128);
-        writer
-        .write_record(&[&q.to_string(), &avg_time.to_string()])
-        .map_err(|e| DataFusionError::External(Box::new(e)))?;
     }
     writer.flush()?;
     Ok(())
@@ -239,6 +236,12 @@ async fn main() -> Result<(), DataFusionError> {
             } else {
                 eprintln!("\nNo modifications.");
             }
+        }
+        Some(ref s) if s == "qs_explain" => {
+            let query = String::from(QUERY_SIMPLE);
+            let orig_physical_plan = db.to_physical_plan(&query).await?;
+            let dpp = displayable(orig_physical_plan.as_ref());
+            eprintln!("\nOriginal plan\n{}", dpp.indent(false));
         }
         _ => (),
     }
