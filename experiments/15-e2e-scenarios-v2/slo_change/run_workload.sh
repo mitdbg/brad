@@ -15,11 +15,11 @@ log_workload_point "brad_start_initiated"
 sleep 30
 
 log_workload_point "clients_starting"
-# 16 clients, offset 4 (for the transactional clients)
-start_repeating_olap_runner 16 5 2 $ra_query_indexes "ra_16" 4
+# 8 clients, offset 12 (for the transactional clients)
+start_repeating_olap_runner 8 5 2 $ra_query_indexes "ra_8" 12
 rana_pid=$runner_pid
 
-start_txn_runner_serial 4  # Implicit: --dataset-type
+start_txn_runner_serial 12  # Implicit: --dataset-type
 txn_pid=$runner_pid
 
 log_workload_point "clients_started"
