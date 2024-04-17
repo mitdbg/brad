@@ -72,22 +72,33 @@ class BradDriver(AbstractDriver):
     DEFAULT_CONFIG = {
         "host": ("Host running the BRAD front end.", "localhost"),
         "port": ("Port on which the BRAD front end is listening.", 6583),
+        "isolation_level": ("The isolation level to use.", "REPEATABLE READ"),
     }
 
     def __init__(self, ddl: str) -> None:
         super().__init__("brad", ddl)
         self._client: Optional[BradGrpcClient] = None
+        self._config: Dict[str, Any] = {}
 
     def makeDefaultConfig(self) -> Config:
         return BradDriver.DEFAULT_CONFIG
 
     def loadConfig(self, config: Config) -> None:
+        self._config = config
         self._client = BradGrpcClient(host=config["host"], port=config["port"])
         self._client.connect()
 
     def loadTuples(self, tableName: str, tuples) -> None:
         # We don't support data loading directly here.
         pass
+
+    def executeStart(self):
+        # We use this callback to set the isolation level.
+        logger.info("Setting isolation level to %s", self._config["isolation_level"])
+        self._client.run_query_ignore_results(
+            f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {self._config['isolation_level']}"
+        )
+        return None
 
     def doDelivery(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
         try:
