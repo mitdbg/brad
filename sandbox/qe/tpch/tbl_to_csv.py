@@ -13,7 +13,7 @@ def converttbldatatocsvformat(filename, header):
     lines = tbl.readlines()
     for line in lines:
         length = len(line)
-        line = line[:-2] + line[-1:]
+        line = line[:-2] + line[-1:]  # remove trailing delimiter
         line = line.replace(",","N")
         line = line.replace("|",",")
         csv.write(line)
