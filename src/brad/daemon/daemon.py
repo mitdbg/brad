@@ -760,7 +760,7 @@ class BradDaemon:
             if self._system_event_logger is not None:
                 self._system_event_logger.log(
                     SystemEvent.ChangedSlos,
-                    f"query_p90_s={query_p90_s}, txn_p90_s={txn_p90_s}",
+                    f"query_p90_s={query_p90_s}; txn_p90_s={txn_p90_s}",
                 )
 
             return [
