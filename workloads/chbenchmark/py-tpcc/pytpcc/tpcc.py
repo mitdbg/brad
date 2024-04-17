@@ -202,7 +202,9 @@ def executorFunc(driverClass, scaleParameters, args, config, debug, worker_index
         config["reset"] = False
         driver.loadConfig(config)
 
-        e = executor.Executor(driver, scaleParameters, stop_on_error=args["stop_on_error"])
+        e = executor.Executor(
+            driver, scaleParameters, stop_on_error=args["stop_on_error"]
+        )
         driver.executeStart()
         results = e.execute(args["duration"], worker_index)
         driver.executeFinish()
