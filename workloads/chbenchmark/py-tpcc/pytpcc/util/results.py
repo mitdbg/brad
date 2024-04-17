@@ -26,18 +26,57 @@
 
 import logging
 import time
+import pathlib
+import random
+import pytz
+from datetime import datetime
+from typing import Dict, Any, Optional, Tuple
+from io import TextIOWrapper
+
+NAME_TO_IDX = {
+    "DELIVERY": 0,
+    "NEW_ORDER": 1,
+    "ORDER_STATUS": 2,
+    "PAYMENT": 3,
+    "STOCK_LEVEL": 4,
+}
 
 
 class Results:
-
-    def __init__(self):
+    def __init__(self, options: Optional[Dict[str, Any]] = None) -> None:
         self.start = None
         self.stop = None
         self.txn_id = 0
 
-        self.txn_counters = {}
-        self.txn_times = {}
-        self.running = {}
+        self.txn_counters: Dict[str, int] = {}
+        self.txn_abort_counters: Dict[str, int] = {}
+        self.txn_times: Dict[str, float] = {}
+        self.running: Dict[str, Tuple[str, float, datetime]] = {}
+
+        if options is not None and "record_individual" in options:
+            worker_index = options["worker_index"]
+            output_prefix = pathlib.Path(options["output_prefix"])
+            self._lat_file: Optional[TextIOWrapper] = open(
+                output_prefix / "oltp_latency_{}.csv".format(worker_index),
+                "w",
+                encoding="UTF-8",
+            )
+            self._stats_file: Optional[TextIOWrapper] = open(
+                output_prefix / "oltp_stats_{}.csv".format(worker_index),
+                "w",
+                encoding="UTF-8",
+            )
+            self._lat_sample_prob = options["lat_sample_prob"]
+            self._prng: Optional[random.Random] = random.Random(
+                worker_index
+            )  # Deterministic pseudorandom.
+            print("txn_idx,timestamp,run_time_s", file=self._lat_file, flush=True)
+            print("stat,value", file=self._stats_file, flush=True)
+        else:
+            self._lat_file = None
+            self._stats_file = None
+            self._lat_sample_prob = 0.0
+            self._prng = None
 
     def startBenchmark(self):
         """Mark the benchmark as having been started"""
@@ -53,22 +92,40 @@ class Results:
         logging.debug("Stopping benchmark statistics collection")
         self.stop = time.time()
 
-    def startTransaction(self, txn):
+        if self._lat_file is not None:
+            self._lat_file.close()
+            self._lat_file = None
+
+        if self._stats_file is not None:
+            for txn_name in NAME_TO_IDX.keys():
+                commits = self.txn_counters.get(txn_name, 0)
+                aborts = self.txn_abort_counters.get(txn_name, 0)
+                print(f"{txn_name.lower()}_commits,{commits}", file=self._stats_file)
+                print(f"{txn_name.lower()}_aborts,{aborts}", file=self._stats_file)
+            self._stats_file.close()
+            self._stats_file = None
+
+    def startTransaction(self, txn: str) -> int:
         self.txn_id += 1
         id = self.txn_id
-        self.running[id] = (txn, time.time())
+        self.running[id] = (txn, time.time(), datetime.now(tz=pytz.utc))
         return id
 
-    def abortTransaction(self, id):
+    def abortTransaction(self, id: int) -> None:
         """Abort a transaction and discard its times"""
         assert id in self.running
-        txn_name, txn_start = self.running[id]
+        txn_name, _, _ = self.running[id]
         del self.running[id]
 
-    def stopTransaction(self, id):
+        if txn_name not in self.txn_abort_counters:
+            self.txn_abort_counters[txn_name] = 1
+        else:
+            self.txn_abort_counters[txn_name] += 1
+
+    def stopTransaction(self, id: int) -> None:
         """Record that the benchmark completed an invocation of the given transaction"""
         assert id in self.running
-        txn_name, txn_start = self.running[id]
+        txn_name, txn_start, start_ts = self.running[id]
         del self.running[id]
 
         duration = time.time() - txn_start
@@ -78,7 +135,15 @@ class Results:
         total_cnt = self.txn_counters.get(txn_name, 0)
         self.txn_counters[txn_name] = total_cnt + 1
 
-    def append(self, r):
+        if self._prng is not None and self._lat_file is not None:
+            if self._prng.random() < self._lat_sample_prob:
+                print(
+                    f"{NAME_TO_IDX[txn_name]},{start_ts},{duration}",
+                    file=self._lat_file,
+                    flush=True,
+                )
+
+    def append(self, r: "Results") -> None:
         for txn_name in r.txn_counters.keys():
             orig_cnt = self.txn_counters.get(txn_name, 0)
             orig_time = self.txn_times.get(txn_name, 0)
@@ -90,7 +155,7 @@ class Results:
         self.start = r.start
         self.stop = r.stop
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.show()
 
     def show(self, load_time=None):
