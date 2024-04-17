@@ -53,7 +53,7 @@ class Results:
         self.txn_times: Dict[str, float] = {}
         self.running: Dict[str, Tuple[str, float, datetime]] = {}
 
-        if options is not None and "record_individual" in options:
+        if options is not None and "record_detailed" in options:
             worker_index = options["worker_index"]
             output_prefix = pathlib.Path(options["output_prefix"])
             self._lat_file: Optional[TextIOWrapper] = open(

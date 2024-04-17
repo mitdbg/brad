@@ -62,6 +62,7 @@ DEV_REQUIRES = [
     "typing-extensions",
     "types-tabulate",
     "matplotlib",
+    "conductor-cli",
 ]
 
 UI_REQUIRES = [

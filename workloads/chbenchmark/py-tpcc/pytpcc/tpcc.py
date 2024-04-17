@@ -164,6 +164,7 @@ def startExecution(driverClass, scaleParameters, args, config):
                 args,
                 config,
                 debug,
+                i,
             ),
         )
         worker_results.append(r)
@@ -190,7 +191,7 @@ def startExecution(driverClass, scaleParameters, args, config):
 ## ==============================================
 ## executorFunc
 ## ==============================================
-def executorFunc(driverClass, scaleParameters, args, config, debug):
+def executorFunc(driverClass, scaleParameters, args, config, debug, worker_index):
     driver = driverClass(args["ddl"])
     assert driver != None
     logging.debug("Starting client execution: %s" % driver)
@@ -201,7 +202,7 @@ def executorFunc(driverClass, scaleParameters, args, config, debug):
 
     e = executor.Executor(driver, scaleParameters, stop_on_error=args["stop_on_error"])
     driver.executeStart()
-    results = e.execute(args["duration"])
+    results = e.execute(args["duration"], worker_index)
     driver.executeFinish()
 
     return results
@@ -347,7 +348,7 @@ if __name__ == "__main__":
                 driver, scaleParameters, stop_on_error=args["stop_on_error"]
             )
             driver.executeStart()
-            results = e.execute(args["duration"])
+            results = e.execute(args["duration"], worker_index=0)
             driver.executeFinish()
         else:
             results = startExecution(driverClass, scaleParameters, args, config)
