@@ -52,6 +52,7 @@ class Results:
         self.txn_abort_counters: Dict[str, int] = {}
         self.txn_times: Dict[str, float] = {}
         self.running: Dict[str, Tuple[str, float, datetime]] = {}
+        self.options = options
 
         if options is not None and "record_detailed" in options:
             worker_index = options["worker_index"]
@@ -77,6 +78,34 @@ class Results:
             self._stats_file = None
             self._lat_sample_prob = 0.0
             self._prng = None
+
+    def __getstate__(self) -> object:
+        # We need a custom implementation to avoid serializing the file handles.
+        return {
+            "start": self.start,
+            "stop": self.stop,
+            "txn_id": self.txn_id,
+            "txn_counters": self.txn_counters,
+            "txn_abort_counters": self.txn_abort_counters,
+            "txn_times": self.txn_times,
+            "running": self.running,
+            "options": self.options,
+        }
+
+    def __setstate__(self, d: Dict[Any, Any]) -> None:
+        self.start = d["start"]
+        self.stop = d["stop"]
+        self.txn_id = d["txn_id"]
+        self.txn_counters = d["txn_counters"]
+        self.txn_abort_counters = d["txn_abort_counters"]
+        self.txn_times = d["txn_times"]
+        self.running = d["running"]
+        self.options = d["options"]
+
+        self._lat_file = None
+        self._stats_file = None
+        self._lat_sample_prob = 0.0
+        self._prng = None
 
     def startBenchmark(self):
         """Mark the benchmark as having been started"""

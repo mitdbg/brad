@@ -36,6 +36,7 @@ import glob
 import time
 import multiprocessing
 import pathlib
+import traceback
 from configparser import ConfigParser
 from pprint import pprint, pformat
 
@@ -192,20 +193,25 @@ def startExecution(driverClass, scaleParameters, args, config):
 ## executorFunc
 ## ==============================================
 def executorFunc(driverClass, scaleParameters, args, config, debug, worker_index):
-    driver = driverClass(args["ddl"])
-    assert driver != None
-    logging.debug("Starting client execution: %s" % driver)
+    try:
+        driver = driverClass(args["ddl"])
+        assert driver != None
+        logging.debug("Starting client execution: %s" % driver)
 
-    config["execute"] = True
-    config["reset"] = False
-    driver.loadConfig(config)
+        config["execute"] = True
+        config["reset"] = False
+        driver.loadConfig(config)
 
-    e = executor.Executor(driver, scaleParameters, stop_on_error=args["stop_on_error"])
-    driver.executeStart()
-    results = e.execute(args["duration"], worker_index)
-    driver.executeFinish()
+        e = executor.Executor(driver, scaleParameters, stop_on_error=args["stop_on_error"])
+        driver.executeStart()
+        results = e.execute(args["duration"], worker_index)
+        driver.executeFinish()
 
-    return results
+        return results
+    except Exception as ex:
+        print("Error in worker", worker_index, str(ex))
+        print(traceback.format_exc())
+        raise
 
 
 ## DEF
@@ -214,6 +220,11 @@ def executorFunc(driverClass, scaleParameters, args, config, debug, worker_index
 ## main
 ## ==============================================
 if __name__ == "__main__":
+    # On Unix platforms, the default way to start a process is by forking, which
+    # is not ideal (we do not want to duplicate this process' file
+    # descriptors!).
+    multiprocessing.set_start_method("spawn")
+
     aparser = argparse.ArgumentParser(
         description="Python implementation of the TPC-C Benchmark"
     )
