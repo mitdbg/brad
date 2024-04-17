@@ -757,6 +757,12 @@ class BradDaemon:
                 elif isinstance(t, TransactionLatencyCeiling):
                     t.set_latency_ceiling(txn_p90_s)
 
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.ChangedSlos,
+                    f"query_p90_s={query_p90_s}, txn_p90_s={txn_p90_s}",
+                )
+
             return [
                 (
                     f"p90 SLOs changed to (query {query_p90_s:.3f} s), (txn {txn_p90_s:.3f} s)",
