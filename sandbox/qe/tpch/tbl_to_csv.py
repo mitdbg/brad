@@ -2,7 +2,6 @@
 # df = pandas.read_table('sf1/customer.tbl', sep="|")
 # df.to_csv("sf1/customer.csv")
 
-import os
 import json
 import sys
 
@@ -13,8 +12,7 @@ def converttbldatatocsvformat(filename, header):
     tbl = open("".join([filename, ".tbl"]), "r")
     lines = tbl.readlines()
     for line in lines:
-        length = len(line)
-        line = line[:-2] + line[-1:]
+        line = line[:-2] + line[-1:]  # remove trailing delimiter
         line = line.replace(",", "N")
         line = line.replace("|", ",")
         csv.write(line)

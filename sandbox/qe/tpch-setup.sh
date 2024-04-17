@@ -11,7 +11,12 @@ if [ $# -gt 0 ]; then
   cd ~/TPC-Hv3.0.1/dbgen
   ./dbgen -f -s $1
   mv *.tbl /tmp/tpcdata
-  cd ~
+  python3 ~/brad/sandbox/qe/tpch/tbl_to_csv.py /tmp/tpcdata
+  cd -
+
+  # Uncomment if want to save generated info somewhere other than /tmp
+  # mkdir -p csvsf$1
+  # cp /tmp/tpcdata/*.csv csvsf$1
 
   docker stop postgres
   docker rm postgres
