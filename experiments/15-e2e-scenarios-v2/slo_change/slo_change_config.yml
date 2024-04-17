@@ -6,7 +6,7 @@
 # listen on successive ports (e.g., 6584, 6585, etc.).
 front_end_interface: "0.0.0.0"
 front_end_port: 6583
-num_front_ends: 20
+num_front_ends: 24
 
 # Logging paths. If the value is in ALL_CAPS (with underscores), it is
 # interpreted as an environment variable (BRAD will log to the path stored in
