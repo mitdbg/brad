@@ -733,7 +733,7 @@ class BradDaemon:
             parts = command.split(" ")
             if self._temp_config is None:
                 return [("Cannot change SLOs because TempConfig is missing.",)]
-            if len(parts) <= 3:
+            if len(parts) < 3:
                 return [("Need to specify query and txn p90 SLOs",)]
 
             query_p90_s = float(parts[1])
