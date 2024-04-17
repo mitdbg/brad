@@ -733,7 +733,7 @@ class BradDaemon:
             parts = command.split(" ")
             if self._temp_config is None:
                 return [("Cannot change SLOs because TempConfig is missing.",)]
-            if len(parts) <= 3:
+            if len(parts) < 3:
                 return [("Need to specify query and txn p90 SLOs",)]
 
             query_p90_s = float(parts[1])
@@ -756,6 +756,12 @@ class BradDaemon:
                     t.set_latency_ceiling(query_p90_s)
                 elif isinstance(t, TransactionLatencyCeiling):
                     t.set_latency_ceiling(txn_p90_s)
+
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.ChangedSlos,
+                    f"query_p90_s={query_p90_s}; txn_p90_s={txn_p90_s}",
+                )
 
             return [
                 (
