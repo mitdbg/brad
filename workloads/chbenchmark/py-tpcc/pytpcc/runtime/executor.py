@@ -35,11 +35,15 @@ import time
 import random
 import traceback
 import logging
+import os
+import pathlib
 from datetime import datetime
 from pprint import pprint, pformat
 
 from .. import constants
 from ..util import *
+
+RECORD_DETAILED_STATS_VAR = "RECORD_DETAILED_STATS"
 
 
 class Executor:
@@ -51,8 +55,35 @@ class Executor:
 
     ## DEF
 
-    def execute(self, duration):
-        r = results.Results()
+    def execute(self, duration: float, worker_index: int) -> results.Results:
+        if RECORD_DETAILED_STATS_VAR in os.environ:
+            import conductor.lib as cond
+
+            try:
+                out_path = cond.get_output_path()
+                logging.info("Writing detailed stats to %s", str(out_path))
+            except ImportError:
+                logging.warning(
+                    "Conductor not installed. Detailed stats will be saved to the current working directory."
+                )
+                out_path = pathlib.Path(".")
+            except RuntimeError:
+                logging.warning(
+                    "Workload is not orchestrated by Conductor. Detailed stats will be saved to the current working directory."
+                )
+                out_path = pathlib.Path(".")
+
+            options = {
+                "record_detailed": True,
+                "worker_index": worker_index,
+                "output_prefix": out_path,
+                "lat_sample_prob": 0.10,  # Sampled 10%
+            }
+        else:
+            logging.info("Not recording detailed stats.")
+            options = {}
+
+        r = results.Results(options)
         assert r
         logging.info("Executing benchmark for %d seconds" % duration)
         start = r.startBenchmark()

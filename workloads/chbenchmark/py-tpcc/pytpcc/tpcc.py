@@ -36,6 +36,7 @@ import glob
 import time
 import multiprocessing
 import pathlib
+import traceback
 from configparser import ConfigParser
 from pprint import pprint, pformat
 
@@ -164,6 +165,7 @@ def startExecution(driverClass, scaleParameters, args, config):
                 args,
                 config,
                 debug,
+                i,
             ),
         )
         worker_results.append(r)
@@ -190,21 +192,28 @@ def startExecution(driverClass, scaleParameters, args, config):
 ## ==============================================
 ## executorFunc
 ## ==============================================
-def executorFunc(driverClass, scaleParameters, args, config, debug):
-    driver = driverClass(args["ddl"])
-    assert driver != None
-    logging.debug("Starting client execution: %s" % driver)
+def executorFunc(driverClass, scaleParameters, args, config, debug, worker_index):
+    try:
+        driver = driverClass(args["ddl"])
+        assert driver != None
+        logging.debug("Starting client execution: %s" % driver)
 
-    config["execute"] = True
-    config["reset"] = False
-    driver.loadConfig(config)
+        config["execute"] = True
+        config["reset"] = False
+        driver.loadConfig(config)
 
-    e = executor.Executor(driver, scaleParameters, stop_on_error=args["stop_on_error"])
-    driver.executeStart()
-    results = e.execute(args["duration"])
-    driver.executeFinish()
+        e = executor.Executor(
+            driver, scaleParameters, stop_on_error=args["stop_on_error"]
+        )
+        driver.executeStart()
+        results = e.execute(args["duration"], worker_index)
+        driver.executeFinish()
 
-    return results
+        return results
+    except Exception as ex:
+        print("Error in worker", worker_index, str(ex))
+        print(traceback.format_exc())
+        raise
 
 
 ## DEF
@@ -213,6 +222,11 @@ def executorFunc(driverClass, scaleParameters, args, config, debug):
 ## main
 ## ==============================================
 if __name__ == "__main__":
+    # On Unix platforms, the default way to start a process is by forking, which
+    # is not ideal (we do not want to duplicate this process' file
+    # descriptors!).
+    multiprocessing.set_start_method("spawn")
+
     aparser = argparse.ArgumentParser(
         description="Python implementation of the TPC-C Benchmark"
     )
@@ -347,7 +361,7 @@ if __name__ == "__main__":
                 driver, scaleParameters, stop_on_error=args["stop_on_error"]
             )
             driver.executeStart()
-            results = e.execute(args["duration"])
+            results = e.execute(args["duration"], worker_index=0)
             driver.executeFinish()
         else:
             results = startExecution(driverClass, scaleParameters, args, config)
