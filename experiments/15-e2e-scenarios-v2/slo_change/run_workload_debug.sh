@@ -10,7 +10,8 @@ source ../common.sh
 # --query-indexes
 extract_named_arguments $@
 
-start_brad $system_config_file $physical_config_file
+export BRAD_IGNORE_BLUEPRINT=1
+start_brad_debug $system_config_file $physical_config_file
 log_workload_point "brad_start_initiated"
 sleep 30
 
@@ -31,15 +32,15 @@ function inner_cancel_experiment() {
 trap "inner_cancel_experiment" INT
 trap "inner_cancel_experiment" TERM
 
-# Sleep for 10 minutes and then change the SLOs.
-sleep $(( 10 * 60 ))
+# Sleep for 2 minutes and then change the SLOs.
+sleep $(( 2 * 60 ))
 
 log_workload_point "changing_slo"
 brad cli --command "BRAD_CHANGE_SLO 30.0 0.030"
 log_workload_point "changed_slo"
 
-# Wait another hour before stopping.
-sleep $(( 60 * 60 ))
+# Wait another 10 mins before stopping.
+sleep $(( 10 * 60 ))
 
 # Shut down everything now.
 log_workload_point "experiment_workload_done"
