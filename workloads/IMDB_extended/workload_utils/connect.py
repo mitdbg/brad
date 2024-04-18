@@ -6,6 +6,7 @@ from typing import Optional
 
 from brad.config.engine import Engine
 from brad.connection.factory import ConnectionFactory, Connection, RedshiftConnection
+from brad.connection.odbc_connection import OdbcConnection
 from brad.config.file import ConfigFile
 from brad.grpc_client import BradGrpcClient
 from brad.provisioning.directory import Directory
@@ -49,6 +50,23 @@ def connect_to_db(
                     autocommit=False,
                     timeout_s=10,
                 )
+
+        elif (
+            direct_engine == Engine.Aurora
+            and hasattr(args, "serverless_aurora")
+            and args.serverless_aurora
+        ):
+            print("Connecting to serverless Aurora")
+
+            def do_connect() -> Connection:
+                # pylint: disable-next=protected-access
+                cstr = ConnectionFactory._pg_aurora_odbc_connection_string(
+                    connection_details["serverless_endpoint"],
+                    5432,
+                    connection_details,
+                    args.schema_name,
+                )
+                return OdbcConnection.connect_sync(cstr, autocommit=False, timeout_s=10)
 
         else:
             if directory is None:

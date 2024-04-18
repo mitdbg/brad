@@ -559,6 +559,11 @@ def main():
         type=int,
         help="Start the client trace at the given number of clients. Used for debugging only.",
     )
+    parser.add_argument(
+        "--serverless-redshift",
+        action="store_true",
+        help="Set if running on serverless Redshift.",
+    )
     args = parser.parse_args()
 
     set_up_logging()

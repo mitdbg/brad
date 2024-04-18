@@ -29,3 +29,12 @@ run_command(
     **COMMON_CONFIGS,
   },
 )
+
+run_experiment(
+  name="ar_100g",
+  run="./run_ar_baseline.sh",
+  options={
+    # System config file not needed.
+    **COMMON_CONFIGS,
+  }
+)
