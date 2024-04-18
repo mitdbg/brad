@@ -411,10 +411,11 @@ class RecordedRun:
             print()
 
 
+# pylint: disable-next=dangerous-default-value
 def get_e2e_axes(
     size: Literal["small", "large"],
-    txn_ceiling_ms=30.0,
-    ana_ceiling_s=30.0,
+    txn_ceiling_ms=[(30.0, (0.0, 1.0))],
+    ana_ceiling_s=[(30.0, (0.0, 1.0))],
     custom_subplots: Optional[
         Callable[[GridSpec], Tuple[plt.Axes, plt.Axes, plt.Axes]]
     ] = None,
@@ -436,12 +437,18 @@ def get_e2e_axes(
         fig.align_ylabels()
 
     # Transaction Latency ceiling
-    txn_ax.axhspan(ymin=0, ymax=txn_ceiling_ms, color="#000", alpha=0.05)
-    txn_ax.axhline(y=txn_ceiling_ms, color="#000", alpha=0.5, lw=1.5)
+    for ceiling, (xmin, xmax) in txn_ceiling_ms:
+        txn_ax.axhspan(
+            ymin=0, ymax=ceiling, xmin=xmin, xmax=xmax, color="#000", alpha=0.05
+        )
+        txn_ax.axhline(y=ceiling, xmin=xmin, xmax=xmax, color="#000", alpha=0.5, lw=1.5)
 
     # OLAP Latency ceiling
-    ana_ax.axhspan(ymin=-5, ymax=ana_ceiling_s, color="#000", alpha=0.05)
-    ana_ax.axhline(y=ana_ceiling_s, color="#000", alpha=0.5, lw=1.5)
+    for ceiling, (xmin, xmax) in ana_ceiling_s:
+        ana_ax.axhspan(
+            ymin=-5, ymax=ceiling, xmin=xmin, xmax=xmax, color="#000", alpha=0.05
+        )
+        ana_ax.axhline(y=ceiling, xmin=xmin, xmax=xmax, color="#000", alpha=0.5, lw=1.5)
 
     cst_ax.set_ylabel("Monthly\nCost ($)")
     cst_ax.set_xlabel("Time Elapsed (minutes)")
