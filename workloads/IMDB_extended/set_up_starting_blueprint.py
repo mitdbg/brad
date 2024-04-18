@@ -135,15 +135,20 @@ def main():
     enum_blueprint.set_routing_policy(replaced_policy)
 
     # Ensure the provisioning is as expected.
-    enum_blueprint.set_aurora_provisioning(parse_provisioning(args.aurora_provisioning))
-    enum_blueprint.set_redshift_provisioning(
-        parse_provisioning(args.redshift_provisioning)
-    )
+    aurora_prov = parse_provisioning(args.aurora_provisioning)
+    redshift_prov = parse_provisioning(args.redshift_provisioning)
+    enum_blueprint.set_aurora_provisioning(aurora_prov)
+    enum_blueprint.set_redshift_provisioning(redshift_prov)
 
     # 6. Adjust the placement.
     new_placement = {}
+    engines = [Engine.Aurora, Engine.Redshift, Engine.Athena]
+    if aurora_prov.num_nodes() == 0:
+        engines.remove(Engine.Aurora)
+    if redshift_prov.num_nodes() == 0:
+        engines.remove(Engine.Redshift)
     for table in blueprint.tables():
-        new_placement[table.name] = [Engine.Aurora, Engine.Athena]
+        new_placement[table.name] = engines
     enum_blueprint.set_table_locations(new_placement)
 
     # 6. Transition to the new blueprint.

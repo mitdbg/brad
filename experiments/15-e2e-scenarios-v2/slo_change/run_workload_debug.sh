@@ -16,11 +16,11 @@ log_workload_point "brad_start_initiated"
 sleep 30
 
 log_workload_point "clients_starting"
-# 6 clients, offset 12 (for the transactional clients)
-start_repeating_olap_runner 6 15 5 $ra_query_indexes "ra_8" 12
+# 12 clients, offset 20 (for the transactional clients)
+start_repeating_olap_runner 12 5 2 $ra_query_indexes "ra_8" 20
 rana_pid=$runner_pid
 
-start_txn_runner_serial 12  # Implicit: --dataset-type
+start_txn_runner_serial 20  # Implicit: --dataset-type
 txn_pid=$runner_pid
 
 log_workload_point "clients_started"
@@ -36,7 +36,7 @@ trap "inner_cancel_experiment" TERM
 sleep $(( 2 * 60 ))
 
 log_workload_point "changing_slo"
-brad cli --command "BRAD_CHANGE_SLO 30.0 0.030"
+brad cli --command "BRAD_CHANGE_SLO 30.0 0.015"
 log_workload_point "changed_slo"
 
 # Wait another 10 mins before stopping.

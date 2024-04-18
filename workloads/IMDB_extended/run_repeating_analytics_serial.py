@@ -210,7 +210,7 @@ def runner(
                         time_unsimulated_str,
                         qidx,
                         end - start,
-                        engine.value,
+                        engine.value if engine is not None else "serverless_redshift",
                     ),
                     file=file,
                     flush=True,
@@ -558,6 +558,11 @@ def main():
         "--ff-trace-clients",
         type=int,
         help="Start the client trace at the given number of clients. Used for debugging only.",
+    )
+    parser.add_argument(
+        "--serverless-redshift",
+        action="store_true",
+        help="Set if running on serverless Redshift.",
     )
     args = parser.parse_args()
 

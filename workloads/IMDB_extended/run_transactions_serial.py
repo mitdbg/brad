@@ -329,6 +329,7 @@ def main():
     parser.add_argument("--brad-host", type=str, default="localhost")
     parser.add_argument("--brad-port", type=int, default=6583)
     parser.add_argument("--num-front-ends", type=int, default=1)
+    parser.add_argument("--serverless-aurora", action="store_true")
     args = parser.parse_args()
 
     set_up_logging()

@@ -151,6 +151,43 @@ function start_repeating_olap_runner() {
   runner_pid=$!
 }
 
+function start_redshift_serverless_olap_runner() {
+  local ra_clients=$1
+  local ra_gap_s=$2
+  local ra_gap_std_s=$3
+  local query_indexes=$4
+  local results_name=$5
+  local schema_name=$6
+
+  local args=(
+    --num-clients $ra_clients
+    --num-front-ends $num_front_ends
+    --query-indexes $query_indexes
+    --query-bank-file $ra_query_bank_file
+    --avg-gap-s $ra_gap_s
+    --avg-gap-std-s $ra_gap_std_s
+    --brad-direct
+    --engine redshift
+    --serverless-redshift
+    --schema-name $schema_name
+    --config-file ../../../$physical_config_file
+  )
+
+  if [[ ! -z $ra_query_frequency_path ]]; then
+    args+=(--query-frequency-path $ra_query_frequency_path)
+  fi
+
+  >&2 echo "[Serial Repeating Analytics] Running with $ra_clients on Redshift serverless..."
+  results_dir=$COND_OUT/$results_name
+  mkdir -p $results_dir
+
+  log_workload_point $results_name
+  COND_OUT=$results_dir python3.11 ../../../workloads/IMDB_extended/run_repeating_analytics_serial.py "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
 function start_snowset_repeating_olap_runner() {
   local ra_clients=$1
   local time_scale_factor=$2
@@ -259,6 +296,33 @@ function start_txn_runner_serial() {
   if [[ ! -z $client_offset ]]; then
     args+=(--client-offset $client_offset)
   fi
+
+  log_workload_point "txn_${t_clients}"
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions_serial.py \
+    "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
+function start_aurora_serverless_txn_runner_serial() {
+  local t_clients=$1
+  local schema_name=$2
+
+  >&2 echo "[Serial Transactions] Running with $t_clients on Aurora Serverless..."
+  results_dir=$COND_OUT/t_${t_clients}
+  mkdir -p $results_dir
+
+  local args=(
+    --num-clients $t_clients
+    --num-front-ends $num_front_ends
+    # --scale-factor $txn_scale_factor
+    # --dataset-type $dataset_type
+    --brad-direct
+    --serverless-aurora
+    --schema-name $schema_name
+    --config-file ../../../$physical_config_file
+  )
 
   log_workload_point "txn_${t_clients}"
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions_serial.py \
