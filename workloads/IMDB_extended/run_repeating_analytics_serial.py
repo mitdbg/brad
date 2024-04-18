@@ -210,7 +210,7 @@ def runner(
                         time_unsimulated_str,
                         qidx,
                         end - start,
-                        engine.value,
+                        engine.value if engine is not None else "serverless_redshift",
                     ),
                     file=file,
                     flush=True,
