@@ -170,6 +170,7 @@ function start_redshift_serverless_olap_runner() {
     --engine redshift
     --serverless-redshift
     --schema-name $schema_name
+    --config-file ../../../$physical_config_file
   )
 
   if [[ ! -z $ra_query_frequency_path ]]; then
@@ -320,6 +321,7 @@ function start_aurora_serverless_txn_runner_serial() {
     --brad-direct
     --serverless-aurora
     --schema-name $schema_name
+    --config-file ../../../$physical_config_file
   )
 
   log_workload_point "txn_${t_clients}"
