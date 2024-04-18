@@ -10,12 +10,14 @@ source ../common.sh
 # --query-indexes
 extract_named_arguments $@
 
+schema_name="imdb_extended_100g"
+
 log_workload_point "clients_starting"
 # 12 clients, offset 20 (for the transactional clients)
-start_redshift_serverless_olap_runner 12 5 2 $ra_query_indexes "ra_8"
+start_redshift_serverless_olap_runner 12 5 2 $ra_query_indexes "ra_8" $schema_name
 rana_pid=$runner_pid
 
-start_aurora_serverless_txn_runner_serial 20  # Implicit: --dataset-type
+start_aurora_serverless_txn_runner_serial 20 $schema_name  # Implicit: --dataset-type
 txn_pid=$runner_pid
 
 log_workload_point "clients_started"

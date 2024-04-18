@@ -157,6 +157,7 @@ function start_redshift_serverless_olap_runner() {
   local ra_gap_std_s=$3
   local query_indexes=$4
   local results_name=$5
+  local schema_name=$6
 
   local args=(
     --num-clients $ra_clients
@@ -168,6 +169,7 @@ function start_redshift_serverless_olap_runner() {
     --brad-direct
     --engine redshift
     --serverless-redshift
+    --schema-name $schema_name
   )
 
   if [[ ! -z $ra_query_frequency_path ]]; then
@@ -303,7 +305,8 @@ function start_txn_runner_serial() {
 }
 
 function start_aurora_serverless_txn_runner_serial() {
-  t_clients=$1
+  local t_clients=$1
+  local schema_name=$2
 
   >&2 echo "[Serial Transactions] Running with $t_clients on Aurora Serverless..."
   results_dir=$COND_OUT/t_${t_clients}
@@ -315,8 +318,8 @@ function start_aurora_serverless_txn_runner_serial() {
     # --scale-factor $txn_scale_factor
     # --dataset-type $dataset_type
     --brad-direct
-    --engine aurora
     --serverless-aurora
+    --schema-name $schema_name
   )
 
   log_workload_point "txn_${t_clients}"
