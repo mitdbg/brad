@@ -7,7 +7,7 @@ COMMON_CONFIGS = {
   "schema-name": "imdb_extended_100g",
   "ra-query-bank-file": IMDB_100GB_REGULAR_QUERY_BANK,
   "txn-scale-factor": IMDB_100GB_SF,
-  "num-front-ends": 24,
+  "num-front-ends": 32,
   "dataset-type": "100gb",
   "ra-query-indexes": ",".join(map(str, QUERIES))
 }
