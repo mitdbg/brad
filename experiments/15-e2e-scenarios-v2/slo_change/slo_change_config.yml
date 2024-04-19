@@ -93,8 +93,8 @@ redshift_min_load_removal_fraction: 0.9
 
 # Blueprint planning performance ceilings.
 # These will change to 30 s and 30 ms during the experiment.
-query_latency_p90_ceiling_s: 30.0
-txn_latency_p90_ceiling_s: 0.030
+query_latency_p90_ceiling_s: 40.0
+txn_latency_p90_ceiling_s: 0.040
 
 # If set to true, BRAD will attempt to use the specified preset Redshift
 # clusters instead of resizing the main Redshift cluster.
