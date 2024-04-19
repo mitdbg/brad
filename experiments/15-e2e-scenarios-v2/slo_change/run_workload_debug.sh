@@ -36,7 +36,7 @@ trap "inner_cancel_experiment" TERM
 sleep $(( 2 * 60 ))
 
 log_workload_point "changing_slo"
-brad cli --command "BRAD_CHANGE_SLO 30.0 0.015"
+brad cli --command "BRAD_CHANGE_SLO 20.0 0.020"
 log_workload_point "changed_slo"
 
 # Wait another 10 mins before stopping.
