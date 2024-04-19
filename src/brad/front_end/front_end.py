@@ -199,6 +199,7 @@ class BradFrontEnd(BradInterface):
 
     def _handle_query_from_flight_sql(self, query: str) -> RowList:
         assert self._flight_sql_server_session_id is not None
+        assert self._main_thread_loop is not None
 
         future = asyncio.run_coroutine_threadsafe(
             self._run_query_impl(self._flight_sql_server_session_id, query, {}),
