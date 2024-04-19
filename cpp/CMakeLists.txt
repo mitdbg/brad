@@ -16,14 +16,6 @@ find_package(Boost REQUIRED)
 
 add_subdirectory(third_party)
 
-# Concurrent hash table
-FetchContent_Declare(
-  libcuckoo
-  GIT_REPOSITORY https://github.com/efficient/libcuckoo.git
-  GIT_TAG        784d0f5d147b9a73f897ae55f6c3712d9a91b058
-)
-FetchContent_MakeAvailable(libcuckoo)
-
 add_library(sqlite_server_lib OBJECT
             sqlite_server/sqlite_server.cc
             sqlite_server/sqlite_sql_info.cc

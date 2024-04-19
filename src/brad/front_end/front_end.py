@@ -100,7 +100,7 @@ class BradFrontEnd(BradInterface):
         else:
             self._flight_sql_server = None
 
-        self._main_thread_loop: Optional[AbstractEventLoop] = None
+        self._main_thread_loop: Optional[asyncio.AbstractEventLoop] = None
 
         self._fe_index = fe_index
         self._config = config

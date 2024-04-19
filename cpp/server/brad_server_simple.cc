@@ -65,7 +65,7 @@ std::vector<std::vector<std::any>> TransformQueryResult(
   return transformed_query_result;  
 }
 
-BradFlightSqlServer::BradFlightSqlServer() = default;
+BradFlightSqlServer::BradFlightSqlServer() : autoincrement_id_(0ULL) {}
 
 BradFlightSqlServer::~BradFlightSqlServer() = default;
 
@@ -119,12 +119,9 @@ arrow::Result<std::unique_ptr<FlightInfo>>
     transformed_query_result = TransformQueryResult(query_result);
   }
 
-  {
-    std::scoped_lock guard(query_data_mutex_);
-    query_data_.insert(query_ticket, transformed_query_result);
-  }
-
   ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(transformed_query_result));
+  query_data_.insert(query_ticket, statement);
+
   ARROW_ASSIGN_OR_RAISE(auto schema, statement->GetSchema());
 
   std::vector<FlightEndpoint> endpoints{
@@ -151,13 +148,19 @@ arrow::Result<std::unique_ptr<FlightDataStream>>
   const std::string transaction_id = pair.second;
 
   const std::string &query_ticket = transaction_id + ':' + autoincrement_id;
-  const auto query_result = query_data_.find(query_ticket);
 
-  std::shared_ptr<BradStatement> statement;
-  ARROW_ASSIGN_OR_RAISE(statement, BradStatement::Create(query_result));
+  std::shared_ptr<BradStatement> result;
+  const bool found = query_data_.erase_fn(query_ticket, [&result](auto& qr) {
+    result = qr;
+    return true;
+  });
+
+  if (!found) {
+    return arrow::Status::Invalid("Invalid ticket.");
+  }
 
   std::shared_ptr<BradStatementBatchReader> reader;
-  ARROW_ASSIGN_OR_RAISE(reader, BradStatementBatchReader::Create(statement));
+  ARROW_ASSIGN_OR_RAISE(reader, BradStatementBatchReader::Create(result));
 
   return std::make_unique<RecordBatchStream>(reader);
 }

@@ -38,13 +38,17 @@ class BradStatement {
 
   /// \brief Creates an Arrow Schema based on the results of this statement.
   /// \return              The resulting Schema.
-  arrow::Result<std::shared_ptr<arrow::Schema>> GetSchema() const;
+  arrow::Result<std::shared_ptr<arrow::Schema>> GetSchema();
+
+  arrow::Result<std::shared_ptr<arrow::RecordBatch>> FetchResult();
 
   std::string* GetBradStmt() const;
 
+ private:
   std::vector<std::vector<std::any>> query_result_;
 
- private:
+  std::shared_ptr<arrow::Schema> schema_;
+
   std::string* stmt_;
 
   BradStatement(std::string* stmt) : stmt_(stmt) {}

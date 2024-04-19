@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include <arrow/flight/sql/server.h>
+#include "brad_statement.h"
 #include <arrow/result.h>
 
 #include "libcuckoo/cuckoohash_map.hh"
@@ -47,10 +48,10 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
       const arrow::flight::ServerCallContext &context,
       const arrow::flight::sql::StatementQueryTicket &command) override;
 
+ private:
   std::function<std::vector<py::tuple>(std::string)> handle_query_;
 
-  libcuckoo::cuckoohash_map<std::string, std::vector<std::vector<std::any>>> query_data_;
-  std::mutex query_data_mutex_;
+  libcuckoo::cuckoohash_map<std::string, std::shared_ptr<BradStatement>> query_data_;
 
   std::atomic<uint64_t> autoincrement_id_;
 };

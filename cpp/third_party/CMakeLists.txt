@@ -12,4 +12,10 @@ FetchContent_Declare(
   GIT_TAG        v2.2.2
 )
 
-FetchContent_MakeAvailable(pybind11 gflags)
+FetchContent_Declare(
+  libcuckoo
+  GIT_REPOSITORY https://github.com/efficient/libcuckoo.git
+  GIT_TAG        784d0f5d147b9a73f897ae55f6c3712d9a91b058
+)
+
+FetchContent_MakeAvailable(pybind11 gflags libcuckoo)
