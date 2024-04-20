@@ -37,23 +37,26 @@ BradStatement::BradStatement(std::vector<std::vector<std::any>> query_result) :
 BradStatement::~BradStatement() {
 }
 
-arrow::Result<std::shared_ptr<arrow::Schema>> BradStatement::GetSchema() {
+arrow::Result<std::shared_ptr<arrow::Schema>> BradStatement::GetSchema() const {
   if (schema_) {
     return schema_;
   }
 
   std::vector<std::shared_ptr<arrow::Field>> fields;
-  const std::vector<std::any> &row = query_result_[0];
 
-  int counter = 0;
-  for (const auto &field : row) {
-    std::string field_type = field.type().name();
-    if (field_type == "i") {
-      fields.push_back(arrow::field("INT FIELD " + std::to_string(++counter), arrow::int8()));
-    } else if (field_type == "f") {
-      fields.push_back(arrow::field("FLOAT FIELD " + std::to_string(++counter), arrow::float32()));
-    } else {
-      fields.push_back(arrow::field("STRING FIELD " + std::to_string(++counter), arrow::utf8()));
+  if (query_result_.size() > 0) {
+    const std::vector<std::any> &row = query_result_[0];
+
+    int counter = 0;
+    for (const auto &field : row) {
+      std::string field_type = field.type().name();
+      if (field_type == "i") {
+        fields.push_back(arrow::field("INT FIELD " + std::to_string(++counter), arrow::int8()));
+      } else if (field_type == "f") {
+        fields.push_back(arrow::field("FLOAT FIELD " + std::to_string(++counter), arrow::float32()));
+      } else {
+        fields.push_back(arrow::field("STRING FIELD " + std::to_string(++counter), arrow::utf8()));
+      }
     }
   }
 
@@ -67,6 +70,8 @@ arrow::Result<std::shared_ptr<arrow::RecordBatch>> BradStatement::FetchResult() 
   const int num_rows = query_result_.size();
 
   std::vector<std::shared_ptr<arrow::Array>> columns;
+  columns.reserve(schema->num_fields());
+
   for (int field_ix = 0; field_ix < schema->num_fields(); ++field_ix) {
     const auto &field = schema->fields()[field_ix];
     if (field->type() == arrow::int8()) {
@@ -94,6 +99,14 @@ arrow::Result<std::shared_ptr<arrow::RecordBatch>> BradStatement::FetchResult() 
 
       columns.push_back(values);
     } else if (field->type() == arrow::utf8()) {
+      arrow::StringBuilder stringbuilder;
+      for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
+        const std::string* str = std::any_cast<const std::string>(&(query_result_[row_ix][field_ix]));
+        ARROW_RETURN_NOT_OK(stringbuilder.Append(str->data(), str->size()));
+      }
+
+      std::shared_ptr<arrow::Array> values;
+      ARROW_ASSIGN_OR_RAISE(values, stringbuilder.Finish());
     }
   }
 

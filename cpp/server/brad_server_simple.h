@@ -3,10 +3,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <functional>
-#include <any>
-#include <atomic>
-#include <mutex>
 
 #include <arrow/flight/sql/server.h>
 #include "brad_statement.h"

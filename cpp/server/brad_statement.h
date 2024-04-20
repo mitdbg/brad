@@ -7,11 +7,6 @@
 #include <arrow/flight/sql/column_metadata.h>
 #include <arrow/type_fwd.h>
 
-#include <pybind11/pybind11.h>
-
-namespace py = pybind11;
-using namespace pybind11::literals;
-
 namespace brad {
 
 /// \brief Create an object ColumnMetadata using the column type and
@@ -38,7 +33,7 @@ class BradStatement {
 
   /// \brief Creates an Arrow Schema based on the results of this statement.
   /// \return              The resulting Schema.
-  arrow::Result<std::shared_ptr<arrow::Schema>> GetSchema();
+  arrow::Result<std::shared_ptr<arrow::Schema>> GetSchema() const;
 
   arrow::Result<std::shared_ptr<arrow::RecordBatch>> FetchResult();
 
@@ -47,7 +42,7 @@ class BradStatement {
  private:
   std::vector<std::vector<std::any>> query_result_;
 
-  std::shared_ptr<arrow::Schema> schema_;
+  mutable std::shared_ptr<arrow::Schema> schema_;
 
   std::string* stmt_;
 
