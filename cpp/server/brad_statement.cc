@@ -24,47 +24,97 @@ arrow::Result<std::shared_ptr<BradStatement>> BradStatement::Create(
   return result;
 }
 
+arrow::Result<std::shared_ptr<BradStatement>> BradStatement::Create(
+  std::vector<std::vector<std::any>> query_result) {
+  std::shared_ptr<BradStatement> result(
+    std::make_shared<BradStatement>(query_result));
+  return result;
+}
+
+BradStatement::BradStatement(std::vector<std::vector<std::any>> query_result) :
+    query_result_(std::move(query_result)) {}
+
 BradStatement::~BradStatement() {
 }
 
 arrow::Result<std::shared_ptr<arrow::Schema>> BradStatement::GetSchema() const {
+  if (schema_) {
+    return schema_;
+  }
+
   std::vector<std::shared_ptr<arrow::Field>> fields;
-  fields.push_back(arrow::field("Day", arrow::int8()));
-  fields.push_back(arrow::field("Month", arrow::int8()));
-  fields.push_back(arrow::field("Year", arrow::int16()));
-  return arrow::schema(fields);
+
+  if (query_result_.size() > 0) {
+    const std::vector<std::any> &row = query_result_[0];
+
+    int counter = 0;
+    for (const auto &field : row) {
+      std::string field_type = field.type().name();
+      if (field_type == "i") {
+        fields.push_back(arrow::field("INT FIELD " + std::to_string(++counter), arrow::int8()));
+      } else if (field_type == "f") {
+        fields.push_back(arrow::field("FLOAT FIELD " + std::to_string(++counter), arrow::float32()));
+      } else {
+        fields.push_back(arrow::field("STRING FIELD " + std::to_string(++counter), arrow::utf8()));
+      }
+    }
+  }
+
+  schema_ = arrow::schema(fields);
+  return schema_;
 }
 
 arrow::Result<std::shared_ptr<arrow::RecordBatch>> BradStatement::FetchResult() {
-  arrow::Int8Builder int8builder;
-  int8_t days_raw[5] = {1, 12, 17, 23, 28};
-  ARROW_RETURN_NOT_OK(int8builder.AppendValues(days_raw, 5));
-  std::shared_ptr<arrow::Array> days;
-  ARROW_ASSIGN_OR_RAISE(days, int8builder.Finish());
+  std::shared_ptr<arrow::Schema> schema = GetSchema().ValueOrDie();
 
-  int8_t months_raw[5] = {1, 3, 5, 7, 1};
-  ARROW_RETURN_NOT_OK(int8builder.AppendValues(months_raw, 5));
-  std::shared_ptr<arrow::Array> months;
-  ARROW_ASSIGN_OR_RAISE(months, int8builder.Finish());
+  const int num_rows = query_result_.size();
 
-  arrow::Int16Builder int16builder;
-  int16_t years_raw[5] = {1990, 2000, 1995, 2000, 1995};
-  ARROW_RETURN_NOT_OK(int16builder.AppendValues(years_raw, 5));
-  std::shared_ptr<arrow::Array> years;
-  ARROW_ASSIGN_OR_RAISE(years, int16builder.Finish());
+  std::vector<std::shared_ptr<arrow::Array>> columns;
+  columns.reserve(schema->num_fields());
 
-  std::shared_ptr<arrow::RecordBatch> record_batch;
+  for (int field_ix = 0; field_ix < schema->num_fields(); ++field_ix) {
+    const auto &field = schema->fields()[field_ix];
+    if (field->type() == arrow::int8()) {
+      arrow::Int8Builder int8builder;
+      int8_t values_raw[num_rows];
+      for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
+        values_raw[row_ix] = std::any_cast<int>(query_result_[row_ix][field_ix]);
+      }
+      ARROW_RETURN_NOT_OK(int8builder.AppendValues(values_raw, num_rows));
 
-  arrow::Result<std::shared_ptr<arrow::Schema>> result = GetSchema();
-  if (result.ok()) {
-    std::shared_ptr<arrow::Schema> schema = result.ValueOrDie();
-    record_batch = arrow::RecordBatch::Make(schema,
-                                            days->length(),
-                                            {days, months, years});
-    return record_batch;
+      std::shared_ptr<arrow::Array> values;
+      ARROW_ASSIGN_OR_RAISE(values, int8builder.Finish());
+
+      columns.push_back(values);
+    } else if (field->type() == arrow::float32()) {
+      arrow::FloatBuilder floatbuilder;
+      float values_raw[num_rows];
+      for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
+        values_raw[row_ix] = std::any_cast<float>(query_result_[row_ix][field_ix]);
+      }
+      ARROW_RETURN_NOT_OK(floatbuilder.AppendValues(values_raw, num_rows));
+
+      std::shared_ptr<arrow::Array> values;
+      ARROW_ASSIGN_OR_RAISE(values, floatbuilder.Finish());
+
+      columns.push_back(values);
+    } else if (field->type() == arrow::utf8()) {
+      arrow::StringBuilder stringbuilder;
+      for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
+        const std::string* str = std::any_cast<const std::string>(&(query_result_[row_ix][field_ix]));
+        ARROW_RETURN_NOT_OK(stringbuilder.Append(str->data(), str->size()));
+      }
+
+      std::shared_ptr<arrow::Array> values;
+      ARROW_ASSIGN_OR_RAISE(values, stringbuilder.Finish());
+    }
   }
 
-  return arrow::Status::OK();
+  std::shared_ptr<arrow::RecordBatch> record_batch =
+    arrow::RecordBatch::Make(schema,
+                             num_rows,
+                             columns);
+  return record_batch;
 }
 
 std::string* BradStatement::GetBradStmt() const { return stmt_; }

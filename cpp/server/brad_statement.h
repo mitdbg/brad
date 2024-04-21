@@ -1,7 +1,9 @@
 #pragma once
 
 #include <memory>
+#include <any>
 #include <string>
+#include <vector>
 
 #include <arrow/flight/sql/column_metadata.h>
 #include <arrow/type_fwd.h>
@@ -23,6 +25,11 @@ class BradStatement {
   static arrow::Result<std::shared_ptr<BradStatement>> Create(
     const std::string& sql);
 
+  static arrow::Result<std::shared_ptr<BradStatement>> Create(
+    const std::vector<std::vector<std::any>>);
+
+  BradStatement(std::vector<std::vector<std::any>>);
+
   ~BradStatement();
 
   /// \brief Creates an Arrow Schema based on the results of this statement.
@@ -34,6 +41,10 @@ class BradStatement {
   std::string* GetBradStmt() const;
 
  private:
+  std::vector<std::vector<std::any>> query_result_;
+
+  mutable std::shared_ptr<arrow::Schema> schema_;
+
   std::string* stmt_;
 
   BradStatement(std::string* stmt) : stmt_(stmt) {}

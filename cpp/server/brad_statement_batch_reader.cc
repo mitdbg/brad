@@ -13,7 +13,8 @@ BradStatementBatchReader::BradStatementBatchReader(
     std::shared_ptr<BradStatement> statement,
     std::shared_ptr<arrow::Schema> schema)
     : statement_(std::move(statement)),
-      schema_(std::move(schema)) {}
+      schema_(std::move(schema)),
+      already_executed_(false) {}
 
 arrow::Result<std::shared_ptr<BradStatementBatchReader>>
 BradStatementBatchReader::Create(
