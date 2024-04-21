@@ -3,6 +3,7 @@
 #include <memory>
 #include <any>
 #include <string>
+#include <vector>
 
 #include <arrow/flight/sql/column_metadata.h>
 #include <arrow/type_fwd.h>
