@@ -4,6 +4,7 @@ use datafusion::catalog::TableReference;
 use datafusion::datasource::memory::MemTable;
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::LogicalPlan;
+use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::prelude::*;
 use futures::future;
@@ -22,6 +23,9 @@ pub mod ops;
 
 /// Utilities for rewriting DataFusion `ExecutionPlan`s.
 pub mod rewrite;
+
+/// DataFusion physical optimizer rules used for injecting our custom operators.
+pub mod rules;
 
 /// Represents an "open" IOHTAP database. Eventually, the DB should run as a
 /// daemon process. For now it is just an embedded DB (similar to SQLite).
@@ -169,11 +173,21 @@ impl DB {
         &self,
         query: &String,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+        self.to_physical_plan_with_custom_rules(query, vec![]).await
+    }
+
+    pub async fn to_physical_plan_with_custom_rules(
+        &self,
+        query: &String,
+        rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>>,
+    ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         let ctx = self.dfusion.session_context();
-        let state = ctx.state();
+        let mut state = ctx.state();
+        for rule in rules {
+            state = state.add_physical_optimizer_rule(rule);
+        }
         let logical_plan = state.create_logical_plan(query).await?;
-        let optimized_plan = state.optimize(&logical_plan)?;
-        state.create_physical_plan(&optimized_plan).await
+        state.create_physical_plan(&logical_plan).await
     }
 
     pub async fn execute_physical_plan(

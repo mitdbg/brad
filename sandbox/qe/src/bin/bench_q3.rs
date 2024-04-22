@@ -1,17 +1,18 @@
 use arrow::util::pretty;
-use brad_qe::DB;
 use brad_qe::rewrite::inject_tap;
+use brad_qe::rules::AddTap;
+use brad_qe::DB;
 use clap::Parser;
 use datafusion::error::DataFusionError;
 use datafusion::execution::options::CsvReadOptions;
 use datafusion::physical_plan::displayable;
-use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::filter::FilterExec;
+use datafusion::physical_plan::ExecutionPlan;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 #[derive(Parser)]
 struct CliArgs {
@@ -189,10 +190,29 @@ async fn main() -> Result<(), DataFusionError> {
                 let elapsed_time = start.elapsed();
                 pretty::print_batches(&results)?;
                 eprintln!("Ran for {:.2?}", elapsed_time);
-
             } else {
                 eprintln!("\nNo modifications.");
             }
+        }
+        Some(ref s) if s == "qs_tap_optim" => {
+            let query = String::from(QUERY_SIMPLE);
+            let orig_physical_plan = db.to_physical_plan(&query).await?;
+            let dpp = displayable(orig_physical_plan.as_ref());
+            eprintln!("\nOriginal plan\n{}", dpp.indent(false));
+
+            let rule = Arc::new(AddTap::new(qs_inject));
+            let new_physical_plan = db
+                .to_physical_plan_with_custom_rules(&query, vec![rule])
+                .await?;
+
+            let dpp2 = displayable(new_physical_plan.as_ref());
+            eprintln!("\nAltered plan\n{}", dpp2.indent(false));
+
+            let start = Instant::now();
+            let results = db.execute_physical_plan(new_physical_plan).await?;
+            let elapsed_time = start.elapsed();
+            pretty::print_batches(&results)?;
+            eprintln!("Ran for {:.2?}", elapsed_time);
         }
         _ => (),
     }
