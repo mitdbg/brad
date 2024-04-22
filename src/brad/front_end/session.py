@@ -70,7 +70,8 @@ class Session:
     async def close(self):
         self._closed = True
         await self._engines.close()
-        await self._estimator.close()
+        if self._estimator is not None:
+            await self._estimator.close()
 
 
 class SessionManager:
@@ -116,7 +117,7 @@ class SessionManager:
             routing_policy_override == RoutingPolicy.ForestTableSelectivity
             or routing_policy_override == RoutingPolicy.Default
         ):
-            if self._config.stub_mode_path() is not None:
+            if self._config.stub_mode_path() is None:
                 estimator: Optional[Estimator] = await PostgresEstimator.connect(
                     self._schema_name, self._config
                 )

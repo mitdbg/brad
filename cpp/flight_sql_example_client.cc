@@ -92,6 +92,7 @@ arrow::Status Main() {
 }
 
 int main(int argc, char** argv) {
+  gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
   auto status = Main();
   if (!status.ok()) {
     std::cerr << status.ToString() << std::endl;
