@@ -1,18 +1,17 @@
 use arrow::util::pretty;
-use brad_qe::rewrite::inject_filter;
+use brad_qe::rules::AddCustomFilter;
 use brad_qe::DB;
-use brad_qe::rewrite::inject_tap;
 use clap::Parser;
 use datafusion::error::DataFusionError;
 use datafusion::execution::options::CsvReadOptions;
 use datafusion::physical_plan::displayable;
-use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::filter::FilterExec;
+use datafusion::physical_plan::ExecutionPlan;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 #[derive(Parser)]
 struct CliArgs {
@@ -51,37 +50,6 @@ fn get_files(data_dir: &PathBuf) -> Vec<PathBuf> {
     }
 }
 
-async fn run_query_and_print_results(
-    db: &DB,
-    query: &str,
-    debug: bool,
-    skip_execution: bool,
-) -> Result<(), DataFusionError> {
-    let query = query.to_string();
-    if debug {
-        // let logical_plan = db.to_logical_plan(&query).await?;
-        // eprintln!("{:#?}", logical_plan);
-
-        // let physical_plan = db.to_physical_plan(&query).await?;
-        // let dpp = displayable(physical_plan.as_ref());
-        // eprintln!("\n{}", dpp.indent(false));
-
-        let start = Instant::now();
-        let res = db.execute(&query).await?;
-        let elapsed_time = start.elapsed();
-        pretty::print_batches(&res)?;
-        println!("(Ran for {:.2?})", elapsed_time);
-    }
-    if !skip_execution {
-        let start = Instant::now();
-        let results = db.execute(&query).await?;
-        let elapsed_time = start.elapsed();
-        pretty::print_batches(&results)?;
-        eprintln!("Ran for {:.2?}", elapsed_time);
-    }
-    Ok(())
-}
-
 async fn run_tpch_queries(db: &DB, repetitions: u32) -> Result<(), DataFusionError> {
     let mut writer = csv::Writer::from_writer(io::stdout());
     writer
@@ -99,8 +67,8 @@ async fn run_tpch_queries(db: &DB, repetitions: u32) -> Result<(), DataFusionErr
         }
         let avg_time = total_time / (repetitions as u128);
         writer
-        .write_record(&[&q.to_string(), &avg_time.to_string()])
-        .map_err(|e| DataFusionError::External(Box::new(e)))?;
+            .write_record(&[&q.to_string(), &avg_time.to_string()])
+            .map_err(|e| DataFusionError::External(Box::new(e)))?;
     }
     writer.flush()?;
     Ok(())
@@ -131,32 +99,6 @@ async fn load_data(db: &DB, args: &CliArgs) -> Result<(), DataFusionError> {
     Ok(())
 }
 
-const QUERY_3: &str = "
-SELECT
-	l_orderkey,
-	SUM(l_extendedprice * (1 - l_discount)) AS revenue,
-	o_orderdate,
-	o_shippriority
-FROM
-	customer,
-	orders,
-	lineitem
-WHERE
-    c_mktsegment = 'BUILDING'
-    AND c_custkey = o_custkey
-    AND l_orderkey = o_orderkey
-    AND o_orderdate < date '1995-03-15'
-    AND l_shipdate > date '1995-03-15'
-GROUP BY
-	l_orderkey,
-	o_orderdate,
-	o_shippriority
-ORDER BY
-	revenue DESC,
-	o_orderdate
-LIMIT 10;
-";
-
 const QUERY_SIMPLE: &str =
     "SELECT o_orderkey FROM orders WHERE o_orderdate < date '1995-03-15' LIMIT 1;";
 
@@ -178,67 +120,25 @@ async fn main() -> Result<(), DataFusionError> {
             let repetitions = args.repetitions.unwrap_or(1);
             run_tpch_queries(&db, repetitions).await?;
         }
-        Some(ref s) if s == "q3" => {
-            let repetitions = args.repetitions.unwrap_or(1);
-            let q3 = String::from(QUERY_3);
-            let mut writer = csv::Writer::from_writer(io::stdout());
-            writer
-                .write_record(&["action", "run_time_ms"])
-                .map_err(|e| DataFusionError::External(Box::new(e)))?;
-            for _ in 0..repetitions {
-                let rt = run_timed_query(&db, &q3).await?;
-                writer
-                    .write_record(&["q3", &rt.as_millis().to_string()])
-                    .map_err(|e| DataFusionError::External(Box::new(e)))?;
-            }
-            writer.flush()?;
-        }
-        Some(ref s) if s == "q3_debug" => {
-            run_query_and_print_results(&db, QUERY_3, true, false).await?;
-        }
-        Some(ref s) if s == "qs_debug" => {
-            run_query_and_print_results(&db, QUERY_SIMPLE, true, false).await?;
-        }
-        Some(ref s) if s == "qs_tap" => {
-            let query = String::from(QUERY_SIMPLE);
-            let orig_physical_plan = db.to_physical_plan(&query).await?;
-            let dpp = displayable(orig_physical_plan.as_ref());
-            eprintln!("\nOriginal plan\n{}", dpp.indent(false));
-
-            let new_physical_plan = inject_tap(&orig_physical_plan, qs_inject)?;
-            if let Some(npp) = new_physical_plan {
-                let dpp2 = displayable(npp.as_ref());
-                eprintln!("\nAltered plan\n{}", dpp2.indent(false));
-
-                let start = Instant::now();
-                let results = db.execute_physical_plan(npp).await?;
-                let elapsed_time = start.elapsed();
-                pretty::print_batches(&results)?;
-                eprintln!("Ran for {:.2?}", elapsed_time);
-
-            } else {
-                eprintln!("\nNo modifications.");
-            }
-        }
         Some(ref s) if s == "qs_filter" => {
             let query = String::from(QUERY_SIMPLE);
             let orig_physical_plan = db.to_physical_plan(&query).await?;
             let dpp = displayable(orig_physical_plan.as_ref());
             eprintln!("\nOriginal plan\n{}", dpp.indent(false));
 
-            let new_physical_plan = inject_filter(&orig_physical_plan, qs_inject)?;
-            if let Some(npp) = new_physical_plan {
-                let dpp2 = displayable(npp.as_ref());
-                eprintln!("\nAltered plan\n{}", dpp2.indent(false));
+            let add_custom_filter = Arc::new(AddCustomFilter::new(qs_inject));
+            let new_physical_plan = db
+                .to_physical_plan_with_custom_rules(&query, vec![add_custom_filter])
+                .await?;
 
-                let start = Instant::now();
-                let results = db.execute_physical_plan(npp).await?;
-                let elapsed_time = start.elapsed();
-                pretty::print_batches(&results)?;
-                eprintln!("Ran for {:.2?}", elapsed_time);
-            } else {
-                eprintln!("\nNo modifications.");
-            }
+            let dpp2 = displayable(new_physical_plan.as_ref());
+            eprintln!("\nAltered plan\n{}", dpp2.indent(false));
+
+            let start = Instant::now();
+            let results = db.execute_physical_plan(new_physical_plan).await?;
+            let elapsed_time = start.elapsed();
+            pretty::print_batches(&results)?;
+            eprintln!("Ran for {:.2?}", elapsed_time);
         }
         _ => (),
     }

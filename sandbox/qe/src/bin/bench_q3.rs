@@ -1,5 +1,4 @@
 use arrow::util::pretty;
-use brad_qe::rewrite::inject_tap;
 use brad_qe::rules::AddTap;
 use brad_qe::DB;
 use clap::Parser;
@@ -175,26 +174,6 @@ async fn main() -> Result<(), DataFusionError> {
             run_query_and_print_results(&db, QUERY_SIMPLE, true, false).await?;
         }
         Some(ref s) if s == "qs_tap" => {
-            let query = String::from(QUERY_SIMPLE);
-            let orig_physical_plan = db.to_physical_plan(&query).await?;
-            let dpp = displayable(orig_physical_plan.as_ref());
-            eprintln!("\nOriginal plan\n{}", dpp.indent(false));
-
-            let new_physical_plan = inject_tap(&orig_physical_plan, qs_inject)?;
-            if let Some(npp) = new_physical_plan {
-                let dpp2 = displayable(npp.as_ref());
-                eprintln!("\nAltered plan\n{}", dpp2.indent(false));
-
-                let start = Instant::now();
-                let results = db.execute_physical_plan(npp).await?;
-                let elapsed_time = start.elapsed();
-                pretty::print_batches(&results)?;
-                eprintln!("Ran for {:.2?}", elapsed_time);
-            } else {
-                eprintln!("\nNo modifications.");
-            }
-        }
-        Some(ref s) if s == "qs_tap_optim" => {
             let query = String::from(QUERY_SIMPLE);
             let orig_physical_plan = db.to_physical_plan(&query).await?;
             let dpp = displayable(orig_physical_plan.as_ref());

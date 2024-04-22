@@ -21,9 +21,6 @@ use dataset_gen::DatasetGenerator;
 /// Custom DataFusion physical operators (`ExecutionPlan`s).
 pub mod ops;
 
-/// Utilities for rewriting DataFusion `ExecutionPlan`s.
-pub mod rewrite;
-
 /// DataFusion physical optimizer rules used for injecting our custom operators.
 pub mod rules;
 
