@@ -5,6 +5,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <utility>
+#include <stdexcept>
 
 #include <arrow/array/builder_binary.h>
 #include "brad_sql_info.h"
@@ -21,6 +22,8 @@ namespace brad {
 using arrow::internal::checked_cast;
 using namespace arrow::flight;
 using namespace arrow::flight::sql;
+
+namespace py = pybind11;
 
 std::string GetQueryTicket(
   const std::string &autoincrement_id,
@@ -88,15 +91,24 @@ void BradFlightSqlServer::InitWrapper(
 
   handle_query_ = handle_query;
 
-  this->Init(options);
+  const auto status = this->Init(options);
+  if (!status.ok()) {
+    throw std::runtime_error(status.message());
+  }
 }
 
 void BradFlightSqlServer::ServeWrapper() {
-  this->Serve();
+  const auto status = this->Serve();
+  if (!status.ok()) {
+    throw std::runtime_error(status.message());
+  }
 }
 
 void BradFlightSqlServer::ShutdownWrapper() {
-  this->Shutdown(nullptr);
+  const auto status = this->Shutdown(nullptr);
+  if (!status.ok()) {
+    throw std::runtime_error(status.message());
+  }
 }
 
 arrow::Result<std::unique_ptr<FlightInfo>>

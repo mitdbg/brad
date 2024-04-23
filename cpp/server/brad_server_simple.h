@@ -16,16 +16,13 @@
 
 #include <pybind11/pybind11.h>
 
-namespace py = pybind11;
-using namespace pybind11::literals;
-
 namespace brad {
 
 // The type of a Python function that will execute the given SQL query (given as
 // a string). The function returns the results and a schema object.
 //
 // NOTE: The GIL must be held when invoking this function.
-using PythonRunQueryFn = std::function<std::pair<std::vector<py::tuple>, py::object>(std::string)>;
+using PythonRunQueryFn = std::function<std::pair<std::vector<pybind11::tuple>, pybind11::object>(std::string)>;
 
 class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
  public:
