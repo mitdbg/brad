@@ -16,8 +16,9 @@ class DataType(enum.Enum):
 
     Integer = 1
     Float = 2
-    String = 3
-    Timestamp = 4
+    Decimal = 3  # Fixed precision.
+    String = 4
+    Timestamp = 5
 
 
 class Field:
@@ -36,6 +37,9 @@ class Field:
     @property
     def data_type(self) -> DataType:
         return self._data_type
+
+    def __str__(self) -> str:
+        return f"{self.name}: {str(self.data_type)}"
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Field):
@@ -61,6 +65,9 @@ class Schema:
     @property
     def num_fields(self) -> int:
         return len(self._fields)
+
+    def __str__(self) -> str:
+        return ", ".join([str(field) for field in self.fields])
 
     def __iter__(self) -> Iterator[Field]:
         return iter(self._fields)
