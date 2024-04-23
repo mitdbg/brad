@@ -3,6 +3,7 @@ import psycopg
 from typing import Any, Optional, List, Iterable
 
 from .cursor import Cursor, Row
+from .schema import Schema, Field, DataType
 
 
 class PsycopgCursor(Cursor):
@@ -43,8 +44,43 @@ class PsycopgCursor(Cursor):
     def fetchall_sync(self) -> List[Row]:
         return self._impl.fetchall()
 
+    def result_schema(self) -> Schema:
+        fields = []
+        for column_metadata in self._impl.description:
+            try:
+                brad_type = _POSTGRESQL_OID_TO_BRAD_TYPE[column_metadata.type_code]
+            except KeyError:
+                brad_type = DataType.Unknown
+            fields.append(Field(name=column_metadata.name, data_type=brad_type))
+        return Schema(fields)
+
     def commit_sync(self) -> None:
         self._conn.commit()
 
     def rollback_sync(self) -> None:
         self._conn.rollback()
+
+
+# Use iter(self._impl.adapters.types) to retrieve the types supported by the
+# underlying database.
+_POSTGRESQL_OID_TO_BRAD_TYPE = {
+    # Integer types.
+    16: DataType.Integer,  # bool
+    21: DataType.Integer,  # int2
+    23: DataType.Integer,  # int4
+    20: DataType.Integer,  # int8
+    26: DataType.Integer,  # oid
+    # Float types.
+    700: DataType.Float,  # float4
+    701: DataType.Float,  # float8
+    # Fixed precision types.
+    1700: DataType.Decimal,
+    # String types.
+    1042: DataType.String,  # bpchar
+    25: DataType.String,  # text
+    1043: DataType.String,  # varchar
+    # Timestamp types.
+    1114: DataType.Timestamp,  # timestamp
+    1083: DataType.Timestamp,  # time
+    # N.B. We do not currently support date types.
+}
