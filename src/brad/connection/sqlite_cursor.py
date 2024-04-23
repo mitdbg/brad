@@ -54,7 +54,6 @@ class SqliteCursor(Cursor):
         for idx, column_metadata in enumerate(self._cursor_impl.description):
             column_name = column_metadata[0]
             brad_type = _deduce_type(results, idx)
-            print(results[0])
             fields.append(Field(name=column_name, data_type=brad_type))
         return Schema(fields)
 

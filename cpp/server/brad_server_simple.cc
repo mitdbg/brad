@@ -82,7 +82,7 @@ std::shared_ptr<BradFlightSqlServer>
 void BradFlightSqlServer::InitWrapper(
   const std::string &host,
   int port,
-  std::function<std::vector<py::tuple>(std::string)> handle_query) {
+  PythonRunQueryFn handle_query) {
   auto location = arrow::flight::Location::ForGrpcTcp(host, port).ValueOrDie();
   arrow::flight::FlightServerOptions options(location);
 
@@ -115,8 +115,8 @@ arrow::Result<std::unique_ptr<FlightInfo>>
 
   { 
     py::gil_scoped_acquire guard;
-    std::vector<py::tuple> query_result = handle_query_(query);
-    transformed_query_result = TransformQueryResult(query_result);
+    auto result = handle_query_(query);
+    transformed_query_result = TransformQueryResult(result.first);
   }
 
   ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(transformed_query_result));

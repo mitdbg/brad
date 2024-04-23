@@ -8,7 +8,7 @@ import multiprocessing as mp
 import redshift_connector.error as redshift_errors
 import psycopg
 import struct
-from typing import AsyncIterable, Optional, Dict, Any
+from typing import AsyncIterable, Optional, Dict, Any, Tuple
 from datetime import timedelta
 from ddsketch import DDSketch
 
@@ -22,6 +22,7 @@ from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.connection.connection import ConnectionFailed
+from brad.connection.schema import Schema, Field, DataType
 from brad.daemon.monitor import Monitor
 from brad.daemon.messages import (
     ShutdownFrontEnd,
@@ -197,17 +198,20 @@ class BradFrontEnd(BradInterface):
 
         self._is_stub_mode = self._config.stub_mode_path() is not None
 
-    def _handle_query_from_flight_sql(self, query: str) -> RowList:
+    def _handle_query_from_flight_sql(self, query: str) -> Tuple[RowList, Schema]:
         assert self._flight_sql_server_session_id is not None
         assert self._main_thread_loop is not None
 
         future = asyncio.run_coroutine_threadsafe(
-            self._run_query_impl(self._flight_sql_server_session_id, query, {}),
+            self._run_query_impl(
+                self._flight_sql_server_session_id, query, {}, retrieve_schema=True
+            ),
             self._main_thread_loop,
         )
-        row_result = future.result()
+        row_result, schema = future.result()
+        assert schema is not None
 
-        return row_result
+        return row_result, schema
 
     async def serve_forever(self):
         await self._run_setup()
@@ -373,19 +377,23 @@ class BradFrontEnd(BradInterface):
     async def run_query(
         self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
     ) -> AsyncIterable[bytes]:
-        results = await self._run_query_impl(session_id, query, debug_info)
+        results, _ = await self._run_query_impl(session_id, query, debug_info)
         for row in results:
             yield (" | ".join(map(str, row))).encode()
 
     async def run_query_json(
         self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
     ) -> str:
-        results = await self._run_query_impl(session_id, query, debug_info)
+        results, _ = await self._run_query_impl(session_id, query, debug_info)
         return json.dumps(results, cls=DecimalEncoder, default=str)
 
     async def _run_query_impl(
-        self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
-    ) -> RowList:
+        self,
+        session_id: SessionId,
+        query: str,
+        debug_info: Dict[str, Any],
+        retrieve_schema: bool = False,
+    ) -> Tuple[RowList, Optional[Schema]]:
         session = self._sessions.get_session(session_id)
         if session is None:
             raise QueryError(
@@ -401,7 +409,10 @@ class BradFrontEnd(BradInterface):
 
             # Handle internal commands separately.
             if query.startswith("BRAD_"):
-                return await self._handle_internal_command(session, query, debug_info)
+                return (
+                    await self._handle_internal_command(session, query, debug_info),
+                    _internal_command_response_schema() if retrieve_schema else None,
+                )
 
             # 2. Select an engine for the query.
             query_rep = QueryRep(query)
@@ -505,10 +516,13 @@ class BradFrontEnd(BradInterface):
                 # Using `fetchall_sync()` is lower overhead than the async interface.
                 results = [tuple(row) for row in cursor.fetchall_sync()]
                 log_verbose(logger, "Responded with %d rows.", len(results))
-                return results
+                return (
+                    results,
+                    (cursor.result_schema(results) if retrieve_schema else None),
+                )
             except (pyodbc.ProgrammingError, psycopg.ProgrammingError):
                 log_verbose(logger, "No rows produced.")
-                return []
+                return ([], Schema.empty() if retrieve_schema else None)
             except (
                 pyodbc.Error,
                 pyodbc.OperationalError,
@@ -846,3 +860,7 @@ async def _orchestrate_shutdown() -> None:
 
     loop = asyncio.get_event_loop()
     loop.stop()
+
+
+def _internal_command_response_schema() -> Schema:
+    return Schema([Field(name="message", data_type=DataType.String)])

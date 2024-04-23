@@ -1,6 +1,8 @@
 import logging
 import threading
-from typing import Callable
+from typing import Callable, Tuple
+from brad.connection.schema import Schema
+from brad.row_list import RowList
 
 # pylint: disable-next=import-error,no-name-in-module,unused-import
 import brad.native.pybind_brad_server as brad_server
@@ -9,7 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class BradFlightSqlServer:
-    def __init__(self, host: str, port: int, callback: Callable) -> None:
+    def __init__(
+        self, host: str, port: int, callback: Callable[[str], Tuple[RowList, Schema]]
+    ) -> None:
         # pylint: disable-next=c-extension-no-member
         self._flight_sql_server = brad_server.BradFlightSqlServer()
         self._flight_sql_server.init(host, port, callback)
