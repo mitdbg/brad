@@ -44,7 +44,10 @@ class PsycopgCursor(Cursor):
     def fetchall_sync(self) -> List[Row]:
         return self._impl.fetchall()
 
-    def result_schema(self) -> Schema:
+    def result_schema(self, results: Optional[List[Row]] = None) -> Schema:
+        if self._impl.description is None:
+            return Schema.empty()
+
         fields = []
         for column_metadata in self._impl.description:
             try:

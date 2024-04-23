@@ -23,9 +23,7 @@ class PyAthenaCursor(Cursor):
 
     async def fetchall(self) -> List[Row]:
         loop = asyncio.get_running_loop()
-        res = await loop.run_in_executor(None, self._impl.fetchall)  # type: ignore
-        print("Athena", self._impl.description)
-        return res
+        return await loop.run_in_executor(None, self._impl.fetchall)  # type: ignore
 
     async def commit(self) -> None:
         pass
@@ -43,10 +41,12 @@ class PyAthenaCursor(Cursor):
         return self._impl.fetchone()  # type: ignore
 
     def fetchall_sync(self) -> List[Row]:
-        res = self._impl.fetchall()  # type: ignore
-        return res
+        return self._impl.fetchall()  # type: ignore
 
-    def result_schema(self) -> Schema:
+    def result_schema(self, results: Optional[List[Row]] = None) -> Schema:
+        if self._impl.description is None:
+            return Schema.empty()
+
         fields = []
         for column_metadata in self._impl.description:
             column_name = column_metadata[0]

@@ -25,9 +25,7 @@ class RedshiftCursor(Cursor):
 
     async def fetchall(self) -> List[Row]:
         loop = asyncio.get_running_loop()
-        res = await loop.run_in_executor(None, self._impl.fetchall)
-        print("Redshift", self._impl.description)
-        return res
+        return await loop.run_in_executor(None, self._impl.fetchall)
 
     async def commit(self) -> None:
         loop = asyncio.get_running_loop()
@@ -50,7 +48,7 @@ class RedshiftCursor(Cursor):
         res = self._impl.fetchall()
         return res
 
-    def result_schema(self) -> Schema:
+    def result_schema(self, results: Optional[List[Row]] = None) -> Schema:
         fields = []
         for column_metadata in self._impl.description:
             column_name = column_metadata[0]

@@ -55,6 +55,10 @@ class Schema:
     Represents the name and type of the columns in a result set.
     """
 
+    @classmethod
+    def empty(cls) -> "Schema":
+        return cls([])
+
     def __init__(self, fields: Iterable[Field]) -> None:
         self._fields = tuple(fields)
 
