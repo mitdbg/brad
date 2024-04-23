@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 class BradFlightSqlServer:
     def __init__(self, host: str, port: int, callback: Callable) -> None:
+        # pylint: disable-next=c-extension-no-member
         self._flight_sql_server = brad_server.BradFlightSqlServer()
         self._flight_sql_server.init(host, port, callback)
         self._thread = threading.Thread(name="BradFlightSqlServer", target=self._serve)
