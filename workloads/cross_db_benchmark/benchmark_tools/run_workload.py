@@ -35,7 +35,7 @@ def run_workload(
     world_size=1,
     # Used by Athena
     s3_output_path=None,
-    explain_only=False
+    explain_only=False,
 ):
     if database == DatabaseSystem.POSTGRES:
         run_pg_workload(
@@ -72,7 +72,7 @@ def run_workload(
                 cap_workload=cap_workload,
                 rank=rank,
                 world_size=world_size,
-                explain_only=explain_only
+                explain_only=explain_only,
             )
     elif database == DatabaseSystem.REDSHIFT:
         run_redshift_workload(

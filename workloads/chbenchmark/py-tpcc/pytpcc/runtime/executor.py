@@ -47,7 +47,6 @@ RECORD_DETAILED_STATS_VAR = "RECORD_DETAILED_STATS"
 
 
 class Executor:
-
     def __init__(self, driver, scaleParameters, stop_on_error=False):
         self.driver = driver
         self.scaleParameters = scaleParameters

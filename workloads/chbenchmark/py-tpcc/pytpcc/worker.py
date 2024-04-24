@@ -114,7 +114,6 @@ def executorFunc(driverClass, scaleParameters, args, config, debug):
 
 ## MAIN
 if __name__ == "__channelexec__":
-
     driverClass = None
     for item in channel:
         command = pickle.loads(item)
