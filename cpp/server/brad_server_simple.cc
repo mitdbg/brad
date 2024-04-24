@@ -12,6 +12,7 @@
 #include "brad_statement.h"
 #include "brad_statement_batch_reader.h"
 #include "brad_tables_schema_batch_reader.h"
+#include "python_utils.h"
 #include <arrow/flight/sql/server.h>
 #include <arrow/scalar.h>
 #include <arrow/util/checked_cast.h>
@@ -123,11 +124,13 @@ arrow::Result<std::unique_ptr<FlightInfo>>
   ARROW_ASSIGN_OR_RAISE(auto ticket,
                         EncodeTransactionQuery(query_ticket));
 
+  std::shared_ptr<arrow::Schema> result_schema;
   std::vector<std::vector<std::any>> transformed_query_result;
 
   { 
     py::gil_scoped_acquire guard;
     auto result = handle_query_(query);
+    result_schema = ArrowSchemaFromBradSchema(result.second);
     transformed_query_result = TransformQueryResult(result.first);
   }
 

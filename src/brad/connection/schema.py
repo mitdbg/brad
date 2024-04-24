@@ -10,6 +10,9 @@ class DataType(enum.Enum):
     supporting different SQL dialects, which each have slightly different types.
     """
 
+    # NOTE: If you change the value mapped to each enum here, make sure to
+    # change `cpp/server/python_utils.cc` as well.
+
     # This is used when we cannot deduce the type from the underlying connection
     # (or we do not support it yet). The data should be treated as all `NULL`s.
     Unknown = 0
