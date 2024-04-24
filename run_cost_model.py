@@ -177,6 +177,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_best", action="store_true")
     parser.add_argument("--train_model", action="store_true")
     parser.add_argument("--is_query", action="store_true")
+    parser.add_argument("--explain_only", action="store_true")
     parser.add_argument("--plan_featurization", default="AuroraEstSystemCardDetail")
     parser.add_argument(
         "--hyperparameter_path",
@@ -315,6 +316,7 @@ if __name__ == "__main__":
             rank=args.run_workload_rank,
             world_size=args.run_workload_world_size,
             s3_output_path=args.s3_output_path,
+            explain_only=args.explain_only
         )
 
     if args.parse_plans:

@@ -81,6 +81,7 @@ def run_aurora_workload(
     cap_workload,
     rank,
     world_size,
+    explain_only
 ):
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
@@ -136,7 +137,7 @@ def run_aurora_workload(
 
         hint = hint_list[i]
         curr_statistics = db_conn.run_query_collect_statistics(
-            sql_query, repetitions=repetitions_per_query, prefix=hint
+            sql_query, repetitions=repetitions_per_query, prefix=hint, explain_only=explain_only
         )
         curr_statistics.update(sql=sql_query)
         curr_statistics.update(hint=hint)
