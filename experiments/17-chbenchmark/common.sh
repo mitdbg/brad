@@ -2,13 +2,26 @@ function start_brad() {
   system_config_file=$1
   physical_config_file=$2
 
-  pushd ../../
+  pushd ../../../
   brad daemon \
     --physical-config-file $physical_config_file \
     --system-config-file $system_config_file \
     --schema-name $schema_name \
     &
   brad_pid=$!
+  popd
+}
+
+function run_tpcc() {
+  pushd ../../../workloads/chbenchmark/py-tpcc/
+  RECORD_DETAILED_STATS=1 python3 -m pytpcc.tpcc brad \
+    --no-load \
+    --config $abs_txn_config_file \
+    --warehouses $txn_warehouses \
+    --duration $run_for_s \
+    --clients $t_clients \
+    --scalefactor $txn_scale_factor &
+  tpcc_pid=$!
   popd
 }
 
