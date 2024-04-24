@@ -73,6 +73,10 @@ class BradDriver(AbstractDriver):
         "host": ("Host running the BRAD front end.", "localhost"),
         "port": ("Port on which the BRAD front end is listening.", 6583),
         "isolation_level": ("The isolation level to use.", "REPEATABLE READ"),
+        "use_worker_offset": (
+            "If true, add the worker index to the port (to have 1 client per front end)",
+            True,
+        ),
     }
 
     def __init__(self, ddl: str) -> None:
@@ -85,7 +89,10 @@ class BradDriver(AbstractDriver):
 
     def loadConfig(self, config: Config) -> None:
         self._config = config
-        self._client = BradGrpcClient(host=config["host"], port=config["port"])
+        port = self._config["port"]
+        if self._config["use_worker_offset"]:
+            port += self._config["worker_index"]
+        self._client = BradGrpcClient(host=config["host"], port=port)
         self._client.connect()
 
     def loadTuples(self, tableName: str, tuples) -> None:
