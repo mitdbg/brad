@@ -42,6 +42,7 @@ from pprint import pprint, pformat
 
 from .util import *
 from .runtime import *
+from .drivers.auroradriver import AuroraDriver
 from .drivers.braddriver import BradDriver
 
 logging.basicConfig(
@@ -56,9 +57,12 @@ logging.basicConfig(
 ## createDriverClass
 ## ==============================================
 def createDriverClass(name):
-    if name != "brad":
+    if name == "brad":
+        return BradDriver
+    elif name == "aurora":
+        return AuroraDriver
+    else:
         raise NotImplementedError
-    return BradDriver
 
 
 ## DEF
@@ -200,6 +204,7 @@ def executorFunc(driverClass, scaleParameters, args, config, debug, worker_index
 
         config["execute"] = True
         config["reset"] = False
+        config["worker_index"] = worker_index
         driver.loadConfig(config)
 
         e = executor.Executor(
@@ -318,6 +323,7 @@ if __name__ == "__main__":
     config["reset"] = args["reset"]
     config["load"] = False
     config["execute"] = False
+    config["worker_index"] = 0
     if config["reset"]:
         logging.info("Reseting database")
     driver.loadConfig(config)
