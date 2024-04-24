@@ -89,7 +89,7 @@ class BradDriver(AbstractDriver):
 
     def loadConfig(self, config: Config) -> None:
         self._config = config
-        port = self._config["port"]
+        port = int(self._config["port"])
         if self._config["use_worker_offset"]:
             port += self._config["worker_index"]
         self._client = BradGrpcClient(host=config["host"], port=port)

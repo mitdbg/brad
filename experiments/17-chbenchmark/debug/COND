@@ -2,10 +2,13 @@ run_command(
   name="txn_lat",
   run="../run_tpcc.sh",
   options={
-    "txn_config_file": "debug/brad.config",  # Relative to one level up.
-    "txn_warehouses": 1740,
-    "txn_scale_factor": 1,  # TBD
-    "t_clients": 1,  # TBD
-    "run_for_s": 60,
+    "physical-config-file": "../../config/physical_config_chbench.yml",
+    "system-config-file": "debug/debug_config.yml",  # Relative to one level up.
+    "txn-config-file": "debug/brad.config",
+    "schema-name": "chbenchmark",
+    "txn-warehouses": 1740,
+    "txn-scale-factor": 1,  # TBD
+    "t-clients": 1,  # TBD
+    "run-for-s": 120,
   },
 )

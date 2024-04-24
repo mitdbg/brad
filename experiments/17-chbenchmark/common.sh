@@ -1,3 +1,17 @@
+function start_brad() {
+  system_config_file=$1
+  physical_config_file=$2
+
+  pushd ../../
+  brad daemon \
+    --physical-config-file $physical_config_file \
+    --system-config-file $system_config_file \
+    --schema-name $schema_name \
+    &
+  brad_pid=$!
+  popd
+}
+
 function extract_named_arguments() {
   # Evaluates any environment variables in this script's arguments. This script
   # should only be run on trusted input.
