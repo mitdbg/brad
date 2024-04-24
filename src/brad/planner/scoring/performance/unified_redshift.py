@@ -5,6 +5,7 @@ import numpy.typing as npt
 from typing import Dict, TYPE_CHECKING, Optional, Iterator, List, Tuple, Any
 
 from brad.config.engine import Engine
+from brad.daemon.hot_config import HotConfig
 from brad.blueprint.provisioning import Provisioning
 from brad.planner.scoring.provisioning import redshift_num_cpus
 from brad.planner.scoring.performance.queuing import predict_mm1_wait_time
@@ -57,8 +58,11 @@ class RedshiftProvisioningScore:
             # This won't be used. This is actually max.
             avg_cpu = ctx.metrics.redshift_cpu_avg
 
+        gamma_norm_factor = HotConfig.instance().get_value(
+            "query_lat_p90", default=30.0
+        )
         gamma = (
-            min(ctx.metrics.query_lat_s_p90 / 30.0 + 0.35, 1.0)
+            min(ctx.metrics.query_lat_s_p90 / gamma_norm_factor + 0.35, 1.0)
             if avg_cpu >= 90.0
             else 1.0
         )

@@ -3,9 +3,10 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 from datetime import timedelta
 
-from brad.config.engine import Engine
 from brad.blueprint import Blueprint
+from brad.config.engine import Engine
 from brad.config.planner import PlannerConfig
+from brad.daemon.hot_config import HotConfig
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.metrics import Metrics
 from brad.planner.workload import Workload
@@ -267,6 +268,8 @@ class ScoringContext:
             logger.info("No queries in the workload.")
             return
 
+        query_lat_p90 = HotConfig.instance().get_value("query_lat_p90", default=30.0)
+
         # Process Redshift.
         is_redshift = np.where(obs_locs == Workload.EngineLatencyIndex[Engine.Redshift])
         if is_redshift[0].sum() > 0:
@@ -279,7 +282,7 @@ class ScoringContext:
             ratio = redshift_preds / base
             # Queries where we have observations where the predictions are probably
             # 5x larger and the predictions violate the SLOs.
-            hes = np.where((ratio > 3.0) & (redshift_preds > 30.0))
+            hes = np.where((ratio > 3.0) & (redshift_preds > query_lat_p90))
             redshift_to_replace = redshift_qidx[hes]
             logger.info(
                 "[Redshift Prediction Corrections] Replacing %d base predictions.",
@@ -311,7 +314,7 @@ class ScoringContext:
                 aurora_obs, self.current_blueprint.aurora_provisioning(), self
             )
             aurora_ratio = aurora_preds / aurora_base
-            ahes = np.where((aurora_ratio > 3.0) & (aurora_preds > 30.0))
+            ahes = np.where((aurora_ratio > 3.0) & (aurora_preds > query_lat_p90))
             aurora_to_replace = aurora_qidx[ahes]
             logger.info(
                 "[Aurora Prediction Corrections] Replacing %d base predictions.",
