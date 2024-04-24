@@ -18,6 +18,7 @@ from brad.config.planner import PlannerConfig
 from brad.config.system_event import SystemEvent
 from brad.config.temp_config import TempConfig
 from brad.connection.factory import ConnectionFactory
+from brad.daemon.hot_config import HotConfig
 from brad.daemon.messages import (
     ShutdownFrontEnd,
     Sentinel,
@@ -234,10 +235,14 @@ class BradDaemon:
                     athena_accessed_bytes_path=self._temp_config.athena_data_access_path(),
                 )
 
+            query_lat_p90 = self._temp_config.query_latency_p90_ceiling_s()
+            txn_lat_p90 = self._temp_config.txn_latency_p90_ceiling_s()
             comparator_provider = self._get_comparator_provider(
-                self._temp_config.query_latency_p90_ceiling_s(),
-                self._temp_config.txn_latency_p90_ceiling_s(),
+                query_lat_p90, txn_lat_p90
             )
+            hot_config = HotConfig.instance()
+            hot_config.set_value("query_lat_p90", query_lat_p90)
+            hot_config.set_value("txn_lat_p90", txn_lat_p90)
 
         else:
             logger.warning(
@@ -756,6 +761,10 @@ class BradDaemon:
                     t.set_latency_ceiling(query_p90_s)
                 elif isinstance(t, TransactionLatencyCeiling):
                     t.set_latency_ceiling(txn_p90_s)
+
+            hot_config = HotConfig.instance()
+            hot_config.set_value("query_lat_p90", query_p90_s)
+            hot_config.set_value("txn_lat_p90", txn_p90_s)
 
             if self._system_event_logger is not None:
                 self._system_event_logger.log(
