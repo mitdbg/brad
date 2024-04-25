@@ -185,5 +185,11 @@ class AbstractDriver(object):
             "%s does not implement doStockLevel" % (self.driver_name)
         )
 
+    def ensureRollback(self) -> None:
+        """
+        Makes sure the transaction has rolled back.
+        """
+        # Default: no-op.
+
 
 ## CLASS

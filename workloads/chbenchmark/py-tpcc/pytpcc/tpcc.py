@@ -170,6 +170,7 @@ def startExecution(driverClass, scaleParameters, args, config):
                 config,
                 debug,
                 i,
+                args["clients"],
             ),
         )
         worker_results.append(r)
@@ -196,7 +197,9 @@ def startExecution(driverClass, scaleParameters, args, config):
 ## ==============================================
 ## executorFunc
 ## ==============================================
-def executorFunc(driverClass, scaleParameters, args, config, debug, worker_index):
+def executorFunc(
+    driverClass, scaleParameters, args, config, debug, worker_index, total_workers
+):
     try:
         driver = driverClass(args["ddl"])
         assert driver != None
@@ -211,7 +214,9 @@ def executorFunc(driverClass, scaleParameters, args, config, debug, worker_index
             driver, scaleParameters, stop_on_error=args["stop_on_error"]
         )
         driver.executeStart()
-        results = e.execute(args["duration"], worker_index)
+        results = e.execute(
+            args["duration"], worker_index, total_workers, args["lat_sample_prob"]
+        )
         driver.executeFinish()
 
         return results
@@ -290,6 +295,12 @@ if __name__ == "__main__":
     aparser.add_argument(
         "--debug", action="store_true", help="Enable debug log messages"
     )
+    aparser.add_argument(
+        "--lat-sample-prob",
+        type=float,
+        default=0.1,
+        help="The fraction of the transaction latencies to record.",
+    )
     args = vars(aparser.parse_args())
 
     if args["debug"]:
@@ -367,7 +378,12 @@ if __name__ == "__main__":
                 driver, scaleParameters, stop_on_error=args["stop_on_error"]
             )
             driver.executeStart()
-            results = e.execute(args["duration"], worker_index=0)
+            results = e.execute(
+                args["duration"],
+                worker_index=0,
+                total_workers=1,
+                lat_sample_prob=args["lat_sample_prob"],
+            )
             driver.executeFinish()
         else:
             results = startExecution(driverClass, scaleParameters, args, config)

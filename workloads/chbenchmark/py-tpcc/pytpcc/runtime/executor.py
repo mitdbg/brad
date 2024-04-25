@@ -39,6 +39,8 @@ import os
 import pathlib
 from datetime import datetime
 from pprint import pprint, pformat
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
+from typing import Optional
 
 from .. import constants
 from ..util import *
@@ -47,14 +49,28 @@ RECORD_DETAILED_STATS_VAR = "RECORD_DETAILED_STATS"
 
 
 class Executor:
-    def __init__(self, driver, scaleParameters, stop_on_error=False):
+    def __init__(self, driver, scaleParameters, stop_on_error=False, pct_remote=0.1):
         self.driver = driver
         self.scaleParameters = scaleParameters
         self.stop_on_error = stop_on_error
+        self.pct_remote = pct_remote
+
+        self.local_warehouse_range = (
+            self.scaleParameters.starting_warehouse,
+            self.scaleParameters.ending_warehouse,
+        )
+        self.total_workers = 1
+        self.worker_index = 0
 
     ## DEF
 
-    def execute(self, duration: float, worker_index: int) -> results.Results:
+    def execute(
+        self,
+        duration: float,
+        worker_index: int,
+        total_workers: int,
+        lat_sample_prob: float,
+    ) -> results.Results:
         if RECORD_DETAILED_STATS_VAR in os.environ:
             import conductor.lib as cond
 
@@ -76,17 +92,35 @@ class Executor:
                 "record_detailed": True,
                 "worker_index": worker_index,
                 "output_prefix": out_path,
-                "lat_sample_prob": 0.10,  # Sampled 10%
+                "lat_sample_prob": lat_sample_prob,
             }
         else:
             logging.info("Not recording detailed stats.")
             options = {}
+
+        # Compute warehouse ranges.
+        self.worker_index = worker_index
+        self.total_workers = total_workers
+        warehouses_per_worker = self.scaleParameters.warehouses // total_workers
+        min_warehouse = worker_index * warehouses_per_worker
+        # N.B. Warehouse IDs are 1-based and this range is supposed to be
+        # inclusive.
+        self.local_warehouse_range = (
+            min_warehouse + 1,
+            min_warehouse + warehouses_per_worker,
+        )
+        logging.info(
+            "Worker index %d - Warehouse range: %d to %d (inclusive)",
+            self.worker_index,
+            *self.local_warehouse_range
+        )
 
         r = results.Results(options)
         assert r
         logging.info("Executing benchmark for %d seconds" % duration)
         start = r.startBenchmark()
         debug = logging.getLogger().isEnabledFor(logging.DEBUG)
+        backoff: Optional[RandomizedExponentialBackoff] = None
 
         while (time.time() - start) <= duration:
             txn, params = self.doOne()
@@ -96,15 +130,30 @@ class Executor:
                 logging.debug("Executing '%s' transaction" % txn)
             try:
                 val = self.driver.executeTransaction(txn, params)
+                backoff = None
             except KeyboardInterrupt:
                 return -1
             except (Exception, AssertionError) as ex:
-                logging.warn("Failed to execute Transaction '%s': %s" % (txn, ex))
                 if debug:
+                    logging.warn("Failed to execute Transaction '%s': %s" % (txn, ex))
+                    traceback.print_exc(file=sys.stdout)
+                elif random.random() < 0.01:
+                    logging.warning("Aborted transaction: %s: %s", txn, ex)
                     traceback.print_exc(file=sys.stdout)
                 if self.stop_on_error:
                     raise
                 r.abortTransaction(txn_id)
+                self.driver.ensureRollback()
+
+                # Back off slightly.
+                if backoff is None:
+                    backoff = RandomizedExponentialBackoff(
+                        max_retries=10, base_delay_s=0.001, max_delay_s=1.0
+                    )
+                wait_s = backoff.wait_time_s()
+                if wait_s is not None:
+                    time.sleep(wait_s)
+
                 continue
 
             # if debug: logging.debug("%s\nParameters:\n%s\nResult:\n%s" % (txn, pformat(params), pformat(val)))
@@ -308,10 +357,21 @@ class Executor:
     ## DEF
 
     def makeWarehouseId(self):
-        w_id = rand.number(
-            self.scaleParameters.starting_warehouse,
-            self.scaleParameters.ending_warehouse,
-        )
+        if random.random() < self.pct_remote:
+            # Generate remote.
+            while True:
+                w_id = rand.number(
+                    self.scaleParameters.starting_warehouse,
+                    self.scaleParameters.ending_warehouse,
+                )
+                if self.total_workers == 1 or not (
+                    w_id >= self.local_warehouse_range[0]
+                    and w_id <= self.local_warehouse_range[1]
+                ):
+                    break
+        else:
+            w_id = rand.number(*self.local_warehouse_range)
+
         assert w_id >= self.scaleParameters.starting_warehouse, (
             "Invalid W_ID: %d" % w_id
         )

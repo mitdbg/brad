@@ -166,3 +166,5 @@ TransactionTypes = enum(
     "PAYMENT",
     "STOCK_LEVEL",
 )
+
+NONSILENT_ERRORS_VAR = "NONSILENT_ERRORS"
