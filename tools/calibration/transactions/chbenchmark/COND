@@ -1,10 +1,10 @@
 RUN_FOR_S = 3 * 60 + 30  # 3 minutes 30 seconds
 NUM_CLIENTS = {
-  "db.t4g.medium": [1, 2, 4, 8, 16, 32],
-  "db.r6g.large": [1, 2, 4, 8, 16, 32],
   "db.r6g.xlarge": [1, 2, 4, 8, 16, 32, 64],
   "db.r6g.2xlarge": [1, 2, 4, 8, 16, 32, 64, 128],
   "db.r6g.4xlarge": [1, 2, 4, 8, 16, 32, 64, 128, 256],
+  "db.r6g.large": [1, 2, 4, 8, 16, 32],
+  "db.t4g.medium": [1, 2, 4, 8, 16, 32],
 }
 
 INSTANCES = list(NUM_CLIENTS.keys())
