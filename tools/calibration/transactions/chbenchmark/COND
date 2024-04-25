@@ -16,14 +16,14 @@ COND_INSTANCES = {
 combine(
   name="all",
   deps=[
-    ":{}".format(instance)
+    ":{}".format(COND_INSTANCES[instance])
     for instance in INSTANCES
   ],
 )
 
 for instance in INSTANCES:
   run_experiment_group(
-    name=instance,
+    name=COND_INSTANCES[instance],
     run="./run_instance.sh",
     experiments=[
       ExperimentInstance(
