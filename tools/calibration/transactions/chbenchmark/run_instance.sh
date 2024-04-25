@@ -61,7 +61,7 @@ brad admin --debug modify_blueprint \
 sleep 30
 
 >&2 echo "Retrieving pre-metrics..."
-python3 retrieve_metrics.py --out-file $COND_OUT/pi_metrics_before.csv --physical-config-file $physical_config_file
+python3 retrieve_metrics.py --out-file $COND_OUT/pi_metrics_before.csv --physical-config-file $abs_physical_config_file
 
 >&2 echo "Running the transactional workload..."
 
@@ -81,4 +81,4 @@ popd
 sleep 10
 
 >&2 echo "Retrieving metrics..."
-python3 retrieve_metrics.py --out-file $COND_OUT/pi_metrics.csv --physical-config-file $physical_config_file
+python3 retrieve_metrics.py --out-file $COND_OUT/pi_metrics.csv --physical-config-file $abs_physical_config_file
