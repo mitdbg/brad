@@ -47,15 +47,27 @@ RECORD_DETAILED_STATS_VAR = "RECORD_DETAILED_STATS"
 
 
 class Executor:
-    def __init__(self, driver, scaleParameters, stop_on_error=False):
+    def __init__(self, driver, scaleParameters, stop_on_error=False, pct_remote=0.1):
         self.driver = driver
         self.scaleParameters = scaleParameters
         self.stop_on_error = stop_on_error
+        self.pct_remote = pct_remote
+
+        self.local_warehouse_range = (
+            self.scaleParameters.starting_warehouse,
+            self.scaleParameters.ending_warehouse,
+        )
+        self.total_workers = 1
+        self.worker_index = 0
 
     ## DEF
 
     def execute(
-        self, duration: float, worker_index: int, lat_sample_prob: float
+        self,
+        duration: float,
+        worker_index: int,
+        total_workers: int,
+        lat_sample_prob: float,
     ) -> results.Results:
         if RECORD_DETAILED_STATS_VAR in os.environ:
             import conductor.lib as cond
@@ -83,6 +95,23 @@ class Executor:
         else:
             logging.info("Not recording detailed stats.")
             options = {}
+
+        # Compute warehouse ranges.
+        self.worker_index = worker_index
+        self.total_workers = total_workers
+        warehouses_per_worker = self.scaleParameters.warehouses // total_workers
+        min_warehouse = worker_index * warehouses_per_worker
+        # N.B. Warehouse IDs are 1-based and this range is supposed to be
+        # inclusive.
+        self.local_warehouse_range = (
+            min_warehouse + 1,
+            min_warehouse + warehouses_per_worker,
+        )
+        logging.info(
+            "Worker index %d - Warehouse range: %d to %d (inclusive)",
+            self.worker_index,
+            *self.local_warehouse_range
+        )
 
         r = results.Results(options)
         assert r
@@ -310,10 +339,21 @@ class Executor:
     ## DEF
 
     def makeWarehouseId(self):
-        w_id = rand.number(
-            self.scaleParameters.starting_warehouse,
-            self.scaleParameters.ending_warehouse,
-        )
+        if random.random() < self.pct_remote:
+            # Generate remote.
+            while True:
+                w_id = rand.number(
+                    self.scaleParameters.starting_warehouse,
+                    self.scaleParameters.ending_warehouse,
+                )
+                if self.total_workers == 1 or not (
+                    w_id >= self.local_warehouse_range[0]
+                    and w_id <= self.local_warehouse_range[1]
+                ):
+                    break
+        else:
+            w_id = rand.number(*self.local_warehouse_range)
+
         assert w_id >= self.scaleParameters.starting_warehouse, (
             "Invalid W_ID: %d" % w_id
         )
