@@ -54,7 +54,9 @@ class Executor:
 
     ## DEF
 
-    def execute(self, duration: float, worker_index: int) -> results.Results:
+    def execute(
+        self, duration: float, worker_index: int, lat_sample_prob: float
+    ) -> results.Results:
         if RECORD_DETAILED_STATS_VAR in os.environ:
             import conductor.lib as cond
 
@@ -76,7 +78,7 @@ class Executor:
                 "record_detailed": True,
                 "worker_index": worker_index,
                 "output_prefix": out_path,
-                "lat_sample_prob": 0.10,  # Sampled 10%
+                "lat_sample_prob": lat_sample_prob,
             }
         else:
             logging.info("Not recording detailed stats.")
