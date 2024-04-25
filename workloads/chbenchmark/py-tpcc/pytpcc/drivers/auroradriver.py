@@ -1,6 +1,7 @@
 import logging
 import traceback
 import decimal
+import os
 from typing import Dict, Tuple, Any, Optional, List
 
 from .abstractdriver import *
@@ -84,6 +85,7 @@ class AuroraDriver(AbstractDriver):
         self._connection: Optional[PsycopgConnection] = None
         self._cursor: Optional[PsycopgCursor] = None
         self._config: Dict[str, Any] = {}
+        self._nonsilent_errs = constants.NONSILENT_ERRORS_VAR in os.environ
 
     def makeDefaultConfig(self) -> Config:
         return AuroraDriver.DEFAULT_CONFIG
@@ -172,8 +174,9 @@ class AuroraDriver(AbstractDriver):
             return result
 
         except Exception as ex:
-            print("Error in DELIVERY", str(ex))
-            print(traceback.format_exc())
+            if self._nonsilent_errs:
+                print("Error in DELIVERY", str(ex))
+                print(traceback.format_exc())
             raise
 
     def doNewOrder(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
@@ -362,8 +365,9 @@ class AuroraDriver(AbstractDriver):
             return [customer_info, misc, item_data]
 
         except Exception as ex:
-            print("Error in NEWORDER", str(ex))
-            print(traceback.format_exc())
+            if self._nonsilent_errs:
+                print("Error in NEWORDER", str(ex))
+                print(traceback.format_exc())
             raise
 
     def doOrderStatus(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
@@ -415,8 +419,9 @@ class AuroraDriver(AbstractDriver):
             return [customer, order, orderLines]
 
         except Exception as ex:
-            print("Error in ORDER_STATUS", str(ex))
-            print(traceback.format_exc())
+            if self._nonsilent_errs:
+                print("Error in ORDER_STATUS", str(ex))
+                print(traceback.format_exc())
             raise
 
     def doPayment(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
@@ -527,8 +532,9 @@ class AuroraDriver(AbstractDriver):
             return [warehouse, district, customer]
 
         except Exception as ex:
-            print("Error in PAYMENT", str(ex))
-            print(traceback.format_exc())
+            if self._nonsilent_errs:
+                print("Error in PAYMENT", str(ex))
+                print(traceback.format_exc())
             raise
 
     def doStockLevel(self, params: Dict[str, Any]) -> int:
@@ -559,6 +565,7 @@ class AuroraDriver(AbstractDriver):
             return int(result[0])
 
         except Exception as ex:
-            print("Error in STOCK_LEVEL", str(ex))
-            print(traceback.format_exc())
+            if self._nonsilent_errs:
+                print("Error in STOCK_LEVEL", str(ex))
+                print(traceback.format_exc())
             raise
