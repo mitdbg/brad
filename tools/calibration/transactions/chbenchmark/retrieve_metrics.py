@@ -97,7 +97,7 @@ def main():
         client = PerfInsightsClient.from_instance_identifier(
             instance_identifier=args.instance_id
         )
-    elif args.config_file is not None:
+    elif args.physical_config_file is not None:
         config = ConfigFile.load_from_physical_config(args.physical_config_file)
         directory = Directory(config)
         asyncio.run(directory.refresh())
