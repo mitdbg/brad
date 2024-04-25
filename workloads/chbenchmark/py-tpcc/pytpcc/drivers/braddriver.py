@@ -552,3 +552,9 @@ class BradDriver(AbstractDriver):
                 print("Error in STOCK_LEVEL", str(ex))
                 print(traceback.format_exc())
             raise
+
+    def ensureRollback(self) -> None:
+        """
+        Makes sure the transaction has rolled back.
+        """
+        self._client.run_query_ignore_results("ROLLBACK")

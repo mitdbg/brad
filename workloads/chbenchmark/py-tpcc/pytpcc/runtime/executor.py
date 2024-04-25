@@ -39,6 +39,8 @@ import os
 import pathlib
 from datetime import datetime
 from pprint import pprint, pformat
+from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
+from typing import Optional
 
 from .. import constants
 from ..util import *
@@ -118,6 +120,7 @@ class Executor:
         logging.info("Executing benchmark for %d seconds" % duration)
         start = r.startBenchmark()
         debug = logging.getLogger().isEnabledFor(logging.DEBUG)
+        backoff: Optional[RandomizedExponentialBackoff] = None
 
         while (time.time() - start) <= duration:
             txn, params = self.doOne()
@@ -127,15 +130,30 @@ class Executor:
                 logging.debug("Executing '%s' transaction" % txn)
             try:
                 val = self.driver.executeTransaction(txn, params)
+                backoff = None
             except KeyboardInterrupt:
                 return -1
             except (Exception, AssertionError) as ex:
                 if debug:
                     logging.warn("Failed to execute Transaction '%s': %s" % (txn, ex))
                     traceback.print_exc(file=sys.stdout)
+                elif random.random() < 0.01:
+                    logging.warning("Aborted transaction: %s: %s", txn, ex)
+                    traceback.print_exc(file=sys.stdout)
                 if self.stop_on_error:
                     raise
                 r.abortTransaction(txn_id)
+                self.driver.ensureRollback()
+
+                # Back off slightly.
+                if backoff is None:
+                    backoff = RandomizedExponentialBackoff(
+                        max_retries=10, base_delay_s=0.001, max_delay_s=1.0
+                    )
+                wait_s = backoff.wait_time_s()
+                if wait_s is not None:
+                    time.sleep(wait_s)
+
                 continue
 
             # if debug: logging.debug("%s\nParameters:\n%s\nResult:\n%s" % (txn, pformat(params), pformat(val)))
