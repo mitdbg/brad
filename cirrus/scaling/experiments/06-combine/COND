@@ -1,7 +1,0 @@
-combine(
-  name="all",
-  deps=[
-    "//experiments/04-postgres3/:postgres_only",
-    "//experiments/05-both/:postgres_redshift",
-  ],
-)

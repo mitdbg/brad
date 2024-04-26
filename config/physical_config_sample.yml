@@ -26,6 +26,20 @@ s3_logs_bucket: my-bucket
 s3_logs_path: brad/query_logs/
 local_logs_path: /tmp/brad_query_logs/
 
+# To get started without setting up resources on AWS, you can run BRAD in "stub
+# mode". In this mode, BRAD connects to a local SQLite database and operates
+# with some features disabled (workload logging, blueprint transitions, data
+# syncs, metrics retrieval). But this is enough to test out the BRAD
+# executables.
+#
+# To start up in stub mode, uncomment the `stub_mode_path` key below and point
+# it to the `config/stubs/imdb_extended/` directory in the BRAD repository. Use
+# an absolute path. You can optionally uncomment `stub_db_path` to configure
+# where the stub DB file is saved.
+#
+# stub_mode_path: config/stubs/imdb_extended/
+# stub_db_path: /tmp/brad_stub_db.sqlite
+
 # Clusters and credentials. BRAD uses these to connect to and manipulate the
 # underlying engines.
 athena:

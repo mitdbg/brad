@@ -315,6 +315,7 @@ if __name__ == "__main__":
             rank=args.run_workload_rank,
             world_size=args.run_workload_world_size,
             s3_output_path=args.s3_output_path,
+            explain_only=args.explain_only,
         )
 
     if args.parse_plans:

@@ -25,6 +25,9 @@ class QueryLatencyCeiling(Trigger):
         self._sustained_epochs = sustained_epochs
         self._lookahead_epochs = lookahead_epochs
 
+    def set_latency_ceiling(self, ceiling_s: float) -> None:
+        self._latency_ceiling_s = ceiling_s
+
     async def should_replan(self) -> bool:
         if not self._passed_delays_since_cutoff():
             logger.debug(

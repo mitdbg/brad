@@ -19,7 +19,7 @@ sleep 30
 start_repeating_olap_runner 1 5 5 $query_indices "ra_1"
 rana_pid=$runner_pid
 
-start_txn_runner 4  # Implicit: --dataset-type
+start_txn_runner_serial 4  # Implicit: --dataset-type
 txn_pid=$runner_pid
 
 sleep $((5 * 60))

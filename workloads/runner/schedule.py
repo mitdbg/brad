@@ -90,15 +90,13 @@ class Repeat(Schedule):
 
     @overload
     @staticmethod
-    def starting_now(*, interval: timedelta, num_repeat: int) -> Repeat:
-        ...
+    def starting_now(*, interval: timedelta, num_repeat: int) -> Repeat: ...
 
     @overload
     @staticmethod
     def starting_now(
         *, interval: timedelta, end_time: datetime = datetime.max
-    ) -> Repeat:
-        ...
+    ) -> Repeat: ...
 
     @staticmethod
     def starting_now(

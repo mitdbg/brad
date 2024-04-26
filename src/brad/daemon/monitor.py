@@ -41,7 +41,6 @@ class Monitor:
         Must be called to initialize the `Monitor`. Run after loading the
         blueprint into the blueprint manager.
         """
-        # TODO: Handle blueprint changes gracefully.
         # TODO: No need to create metrics sources if the engine is paused.
         blueprint = self._blueprint_mgr.get_blueprint()
 

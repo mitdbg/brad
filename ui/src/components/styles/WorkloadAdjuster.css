@@ -1,0 +1,16 @@
+.workload-adjuster {
+  width: 290px;
+  padding: 10px 25px;
+  background-color: #ffffff;
+  position: absolute;
+  top: -110px;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  border-radius: 9px;
+}
+
+.workload-adjuster h3 {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin: 0 0 10px 0;
+}

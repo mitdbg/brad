@@ -24,6 +24,10 @@ class DataSyncExecutor:
         self._engines: Optional[EngineConnections] = None
 
     async def establish_connections(self) -> None:
+        if self._config.stub_mode_path() is not None:
+            logger.info("In stub mode, so data sync executor is not starting.")
+            return
+
         logger.debug(
             "Data sync executor is establishing connections to the underlying engines..."
         )

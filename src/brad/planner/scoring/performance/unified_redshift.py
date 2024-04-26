@@ -5,6 +5,7 @@ import numpy.typing as npt
 from typing import Dict, TYPE_CHECKING, Optional, Iterator, List, Tuple, Any
 
 from brad.config.engine import Engine
+from brad.daemon.hot_config import HotConfig
 from brad.blueprint.provisioning import Provisioning
 from brad.planner.scoring.provisioning import redshift_num_cpus
 from brad.planner.scoring.performance.queuing import predict_mm1_wait_time
@@ -48,7 +49,23 @@ class RedshiftProvisioningScore:
 
         # Load adjustment factor.
         # TODO: Hardcoded SLO.
-        gamma = min(ctx.metrics.query_lat_s_p90 / 30.0, 1.0)
+        if (
+            ctx.metrics.redshift_cpu_list is not None
+            and ctx.metrics.redshift_cpu_list.shape[0] > 0
+        ):
+            avg_cpu = ctx.metrics.redshift_cpu_list.mean()
+        else:
+            # This won't be used. This is actually max.
+            avg_cpu = ctx.metrics.redshift_cpu_avg
+
+        gamma_norm_factor = HotConfig.instance().get_value(
+            "query_lat_p90", default=30.0
+        )
+        gamma = (
+            min(ctx.metrics.query_lat_s_p90 / gamma_norm_factor + 0.35, 1.0)
+            if avg_cpu >= 90.0
+            else 1.0
+        )
         debug_dict["redshift_gamma_factor"] = gamma
         if (
             ctx.metrics.redshift_cpu_list is not None
@@ -90,12 +107,14 @@ class RedshiftProvisioningScore:
                 predicted_max_node_cpu_util,
                 {
                     **debug_dict,
-                    "redshift_query_factor": query_factor
-                    if query_factor is not None
-                    else np.nan,
-                    "redshift_skew_adjustment": ctx.cpu_skew_adjustment
-                    if ctx.cpu_skew_adjustment is not None
-                    else np.nan,
+                    "redshift_query_factor": (
+                        query_factor if query_factor is not None else np.nan
+                    ),
+                    "redshift_skew_adjustment": (
+                        ctx.cpu_skew_adjustment
+                        if ctx.cpu_skew_adjustment is not None
+                        else np.nan
+                    ),
                 },
             )
 
@@ -179,7 +198,7 @@ class RedshiftProvisioningScore:
                 # When this value is close to 0, it indicates high load skew.
                 # Thus adding an instance of the same kind of node should not
                 # affect the load as much.
-                if ctx.cpu_skew_adjustment < 0.8:
+                if ctx.cpu_skew_adjustment < 0.5:
                     next_max_cpu_denorm = curr_max_cpu_denorm
                 else:
                     next_max_cpu_denorm = curr_max_cpu_denorm * math.pow(

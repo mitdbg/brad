@@ -17,6 +17,8 @@ from brad.config.file import ConfigFile
 from brad.config.planner import PlannerConfig
 from brad.config.system_event import SystemEvent
 from brad.config.temp_config import TempConfig
+from brad.connection.factory import ConnectionFactory
+from brad.daemon.hot_config import HotConfig
 from brad.daemon.messages import (
     ShutdownFrontEnd,
     Sentinel,
@@ -30,8 +32,10 @@ from brad.daemon.monitor import Monitor
 from brad.daemon.system_event_logger import SystemEventLogger
 from brad.daemon.transition_orchestrator import TransitionOrchestrator
 from brad.daemon.blueprint_watchdog import BlueprintWatchdog
+from brad.daemon.populate_stub import create_tables_in_stub, load_tables_in_stub
 from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
+from brad.data_stats.stub_estimator import StubEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
 from brad.front_end.start_front_end import start_front_end
 from brad.planner.abstract import BlueprintPlanner
@@ -56,12 +60,15 @@ from brad.planner.scoring.performance.precomputed_predictions import (
 )
 from brad.planner.triggers.provider import ConfigDefinedTriggers
 from brad.planner.triggers.trigger import Trigger
+from brad.planner.triggers.query_latency_ceiling import QueryLatencyCeiling
+from brad.planner.triggers.txn_latency_ceiling import TransactionLatencyCeiling
 from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import LoggedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
 from brad.row_list import RowList
 from brad.utils.time_periods import period_start, universal_now
+from brad.ui.manager import UiManager
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +94,7 @@ class BradDaemon:
         schema_name: str,
         path_to_system_config: str,
         debug_mode: bool,
+        start_ui: bool,
     ):
         self._config = config
         self._temp_config = temp_config
@@ -96,6 +104,7 @@ class BradDaemon:
             system_config=path_to_system_config
         )
         self._debug_mode = debug_mode
+        self._start_ui = start_ui
 
         self._assets = AssetManager(self._config)
         self._blueprint_mgr = BlueprintManager(
@@ -103,6 +112,7 @@ class BradDaemon:
         )
         self._monitor = Monitor(self._config, self._blueprint_mgr)
         self._estimator_provider = _EstimatorProvider()
+        self._providers: Optional[BlueprintProviders] = None
         self._planner: Optional[BlueprintPlanner] = None
 
         self._process_manager: Optional[mp.managers.SyncManager] = None
@@ -123,6 +133,21 @@ class BradDaemon:
 
         self._startup_timestamp = universal_now()
 
+        if self._start_ui and UiManager.is_supported():
+            self._ui_mgr: Optional[UiManager] = UiManager.create(
+                self._config,
+                self._monitor,
+                self._blueprint_mgr,
+                self._system_event_logger,
+            )
+        else:
+            self._ui_mgr = None
+            if self._start_ui:
+                logger.warning(
+                    "Cannot start the BRAD UI because it is not supported. "
+                    "Please make sure you install BRAD with the [ui] option."
+                )
+
     async def run_forever(self) -> None:
         """
         Starts running the daemon.
@@ -136,6 +161,10 @@ class BradDaemon:
                 for fe in self._front_ends
                 if fe.message_reader_task is not None
             ]
+            additional_tasks = []
+            if self._ui_mgr is not None:
+                self._ui_mgr.set_planner(self._planner)
+                additional_tasks.append(self._ui_mgr.serve_forever())
             logger.info("The BRAD daemon is running.")
             if self._system_event_logger is not None:
                 self._system_event_logger.log(SystemEvent.StartUp)
@@ -143,6 +172,7 @@ class BradDaemon:
                 self._planner.run_forever(),
                 self._monitor.run_forever(),
                 *message_reader_tasks,
+                *additional_tasks,
             )
         except Exception:
             logger.exception("The BRAD daemon encountered an unexpected exception.")
@@ -155,9 +185,21 @@ class BradDaemon:
             logger.info("The BRAD daemon has shut down.")
 
     async def _run_setup(self) -> None:
+        is_stub_mode = self._config.stub_mode_path() is not None
         await self._blueprint_mgr.load()
         logger.info("Current blueprint: %s", self._blueprint_mgr.get_blueprint())
-        logger.info("Current directory: %s", self._blueprint_mgr.get_directory())
+        if not is_stub_mode:
+            logger.info("Current directory: %s", self._blueprint_mgr.get_directory())
+
+        if is_stub_mode:
+            stub_conn = ConnectionFactory.connect_to_stub(self._config)
+            create_tables_in_stub(
+                self._config, stub_conn, self._blueprint_mgr.get_blueprint()
+            )
+            load_tables_in_stub(
+                self._config, stub_conn, self._blueprint_mgr.get_blueprint()
+            )
+            stub_conn.close_sync()
 
         # Initialize the monitor.
         self._monitor.set_up_metrics_sources()
@@ -193,21 +235,15 @@ class BradDaemon:
                     athena_accessed_bytes_path=self._temp_config.athena_data_access_path(),
                 )
 
-            if self._temp_config.comparator_type() == "benefit_perf_ceiling":
-                comparator_provider: BlueprintComparatorProvider = (
-                    BenefitPerformanceCeilingComparatorProvider(
-                        self._temp_config.query_latency_p90_ceiling_s(),
-                        self._temp_config.txn_latency_p90_ceiling_s(),
-                        self._temp_config.benefit_horizon(),
-                        self._temp_config.penalty_threshold(),
-                        self._temp_config.penalty_power(),
-                    )
-                )
-            else:
-                comparator_provider = PerformanceCeilingComparatorProvider(
-                    self._temp_config.query_latency_p90_ceiling_s(),
-                    self._temp_config.txn_latency_p90_ceiling_s(),
-                )
+            query_lat_p90 = self._temp_config.query_latency_p90_ceiling_s()
+            txn_lat_p90 = self._temp_config.txn_latency_p90_ceiling_s()
+            comparator_provider = self._get_comparator_provider(
+                query_lat_p90, txn_lat_p90
+            )
+            hot_config = HotConfig.instance()
+            hot_config.set_value("query_lat_p90", query_lat_p90)
+            hot_config.set_value("txn_lat_p90", txn_lat_p90)
+
         else:
             logger.warning(
                 "TempConfig not provided. The planner will not be able to run correctly."
@@ -219,7 +255,7 @@ class BradDaemon:
         # Update just to get the most recent startup time.
         self._startup_timestamp = universal_now()
 
-        providers = BlueprintProviders(
+        self._providers = BlueprintProviders(
             workload_provider=LoggedWorkloadProvider(
                 self._config,
                 self._planner_config,
@@ -253,7 +289,7 @@ class BradDaemon:
             schema_name=self._schema_name,
             current_blueprint=self._blueprint_mgr.get_blueprint(),
             current_blueprint_score=self._blueprint_mgr.get_active_score(),
-            providers=providers,
+            providers=self._providers,
             system_event_logger=self._system_event_logger,
         )
         self._planner.register_new_blueprint_callback(self._handle_new_blueprint)
@@ -292,7 +328,12 @@ class BradDaemon:
             or self._config.routing_policy == RoutingPolicy.Default
         ):
             logger.info("Setting up the cardinality estimator...")
-            estimator = await PostgresEstimator.connect(self._schema_name, self._config)
+            if is_stub_mode:
+                estimator: Estimator = StubEstimator()
+            else:
+                estimator = await PostgresEstimator.connect(
+                    self._schema_name, self._config
+                )
             await estimator.analyze(
                 self._blueprint_mgr.get_blueprint(),
                 # N.B. Only the daemon attempts to repopulate the cache.
@@ -408,7 +449,10 @@ class BradDaemon:
         Informs the server about a new blueprint.
         """
 
-        if IGNORE_ALL_BLUEPRINTS_VAR in os.environ:
+        if (
+            IGNORE_ALL_BLUEPRINTS_VAR in os.environ
+            or self._config.stub_mode_path() is not None
+        ):
             logger.info("Skipping all blueprints. Chosen blueprint: %s", blueprint)
             return
 
@@ -689,6 +733,51 @@ class BradDaemon:
             self._transition_task = asyncio.create_task(self._run_transition_part_one())
             return [(f"Transition to {preset} in progress.",)]
 
+        elif command.startswith("BRAD_CHANGE_SLO"):
+            # Format: BRAD_CHANGE_SLO <query p90 s> <txn p90 s>
+            parts = command.split(" ")
+            if self._temp_config is None:
+                return [("Cannot change SLOs because TempConfig is missing.",)]
+            if len(parts) < 3:
+                return [("Need to specify query and txn p90 SLOs",)]
+
+            query_p90_s = float(parts[1])
+            txn_p90_s = float(parts[2])
+
+            # The planner asks for a new comparator from the provider on each
+            # run. So if we swap out the provider here, we will get a comparator
+            # with the updated SLOs on the next planning run.
+            assert self._providers is not None
+            self._providers.comparator_provider = self._get_comparator_provider(
+                query_p90_s, txn_p90_s
+            )
+
+            # Adjust triggers if applicable. This works because `get_triggers()`
+            # returns references to the actual triggers (i.e., it is not a
+            # read-only copy of the triggers).
+            assert self._planner is not None
+            for t in self._planner.get_triggers():
+                if isinstance(t, QueryLatencyCeiling):
+                    t.set_latency_ceiling(query_p90_s)
+                elif isinstance(t, TransactionLatencyCeiling):
+                    t.set_latency_ceiling(txn_p90_s)
+
+            hot_config = HotConfig.instance()
+            hot_config.set_value("query_lat_p90", query_p90_s)
+            hot_config.set_value("txn_lat_p90", txn_p90_s)
+
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.ChangedSlos,
+                    f"query_p90_s={query_p90_s}; txn_p90_s={txn_p90_s}",
+                )
+
+            return [
+                (
+                    f"p90 SLOs changed to (query {query_p90_s:.3f} s), (txn {txn_p90_s:.3f} s)",
+                )
+            ]
+
         else:
             logger.warning("Received unknown internal command: %s", command)
             return []
@@ -827,6 +916,26 @@ class BradDaemon:
             logger.exception(
                 "Transition part two failed due to an unexpected exception."
             )
+
+    def _get_comparator_provider(
+        self, query_p90_s: float, txn_p90_s: float
+    ) -> BlueprintComparatorProvider:
+        assert self._temp_config is not None
+        if self._temp_config.comparator_type() == "benefit_perf_ceiling":
+            comparator_provider: BlueprintComparatorProvider = (
+                BenefitPerformanceCeilingComparatorProvider(
+                    query_p90_s,
+                    txn_p90_s,
+                    self._temp_config.benefit_horizon(),
+                    self._temp_config.penalty_threshold(),
+                    self._temp_config.penalty_power(),
+                )
+            )
+        else:
+            comparator_provider = PerformanceCeilingComparatorProvider(
+                query_p90_s, txn_p90_s
+            )
+        return comparator_provider
 
 
 class _NoopAnalyticsScorer(AnalyticsLatencyScorer):

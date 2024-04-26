@@ -21,7 +21,7 @@ log_workload_point "clients_starting"
 start_repeating_olap_runner 8 15 5 $ra_query_indexes "ra_8"
 rana_pid=$runner_pid
 
-start_txn_runner 4  # Implicit: --dataset-type
+start_txn_runner_serial 4  # Implicit: --dataset-type
 txn_pid=$runner_pid
 
 log_workload_point "clients_started"

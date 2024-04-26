@@ -122,7 +122,6 @@ function start_repeating_olap_runner() {
   local query_indexes=$4
   local results_name=$5
   local client_offset=$6
-  local issue_slots=$7
 
   local args=(
     --num-clients $ra_clients
@@ -133,10 +132,6 @@ function start_repeating_olap_runner() {
     --avg-gap-std-s $ra_gap_std_s
   )
 
-  if [[ ! -z $issue_slots ]]; then
-    args+=(--issue-slots $issue_slots)
-  fi
-
   if [[ ! -z $ra_query_frequency_path ]]; then
     args+=(--query-frequency-path $ra_query_frequency_path)
   fi
@@ -145,12 +140,49 @@ function start_repeating_olap_runner() {
     args+=(--client-offset $client_offset)
   fi
 
-  >&2 echo "[Repeating Analytics] Running with $ra_clients..."
+  >&2 echo "[Serial Repeating Analytics] Running with $ra_clients..."
   results_dir=$COND_OUT/$results_name
   mkdir -p $results_dir
 
   log_workload_point $results_name
-  COND_OUT=$results_dir python3.11 ../../../workloads/IMDB_extended/run_repeating_analytics.py "${args[@]}" &
+  COND_OUT=$results_dir python3.11 ../../../workloads/IMDB_extended/run_repeating_analytics_serial.py "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
+function start_redshift_serverless_olap_runner() {
+  local ra_clients=$1
+  local ra_gap_s=$2
+  local ra_gap_std_s=$3
+  local query_indexes=$4
+  local results_name=$5
+  local schema_name=$6
+
+  local args=(
+    --num-clients $ra_clients
+    --num-front-ends $num_front_ends
+    --query-indexes $query_indexes
+    --query-bank-file $ra_query_bank_file
+    --avg-gap-s $ra_gap_s
+    --avg-gap-std-s $ra_gap_std_s
+    --brad-direct
+    --engine redshift
+    --serverless-redshift
+    --schema-name $schema_name
+    --config-file ../../../$physical_config_file
+  )
+
+  if [[ ! -z $ra_query_frequency_path ]]; then
+    args+=(--query-frequency-path $ra_query_frequency_path)
+  fi
+
+  >&2 echo "[Serial Repeating Analytics] Running with $ra_clients on Redshift serverless..."
+  results_dir=$COND_OUT/$results_name
+  mkdir -p $results_dir
+
+  log_workload_point $results_name
+  COND_OUT=$results_dir python3.11 ../../../workloads/IMDB_extended/run_repeating_analytics_serial.py "${args[@]}" &
 
   # This is a special return value variable that we use.
   runner_pid=$!
@@ -179,6 +211,8 @@ function start_snowset_repeating_olap_runner() {
   if [[ ! -z $issue_slots ]]; then
     >&2 echo "[Snowset Repeating Analytics] Issue slots $issue_slots."
     args+=(--issue-slots $issue_slots)
+  else
+    >&2 echo "Snowset RA - Running with default issue slots"
   fi
 
   >&2 echo "[Snowset Repeating Analytics] Running with up to $ra_clients. Time scale factor $time_scale_factor."
@@ -201,7 +235,7 @@ function run_repeating_olap_warmup() {
   results_dir=$COND_OUT/ra_${ra_clients}
   mkdir -p $results_dir
 
-  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics.py \
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_repeating_analytics_serial.py \
     --num-clients $ra_clients \
     --num-front-ends $num_front_ends \
     --query-indexes $ra_query_indexes \
@@ -222,14 +256,14 @@ function start_txn_runner() {
   local args=(
     --num-clients $t_clients
     --num-front-ends $num_front_ends
-    --avg-gap-s 0.025
-    --avg-gap-std-s 0.002
     # --scale-factor $txn_scale_factor
     # --dataset-type $dataset_type
   )
 
   if [[ ! -z $issue_slots ]]; then
     args+=(--issue-slots $issue_slots)
+  else
+    >&2 echo "Txn - Running with default issue slots"
   fi
 
   if [[ ! -z $client_offset ]]; then
@@ -238,6 +272,60 @@ function start_txn_runner() {
 
   log_workload_point "txn_${t_clients}"
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions.py \
+    "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
+function start_txn_runner_serial() {
+  t_clients=$1
+  client_offset=$2
+
+  >&2 echo "[Serial Transactions] Running with $t_clients..."
+  results_dir=$COND_OUT/t_${t_clients}
+  mkdir -p $results_dir
+
+  local args=(
+    --num-clients $t_clients
+    --num-front-ends $num_front_ends
+    # --scale-factor $txn_scale_factor
+    # --dataset-type $dataset_type
+  )
+
+  if [[ ! -z $client_offset ]]; then
+    args+=(--client-offset $client_offset)
+  fi
+
+  log_workload_point "txn_${t_clients}"
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions_serial.py \
+    "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
+function start_aurora_serverless_txn_runner_serial() {
+  local t_clients=$1
+  local schema_name=$2
+
+  >&2 echo "[Serial Transactions] Running with $t_clients on Aurora Serverless..."
+  results_dir=$COND_OUT/t_${t_clients}
+  mkdir -p $results_dir
+
+  local args=(
+    --num-clients $t_clients
+    --num-front-ends $num_front_ends
+    # --scale-factor $txn_scale_factor
+    # --dataset-type $dataset_type
+    --brad-direct
+    --serverless-aurora
+    --schema-name $schema_name
+    --config-file ../../../$physical_config_file
+  )
+
+  log_workload_point "txn_${t_clients}"
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions_serial.py \
     "${args[@]}" &
 
   # This is a special return value variable that we use.
@@ -263,17 +351,45 @@ function start_snowset_txn_runner() {
     --time-scale-factor $time_scale_factor
     --num-client-multiplier $client_multiplier
     --run-for-s $run_for_s
-    --avg-gap-s 0.025
-    --avg-gap-std-s 0.002
   )
 
   if [[ ! -z $issue_slots ]]; then
     >&2 echo "[Snowset Transactions] Running with $issue_slots slots..."
     args+=(--issue-slots $issue_slots)
+  else
+    >&2 echo "Snowset Txns - Running with default issue slots"
   fi
 
   log_workload_point "txn_${t_clients}"
   COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions.py \
+    "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
+function start_snowset_txn_runner_serial() {
+  local t_clients=$1
+  local time_scale_factor=$2
+  local client_multiplier=$3
+  local results_name=$4
+  local run_for_s=$5
+
+  >&2 echo "[Snowset Transactions] Running with $t_clients..."
+  results_dir=$COND_OUT/${results_name}
+  mkdir -p $results_dir
+
+  local args=(
+    --num-clients $t_clients
+    --num-front-ends $num_front_ends
+    --num-client-path $snowset_client_dist_path
+    --time-scale-factor $time_scale_factor
+    --num-client-multiplier $client_multiplier
+    --run-for-s $run_for_s
+  )
+
+  log_workload_point "txn_${t_clients}"
+  COND_OUT=$results_dir python3 ../../../workloads/IMDB_extended/run_transactions_serial.py \
     "${args[@]}" &
 
   # This is a special return value variable that we use.
@@ -286,7 +402,6 @@ function start_other_repeating_runner() {
   local gap_std_s=$3
   local results_name=$4
   local client_offset=$5
-  local issue_slots=$6
 
   local args=(
     --num-clients $clients
@@ -296,21 +411,16 @@ function start_other_repeating_runner() {
     --avg-gap-std-s $gap_std_s
   )
 
-  if [[ ! -z $issue_slots ]]; then
-    >&2 echo "[Other queries] Running with $issue_slots slots..."
-    args+=(--issue-slots $issue_slots)
-  fi
-
   if [[ ! -z $client_offset ]]; then
     args+=(--client-offset $client_offset)
   fi
 
-  >&2 echo "[Other queries] Running with $clients..."
+  >&2 echo "[Serial other queries] Running with $clients..."
   results_dir=$COND_OUT/$results_name
   mkdir -p $results_dir
 
   log_workload_point $results_name
-  COND_OUT=$results_dir python3.11 ../../../workloads/IMDB_extended/run_repeating_analytics.py "${args[@]}" &
+  COND_OUT=$results_dir python3.11 ../../../workloads/IMDB_extended/run_repeating_analytics_serial.py "${args[@]}" &
 
   # This is a special return value variable that we use.
   runner_pid=$!
@@ -335,6 +445,8 @@ function start_sequence_runner() {
   if [[ ! -z $issue_slots ]]; then
     >&2 echo "[Sequence runner] Running with $issue_slots slots..."
     args+=(--issue-slots $issue_slots)
+  else
+    >&2 echo "Sequence Runner - Running with default issue slots"
   fi
 
   if [[ ! -z $client_offset ]]; then

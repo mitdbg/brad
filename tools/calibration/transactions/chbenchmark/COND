@@ -1,0 +1,44 @@
+RUN_FOR_S = 3 * 60 + 30  # 3 minutes 30 seconds
+NUM_CLIENTS = {
+  "db.r6g.xlarge": [1, 2, 4, 8, 16, 32, 64],
+  "db.r6g.2xlarge": [1, 2, 4, 8, 16, 32, 64, 128],
+  "db.r6g.4xlarge": [1, 2, 4, 8, 16, 32, 64, 128, 256],
+  "db.r6g.large": [1, 2, 4, 8, 16, 32],
+  "db.t4g.medium": [1, 2, 4, 8, 16, 32],
+}
+
+INSTANCES = list(NUM_CLIENTS.keys())
+
+COND_INSTANCES = {
+  instance: instance.replace(".", "_").replace("db.", "") for instance in INSTANCES
+}
+
+combine(
+  name="all",
+  deps=[
+    ":{}".format(COND_INSTANCES[instance])
+    for instance in INSTANCES
+  ],
+)
+
+for instance in INSTANCES:
+  run_experiment_group(
+    name=COND_INSTANCES[instance],
+    run="./run_instance.sh",
+    experiments=[
+      ExperimentInstance(
+        name="{}-{}".format(COND_INSTANCES[instance], clients),
+        options={
+          "t-clients": clients,
+          "run-for-s": RUN_FOR_S,
+          "system-config-file": "system_config_chbench.yml",
+          "physical-config-file": "../../../../config/physical_config_chbench.yml",
+          "txn-warehouses": 1740,
+          "txn-config-file": "aurora.config",
+          "schema-name": "chbenchmark",
+          "instance": instance,
+        },
+      )
+      for clients in NUM_CLIENTS[instance]
+    ],
+  )

@@ -203,7 +203,7 @@ redshift_scaling_new:
 
 run_time_to_denorm_cpu:
   aurora:
-    alpha: 0.39142781
+    alpha: 0.195713905
     max: 3.2
   redshift:
     alpha: 0.54941336

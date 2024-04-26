@@ -14,7 +14,7 @@ source ../common.sh
 # TODO: This executor file should be adapted to run against the baselines too
 # (TiDB / Serverless Redshift + Aurora)
 
-initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
+initial_queries="99,56,32,92,91,49,30,83,94,87,86,76,37,31,46"
 heavier_queries="58,61,62,64,69,73,74,51,57,60"
 
 # Arguments:
@@ -29,7 +29,7 @@ function txn_sweep() {
   local keep_last=$3
 
   for t_clients in $sweep; do
-    start_txn_runner $t_clients  # Implicit: --dataset-type
+    start_txn_runner_serial $t_clients  # Implicit: --dataset-type
     txn_pid=$runner_pid
 
     sleep $(($gap_minute * 60))
@@ -62,7 +62,7 @@ sleep 2
 
 # Start with 4 transactional clients; hold for 15 minutes to stabilize.
 log_workload_point "start_txn_4"
-start_txn_runner 4
+start_txn_runner_serial 4
 txn_pid=$runner_pid
 sleep $((10 * 60))  # 10 mins; 10 mins cumulative
 

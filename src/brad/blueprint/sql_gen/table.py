@@ -283,20 +283,23 @@ def comma_separated_column_names_and_types(cols: List[Column], for_db: Engine) -
 def _type_for(data_type: str, for_db: Engine) -> str:
     # A hacky way to ensure we use a supported type in each DBMS (e.g. Athena does
     # not support `TEXT` data).
-    if data_type.upper().startswith("CHARACTER"):
+    data_type_upper = data_type.upper()
+    if data_type_upper.startswith("CHARACTER") or data_type_upper.startswith("CHAR("):
         if for_db == Engine.Athena:
             return "STRING"
-        elif for_db == Engine.Redshift and data_type.upper() == "CHARACTER VARYING":
+        elif for_db == Engine.Redshift and data_type_upper == "CHARACTER VARYING":
             return "VARCHAR(MAX)"
-        elif for_db == Engine.Redshift and data_type.upper().startswith(
+        elif for_db == Engine.Redshift and data_type_upper.startswith(
             "CHARACTER VARYING"
         ):
             return "VARCHAR(256)"
-    if data_type.upper() == "TEXT" and for_db == Engine.Athena:
+    if data_type_upper == "TEXT" and for_db == Engine.Athena:
         return "STRING"
-    elif data_type.upper() == "SERIAL" and (
+    elif data_type_upper == "SERIAL" and (
         for_db == Engine.Athena or for_db == Engine.Redshift
     ):
         return "BIGINT"
+    elif data_type_upper.startswith("VARCHAR") and for_db == Engine.Athena:
+        return "STRING"
     else:
         return data_type

@@ -33,3 +33,7 @@ class SystemEvent(enum.Enum):
 
     # Use this for long running experiments.
     ReachedExpectedState = "reached_expected_state"
+
+    # Used when a service level objective is changed while BRAD is running (used
+    # for experiments).
+    ChangedSlos = "changed_slos"

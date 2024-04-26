@@ -5,6 +5,7 @@ import pyathena.cursor
 from typing import Any, Iterable, Optional, List
 
 from .cursor import Cursor, Row
+from .schema import Schema, Field, DataType
 
 
 class PyAthenaCursor(Cursor):
@@ -41,6 +42,29 @@ class PyAthenaCursor(Cursor):
 
     def fetchall_sync(self) -> List[Row]:
         return self._impl.fetchall()  # type: ignore
+
+    def result_schema(self, results: Optional[List[Row]] = None) -> Schema:
+        if self._impl.description is None:
+            return Schema.empty()
+
+        fields = []
+        for column_metadata in self._impl.description:
+            column_name = column_metadata[0]
+            athena_type = column_metadata[1]
+            if athena_type == "integer":
+                brad_type = DataType.Integer
+            elif athena_type == "varchar":
+                brad_type = DataType.String
+            elif athena_type == "float":
+                brad_type = DataType.Float
+            elif athena_type == "timestamp":
+                brad_type = DataType.Timestamp
+            elif athena_type == "decimal":
+                brad_type = DataType.Decimal
+            else:
+                brad_type = DataType.Unknown
+            fields.append(Field(name=column_name, data_type=brad_type))
+        return Schema(fields)
 
     def commit_sync(self) -> None:
         pass

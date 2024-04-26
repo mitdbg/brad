@@ -72,6 +72,7 @@ class RedshiftConnection(Connection):
         super().__init__()
         self._connection = connection_impl
         self._cursor: Optional[Cursor] = None
+        self._is_closed = False
 
     async def cursor(self) -> Cursor:
         if self._cursor is None:
@@ -81,7 +82,10 @@ class RedshiftConnection(Connection):
         return self._cursor
 
     async def close(self) -> None:
+        if self._is_closed:
+            return
         loop = asyncio.get_running_loop()
+        self._is_closed = True
         await loop.run_in_executor(None, self._connection.close)
 
     def cursor_sync(self) -> Cursor:
@@ -90,7 +94,10 @@ class RedshiftConnection(Connection):
         return self._cursor
 
     def close_sync(self) -> None:
+        if self._is_closed:
+            return
         self._connection.close()
+        self._is_closed = True
 
     def is_connection_lost_error(self, ex: Exception) -> bool:
         if isinstance(ex, redshift_errors.InterfaceError):
@@ -104,6 +111,9 @@ class RedshiftConnection(Connection):
             if phrase in message:
                 return True
         return False
+
+    def __del__(self) -> None:
+        self.close_sync()
 
 
 _CONNECTION_LOST_PHRASES = [

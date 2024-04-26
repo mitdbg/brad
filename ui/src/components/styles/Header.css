@@ -1,0 +1,80 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 80px;
+  width: 100%;
+  background-color: white;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+}
+
+.header-inner {
+  max-width: 2100px;
+  flex-grow: 1;
+  padding: 0 15px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  align-content: center;
+}
+
+.header-logo-img {
+  margin-top: 10px;
+  margin-right: 15px;
+  margin-left: 15px;
+}
+
+.header-logo-img img {
+  width: 55px;
+  height: 55px;
+  border-radius: 50%;
+  border: 2px solid #dae4eb;
+}
+
+.header-logo-txt {
+  font-size: 2.2em;
+  font-weight: 400;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  margin-right: 15px;
+}
+
+.header-status-text {
+  font-size: 1em;
+}
+
+.header-status-icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin: -2px 15px 0 0;
+}
+
+.header-status-icon.running {
+  background-color: #51a965;
+  box-shadow: 0 0 5px #51a965;
+}
+
+.header-status-icon.transitioning {
+  background-color: #ec8405;
+  box-shadow: 0 0 5px #ec8405;
+}
+
+.header-status-icon.planning {
+  background-color: #517aa9;
+  box-shadow: 0 0 5px #517aa9;
+}

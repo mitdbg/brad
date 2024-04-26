@@ -89,12 +89,12 @@ redshift_initialize_load_fraction: 0.25
 # BRAD will not reduce predicted load lower than these values. Raise these
 # values to be more conservative against mispredictions.
 aurora_min_load_removal_fraction: 0.8
-redshift_min_load_removal_fraction: 0.9
+redshift_min_load_removal_fraction: 0.99  # To fix a bug.
 
 aurora_max_query_factor: 4.0
 aurora_max_query_factor_replace: 10000.0
-redshift_peak_load_threshold: 96.0
-redshift_peak_load_multiplier: 1.5
+redshift_peak_load_threshold: 99.0
+redshift_peak_load_multiplier: 1.0
 
 # Blueprint planning performance ceilings.
 query_latency_p90_ceiling_s: 30.0
@@ -123,7 +123,7 @@ std_datasets:
 use_preset_redshift_clusters: false
 
 aurora_provisioning_search_distance: 700.0
-redshift_provisioning_search_distance: 5000.0
+redshift_provisioning_search_distance: 900.0
 
 planner_max_workers: 16
 
@@ -140,14 +140,14 @@ triggers:
     multiplier: 60  # Multiplier over `planning_window`.
 
   redshift_cpu:
-    lo: 15
-    hi: 85
-    sustained_epochs: 6
+    lo: 28
+    hi: 78
+    sustained_epochs: 5
 
   aurora_cpu:
-    lo: 10
+    lo: 15
     hi: 85
-    sustained_epochs: 6
+    sustained_epochs: 5
 
   variable_costs:
     disabled: true
@@ -162,5 +162,4 @@ triggers:
     sustained_epochs: 3
 
   recent_change:
-    disabled: true
     delay_epochs: 5

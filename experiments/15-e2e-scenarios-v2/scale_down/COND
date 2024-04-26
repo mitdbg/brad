@@ -37,7 +37,7 @@ aurora_good = [25, 26, 27, 28, 29, 31, 32, 33, 37, 43, 46, 47, 49, 83, 90]
 
 # 16 queries that should be acceptable on Aurora. We have 4 that should run on
 # Redshift/Athena.
-aurora_alt = [99, 56, 32, 92, 91, 49, 30, 83, 94, 38, 87, 86, 76, 37, 31, 46]
+aurora_alt = [99, 56, 32, 92, 91, 49, 30, 83, 94, 87, 86, 76, 37, 31, 46]
 
 COMMON_100G_CONFIGS = {
   "physical-config-file": "config/physical_config_100gb.yml",

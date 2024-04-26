@@ -18,7 +18,7 @@ from brad.planner.beam.fpqb_candidate import BlueprintCandidate as FpqbCandidate
 
 class RecordedRun:
     @classmethod
-    def load(cls, exp_dir: str) -> "RecordedRun":
+    def load(cls, exp_dir: str, is_trace: bool = False) -> "RecordedRun":
         base = pathlib.Path(exp_dir)
 
         if (base / "brad_metrics_front_end.log").exists():
@@ -49,53 +49,73 @@ class RecordedRun:
 
         all_olap = []
 
-        for inner in base.iterdir():
-            if not inner.is_dir() or not inner.name.startswith("ra_"):
-                continue
-            if inner.name == "ra_vector":
-                clients = 2
-            else:
-                name_parts = inner.name.split("_")
-                if name_parts[1] == "sweep":
-                    clients = int(name_parts[2])
+        if not is_trace:
+            for inner in base.iterdir():
+                if not inner.is_dir() or not inner.name.startswith("ra_"):
+                    continue
+                if inner.name == "ra_vector":
+                    clients = 2
                 else:
-                    clients = int(name_parts[1])
-            for c in range(clients):
-                try:
-                    olap_inner = pd.read_csv(
-                        inner / "repeating_olap_batch_{}.csv".format(c)
-                    )
+                    name_parts = inner.name.split("_")
+                    if name_parts[1] == "sweep":
+                        clients = int(name_parts[2])
+                    else:
+                        clients = int(name_parts[1])
+                for c in range(clients):
+                    try:
+                        olap_inner = pd.read_csv(
+                            inner / "repeating_olap_batch_{}.csv".format(c)
+                        )
+                        olap_inner["timestamp"] = pd.to_datetime(
+                            olap_inner["timestamp"], format="mixed"
+                        )
+                        olap_inner["timestamp"] = olap_inner[
+                            "timestamp"
+                        ].dt.tz_localize(None)
+                        olap_inner.insert(0, "num_clients", clients)
+                        olap_inner.insert(1, "qtype", "repeating")
+                        all_olap.append(olap_inner)
+                    except pd.errors.EmptyDataError:
+                        pass
+
+            for inner in base.iterdir():
+                if not inner.is_dir() or not inner.name.startswith("adhoc"):
+                    continue
+                num_clients = 0
+                this_adhoc = []
+                for data_file in inner.iterdir():
+                    if not data_file.name.endswith(".csv"):
+                        continue
+                    num_clients += 1
+                    olap_inner = pd.read_csv(data_file)
                     olap_inner["timestamp"] = pd.to_datetime(
                         olap_inner["timestamp"], format="mixed"
                     )
                     olap_inner["timestamp"] = olap_inner["timestamp"].dt.tz_localize(
                         None
                     )
-                    olap_inner.insert(0, "num_clients", clients)
-                    olap_inner.insert(1, "qtype", "repeating")
-                    all_olap.append(olap_inner)
-                except pd.errors.EmptyDataError:
-                    pass
+                    this_adhoc.append(olap_inner)
+                adhoc = pd.concat(this_adhoc)
+                adhoc.insert(0, "num_clients", num_clients)
+                adhoc.insert(1, "qtype", "adhoc")
+                all_olap.append(adhoc)
 
         for inner in base.iterdir():
-            if not inner.is_dir() or not inner.name.startswith("adhoc"):
+            if not inner.is_dir() or not inner.name.startswith("trace"):
                 continue
-            num_clients = 0
-            this_adhoc = []
-            for data_file in inner.iterdir():
-                if not data_file.name.endswith(".csv"):
+            for datafile in inner.iterdir():
+                if not (
+                    datafile.name.startswith("trace_client")
+                    and datafile.name.endswith(".csv")
+                ):
                     continue
-                num_clients += 1
-                olap_inner = pd.read_csv(data_file)
-                olap_inner["timestamp"] = pd.to_datetime(
-                    olap_inner["timestamp"], format="mixed"
-                )
-                olap_inner["timestamp"] = olap_inner["timestamp"].dt.tz_localize(None)
-                this_adhoc.append(olap_inner)
-            adhoc = pd.concat(this_adhoc)
-            adhoc.insert(0, "num_clients", num_clients)
-            adhoc.insert(1, "qtype", "adhoc")
-            all_olap.append(adhoc)
+                df = pd.read_csv(datafile)
+                df["timestamp"] = pd.to_datetime(df["timestamp"], format="mixed")
+                df["timestamp"] = df["timestamp"].dt.tz_localize(None)
+                df.insert(0, "num_clients", 10)
+                df.insert(1, "qtype", "trace")
+                all_olap.append(df)
+                print("Adding", datafile.name, "Rows", len(df))
 
         olap = pd.concat(all_olap).sort_values(by=["timestamp"])
 
@@ -391,10 +411,11 @@ class RecordedRun:
             print()
 
 
+# pylint: disable-next=dangerous-default-value
 def get_e2e_axes(
     size: Literal["small", "large"],
-    txn_ceiling_ms=30.0,
-    ana_ceiling_s=30.0,
+    txn_ceiling_ms=[(30.0, (0.0, 1.0))],
+    ana_ceiling_s=[(30.0, (0.0, 1.0))],
     custom_subplots: Optional[
         Callable[[GridSpec], Tuple[plt.Axes, plt.Axes, plt.Axes]]
     ] = None,
@@ -416,12 +437,18 @@ def get_e2e_axes(
         fig.align_ylabels()
 
     # Transaction Latency ceiling
-    txn_ax.axhspan(ymin=0, ymax=txn_ceiling_ms, color="#000", alpha=0.05)
-    txn_ax.axhline(y=txn_ceiling_ms, color="#000", alpha=0.5, lw=1.5)
+    for ceiling, (xmin, xmax) in txn_ceiling_ms:
+        txn_ax.axhspan(
+            ymin=0, ymax=ceiling, xmin=xmin, xmax=xmax, color="#000", alpha=0.05
+        )
+        txn_ax.axhline(y=ceiling, xmin=xmin, xmax=xmax, color="#000", alpha=0.5, lw=1.5)
 
     # OLAP Latency ceiling
-    ana_ax.axhspan(ymin=-5, ymax=ana_ceiling_s, color="#000", alpha=0.05)
-    ana_ax.axhline(y=ana_ceiling_s, color="#000", alpha=0.5, lw=1.5)
+    for ceiling, (xmin, xmax) in ana_ceiling_s:
+        ana_ax.axhspan(
+            ymin=-5, ymax=ceiling, xmin=xmin, xmax=xmax, color="#000", alpha=0.05
+        )
+        ana_ax.axhline(y=ceiling, xmin=xmin, xmax=xmax, color="#000", alpha=0.5, lw=1.5)
 
     cst_ax.set_ylabel("Monthly\nCost ($)")
     cst_ax.set_xlabel("Time Elapsed (minutes)")
@@ -598,4 +625,5 @@ def _load_process_costs(cost_file: pathlib.Path) -> pd.DataFrame:
     comb["total_cost_per_minute"] = comb["cost_aurora"] + comb["cost_redshift"]
     # 30 days in a month.
     comb["total_cost_per_month"] = comb["total_cost_per_minute"] * 60 * 24 * 30
+    comb["aurora_cost_per_month"] = comb["cost_aurora"] * 60 * 24 * 30
     return comb

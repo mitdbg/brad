@@ -16,7 +16,10 @@ META_PATH = os.path.join("src", "brad", "__init__.py")
 README_PATH = "README.md"
 PYTHON_REQUIRES = ">=3.11"
 
-PACKAGE_DATA = {"": ["brad/planner/scoring/data/*.json", "brad/daemon/*.json"]}
+PACKAGE_DATA = {
+    "": ["brad/planner/scoring/data/*.json", "brad/daemon/*.json"],
+    "brad.ui.static": ["*.html", "*.js", "*.css"],
+}
 PACKAGE_DIR = {"": "src"}
 
 ENTRY_POINTS = {
@@ -32,7 +35,7 @@ INSTALL_REQUIRES = [
     "pyyaml",
     "sqlglot",
     "pandas",
-    "scikit-learn",
+    "scikit-learn==1.3.0",
     "types-pytz",
     "numpy",
     "imbalanced-learn",
@@ -61,6 +64,15 @@ DEV_REQUIRES = [
     "typing-extensions",
     "types-tabulate",
     "matplotlib",
+    "conductor-cli",
+]
+
+UI_REQUIRES = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "requests",
+    "types-requests",
 ]
 
 KEYWORDS = []
@@ -117,6 +129,7 @@ if __name__ == "__main__":
         install_requires=INSTALL_REQUIRES,
         extras_require={
             "dev": DEV_REQUIRES,
+            "ui": UI_REQUIRES,
         },
         entry_points=ENTRY_POINTS,
         classifiers=CLASSIFIERS,

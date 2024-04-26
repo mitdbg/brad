@@ -198,6 +198,14 @@ async def runner_impl(
                     )
                 return
 
+            if bh.backoff is not None and bh.backoff_timestamp is not None:
+                if bh.backoff_timestamp < result.timestamp:
+                    # We recovered. This means a query issued after the rand
+                    # backoff was created finished successfully.
+                    bh.backoff = None
+                    bh.backoff_timestamp = None
+                    logger.info("[T %d] Continued after transient errors.", worker_idx)
+
             if txn_prng.random() < args.latency_sample_prob:
                 print(
                     "{},{},{}".format(
@@ -426,10 +434,8 @@ def main():
     parser.add_argument("--brad-port", type=int, default=6583)
     parser.add_argument("--num-front-ends", type=int, default=1)
     parser.add_argument("--issue-slots", type=int, default=1)
-    # 25 milliseconds.
-    parser.add_argument("--avg-gap-s", type=float, default=0.025)
-    # 2 milliseconds.
-    parser.add_argument("--avg-gap-std-s", type=float, default=0.002)
+    parser.add_argument("--avg-gap-s", type=float)
+    parser.add_argument("--avg-gap-std-s", type=float)
     args = parser.parse_args()
 
     set_up_logging()

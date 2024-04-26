@@ -1,4 +1,5 @@
 from typing import Any, Tuple, Optional, List, Iterator, AsyncIterator, Iterable
+from .schema import Schema
 
 
 Row = Tuple[Any, ...]
@@ -46,6 +47,11 @@ class Cursor:
         raise NotImplementedError
 
     def fetchall_sync(self) -> List[Row]:
+        raise NotImplementedError
+
+    def result_schema(self, results: Optional[List[Row]] = None) -> Schema:
+        # Note that `results` only needs to be passed in when running in stub
+        # mode (needed for type deduction).
         raise NotImplementedError
 
     def __iter__(self) -> Iterator[Row]:

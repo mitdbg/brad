@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import pathlib
 from typing import Optional, Tuple
 
 from brad.asset_manager import AssetManager
@@ -67,6 +68,11 @@ class BlueprintManager:
         """
         Loads the persisted version of the blueprint from S3.
         """
+        stub_path = self._config.stub_mode_path()
+        if stub_path is not None:
+            self._load_stub(stub_path)
+            return
+
         try:
             versioning = await self._load_versioning()
         except ValueError:
@@ -107,6 +113,11 @@ class BlueprintManager:
         logger.debug("Loaded %s", self._versioning)
 
     def load_sync(self) -> None:
+        stub_path = self._config.stub_mode_path()
+        if stub_path is not None:
+            self._load_stub(stub_path)
+            return
+
         try:
             self._versioning = self._load_versioning_sync()
         except ValueError:
@@ -130,6 +141,18 @@ class BlueprintManager:
             self._next_blueprint_score = None
         asyncio.run(self._directory.refresh())
         logger.debug("Loaded %s", self._versioning)
+
+    def _load_stub(self, stub_path: pathlib.Path) -> None:
+        logger.info("Loading blueprint stub from %s", str(stub_path))
+        with open(stub_path / "blueprint", "rb") as file:
+            blueprint_bytes = file.read()
+        self._versioning = BlueprintVersioning(
+            version=0, transition_state=TransitionState.Stable, next_version=None
+        )
+        self._current_blueprint = deserialize_blueprint(blueprint_bytes)
+        self._current_blueprint_score = None
+        self._next_blueprint = None
+        self._next_blueprint_score = None
 
     async def fetch_historical_version(
         self, version: int

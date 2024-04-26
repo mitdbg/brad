@@ -38,6 +38,15 @@ class ConfigFile:
         return cls(merged)
 
     @classmethod
+    def load_from_physical_config(cls, phys_config: str) -> "ConfigFile":
+        # This implementation is designed to support backward compatibility (to
+        # minimize invasiveness). This should be used when only physical
+        # config values are needed.
+        with open(phys_config, "r", encoding="UTF-8") as file:
+            phys_config_dict = yaml.load(file, Loader=yaml.Loader)
+        return cls(phys_config_dict)
+
+    @classmethod
     def load(cls, file_path: str) -> "ConfigFile":
         with open(file_path, "r", encoding="UTF-8") as file:
             raw = yaml.load(file, Loader=yaml.Loader)
@@ -226,6 +235,34 @@ class ConfigFile:
         if "sidecar_db" not in self._raw:
             raise RuntimeError("Missing connection details for the Sidecar DBMS.")
         return self._raw["sidecar_db"]
+
+    def stub_mode_path(self) -> Optional[pathlib.Path]:
+        """
+        If set, BRAD will run in "stub" mode, where we connect to in memory
+        databases instead and use a preset blueprint. This is for debug and
+        testing purposes to avoid dependencies on AWS resources.
+        """
+        if "stub_mode_path" not in self._raw:
+            return None
+        return pathlib.Path(self._raw["stub_mode_path"])
+
+    def stub_db_path(self) -> pathlib.Path:
+        if "stub_db_path" not in self._raw:
+            return pathlib.Path("/tmp/brad_db_stub.sqlite")
+        else:
+            return pathlib.Path(self._raw["stub_db_path"])
+
+    def ui_interface(self) -> str:
+        if "ui_interface" in self._raw:
+            return self._raw["ui_interface"]
+        else:
+            return "0.0.0.0"
+
+    def ui_port(self) -> int:
+        if "ui_port" in self._raw:
+            return self._raw["ui_port"]
+        else:
+            return 7583
 
     def _extract_log_path(self, config_key: str) -> Optional[pathlib.Path]:
         if config_key not in self._raw:

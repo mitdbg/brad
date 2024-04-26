@@ -1,8 +1,10 @@
 import asyncio
 import redshift_connector
+from redshift_connector.utils.oids import RedshiftOID
 from typing import Any, Iterable, Optional, List
 
 from .cursor import Cursor, Row
+from .schema import Schema, Field, DataType
 
 
 class RedshiftCursor(Cursor):
@@ -43,10 +45,50 @@ class RedshiftCursor(Cursor):
         return self._impl.fetchone()
 
     def fetchall_sync(self) -> List[Row]:
-        return self._impl.fetchall()
+        res = self._impl.fetchall()
+        return res
+
+    def result_schema(self, results: Optional[List[Row]] = None) -> Schema:
+        fields = []
+        for column_metadata in self._impl.description:
+            column_name = column_metadata[0]
+            redshift_oid = column_metadata[1]
+            try:
+                brad_type = _REDSHIFT_OID_TO_BRAD_TYPE[redshift_oid]
+            except KeyError:
+                brad_type = DataType.Unknown
+            fields.append(Field(name=column_name, data_type=brad_type))
+        return Schema(fields)
 
     def commit_sync(self) -> None:
         self._conn.commit()
 
     def rollback_sync(self) -> None:
         self._conn.rollback()
+
+
+_REDSHIFT_OID_TO_BRAD_TYPE = {
+    # Integer types.
+    RedshiftOID.INTEGER: DataType.Integer,
+    RedshiftOID.BIGINT: DataType.Integer,
+    RedshiftOID.BOOLEAN: DataType.Integer,
+    RedshiftOID.SMALLINT: DataType.Integer,
+    RedshiftOID.OID: DataType.Integer,
+    RedshiftOID.ROWID: DataType.Integer,
+    # Float types.
+    RedshiftOID.FLOAT: DataType.Float,
+    # Fixed precision types.
+    RedshiftOID.NUMERIC: DataType.Decimal,
+    RedshiftOID.DECIMAL: DataType.Decimal,
+    # String types.
+    RedshiftOID.CHAR: DataType.String,
+    RedshiftOID.CSTRING: DataType.String,
+    RedshiftOID.STRING: DataType.String,
+    RedshiftOID.TEXT: DataType.String,
+    RedshiftOID.VARCHAR: DataType.String,
+    RedshiftOID.BPCHAR: DataType.String,
+    # Timestamp types.
+    RedshiftOID.TIMESTAMP: DataType.Timestamp,
+    RedshiftOID.TIME: DataType.Timestamp,
+    # N.B. We do not currently support date types.
+}

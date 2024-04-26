@@ -1,0 +1,40 @@
+.perf-view-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.perf-view-heading {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.perf-view-winsel {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.perf-view-winsel-button {
+  border-radius: 5px;
+  width: 80px;
+  background-color: #f2f2f2;
+  margin: 0 5px;
+  border: 0;
+  font-weight: 400;
+  font-size: 0.8em;
+}
+
+.perf-view-winsel-button:hover {
+  border: 0;
+  background-color: #eee;
+}
+
+.perf-view-winsel-button.selected {
+  background-color: #e0e0e0;
+  border: 1px solid #aaa;
+}
+
+.perf-view-plot-wrap h2 {
+  margin-bottom: 15px;
+}

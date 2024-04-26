@@ -1,0 +1,60 @@
+.db-table-set {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 340px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.db-table-view {
+  width: 160px;
+  height: 35px;
+  background-color: #ededed;
+  text-align: center;
+  line-height: 35px;
+  font-size: 1.1em;
+  border-radius: 3px;
+  margin: 8px 0;
+  position: relative;
+  transition:
+    opacity 0.3s,
+    margin 0.2s,
+    height 0.2s,
+    visibility 0s;
+  cursor: default;
+}
+
+.db-table-view.dim {
+  opacity: 0.2;
+}
+
+.db-table-view.highlight {
+  opacity: 1;
+}
+
+.db-table-view.hidden {
+  opacity: 0.2;
+}
+
+.db-table-view-writer {
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  background-color: #000;
+  position: absolute;
+  right: -8px;
+  top: -8px;
+  color: #fff;
+  font-size: 1em;
+  font-weight: 600;
+  line-height: 29px;
+}
+
+.db-table-view-writer.blue {
+  background-color: #386fc7;
+}
+
+.db-table-view-writer.green {
+  background-color: #51a965;
+}

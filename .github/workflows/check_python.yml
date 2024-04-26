@@ -1,0 +1,54 @@
+name: Check Python Code
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+    - 'cpp/**'
+    - 'sandbox/**'
+    - 'ui/**'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+    - 'cpp/**'
+    - 'sandbox/**'
+    - 'ui/**'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    name: Check Python Code
+    timeout-minutes: 30
+
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install BRAD (development mode)
+      run: ./tools/install-dev.sh --ci
+      if: success() || failure()
+
+    - name: Check Formatting (black)
+      run: ./tools/check-code.sh format
+      if: success() || failure()
+
+    - name: Lint (pylint)
+      run: ./tools/check-code.sh lint
+      if: success() || failure()
+
+    - name: Type Check (mypy)
+      run: ./tools/check-code.sh types
+      if: success() || failure()
+
+    - name: Run Tests (pytest)
+      run: ./tools/run-tests.sh
+      if: success() || failure()

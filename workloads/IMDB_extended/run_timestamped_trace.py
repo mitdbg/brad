@@ -37,8 +37,14 @@ QueryResult = namedtuple(
         "query_idx",
         "time_since_execution_s",
         "time_of_day",
+        "db",
     ],
 )
+
+connection_lost_phrases = [
+    "server socket closed",
+    "connection has been closed",
+]
 
 
 def load_trace(
@@ -154,6 +160,7 @@ def get_run_query(
                 query_idx=query_idx,
                 time_since_execution_s=time_since_execution,
                 time_of_day=time_of_day,
+                db=db,
             )
         except Exception as ex:
             return QueryResult(
@@ -164,6 +171,7 @@ def get_run_query(
                 query_idx=query_idx,
                 time_since_execution_s=time_since_execution,
                 time_of_day=time_of_day,
+                db=db,
             )
 
     return _run_query
@@ -275,7 +283,16 @@ async def runner_impl(
             try:
                 if result.error is not None:
                     ex = result.error
-                    logger.error("Unexpected query error: %s", str(ex))
+                    logger.error(
+                        "[Trace Runner %d] Unexpected query error: %s",
+                        runner_idx,
+                        str(ex),
+                    )
+                    if not isinstance(ex, BradClientError):
+                        msg = str(ex)
+                        for phrase in connection_lost_phrases:
+                            if phrase in msg:
+                                result.db.reconnect()
                     return
 
                 # Record execution result.
@@ -387,10 +404,7 @@ def main():
         type=str,
         help="Set to connect via ODBC instead of the BRAD client (for use with other baselines).",
     )
-    parser.add_argument("--num-clients", type=int, default=1)
     parser.add_argument("--client-offset", type=int, default=0)
-    parser.add_argument("--avg-gap-s", type=float)
-    parser.add_argument("--avg-gap-std-s", type=float, default=0.5)
     parser.add_argument(
         "--brad-direct",
         action="store_true",
@@ -437,6 +451,14 @@ def main():
     logger.info(
         "[Trace Runner] Running with %d issue slots per client.", args.issue_slots
     )
+    if args.brad_direct:
+        logger.info(
+            "[Trace Runner] Running directly against an engine: %s", args.engine
+        )
+    else:
+        logger.info(
+            "[Trace Runner] Running on BRAD with %d front ends.", args.num_front_ends
+        )
 
     dataset, client_trace = load_trace(args.trace_manifest)
     for idx, trace in enumerate(client_trace):

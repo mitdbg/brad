@@ -75,9 +75,9 @@ class AuroraProvisioningScore:
             scaled_rt,
             scaled_txn_lats,
             {
-                "aurora_query_factor": query_factor
-                if query_factor is not None
-                else np.nan,
+                "aurora_query_factor": (
+                    query_factor if query_factor is not None else np.nan
+                ),
                 "aurora_txn_cpu_denorm": txn_cpu_denorm,
                 "aurora_ana_cpu_denorm": ana_node_cpu_denorm,
                 **debug_dict,

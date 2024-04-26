@@ -1,0 +1,282 @@
+schema_name: chbenchmark
+
+tables:
+  # TPC-C Tables
+  - table_name: warehouse
+    columns:
+      - name: w_id
+        data_type: INT
+        primary_key: true
+      - name: w_ytd
+        data_type: DECIMAL(12, 2)
+      - name: w_tax
+        data_type: DECIMAL(4, 4)
+      - name: w_name
+        data_type: VARCHAR(10)
+      - name: w_street_1
+        data_type: VARCHAR(20)
+      - name: w_street_2
+        data_type: VARCHAR(20)
+      - name: w_city
+        data_type: VARCHAR(20)
+      - name: w_state
+        data_type: CHAR(2)
+      - name: w_zip
+        data_type: CHAR(9)
+
+  - table_name: item
+    columns:
+      - name: i_id
+        data_type: INT
+        primary_key: true
+      - name: i_name
+        data_type: VARCHAR(24)
+      - name: i_price
+        data_type: DECIMAL(5, 2)
+      - name: i_data
+        data_type: VARCHAR(50)
+      - name: i_im_id
+        data_type: INT
+
+  - table_name: stock
+    columns:
+      - name: s_w_id
+        data_type: INT
+        primary_key: true
+      - name: s_i_id
+        data_type: INT
+        primary_key: true
+      - name: s_quantity
+        data_type: INT
+      - name: s_ytd
+        data_type: DECIMAL(8, 2)
+      - name: s_order_cnt
+        data_type: INT
+      - name: s_remote_cnt
+        data_type: INT
+      - name: s_data
+        data_type: VARCHAR(50)
+      - name: s_dist_01
+        data_type: CHAR(24)
+      - name: s_dist_02
+        data_type: CHAR(24)
+      - name: s_dist_03
+        data_type: CHAR(24)
+      - name: s_dist_04
+        data_type: CHAR(24)
+      - name: s_dist_05
+        data_type: CHAR(24)
+      - name: s_dist_06
+        data_type: CHAR(24)
+      - name: s_dist_07
+        data_type: CHAR(24)
+      - name: s_dist_08
+        data_type: CHAR(24)
+      - name: s_dist_09
+        data_type: CHAR(24)
+      - name: s_dist_10
+        data_type: CHAR(24)
+
+  - table_name: district
+    columns:
+      - name: d_w_id
+        data_type: INT
+        primary_key: true
+      - name: d_id
+        data_type: INT
+        primary_key: true
+      - name: d_ytd
+        data_type: DECIMAL(12, 2)
+      - name: d_tax
+        data_type: DECIMAL(4, 4)
+      - name: d_next_o_id
+        data_type: INT
+      - name: d_name
+        data_type: VARCHAR(10)
+      - name: d_street_1
+        data_type: VARCHAR(20)
+      - name: d_street_2
+        data_type: VARCHAR(20)
+      - name: d_city
+        data_type: VARCHAR(20)
+      - name: d_state
+        data_type: CHAR(2)
+      - name: d_zip
+        data_type: CHAR(9)
+
+  - table_name: customer
+    columns:
+      - name: c_w_id
+        data_type: INT
+        primary_key: true
+      - name: c_d_id
+        data_type: INT
+        primary_key: true
+      - name: c_id
+        data_type: INT
+        primary_key: true
+      - name: c_discount
+        data_type: DECIMAL(4, 4)
+      - name: c_credit
+        data_type: CHAR(2)
+      - name: c_last
+        data_type: VARCHAR(16)
+      - name: c_first
+        data_type: VARCHAR(16)
+      - name: c_credit_lim
+        data_type: DECIMAL(12, 2)
+      - name: c_balance
+        data_type: DECIMAL(12, 2)
+      - name: c_ytd_payment
+        data_type: FLOAT
+      - name: c_payment_cnt
+        data_type: INT
+      - name: c_delivery_cnt
+        data_type: INT
+      - name: c_street_1
+        data_type: VARCHAR(20)
+      - name: c_street_2
+        data_type: VARCHAR(20)
+      - name: c_city
+        data_type: VARCHAR(20)
+      - name: c_state
+        data_type: CHAR(2)
+      - name: c_zip
+        data_type: CHAR(9)
+      - name: c_phone
+        data_type: CHAR(16)
+      - name: c_since
+        data_type: TIMESTAMP
+      - name: c_middle
+        data_type: CHAR(2)
+      - name: c_data
+        data_type: VARCHAR(500)
+    indexes:
+      - c_w_id, c_d_id, c_last, c_first
+
+  - table_name: history
+    columns:
+      # N.B. The history table in TPC-C does not have a primary key. But our
+      # current code assumes the presence of a primary key. So we add in this
+      # column to simplify the implementation.
+      - name: h_id
+        data_type: SERIAL
+        primary_key: true
+      - name: h_c_id
+        data_type: INT
+      - name: h_c_d_id
+        data_type: INT
+      - name: h_c_w_id
+        data_type: INT
+      - name: h_d_id
+        data_type: INT
+      - name: h_w_id
+        data_type: INT
+      - name: h_date
+        data_type: TIMESTAMP
+      - name: h_amount
+        data_type: DECIMAL(6, 2)
+      - name: h_data
+        data_type: VARCHAR(24)
+
+  - table_name: orders
+    columns:
+      - name: o_w_id
+        data_type: INT
+        primary_key: true
+      - name: o_d_id
+        data_type: INT
+        primary_key: true
+      - name: o_id
+        data_type: INT
+        primary_key: true
+      - name: o_c_id
+        data_type: INT
+      - name: o_carrier_id
+        data_type: INT
+      - name: o_ol_cnt
+        data_type: INT
+      - name: o_all_local
+        data_type: INT
+      - name: o_entry_d
+        data_type: TIMESTAMP
+
+  - table_name: new_order
+    columns:
+      - name: no_w_id
+        data_type: INT
+        primary_key: true
+      - name: no_d_id
+        data_type: INT
+        primary_key: true
+      - name: no_o_id
+        data_type: INT
+        primary_key: true
+
+  - table_name: order_line
+    columns:
+      - name: ol_w_id
+        data_type: INT
+        primary_key: true
+      - name: ol_d_id
+        data_type: INT
+        primary_key: true
+      - name: ol_o_id
+        data_type: INT
+        primary_key: true
+      - name: ol_number
+        data_type: INT
+        primary_key: true
+      - name: ol_i_id
+        data_type: INT
+      - name: ol_delivery_d
+        data_type: TIMESTAMP
+      - name: ol_amount
+        data_type: DECIMAL(6, 2)
+      - name: ol_supply_w_id
+        data_type: INT
+      - name: ol_quantity
+        data_type: DECIMAL(6, 2)
+      - name: ol_dist_info
+        data_type: CHAR(24)
+
+  # CH-Benchmark added tables
+  - table_name: region
+    columns:
+      - name: r_regionkey
+        data_type: INT
+        primary_key: true
+      - name: r_name
+        data_type: CHAR(55)
+      - name: r_comment
+        data_type: CHAR(152)
+
+  - table_name: nation
+    columns:
+      - name: n_nationkey
+        data_type: INT
+        primary_key: true
+      - name: n_name
+        data_type: CHAR(25)
+      - name: n_regionkey
+        data_type: INT
+      - name: n_comment
+        data_type: CHAR(152)
+
+  - table_name: supplier
+    columns:
+      - name: su_suppkey
+        data_type: INT
+        primary_key: true
+      - name: su_name
+        data_type: CHAR(25)
+      - name: su_address
+        data_type: VARCHAR(40)
+      - name: su_nationkey
+        data_type: INT
+      - name: su_phone
+        data_type: CHAR(15)
+      - name: su_acctbal
+        data_type: DECIMAL(12, 2)
+      - name: su_comment
+        data_type: CHAR(101)

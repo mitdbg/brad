@@ -466,9 +466,9 @@ class BlueprintCandidate(ComparableBlueprint):
 
         self.scaled_query_latencies.clear()
         self.scaled_query_latencies[Engine.Aurora] = self.aurora_score.scaled_run_times
-        self.scaled_query_latencies[
-            Engine.Redshift
-        ] = self.redshift_score.scaled_run_times
+        self.scaled_query_latencies[Engine.Redshift] = (
+            self.redshift_score.scaled_run_times
+        )
 
     def is_better_than(self, other: "BlueprintCandidate") -> bool:
         return self._comparator(self, other)

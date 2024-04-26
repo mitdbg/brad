@@ -3,7 +3,7 @@ import mysql.connector
 import psycopg2
 import sys
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable
 from brad.config.engine import Engine
 from brad.grpc_client import BradGrpcClient, RowList, BradClientError
 from brad.connection.connection import Connection
@@ -27,6 +27,9 @@ class Database:
 
     def close_sync(self) -> None:
         raise NotImplementedError
+
+    def reconnect(self) -> None:
+        print("Reconnecting not supported.", file=sys.stderr, flush=True)
 
 
 class PyodbcDatabase(Database):
@@ -129,9 +132,12 @@ class BradDatabase(Database):
 
 
 class DirectConnection(Database):
-    def __init__(self, connection: Connection) -> None:
+    def __init__(
+        self, connection: Connection, do_reconnect: Callable[[], Connection]
+    ) -> None:
         self._conn = connection
         self._cursor = connection.cursor_sync()
+        self._do_reconnect = do_reconnect
 
     def execute_sync(self, query: str) -> RowList:
         self._cursor.execute_sync(query)
@@ -155,3 +161,15 @@ class DirectConnection(Database):
 
     def close_sync(self) -> None:
         self._conn.close_sync()
+
+    def reconnect(self) -> None:
+        try:
+            self._conn = self._do_reconnect()
+            self._cursor = self._conn.cursor_sync()
+        except Exception as ex:
+            print(
+                "Direct connection reconnect failed.",
+                str(ex),
+                file=sys.stderr,
+                flush=True,
+            )

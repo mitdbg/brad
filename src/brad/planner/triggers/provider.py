@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from typing import List
 
@@ -14,6 +15,8 @@ from brad.planner.triggers.recent_change import RecentChange
 from brad.planner.triggers.trigger import Trigger
 from brad.planner.triggers.txn_latency_ceiling import TransactionLatencyCeiling
 from brad.planner.triggers.variable_costs import VariableCosts
+
+logger = logging.getLogger(__name__)
 
 
 class TriggerProvider:
@@ -48,6 +51,10 @@ class ConfigDefinedTriggers(TriggerProvider):
         self._startup_timestamp = startup_timestamp
 
     def get_triggers(self) -> List[Trigger]:
+        if self._config.stub_mode_path() is not None:
+            logger.info("Stub mode enabled - not creating any planner triggers.")
+            return []
+
         trigger_config = self._planner_config.trigger_configs()
         if not trigger_config["enabled"]:
             return []

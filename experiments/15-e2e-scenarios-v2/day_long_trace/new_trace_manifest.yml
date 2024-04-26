@@ -1,0 +1,31 @@
+datasets:
+  - name: repeating
+    path: ../../../workloads/IMDB_100GB/regular_test/queries.sql
+  - name: adhoc
+    path: ../../../workloads/IMDB_100GB/adhoc_test/queries.sql
+
+traces:
+  - trace_file: trace/ra_10_new/repeating_olap_batch_0.csv
+    dataset: repeating
+  - trace_file: trace/ra_10_new/repeating_olap_batch_1.csv
+    dataset: repeating
+  - trace_file: trace/ra_10_new/repeating_olap_batch_2.csv
+    dataset: repeating
+  - trace_file: trace/ra_10_new/repeating_olap_batch_3.csv
+    dataset: repeating
+  - trace_file: trace/ra_10_new/repeating_olap_batch_4.csv
+    dataset: repeating
+  - trace_file: trace/ra_10_new/repeating_olap_batch_5.csv
+    dataset: repeating
+  - trace_file: trace/ra_10_new/repeating_olap_batch_6.csv
+    dataset: repeating
+  - trace_file: trace/ra_10_new/repeating_olap_batch_7.csv
+    dataset: repeating
+  - trace_file: trace/ra_10_new/repeating_olap_batch_8.csv
+    dataset: repeating
+  - trace_file: trace/ra_10_new/repeating_olap_batch_9.csv
+    dataset: repeating
+  - trace_file: trace/adhoc/seq_queries_0.csv
+    dataset: adhoc
+  - trace_file: trace/adhoc/seq_queries_1.csv
+    dataset: adhoc

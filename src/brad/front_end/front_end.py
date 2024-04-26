@@ -8,7 +8,7 @@ import multiprocessing as mp
 import redshift_connector.error as redshift_errors
 import psycopg
 import struct
-from typing import AsyncIterable, Optional, Dict, Any
+from typing import AsyncIterable, Optional, Dict, Any, Tuple
 from datetime import timedelta
 from ddsketch import DDSketch
 
@@ -22,6 +22,7 @@ from brad.blueprint.manager import BlueprintManager
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.connection.connection import ConnectionFailed
+from brad.connection.schema import Schema, Field, DataType
 from brad.daemon.monitor import Monitor
 from brad.daemon.messages import (
     ShutdownFrontEnd,
@@ -61,6 +62,20 @@ LINESEP = "\n".encode()
 
 
 class BradFrontEnd(BradInterface):
+    @staticmethod
+    def native_server_is_supported() -> bool:
+        """
+        If the native pybind_brad_server module built using Arrow Flight SQL
+        exists, this function will return True. Otherwise, it returns False.
+        """
+        try:
+            # pylint: disable-next=import-error,no-name-in-module,unused-import
+            import brad.native.pybind_brad_server as brad_server
+
+            return True
+        except ImportError:
+            return False
+
     def __init__(
         self,
         fe_index: int,
@@ -72,6 +87,22 @@ class BradFrontEnd(BradInterface):
         input_queue: mp.Queue,
         output_queue: mp.Queue,
     ):
+        if BradFrontEnd.native_server_is_supported():
+            from brad.front_end.flight_sql_server import BradFlightSqlServer
+
+            self._flight_sql_server: Optional[BradFlightSqlServer] = (
+                BradFlightSqlServer(
+                    host="0.0.0.0",
+                    port=31337,
+                    callback=self._handle_query_from_flight_sql,
+                )
+            )
+            self._flight_sql_server_session_id: Optional[SessionId] = None
+        else:
+            self._flight_sql_server = None
+
+        self._main_thread_loop: Optional[asyncio.AbstractEventLoop] = None
+
         self._fe_index = fe_index
         self._config = config
         self._schema_name = schema_name
@@ -165,8 +196,31 @@ class BradFrontEnd(BradInterface):
         )
         self._ping_watchdog_task: Optional[asyncio.Task[None]] = None
 
+        self._is_stub_mode = self._config.stub_mode_path() is not None
+
+    def _handle_query_from_flight_sql(self, query: str) -> Tuple[RowList, Schema]:
+        assert self._flight_sql_server_session_id is not None
+        assert self._main_thread_loop is not None
+
+        future = asyncio.run_coroutine_threadsafe(
+            self._run_query_impl(
+                self._flight_sql_server_session_id, query, {}, retrieve_schema=True
+            ),
+            self._main_thread_loop,
+        )
+        row_result, schema = future.result()
+        assert schema is not None
+
+        return row_result, schema
+
     async def serve_forever(self):
         await self._run_setup()
+
+        # Start FlightSQL server
+        if self._flight_sql_server is not None:
+            self._flight_sql_server_session_id = await self.start_session()
+            self._flight_sql_server.start()
+
         try:
             grpc_server = grpc.aio.server()
             brad_grpc.add_BradServicer_to_server(BradGrpc(self), grpc_server)
@@ -189,6 +243,8 @@ class BradFrontEnd(BradInterface):
             logger.debug("BRAD front end _run_teardown() complete.")
 
     async def _run_setup(self) -> None:
+        self._main_thread_loop = asyncio.get_running_loop()
+
         # The directory will have been populated by the daemon.
         await self._blueprint_mgr.load(skip_directory_refresh=True)
         logger.info("Using blueprint: %s", self._blueprint_mgr.get_blueprint())
@@ -207,8 +263,9 @@ class BradFrontEnd(BradInterface):
         # Used to handle messages from the daemon.
         self._daemon_messages_task = asyncio.create_task(self._read_daemon_messages())
 
-        self._qlogger_refresh_task = asyncio.create_task(self._refresh_qlogger())
-        self._watchdog.start(asyncio.get_running_loop())
+        if not self._is_stub_mode:
+            self._qlogger_refresh_task = asyncio.create_task(self._refresh_qlogger())
+        self._watchdog.start(self._main_thread_loop)
         self._ping_watchdog_task = asyncio.create_task(self._ping_watchdog())
 
     async def _set_up_router(self) -> None:
@@ -256,6 +313,11 @@ class BradFrontEnd(BradInterface):
 
     async def _run_teardown(self):
         logger.debug("Starting BRAD front end _run_teardown()")
+
+        # Shutdown FlightSQL server
+        if self._flight_sql_server is not None:
+            self._flight_sql_server.stop()
+
         await self._sessions.end_all_sessions()
 
         # Important for unblocking our message reader thread.
@@ -315,19 +377,23 @@ class BradFrontEnd(BradInterface):
     async def run_query(
         self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
     ) -> AsyncIterable[bytes]:
-        results = await self._run_query_impl(session_id, query, debug_info)
+        results, _ = await self._run_query_impl(session_id, query, debug_info)
         for row in results:
             yield (" | ".join(map(str, row))).encode()
 
     async def run_query_json(
         self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
     ) -> str:
-        results = await self._run_query_impl(session_id, query, debug_info)
+        results, _ = await self._run_query_impl(session_id, query, debug_info)
         return json.dumps(results, cls=DecimalEncoder, default=str)
 
     async def _run_query_impl(
-        self, session_id: SessionId, query: str, debug_info: Dict[str, Any]
-    ) -> RowList:
+        self,
+        session_id: SessionId,
+        query: str,
+        debug_info: Dict[str, Any],
+        retrieve_schema: bool = False,
+    ) -> Tuple[RowList, Optional[Schema]]:
         session = self._sessions.get_session(session_id)
         if session is None:
             raise QueryError(
@@ -343,7 +409,10 @@ class BradFrontEnd(BradInterface):
 
             # Handle internal commands separately.
             if query.startswith("BRAD_"):
-                return await self._handle_internal_command(session, query, debug_info)
+                return (
+                    await self._handle_internal_command(session, query, debug_info),
+                    _internal_command_response_schema() if retrieve_schema else None,
+                )
 
             # 2. Select an engine for the query.
             query_rep = QueryRep(query)
@@ -424,12 +493,14 @@ class BradFrontEnd(BradInterface):
             # Decide whether to log the query.
             run_time_s = end - start
             if not transactional_query or (random.random() < self._config.txn_log_prob):
-                self._qlogger.info(
-                    f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} "
-                    f"Engine: {engine_to_use.value} "
-                    f"Duration (s): {run_time_s.total_seconds()} "
-                    f"IsTransaction: {transactional_query}"
-                )
+                if not self._is_stub_mode:
+                    # Skip logging the query when running in stub mode.
+                    self._qlogger.info(
+                        f"{end.strftime('%Y-%m-%d %H:%M:%S,%f')} INFO Query: {query} "
+                        f"Engine: {engine_to_use.value} "
+                        f"Duration (s): {run_time_s.total_seconds()} "
+                        f"IsTransaction: {transactional_query}"
+                    )
                 run_time_s_float = run_time_s.total_seconds()
                 if not transactional_query:
                     self._query_latency_sketch.add(run_time_s_float)
@@ -445,10 +516,13 @@ class BradFrontEnd(BradInterface):
                 # Using `fetchall_sync()` is lower overhead than the async interface.
                 results = [tuple(row) for row in cursor.fetchall_sync()]
                 log_verbose(logger, "Responded with %d rows.", len(results))
-                return results
+                return (
+                    results,
+                    (cursor.result_schema(results) if retrieve_schema else None),
+                )
             except (pyodbc.ProgrammingError, psycopg.ProgrammingError):
                 log_verbose(logger, "No rows produced.")
-                return []
+                return ([], Schema.empty() if retrieve_schema else None)
             except (
                 pyodbc.Error,
                 pyodbc.OperationalError,
@@ -496,6 +570,7 @@ class BradFrontEnd(BradInterface):
             or command.startswith("BRAD_RUN_PLANNER")
             or command.startswith("BRAD_MODIFY_REDSHIFT")
             or command.startswith("BRAD_USE_PRESET_BP")
+            or command.startswith("BRAD_CHANGE_SLO")
         ):
             if self._daemon_request_mailbox.is_active():
                 return [
@@ -785,3 +860,7 @@ async def _orchestrate_shutdown() -> None:
 
     loop = asyncio.get_event_loop()
     loop.stop()
+
+
+def _internal_command_response_schema() -> Schema:
+    return Schema([Field(name="message", data_type=DataType.String)])
