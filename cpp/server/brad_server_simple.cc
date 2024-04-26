@@ -5,12 +5,14 @@
 #include <sstream>
 #include <unordered_map>
 #include <utility>
+#include <stdexcept>
 
 #include <arrow/array/builder_binary.h>
 #include "brad_sql_info.h"
 #include "brad_statement.h"
 #include "brad_statement_batch_reader.h"
 #include "brad_tables_schema_batch_reader.h"
+#include "python_utils.h"
 #include <arrow/flight/sql/server.h>
 #include <arrow/scalar.h>
 #include <arrow/util/checked_cast.h>
@@ -21,6 +23,8 @@ namespace brad {
 using arrow::internal::checked_cast;
 using namespace arrow::flight;
 using namespace arrow::flight::sql;
+
+namespace py = pybind11;
 
 std::string GetQueryTicket(
   const std::string &autoincrement_id,
@@ -82,21 +86,30 @@ std::shared_ptr<BradFlightSqlServer>
 void BradFlightSqlServer::InitWrapper(
   const std::string &host,
   int port,
-  std::function<std::vector<py::tuple>(std::string)> handle_query) {
+  PythonRunQueryFn handle_query) {
   auto location = arrow::flight::Location::ForGrpcTcp(host, port).ValueOrDie();
   arrow::flight::FlightServerOptions options(location);
 
   handle_query_ = handle_query;
 
-  this->Init(options);
+  const auto status = this->Init(options);
+  if (!status.ok()) {
+    throw std::runtime_error(status.message());
+  }
 }
 
 void BradFlightSqlServer::ServeWrapper() {
-  this->Serve();
+  const auto status = this->Serve();
+  if (!status.ok()) {
+    throw std::runtime_error(status.message());
+  }
 }
 
 void BradFlightSqlServer::ShutdownWrapper() {
-  this->Shutdown(nullptr);
+  const auto status = this->Shutdown(nullptr);
+  if (!status.ok()) {
+    throw std::runtime_error(status.message());
+  }
 }
 
 arrow::Result<std::unique_ptr<FlightInfo>>
@@ -111,12 +124,14 @@ arrow::Result<std::unique_ptr<FlightInfo>>
   ARROW_ASSIGN_OR_RAISE(auto ticket,
                         EncodeTransactionQuery(query_ticket));
 
+  std::shared_ptr<arrow::Schema> result_schema;
   std::vector<std::vector<std::any>> transformed_query_result;
 
   { 
     py::gil_scoped_acquire guard;
-    std::vector<py::tuple> query_result = handle_query_(query);
-    transformed_query_result = TransformQueryResult(query_result);
+    auto result = handle_query_(query);
+    result_schema = ArrowSchemaFromBradSchema(result.second);
+    transformed_query_result = TransformQueryResult(result.first);
   }
 
   ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(transformed_query_result));

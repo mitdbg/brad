@@ -29,7 +29,8 @@ pybind11_add_module(pybind_brad_server pybind/brad_server.cc
                                        server/brad_sql_info.cc
                                        server/brad_statement_batch_reader.cc
                                        server/brad_statement.cc
-                                       server/brad_tables_schema_batch_reader.cc)
+                                       server/brad_tables_schema_batch_reader.cc
+                                       server/python_utils.cc)
 
 target_link_libraries(pybind_brad_server
                       PRIVATE Arrow::arrow_shared
