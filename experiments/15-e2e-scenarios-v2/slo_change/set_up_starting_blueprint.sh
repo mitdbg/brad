@@ -15,6 +15,6 @@ python3 ../../../workloads/IMDB_extended/set_up_starting_blueprint.py \
   --aurora-queries "99,56,32,92,91" \
   --redshift-queries "49,30,83,94,38,87,86,76,37,31,46,58,61,62,64,69,73,74,51,57,60" \
   --redshift-provisioning "dc2.large:2" \
-  --aurora-provisioning "db.r6g.xlarge:2" \
+  --aurora-provisioning "db.r6g.xlarge:1" \
   --system-config-file slo_change_config.yml \
   --physical-config-file $1
