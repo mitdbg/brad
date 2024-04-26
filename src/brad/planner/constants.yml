@@ -181,6 +181,22 @@ table_extract_bytes_per_row:
     movie_info: 29.57191
     person_info: 133.458044
 
+  # TPC-C Warehouses: 1740
+  # Around ~120 GB of uncompressed data.
+  chbenchmark:
+    warehouse: 92.40747126436781
+    item: 75.62581
+    stock: 308.868974
+    district: 98.52431034482758
+    customer: 570.148704
+    history: 65.51127
+    orders: 40.134002
+    new_order: 9.937048
+    order_line: 68.538322
+    region: 216.8
+    nation: 185.03225806451613
+    supplier: 194.728
+
 ###
 ### Models used to account for hardware/system load.
 ###
