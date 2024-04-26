@@ -75,9 +75,10 @@ def runner(
         db = connect_to_db(
             args, worker_idx, direct_engine=Engine.Aurora, directory=directory
         )
-        db.execute_sync(
-            f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
-        )
+        if args.baseline != "tidb":
+            db.execute_sync(
+                f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
+            )
     except BradClientError as ex:
         logger.error("[T %d] Failed to connect to BRAD: %s", worker_idx, str(ex))
         start_queue.put_nowait(STARTUP_FAILED)
@@ -90,7 +91,7 @@ def runner(
 
         out_dir = cond.get_output_path()
     else:
-        out_dir = pathlib.Path(".")
+        out_dir = pathlib.Path(f"./{args.output_dir}").resolve()
 
     verbose_log_dir = out_dir / "verbose_logs"
     verbose_log_dir.mkdir(exist_ok=True)
@@ -330,6 +331,18 @@ def main():
     parser.add_argument("--brad-port", type=int, default=6583)
     parser.add_argument("--num-front-ends", type=int, default=1)
     parser.add_argument("--serverless-aurora", action="store_true")
+    parser.add_argument(
+        "--baseline",
+        default="",
+        type=str,
+        help="Whether to use tidb, aurora or redshift",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=".",
+        help="Environment variable that stores the output directory of the results",
+    )
     args = parser.parse_args()
 
     set_up_logging()

@@ -144,6 +144,28 @@ function start_txn_runner() {
   runner_pid=$!
 }
 
+function start_txn_runner_serial() {
+  t_clients=$1
+
+  >&2 echo "[Serial Transactions] Running with $t_clients..."
+  results_dir=$EXPT_OUT/t_${t_clients}
+  mkdir -p $results_dir
+
+  local args=(
+    --num-clients $t_clients
+    --output-dir $results_dir
+    --baseline $TRANSACTION_ENGINE
+  )
+
+  log_workload_point "txn_${t_clients}"
+  python3 workloads/IMDB_extended/run_transactions_serial.py \
+    "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
+
 function extract_named_arguments() {
   # Evaluates any environment variables in this script's arguments. This script
   # should only be run on trusted input.
