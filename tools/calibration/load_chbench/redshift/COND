@@ -1,0 +1,49 @@
+from itertools import product
+
+
+AVG_GAP_S = 3
+RUN_FOR_S = 5 * 60  # 5 minutes
+NUM_CLIENTS = [1, 2, 4, 6]
+WAIT_BEFORE_START = 10
+NUM_QUERIES = 22
+
+
+# Relative to experiment definition directories.
+QUERY_BANK = "../selected_queries.sql"
+
+
+CLUSTER_CONFIGS = [
+  ("dc2_large", 2),
+  ("dc2_large", 4),
+  ("dc2_large", 8),
+  ("dc2_large", 16),
+  ("ra3_xlplus", 2),
+  ("ra3_xlplus", 4),
+  ("ra3_xlplus", 8),
+  ("ra3_4xlarge", 2),
+  ("ra3_4xlarge", 4),
+  ("ra3_4xlarge", 8),
+]
+
+
+for inst, nodes in CLUSTER_CONFIGS:
+  cfg_name = f"{inst}-{nodes}"
+  run_experiment_group(
+    name=cfg_name,
+    run="python3 -m brad.calibration.measure_load",
+    experiments=[
+      ExperimentInstance(
+        name=f"{cfg_name}-{clients}-q{query_idx}",
+        options={
+          "num-clients": clients,
+          "specific-query-idx": query_idx,
+          "run-for-s": RUN_FOR_S,
+          "avg-gap-s": AVG_GAP_S,
+          "wait-before-start": WAIT_BEFORE_START,
+          "query-file": QUERY_BANK,
+          "engine": "redshift",
+        },
+      )
+      for query_idx, clients in product(range(NUM_QUERIES), NUM_CLIENTS)
+    ],
+  )
