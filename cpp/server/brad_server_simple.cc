@@ -64,7 +64,7 @@ ResultToRecordBatch(std::vector<py::tuple> query_result, std::shared_ptr<arrow::
     if (field_type->Equals(arrow::int64())) {
       arrow::Int64Builder int64builder;
       for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
-        const int64_t val = py::cast<int>(query_result[row_ix][field_ix]); 
+        const int64_t val = py::cast<int64_t>(query_result[row_ix][field_ix]); 
         // TODO: How do we check for null values in ints or floats?
         ARROW_RETURN_NOT_OK(int64builder.Append(val));
       }
@@ -72,7 +72,9 @@ ResultToRecordBatch(std::vector<py::tuple> query_result, std::shared_ptr<arrow::
       ARROW_ASSIGN_OR_RAISE(values, int64builder.Finish());
       columns.push_back(values);
 
-    } else if (field_type->Equals(arrow::float32())) {
+    } else if (field_type->Equals(arrow::float32()) ||
+               // TODO: Should not hardcode precision and scale values
+               field_type->Equals(arrow::decimal(/*precision=*/10, /*scale=*/2))) {
       arrow::FloatBuilder floatbuilder;
       for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
         const float val = py::cast<float>(query_result[row_ix][field_ix]);
@@ -82,7 +84,7 @@ ResultToRecordBatch(std::vector<py::tuple> query_result, std::shared_ptr<arrow::
       ARROW_ASSIGN_OR_RAISE(values, floatbuilder.Finish());
       columns.push_back(values);
 
-    } else {
+    } else if (field_type->Equals(arrow::utf8())) {
       arrow::StringBuilder stringbuilder;
       for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
         const std::string str = py::cast<std::string>(query_result[row_ix][field_ix]);
@@ -95,6 +97,17 @@ ResultToRecordBatch(std::vector<py::tuple> query_result, std::shared_ptr<arrow::
       std::shared_ptr<arrow::Array> values;
       ARROW_ASSIGN_OR_RAISE(values, stringbuilder.Finish());
       columns.push_back(values);
+
+    } else if (field_type->Equals(arrow::date64())) {
+      arrow::Date64Builder datebuilder;
+      for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
+        const int64_t val = py::cast<int64_t>(query_result[row_ix][field_ix]);
+        ARROW_RETURN_NOT_OK(datebuilder.Append(val));
+      }
+      std::shared_ptr<arrow::Array> values;
+      ARROW_ASSIGN_OR_RAISE(values, datebuilder.Finish());
+      columns.push_back(values); 
+
     }
   }
 
