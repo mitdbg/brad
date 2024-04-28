@@ -7,8 +7,6 @@
 #include <utility>
 #include <stdexcept>
 
-#include <iostream>
-
 #include <arrow/api.h>
 #include <arrow/array/builder_binary.h>
 #include "brad_sql_info.h"
@@ -51,25 +49,6 @@ arrow::Result<std::pair<std::string, std::string>> DecodeTransactionQuery(
   std::string transaction_id = ticket.substr(0, divider);
   std::string autoincrement_id = ticket.substr(divider + 1);
   return std::make_pair(std::move(autoincrement_id), std::move(transaction_id));
-}
-
-std::vector<std::vector<std::any>> TransformQueryResult(
-  std::vector<py::tuple> query_result) {
-  std::vector<std::vector<std::any>> transformed_query_result;
-  for (const auto &row : query_result) {
-    std::vector<std::any> transformed_row{};
-    for (const auto &field : row) {
-      if (py::isinstance<py::int_>(field)) {
-        transformed_row.push_back(std::make_any<int>(py::cast<int>(field)));
-      } else if (py::isinstance<py::float_>(field)) {
-        transformed_row.push_back(std::make_any<float>(py::cast<float>(field)));
-      } else {
-        transformed_row.push_back(std::make_any<std::string>(py::cast<std::string>(field)));
-      }
-    }
-    transformed_query_result.push_back(transformed_row);
-  }
-  return transformed_query_result;  
 }
 
 arrow::Result<std::shared_ptr<arrow::RecordBatch>>
