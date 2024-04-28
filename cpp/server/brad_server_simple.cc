@@ -7,6 +7,8 @@
 #include <utility>
 #include <stdexcept>
 
+#include <iostream>
+
 #include <arrow/api.h>
 #include <arrow/array/builder_binary.h>
 #include "brad_sql_info.h"
@@ -72,36 +74,31 @@ std::vector<std::vector<std::any>> TransformQueryResult(
 
 arrow::Result<std::shared_ptr<arrow::RecordBatch>>
 ResultToRecordBatch(std::vector<py::tuple> query_result, std::shared_ptr<arrow::Schema> schema) {
-  // TODO: Handle edge case with empty vector
   const int num_rows = query_result.size();
 
-  const auto &row = query_result[0];
-  const int num_columns = row.size();
+  const int num_columns = schema->num_fields();
   std::vector<std::shared_ptr<arrow::Array>> columns;
   columns.reserve(num_columns);
 
-  // TODO: Use schema fields instead of inferring from result
   for (int field_ix = 0; field_ix < num_columns; ++field_ix) {
-    if (py::isinstance<py::int_>(row[field_ix])) {
+    const auto &field_type = schema->field(field_ix)->type();
+    if (field_type->Equals(arrow::int64())) {
       arrow::Int64Builder int64builder;
-      int64_t values_raw[num_rows];
       for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
-        values_raw[row_ix] = py::cast<int>(query_result[row_ix][field_ix]);
+        const int64_t val = py::cast<int>(query_result[row_ix][field_ix]); 
+        // TODO: How do we check for null values in ints or floats?
+        ARROW_RETURN_NOT_OK(int64builder.Append(val));
       }
-      ARROW_RETURN_NOT_OK(int64builder.AppendValues(values_raw, num_rows));
-
       std::shared_ptr<arrow::Array> values;
       ARROW_ASSIGN_OR_RAISE(values, int64builder.Finish());
       columns.push_back(values);
 
-    } else if (py::isinstance<py::float_>(row[field_ix])) {
+    } else if (field_type->Equals(arrow::float32())) {
       arrow::FloatBuilder floatbuilder;
-      float values_raw[num_rows]; 
       for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
-        values_raw[row_ix] = py::cast<float>(query_result[row_ix][field_ix]);
+        const float val = py::cast<float>(query_result[row_ix][field_ix]);
+        ARROW_RETURN_NOT_OK(floatbuilder.Append(val));
       }
-      ARROW_RETURN_NOT_OK(floatbuilder.AppendValues(values_raw, num_rows));
-
       std::shared_ptr<arrow::Array> values;
       ARROW_ASSIGN_OR_RAISE(values, floatbuilder.Finish());
       columns.push_back(values);
@@ -110,11 +107,15 @@ ResultToRecordBatch(std::vector<py::tuple> query_result, std::shared_ptr<arrow::
       arrow::StringBuilder stringbuilder;
       for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
         const std::string str = py::cast<std::string>(query_result[row_ix][field_ix]);
-        ARROW_RETURN_NOT_OK(stringbuilder.Append(str.data(), str.size()));
+        if (str.empty()) {
+          ARROW_RETURN_NOT_OK(stringbuilder.Append(str.data(), str.size()));
+        } else {
+          ARROW_RETURN_NOT_OK(stringbuilder.AppendNull());
+        }
       }
-
       std::shared_ptr<arrow::Array> values;
       ARROW_ASSIGN_OR_RAISE(values, stringbuilder.Finish());
+      columns.push_back(values);
     }
   }
 
