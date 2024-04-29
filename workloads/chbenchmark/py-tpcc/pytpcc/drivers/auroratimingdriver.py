@@ -10,6 +10,7 @@ from .. import constants
 
 from brad.connection.psycopg_connection import PsycopgConnection
 from brad.connection.psycopg_cursor import PsycopgCursor
+import conductor.lib as cond
 
 Config = Dict[str, Tuple[str, Any]]
 
@@ -114,9 +115,10 @@ class AuroraTimingDriver(AbstractDriver):
         self._cursor.execute_sync(
             f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {self._config['isolation_level']}"
         )
-        self._measure_file = open("aurora_timing.csv", "w", encoding="UTF-8")
+        measure_file_path = cond.in_output_dir("aurora_timing.csv")
+        self._measure_file = open(measure_file_path, "w", encoding="UTF-8")
         print(
-            "init,begin,getitems,getwdc,getorder,insertorder,commit,collect",
+            "init,begin,getitems,getwdc,getorder,insertorder,commit,collect,total",
             file=self._measure_file,
         )
         return None
@@ -392,8 +394,9 @@ class AuroraTimingDriver(AbstractDriver):
                 insertorder_time = no_insert_order_line - no_ins_order_info
                 commit_time = no_commit - no_insert_order_line
                 collect_time = no_collect - no_commit
+                total_time = no_collect - no_start
                 print(
-                    f"{init_time},{begin_time},{getitems_time},{getwdc_time},{getorder_time},{insertorder_time},{commit_time},{collect_time}",
+                    f"{init_time},{begin_time},{getitems_time},{getwdc_time},{getorder_time},{insertorder_time},{commit_time},{collect_time},{total_time}",
                     file=self._measure_file,
                 )
 
