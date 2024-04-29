@@ -24,3 +24,15 @@ run_command(
     "run-for-s": 180,
   },
 )
+
+run_experiment(
+  name="aurora_timing",
+  run="./run_aurora_timing.sh",
+  options={
+    "txn-config-file": "aurora.config",
+    "txn-warehouses": 1740,
+    "txn-scale-factor": 1,  # TBD
+    "t-clients": 1,  # TBD
+    "run-for-s": 30,
+  },
+)
