@@ -15,6 +15,7 @@
 #include "libcuckoo/cuckoohash_map.hh"
 
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace brad {
 
