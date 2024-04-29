@@ -43,6 +43,7 @@ from pprint import pprint, pformat
 from .util import *
 from .runtime import *
 from .drivers.auroradriver import AuroraDriver
+from .drivers.auroratimingdriver import AuroraTimingDriver
 from .drivers.braddriver import BradDriver
 
 logging.basicConfig(
@@ -61,6 +62,8 @@ def createDriverClass(name):
         return BradDriver
     elif name == "aurora":
         return AuroraDriver
+    elif name == "auroratiming":
+        return AuroraTimingDriver
     else:
         raise NotImplementedError
 
