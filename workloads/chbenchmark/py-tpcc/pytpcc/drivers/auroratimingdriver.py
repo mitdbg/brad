@@ -93,6 +93,12 @@ class AuroraTimingDriver(AbstractDriver):
         self._ol_stats_file = None
         self._ins_ol_counter = 0
 
+        if "LOG_QUERIES" in os.environ:
+            query_log_file_path = cond.in_output_dir("queries.log")
+            self._query_log_file = open(query_log_file_path, "w", encoding="UTF-8")
+        else:
+            self._query_log_file = None
+
     def makeDefaultConfig(self) -> Config:
         return AuroraTimingDriver.DEFAULT_CONFIG
 
@@ -148,6 +154,10 @@ class AuroraTimingDriver(AbstractDriver):
         if self._ol_stats_file is not None:
             self._ol_stats_file.close()
             self._ol_stats_file = None
+
+        if self._query_log_file is not None:
+            self._query_log_file.close()
+            self._query_log_file = None
 
     def doDelivery(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
         try:
@@ -258,23 +268,31 @@ class AuroraTimingDriver(AbstractDriver):
             ## Collect Information from WAREHOUSE, DISTRICT, and CUSTOMER
             ## ----------------
             wdc_start = time.time()
-            self._cursor.execute_sync(q["getWarehouseTaxRate"].format(w_id))
+            get_warehouse = q["getWarehouseTaxRate"].format(w_id)
+            self._cursor.execute_sync(get_warehouse)
             r = self._cursor.fetchone_sync()
             w_tax = r[0]
             wdc_warehouse_tax_rate = time.time()
 
-            self._cursor.execute_sync(q["getDistrict"].format(d_id, w_id))
+            get_district = q["getDistrict"].format(d_id, w_id)
+            self._cursor.execute_sync(get_district)
             r = self._cursor.fetchone_sync()
             district_info = r
             d_tax = district_info[0]
             d_next_o_id = district_info[1]
             wdc_district = time.time()
 
-            self._cursor.execute_sync(q["getCustomer"].format(w_id, d_id, c_id))
+            get_customer = q["getCustomer"].format(w_id, d_id, c_id)
+            self._cursor.execute_sync(get_customer)
             r = self._cursor.fetchone_sync()
             customer_info = r
             c_discount = customer_info[0]
             no_get_wdc_info = time.time()
+
+            if self._query_log_file is not None:
+                print(get_warehouse, file=self._query_log_file)
+                print(get_district, file=self._query_log_file)
+                print(get_customer, file=self._query_log_file)
 
             ## ----------------
             ## Insert Order Information
@@ -320,9 +338,8 @@ class AuroraTimingDriver(AbstractDriver):
                 i_price = decimal.Decimal(itemInfo[0])
                 io_init = time.time()
 
-                self._cursor.execute_sync(
-                    q["getStockInfo"].format(d_id, ol_i_id, ol_supply_w_id)
-                )
+                get_stock_info = q["getStockInfo"].format(d_id, ol_i_id, ol_supply_w_id)
+                self._cursor.execute_sync(get_stock_info)
                 r = self._cursor.fetchone_sync()
                 io_fetch_stock = time.time()
                 if r is None:
@@ -352,16 +369,15 @@ class AuroraTimingDriver(AbstractDriver):
                     s_remote_cnt += 1
                 io_stock_prep = time.time()
 
-                self._cursor.execute_sync(
-                    q["updateStock"].format(
-                        s_quantity,
-                        s_ytd.quantize(decimal.Decimal("1.00")),
-                        s_order_cnt,
-                        s_remote_cnt,
-                        ol_i_id,
-                        ol_supply_w_id,
-                    ),
+                update_stock = q["updateStock"].format(
+                    s_quantity,
+                    s_ytd.quantize(decimal.Decimal("1.00")),
+                    s_order_cnt,
+                    s_remote_cnt,
+                    ol_i_id,
+                    ol_supply_w_id,
                 )
+                self._cursor.execute_sync(update_stock)
                 io_update_stock = time.time()
 
                 if (
@@ -410,6 +426,12 @@ class AuroraTimingDriver(AbstractDriver):
                         io_ol_append - io_start,
                     )
                 )
+
+                if self._query_log_file is not None:
+                    print(get_stock_info, file=self._query_log_file)
+                    print(update_stock, file=self._query_log_file)
+                    print(createOrderLine, file=self._query_log_file)
+
             ## FOR
             no_insert_order_line = time.time()
 
