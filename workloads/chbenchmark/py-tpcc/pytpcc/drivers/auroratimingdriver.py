@@ -241,8 +241,8 @@ class AuroraTimingDriver(AbstractDriver):
                 ## Determine if this is an all local order or not
                 all_local = all_local and i_w_ids[i] == w_id
                 self._cursor.execute_sync(q["getItemInfo"].format(i_ids[i]))
-                r = self._cursor.fetchall_sync()
-                items.append(r[0])
+                r = self._cursor.fetchone_sync()
+                items.append(r)
             assert len(items) == len(i_ids)
             no_getitems = time.time()
 
@@ -259,20 +259,20 @@ class AuroraTimingDriver(AbstractDriver):
             ## ----------------
             wdc_start = time.time()
             self._cursor.execute_sync(q["getWarehouseTaxRate"].format(w_id))
-            r = self._cursor.fetchall_sync()
-            w_tax = r[0][0]
+            r = self._cursor.fetchone_sync()
+            w_tax = r[0]
             wdc_warehouse_tax_rate = time.time()
 
             self._cursor.execute_sync(q["getDistrict"].format(d_id, w_id))
-            r = self._cursor.fetchall_sync()
-            district_info = r[0]
+            r = self._cursor.fetchone_sync()
+            district_info = r
             d_tax = district_info[0]
             d_next_o_id = district_info[1]
             wdc_district = time.time()
 
             self._cursor.execute_sync(q["getCustomer"].format(w_id, d_id, c_id))
-            r = self._cursor.fetchall_sync()
-            customer_info = r[0]
+            r = self._cursor.fetchone_sync()
+            customer_info = r
             c_discount = customer_info[0]
             no_get_wdc_info = time.time()
 
@@ -323,16 +323,16 @@ class AuroraTimingDriver(AbstractDriver):
                 self._cursor.execute_sync(
                     q["getStockInfo"].format(d_id, ol_i_id, ol_supply_w_id)
                 )
-                r = self._cursor.fetchall_sync()
+                r = self._cursor.fetchone_sync()
                 io_fetch_stock = time.time()
-                if len(r) == 0:
+                if r is None:
                     logger.warning(
                         "No STOCK record for (ol_i_id=%d, ol_supply_w_id=%d)",
                         ol_i_id,
                         ol_supply_w_id,
                     )
                     continue
-                stockInfo = r[0]
+                stockInfo = r
                 s_quantity = stockInfo[0]
                 s_ytd = decimal.Decimal(stockInfo[2])
                 s_order_cnt = int(stockInfo[3])
