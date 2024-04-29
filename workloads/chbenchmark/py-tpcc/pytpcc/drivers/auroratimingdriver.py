@@ -89,6 +89,9 @@ class AuroraTimingDriver(AbstractDriver):
         self._config: Dict[str, Any] = {}
         self._nonsilent_errs = constants.NONSILENT_ERRORS_VAR in os.environ
         self._measure_file = None
+        self._wdc_stats_file = None
+        self._ol_stats_file = None
+        self._ins_ol_counter = 0
 
     def makeDefaultConfig(self) -> Config:
         return AuroraTimingDriver.DEFAULT_CONFIG
@@ -121,12 +124,30 @@ class AuroraTimingDriver(AbstractDriver):
             "init,begin,getitems,getwdc,getorder,insertorder,commit,collect,total",
             file=self._measure_file,
         )
-        return None
+
+        stats_file = cond.in_output_dir("wdc_stats.csv")
+        self._wdc_stats_file = open(stats_file, "w", encoding="UTF-8")
+        print("tax_rate,district,customer,total", file=self._wdc_stats_file)
+
+        stats_file2 = cond.in_output_dir("item_stats.csv")
+        self._ol_stats_file = open(stats_file2, "w", encoding="UTF-8")
+        print(
+            "txn_counter,init,fetch_stock,stock_prep,update_stock,ol_prep,ol_insert,ol_append,total",
+            file=self._ol_stats_file,
+        )
 
     def __del__(self):
         if self._measure_file is not None:
             self._measure_file.close()
             self._measure_file = None
+
+        if self._wdc_stats_file is not None:
+            self._wdc_stats_file.close()
+            self._wdc_stats_file = None
+
+        if self._ol_stats_file is not None:
+            self._ol_stats_file.close()
+            self._ol_stats_file = None
 
     def doDelivery(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
         try:
@@ -236,15 +257,18 @@ class AuroraTimingDriver(AbstractDriver):
             ## ----------------
             ## Collect Information from WAREHOUSE, DISTRICT, and CUSTOMER
             ## ----------------
+            wdc_start = time.time()
             self._cursor.execute_sync(q["getWarehouseTaxRate"].format(w_id))
             r = self._cursor.fetchall_sync()
             w_tax = r[0][0]
+            wdc_warehouse_tax_rate = time.time()
 
             self._cursor.execute_sync(q["getDistrict"].format(d_id, w_id))
             r = self._cursor.fetchall_sync()
             district_info = r[0]
             d_tax = district_info[0]
             d_next_o_id = district_info[1]
+            wdc_district = time.time()
 
             self._cursor.execute_sync(q["getCustomer"].format(w_id, d_id, c_id))
             r = self._cursor.fetchall_sync()
@@ -282,7 +306,9 @@ class AuroraTimingDriver(AbstractDriver):
             ## ----------------
             item_data = []
             total = 0
+            insert_metadata = []
             for i in range(len(i_ids)):
+                io_start = time.time()
                 ol_number = i + 1
                 ol_supply_w_id = i_w_ids[i]
                 ol_i_id = i_ids[i]
@@ -292,11 +318,13 @@ class AuroraTimingDriver(AbstractDriver):
                 i_name = itemInfo[1]
                 i_data = itemInfo[2]
                 i_price = decimal.Decimal(itemInfo[0])
+                io_init = time.time()
 
                 self._cursor.execute_sync(
                     q["getStockInfo"].format(d_id, ol_i_id, ol_supply_w_id)
                 )
                 r = self._cursor.fetchall_sync()
+                io_fetch_stock = time.time()
                 if len(r) == 0:
                     logger.warning(
                         "No STOCK record for (ol_i_id=%d, ol_supply_w_id=%d)",
@@ -322,6 +350,7 @@ class AuroraTimingDriver(AbstractDriver):
 
                 if ol_supply_w_id != w_id:
                     s_remote_cnt += 1
+                io_stock_prep = time.time()
 
                 self._cursor.execute_sync(
                     q["updateStock"].format(
@@ -333,6 +362,7 @@ class AuroraTimingDriver(AbstractDriver):
                         ol_supply_w_id,
                     ),
                 )
+                io_update_stock = time.time()
 
                 if (
                     i_data.find(constants.ORIGINAL_STRING) != -1
@@ -345,6 +375,7 @@ class AuroraTimingDriver(AbstractDriver):
                 ## Transaction profile states to use "ol_quantity * i_price"
                 ol_amount = ol_quantity * i_price
                 total += ol_amount
+                io_ol_prep = time.time()
 
                 createOrderLine = q["createOrderLine"].format(
                     d_next_o_id,
@@ -359,10 +390,25 @@ class AuroraTimingDriver(AbstractDriver):
                     s_dist_xx,
                 )
                 self._cursor.execute_sync(createOrderLine)
+                io_ol_insert = time.time()
 
                 ## Add the info to be returned
                 item_data.append(
                     (i_name, s_quantity, brand_generic, i_price, ol_amount)
+                )
+                io_ol_append = time.time()
+
+                insert_metadata.append(
+                    (
+                        io_init - io_start,
+                        io_fetch_stock - io_init,
+                        io_stock_prep - io_fetch_stock,
+                        io_update_stock - io_stock_prep,
+                        io_ol_prep - io_update_stock,
+                        io_ol_insert - io_ol_prep,
+                        io_ol_append - io_ol_insert,
+                        io_ol_append - io_start,
+                    )
                 )
             ## FOR
             no_insert_order_line = time.time()
@@ -399,6 +445,24 @@ class AuroraTimingDriver(AbstractDriver):
                     f"{init_time},{begin_time},{getitems_time},{getwdc_time},{getorder_time},{insertorder_time},{commit_time},{collect_time},{total_time}",
                     file=self._measure_file,
                 )
+
+            if self._wdc_stats_file is not None:
+                tax_rate_time = wdc_warehouse_tax_rate - wdc_start
+                district_time = wdc_district - wdc_warehouse_tax_rate
+                customer_time = no_get_wdc_info - wdc_district
+                total_time = no_get_wdc_info - wdc_start
+                print(
+                    f"{tax_rate_time},{district_time},{customer_time},{total_time}",
+                    file=self._wdc_stats_file,
+                )
+
+            if self._ol_stats_file is not None:
+                for im in insert_metadata:
+                    print(
+                        "{},{},{},{},{},{},{},{},{}".format(self._ins_ol_counter, *im),
+                        file=self._ol_stats_file,
+                    )
+                self._ins_ol_counter += 1
 
             return [customer_info, misc, item_data]
 
