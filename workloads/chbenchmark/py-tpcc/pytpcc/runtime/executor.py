@@ -37,6 +37,7 @@ import traceback
 import logging
 import os
 import pathlib
+import numpy as np
 from datetime import datetime
 from pprint import pprint, pformat
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
@@ -46,6 +47,7 @@ from .. import constants
 from ..util import *
 
 RECORD_DETAILED_STATS_VAR = "RECORD_DETAILED_STATS"
+SKEW_ALPHA_VAR = "SKEW_ALPHA"
 
 
 class Executor:
@@ -61,6 +63,12 @@ class Executor:
         )
         self.total_workers = 1
         self.worker_index = 0
+
+        if SKEW_ALPHA_VAR in os.environ:
+            self.skew_alpha = float(os.environ[SKEW_ALPHA_VAR])
+        else:
+            self.skew_alpha = None
+        self.skew_prng = None
 
     ## DEF
 
@@ -114,6 +122,9 @@ class Executor:
             self.worker_index,
             *self.local_warehouse_range
         )
+
+        if self.skew_alpha is not None:
+            self.skew_prng = np.random.default_rng(seed=42 ^ worker_index)
 
         r = results.Results(options)
         assert r
@@ -391,7 +402,14 @@ class Executor:
     ## DEF
 
     def makeItemId(self):
-        return rand.NURand(8191, 1, self.scaleParameters.items)
+        if self.skew_alpha is None:
+            return rand.NURand(8191, 1, self.scaleParameters.items)
+        else:
+            # Select item ID using a zipfian distribution.
+            while True:
+                candidate = self.skew_prng.zipf(a=self.skew_alpha) - 1
+                if candidate < self.scaleParameters.items:
+                    return candidate
 
     ## DEF
 
