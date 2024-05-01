@@ -1,3 +1,6 @@
+ZIPFIAN_ALPHA = 5.0
+
+
 run_command(
   name="txn_lat",
   run="./run_tpcc.sh",
@@ -14,6 +17,22 @@ run_command(
 )
 
 run_command(
+  name="txn_lat_zipf",
+  run="./run_tpcc.sh",
+  options={
+    "physical-config-file": "../../../config/physical_config_chbench.yml",
+    "system-config-file": "debug_config.yml",  # Relative to one level up.
+    "txn-config-file": "brad.config",
+    "schema-name": "chbenchmark",
+    "txn-warehouses": 1740,
+    "txn-scale-factor": 1,  # TBD
+    "t-clients": 1,  # TBD
+    "run-for-s": 180,
+    "txn-zipfian-alpha": ZIPFIAN_ALPHA,
+  },
+)
+
+run_command(
   name="aurora_direct",
   run="./run_aurora_direct.sh",
   options={
@@ -22,6 +41,19 @@ run_command(
     "txn-scale-factor": 1,  # TBD
     "t-clients": 1,  # TBD
     "run-for-s": 180,
+  },
+)
+
+run_command(
+  name="aurora_direct_zipf",
+  run="./run_aurora_direct.sh",
+  options={
+    "txn-config-file": "aurora.config",
+    "txn-warehouses": 1740,
+    "txn-scale-factor": 1,  # TBD
+    "t-clients": 1,  # TBD
+    "run-for-s": 180,
+    "txn-zipfian-alpha": ZIPFIAN_ALPHA,
   },
 )
 
@@ -34,5 +66,18 @@ run_experiment(
     "txn-scale-factor": 1,  # TBD
     "t-clients": 1,  # TBD
     "run-for-s": 30,
+  },
+)
+
+run_experiment(
+  name="aurora_timing_zipf",
+  run="./run_aurora_timing.sh",
+  options={
+    "txn-config-file": "aurora.config",
+    "txn-warehouses": 1740,
+    "txn-scale-factor": 1,  # TBD
+    "t-clients": 1,  # TBD
+    "run-for-s": 30,
+    "txn-zipfian-alpha": ZIPFIAN_ALPHA,
   },
 )

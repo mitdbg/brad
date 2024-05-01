@@ -14,13 +14,18 @@ function start_brad() {
 
 function run_tpcc() {
   pushd ../../../workloads/chbenchmark/py-tpcc/
-  RECORD_DETAILED_STATS=1 python3 -m pytpcc.tpcc brad \
-    --no-load \
-    --config $abs_txn_config_file \
-    --warehouses $txn_warehouses \
-    --duration $run_for_s \
-    --clients $t_clients \
-    --scalefactor $txn_scale_factor &
+  local args=(
+    --no-load
+    --config $abs_txn_config_file
+    --warehouses $txn_warehouses
+    --duration $run_for_s
+    --clients $t_clients
+    --scalefactor $txn_scale_factor
+  )
+  if [[ ! -z $txn_zipfian_alpha ]]; then
+    args+=(--zipfian-alpha $txn_zipfian_alpha)
+  fi
+  RECORD_DETAILED_STATS=1 python3 -m pytpcc.tpcc brad "${args[@]}" &
   tpcc_pid=$!
   popd
 }
@@ -90,6 +95,10 @@ function extract_named_arguments() {
 
     if [[ $phys_arg =~ --txn-config-file=.+ ]]; then
       txn_config_file=${phys_arg:18}
+    fi
+
+    if [[ $phys_arg =~ --txn-zipfian-alpha=.+ ]]; then
+      txn_zipfian_alpha=${phys_arg:20}
     fi
   done
 }
