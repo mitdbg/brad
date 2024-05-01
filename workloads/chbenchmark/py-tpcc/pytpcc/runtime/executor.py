@@ -407,8 +407,8 @@ class Executor:
         else:
             # Select item ID using a zipfian distribution.
             while True:
-                candidate = self.skew_prng.zipf(a=self.skew_alpha) - 1
-                if candidate < self.scaleParameters.items:
+                candidate = self.skew_prng.zipf(a=self.skew_alpha)
+                if candidate <= self.scaleParameters.items:
                     return candidate
 
     ## DEF

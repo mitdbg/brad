@@ -85,7 +85,7 @@ class AuroraTimingDriver(AbstractDriver):
     }
 
     def __init__(self, ddl: str) -> None:
-        super().__init__("brad", ddl)
+        super().__init__("aurora timing", ddl)
         self._connection: Optional[PsycopgConnection] = None
         self._cursor: Optional[PsycopgCursor] = None
         self._config: Dict[str, Any] = {}
@@ -531,7 +531,7 @@ class AuroraTimingDriver(AbstractDriver):
             ## TPCC defines 1% of neworder gives a wrong itemid, causing rollback.
             ## Note that this will happen with 1% of transactions on purpose.
             for item in items:
-                if len(item) == 0:
+                if item is None or len(item) == 0:
                     self._cursor.execute_sync("ROLLBACK")
                     return
             ## FOR
