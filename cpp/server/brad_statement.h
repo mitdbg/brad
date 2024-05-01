@@ -26,9 +26,11 @@ class BradStatement {
     const std::string& sql);
 
   static arrow::Result<std::shared_ptr<BradStatement>> Create(
-    const std::vector<std::vector<std::any>>);
+    std::shared_ptr<arrow::RecordBatch> result_record_batch,
+    std::shared_ptr<arrow::Schema> schema);
 
-  BradStatement(std::vector<std::vector<std::any>>);
+  BradStatement(std::shared_ptr<arrow::RecordBatch>,
+                std::shared_ptr<arrow::Schema>);
 
   ~BradStatement();
 
@@ -41,7 +43,7 @@ class BradStatement {
   std::string* GetBradStmt() const;
 
  private:
-  std::vector<std::vector<std::any>> query_result_;
+  std::shared_ptr<arrow::RecordBatch> result_record_batch_;
 
   mutable std::shared_ptr<arrow::Schema> schema_;
 

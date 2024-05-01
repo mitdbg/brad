@@ -7,6 +7,7 @@
 #include <utility>
 #include <stdexcept>
 
+#include <arrow/api.h>
 #include <arrow/array/builder_binary.h>
 #include "brad_sql_info.h"
 #include "brad_statement.h"
@@ -50,23 +51,108 @@ arrow::Result<std::pair<std::string, std::string>> DecodeTransactionQuery(
   return std::make_pair(std::move(autoincrement_id), std::move(transaction_id));
 }
 
-std::vector<std::vector<std::any>> TransformQueryResult(
-  std::vector<py::tuple> query_result) {
-  std::vector<std::vector<std::any>> transformed_query_result;
-  for (const auto &row : query_result) {
-    std::vector<std::any> transformed_row{};
-    for (const auto &field : row) {
-      if (py::isinstance<py::int_>(field)) {
-        transformed_row.push_back(std::make_any<int>(py::cast<int>(field)));
-      } else if (py::isinstance<py::float_>(field)) {
-        transformed_row.push_back(std::make_any<float>(py::cast<float>(field)));
-      } else {
-        transformed_row.push_back(std::make_any<std::string>(py::cast<std::string>(field)));
+arrow::Result<std::shared_ptr<arrow::RecordBatch>> ResultToRecordBatch(
+  const std::vector<py::tuple> &query_result,
+  const std::shared_ptr<arrow::Schema> &schema) {
+  const size_t num_rows = query_result.size();
+
+  const size_t num_columns = schema->num_fields();
+  std::vector<std::shared_ptr<arrow::Array>> columns;
+  columns.reserve(num_columns);
+
+  for (int field_ix = 0; field_ix < num_columns; ++field_ix) {
+    const auto &field_type = schema->field(field_ix)->type();
+    if (field_type->Equals(arrow::int64())) {
+      arrow::Int64Builder int64builder;
+      for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
+        const std::optional<int64_t> val =
+          py::cast<std::optional<int64_t>>(query_result[row_ix][field_ix]);
+        if (val) {
+          ARROW_RETURN_NOT_OK(int64builder.Append(*val));
+        } else {
+          ARROW_RETURN_NOT_OK(int64builder.AppendNull());
+        }
       }
+      std::shared_ptr<arrow::Array> values;
+      ARROW_ASSIGN_OR_RAISE(values, int64builder.Finish());
+      columns.push_back(values);
+
+    } else if (field_type->Equals(arrow::float32())) {
+      arrow::FloatBuilder floatbuilder;
+      for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
+        const std::optional<float> val =
+          py::cast<std::optional<float>>(query_result[row_ix][field_ix]);
+        if (val) {
+          ARROW_RETURN_NOT_OK(floatbuilder.Append(*val));
+        } else {
+          ARROW_RETURN_NOT_OK(floatbuilder.AppendNull());
+        }
+      }
+      std::shared_ptr<arrow::Array> values;
+      ARROW_ASSIGN_OR_RAISE(values, floatbuilder.Finish());
+      columns.push_back(values);
+
+    } else if (field_type->Equals(arrow::decimal(/*precision=*/10, /*scale=*/2))) {
+      arrow::Decimal128Builder decimalbuilder(arrow::decimal(/*precision=*/10, /*scale=*/2));
+      for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
+        const std::optional<std::string> val =
+          py::cast<std::optional<std::string>>(query_result[row_ix][field_ix]);
+        if (val) {
+          ARROW_RETURN_NOT_OK(
+            decimalbuilder.Append(arrow::Decimal128::FromString(*val).ValueOrDie()));
+        } else {
+          ARROW_RETURN_NOT_OK(decimalbuilder.AppendNull());
+        }
+      }
+      std::shared_ptr<arrow::Array> values;
+      ARROW_ASSIGN_OR_RAISE(values, decimalbuilder.Finish());
+      columns.push_back(values);  
+
+    } else if (field_type->Equals(arrow::utf8())) {
+      arrow::StringBuilder stringbuilder;
+      for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
+        const std::optional<std::string> str =
+          py::cast<std::optional<std::string>>(query_result[row_ix][field_ix]);
+        if (str) {
+          ARROW_RETURN_NOT_OK(stringbuilder.Append(str->data(), str->size()));
+        } else {
+          ARROW_RETURN_NOT_OK(stringbuilder.AppendNull());
+        }
+      }
+      std::shared_ptr<arrow::Array> values;
+      ARROW_ASSIGN_OR_RAISE(values, stringbuilder.Finish());
+      columns.push_back(values);
+
+    } else if (field_type->Equals(arrow::date64())) {
+      arrow::Date64Builder datebuilder;
+      for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
+        const std::optional<int64_t> val =
+          py::cast<std::optional<int64_t>>(query_result[row_ix][field_ix]);
+        if (val) {
+          ARROW_RETURN_NOT_OK(datebuilder.Append(*val));
+        } else {
+          ARROW_RETURN_NOT_OK(datebuilder.AppendNull());
+        }
+      }
+      std::shared_ptr<arrow::Array> values;
+      ARROW_ASSIGN_OR_RAISE(values, datebuilder.Finish());
+      columns.push_back(values); 
+
+    } else if (field_type->Equals(arrow::null())) {
+      arrow::NullBuilder nullbuilder;
+      for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
+        ARROW_RETURN_NOT_OK(nullbuilder.AppendNull());
+      }
+      std::shared_ptr<arrow::Array> values;
+      ARROW_ASSIGN_OR_RAISE(values, nullbuilder.Finish());
+      columns.push_back(values);
     }
-    transformed_query_result.push_back(transformed_row);
   }
-  return transformed_query_result;  
+
+  std::shared_ptr<arrow::RecordBatch> result_record_batch =
+    arrow::RecordBatch::Make(schema, num_rows, columns);
+
+  return result_record_batch;
 }
 
 BradFlightSqlServer::BradFlightSqlServer() : autoincrement_id_(0ULL) {}
@@ -125,25 +211,23 @@ arrow::Result<std::unique_ptr<FlightInfo>>
                         EncodeTransactionQuery(query_ticket));
 
   std::shared_ptr<arrow::Schema> result_schema;
-  std::vector<std::vector<std::any>> transformed_query_result;
+  std::shared_ptr<arrow::RecordBatch> result_record_batch;
 
   { 
     py::gil_scoped_acquire guard;
     auto result = handle_query_(query);
     result_schema = ArrowSchemaFromBradSchema(result.second);
-    transformed_query_result = TransformQueryResult(result.first);
+    result_record_batch = ResultToRecordBatch(result.first, result_schema).ValueOrDie();
   }
 
-  ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(transformed_query_result));
+  ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(std::move(result_record_batch), result_schema));
   query_data_.insert(query_ticket, statement);
-
-  ARROW_ASSIGN_OR_RAISE(auto schema, statement->GetSchema());
 
   std::vector<FlightEndpoint> endpoints{
     FlightEndpoint{std::move(ticket), {}, std::nullopt, ""}};
 
   const bool ordered = false;
-  ARROW_ASSIGN_OR_RAISE(auto result, FlightInfo::Make(*schema,
+  ARROW_ASSIGN_OR_RAISE(auto result, FlightInfo::Make(*result_schema,
                                                       descriptor,
                                                       endpoints,
                                                       -1,
