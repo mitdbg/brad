@@ -129,7 +129,7 @@ class AuroraTimingDriver(AbstractDriver):
         measure_file_path = cond.in_output_dir("aurora_timing.csv")
         self._measure_file = open(measure_file_path, "w", encoding="UTF-8")
         print(
-            "init,begin,getitems,getwdc,getorder,insertorder,commit,collect,total",
+            "init,begin,getitems,getwdc,getorder,insertorder,commit,collect,multi_insert_time,total",
             file=self._measure_file,
         )
 
@@ -704,11 +704,13 @@ class AuroraTimingDriver(AbstractDriver):
                     print(get_stock_info, file=self._query_log_file)
                     print(update_stock, file=self._query_log_file)
 
+            no_mv_insert_pre = time.time()
             ## FOR
             insert_order_line_query = q["createOrderLineMultivalue"] + ", ".join(
                 insert_value_strs
             )
             self._cursor.execute_sync(insert_order_line_query)
+            no_mv_insert_after = time.time()
             if self._query_log_file is not None:
                 print(insert_order_line_query, file=self._query_log_file)
             no_insert_order_line = time.time()
@@ -741,8 +743,9 @@ class AuroraTimingDriver(AbstractDriver):
                 commit_time = no_commit - no_insert_order_line
                 collect_time = no_collect - no_commit
                 total_time = no_collect - no_start
+                multi_insert_time = no_mv_insert_after - no_mv_insert_pre
                 print(
-                    f"{init_time},{begin_time},{getitems_time},{getwdc_time},{getorder_time},{insertorder_time},{commit_time},{collect_time},{total_time}",
+                    f"{init_time},{begin_time},{getitems_time},{getwdc_time},{getorder_time},{insertorder_time},{commit_time},{collect_time},{multi_insert_time},{total_time}",
                     file=self._measure_file,
                 )
 
