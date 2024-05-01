@@ -36,6 +36,8 @@ TXN_QUERIES = {
         "getStockInfo": "SELECT s_quantity, s_data, s_ytd, s_order_cnt, s_remote_cnt, s_dist_{:02d} FROM stock WHERE s_i_id = {} AND s_w_id = {}",  # d_id, ol_i_id, ol_supply_w_id
         "updateStock": "UPDATE stock SET s_quantity = {}, s_ytd = {}, s_order_cnt = {}, s_remote_cnt = {} WHERE s_i_id = {} AND s_w_id = {}",  # s_quantity, s_order_cnt, s_remote_cnt, ol_i_id, ol_supply_w_id
         "createOrderLine": "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES ({}, {}, {}, {}, {}, {}, '{}', {}, {}, '{}')",  # o_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info
+        "createOrderLineMultivalue": "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES ",
+        "createOrderLineValues": "({}, {}, {}, {}, {}, {}, '{}', {}, {}, '{}')",
     },
     "ORDER_STATUS": {
         "getCustomerByCustomerId": "SELECT c_id, c_first, c_middle, c_last, c_balance FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # w_id, d_id, c_id
@@ -81,7 +83,7 @@ class AuroraDriver(AbstractDriver):
     }
 
     def __init__(self, ddl: str) -> None:
-        super().__init__("brad", ddl)
+        super().__init__("aurora", ddl)
         self._connection: Optional[PsycopgConnection] = None
         self._cursor: Optional[PsycopgCursor] = None
         self._config: Dict[str, Any] = {}
@@ -127,19 +129,19 @@ class AuroraDriver(AbstractDriver):
             self._cursor.execute_sync("BEGIN")
             for d_id in range(1, constants.DISTRICTS_PER_WAREHOUSE + 1):
                 self._cursor.execute_sync(q["getNewOrder"].format(d_id, w_id))
-                r = self._cursor.fetchall_sync()
-                if len(r) == 0:
+                r = self._cursor.fetchone_sync()
+                if r is None:
                     ## No orders for this district: skip it. Note: This must be reported if > 1%
                     continue
-                no_o_id = r[0][0]
+                no_o_id = r[0]
 
                 self._cursor.execute_sync(q["getCId"].format(no_o_id, d_id, w_id))
-                r = self._cursor.fetchall_sync()
-                c_id = r[0][0]
+                r = self._cursor.fetchone_sync()
+                c_id = r[0]
 
                 self._cursor.execute_sync(q["sumOLAmount"].format(no_o_id, d_id, w_id))
-                r = self._cursor.fetchall_sync()
-                ol_total = decimal.Decimal(r[0][0])
+                r = self._cursor.fetchone_sync()
+                ol_total = decimal.Decimal(r[0])
 
                 self._cursor.execute_sync(
                     q["deleteNewOrder"].format(d_id, w_id, no_o_id)
@@ -203,8 +205,8 @@ class AuroraDriver(AbstractDriver):
                 ## Determine if this is an all local order or not
                 all_local = all_local and i_w_ids[i] == w_id
                 self._cursor.execute_sync(q["getItemInfo"].format(i_ids[i]))
-                r = self._cursor.fetchall_sync()
-                items.append(r[0])
+                r = self._cursor.fetchone_sync()
+                items.append(r)
             assert len(items) == len(i_ids)
 
             ## TPCC defines 1% of neworder gives a wrong itemid, causing rollback.
@@ -219,18 +221,18 @@ class AuroraDriver(AbstractDriver):
             ## Collect Information from WAREHOUSE, DISTRICT, and CUSTOMER
             ## ----------------
             self._cursor.execute_sync(q["getWarehouseTaxRate"].format(w_id))
-            r = self._cursor.fetchall_sync()
-            w_tax = r[0][0]
+            r = self._cursor.fetchone_sync()
+            w_tax = r[0]
 
             self._cursor.execute_sync(q["getDistrict"].format(d_id, w_id))
-            r = self._cursor.fetchall_sync()
-            district_info = r[0]
+            r = self._cursor.fetchone_sync()
+            district_info = r
             d_tax = district_info[0]
             d_next_o_id = district_info[1]
 
             self._cursor.execute_sync(q["getCustomer"].format(w_id, d_id, c_id))
-            r = self._cursor.fetchall_sync()
-            customer_info = r[0]
+            r = self._cursor.fetchone_sync()
+            customer_info = r
             c_discount = customer_info[0]
 
             ## ----------------
@@ -261,6 +263,7 @@ class AuroraDriver(AbstractDriver):
             ## Insert Order Item Information
             ## ----------------
             item_data = []
+            insert_value_strings = []
             total = 0
             for i in range(len(i_ids)):
                 ol_number = i + 1
@@ -276,15 +279,15 @@ class AuroraDriver(AbstractDriver):
                 self._cursor.execute_sync(
                     q["getStockInfo"].format(d_id, ol_i_id, ol_supply_w_id)
                 )
-                r = self._cursor.fetchall_sync()
-                if len(r) == 0:
+                r = self._cursor.fetchone_sync()
+                if r is None:
                     logger.warning(
                         "No STOCK record for (ol_i_id=%d, ol_supply_w_id=%d)",
                         ol_i_id,
                         ol_supply_w_id,
                     )
                     continue
-                stockInfo = r[0]
+                stockInfo = r
                 s_quantity = stockInfo[0]
                 s_ytd = decimal.Decimal(stockInfo[2])
                 s_order_cnt = int(stockInfo[3])
@@ -326,7 +329,7 @@ class AuroraDriver(AbstractDriver):
                 ol_amount = ol_quantity * i_price
                 total += ol_amount
 
-                createOrderLine = q["createOrderLine"].format(
+                createOrderLineValues = q["createOrderLineValues"].format(
                     d_next_o_id,
                     d_id,
                     w_id,
@@ -338,13 +341,19 @@ class AuroraDriver(AbstractDriver):
                     ol_amount,
                     s_dist_xx,
                 )
-                self._cursor.execute_sync(createOrderLine)
+                insert_value_strings.append(createOrderLineValues)
 
                 ## Add the info to be returned
                 item_data.append(
                     (i_name, s_quantity, brand_generic, i_price, ol_amount)
                 )
             ## FOR
+
+            # Do one multivalue insert.
+            insertOrderLines = q["createOrderLineMultivalue"] + ", ".join(
+                insert_value_strings
+            )
+            self._cursor.execute_sync(insertOrderLines)
 
             ## Commit!
             self._cursor.execute_sync("COMMIT")
@@ -385,8 +394,8 @@ class AuroraDriver(AbstractDriver):
                 self._cursor.execute_sync(
                     q["getCustomerByCustomerId"].format(w_id, d_id, c_id)
                 )
-                r = self._cursor.fetchall_sync()
-                customer = r[0]
+                r = self._cursor.fetchone_sync()
+                customer = r
             else:
                 # Get the midpoint customer's id
                 self._cursor.execute_sync(
@@ -404,13 +413,13 @@ class AuroraDriver(AbstractDriver):
 
             getLastOrder = q["getLastOrder"].format(w_id, d_id, c_id)
             self._cursor.execute_sync(getLastOrder)
-            r = self._cursor.fetchall_sync()
-            order = r[0]
+            r = self._cursor.fetchone_sync()
+            order = r
             if order:
                 self._cursor.execute_sync(
                     q["getOrderLines"].format(w_id, d_id, order[0])
                 )
-                r = self._cursor.fetchall_sync()
+                r = self._cursor.fetchone_sync()
                 orderLines = r
             else:
                 orderLines = []
@@ -443,8 +452,8 @@ class AuroraDriver(AbstractDriver):
                 self._cursor.execute_sync(
                     q["getCustomerByCustomerId"].format(w_id, d_id, c_id)
                 )
-                r = self._cursor.fetchall_sync()
-                customer = r[0]
+                r = self._cursor.fetchone_sync()
+                customer = r
             else:
                 # Get the midpoint customer's id
                 self._cursor.execute_sync(
@@ -464,12 +473,12 @@ class AuroraDriver(AbstractDriver):
             c_data = customer[17]
 
             self._cursor.execute_sync(q["getWarehouse"].format(w_id))
-            r = self._cursor.fetchall_sync()
-            warehouse = r[0]
+            r = self._cursor.fetchone_sync()
+            warehouse = r
 
             self._cursor.execute_sync(q["getDistrict"].format(w_id, d_id))
-            r = self._cursor.fetchall_sync()
-            district = r[0]
+            r = self._cursor.fetchone_sync()
+            district = r
 
             self._cursor.execute_sync(
                 q["updateWarehouseBalance"].format(h_amount, w_id)
@@ -548,8 +557,8 @@ class AuroraDriver(AbstractDriver):
 
             self._cursor.execute_sync("BEGIN")
             self._cursor.execute_sync(q["getOId"].format(w_id, d_id))
-            r = self._cursor.fetchall_sync()
-            result = r[0]
+            r = self._cursor.fetchone_sync()
+            result = r
             assert result
             o_id = result[0]
 
@@ -558,8 +567,8 @@ class AuroraDriver(AbstractDriver):
                     w_id, d_id, o_id, (o_id - 20), w_id, threshold
                 )
             )
-            r = self._cursor.fetchall_sync()
-            result = r[0]
+            r = self._cursor.fetchone_sync()
+            result = r
 
             self._cursor.execute_sync("COMMIT")
             return int(result[0])

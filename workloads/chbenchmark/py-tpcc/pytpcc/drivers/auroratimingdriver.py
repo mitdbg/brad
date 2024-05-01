@@ -38,6 +38,8 @@ TXN_QUERIES = {
         "getStockInfo": "SELECT s_quantity, s_data, s_ytd, s_order_cnt, s_remote_cnt, s_dist_{:02d} FROM stock WHERE s_i_id = {} AND s_w_id = {}",  # d_id, ol_i_id, ol_supply_w_id
         "updateStock": "UPDATE stock SET s_quantity = {}, s_ytd = {}, s_order_cnt = {}, s_remote_cnt = {} WHERE s_i_id = {} AND s_w_id = {}",  # s_quantity, s_order_cnt, s_remote_cnt, ol_i_id, ol_supply_w_id
         "createOrderLine": "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES ({}, {}, {}, {}, {}, {}, '{}', {}, {}, '{}')",  # o_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info
+        "createOrderLineMultivalue": "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES ",
+        "createOrderLineValues": "({}, {}, {}, {}, {}, {}, '{}', {}, {}, '{}')",
     },
     "ORDER_STATUS": {
         "getCustomerByCustomerId": "SELECT c_id, c_first, c_middle, c_last, c_balance FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # w_id, d_id, c_id
@@ -83,7 +85,7 @@ class AuroraTimingDriver(AbstractDriver):
     }
 
     def __init__(self, ddl: str) -> None:
-        super().__init__("brad", ddl)
+        super().__init__("aurora timing", ddl)
         self._connection: Optional[PsycopgConnection] = None
         self._cursor: Optional[PsycopgCursor] = None
         self._config: Dict[str, Any] = {}
@@ -127,7 +129,7 @@ class AuroraTimingDriver(AbstractDriver):
         measure_file_path = cond.in_output_dir("aurora_timing.csv")
         self._measure_file = open(measure_file_path, "w", encoding="UTF-8")
         print(
-            "init,begin,getitems,getwdc,getorder,insertorder,commit,collect,total",
+            "init,begin,getitems,getwdc,getorder,insertorder,commit,collect,multi_insert_time,total",
             file=self._measure_file,
         )
 
@@ -224,7 +226,7 @@ class AuroraTimingDriver(AbstractDriver):
                 print(traceback.format_exc())
             raise
 
-    def doNewOrder(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
+    def doNewOrderOriginal(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
         try:
             assert self._cursor is not None
 
@@ -465,6 +467,285 @@ class AuroraTimingDriver(AbstractDriver):
                 total_time = no_collect - no_start
                 print(
                     f"{init_time},{begin_time},{getitems_time},{getwdc_time},{getorder_time},{insertorder_time},{commit_time},{collect_time},{total_time}",
+                    file=self._measure_file,
+                )
+
+            if self._wdc_stats_file is not None:
+                tax_rate_time = wdc_warehouse_tax_rate - wdc_start
+                district_time = wdc_district - wdc_warehouse_tax_rate
+                customer_time = no_get_wdc_info - wdc_district
+                total_time = no_get_wdc_info - wdc_start
+                print(
+                    f"{tax_rate_time},{district_time},{customer_time},{total_time}",
+                    file=self._wdc_stats_file,
+                )
+
+            if self._ol_stats_file is not None:
+                for im in insert_metadata:
+                    print(
+                        "{},{},{},{},{},{},{},{},{}".format(self._ins_ol_counter, *im),
+                        file=self._ol_stats_file,
+                    )
+                self._ins_ol_counter += 1
+
+            return [customer_info, misc, item_data]
+
+        except Exception as ex:
+            if self._nonsilent_errs:
+                print("Error in NEWORDER", str(ex))
+                print(traceback.format_exc())
+            raise
+
+    def doNewOrder(self, params: Dict[str, Any]) -> List[Tuple[Any, ...]]:
+        try:
+            assert self._cursor is not None
+
+            no_start = time.time()
+            q = TXN_QUERIES["NEW_ORDER"]
+            w_id = params["w_id"]
+            d_id = params["d_id"]
+            c_id = params["c_id"]
+            o_entry_d = params["o_entry_d"]
+            i_ids = params["i_ids"]
+            i_w_ids = params["i_w_ids"]
+            i_qtys = params["i_qtys"]
+
+            assert len(i_ids) > 0
+            assert len(i_ids) == len(i_w_ids)
+            assert len(i_ids) == len(i_qtys)
+
+            no_pbegin = time.time()
+            self._cursor.execute_sync("BEGIN")
+            no_abegin = time.time()
+            all_local = True
+            items = []
+            for i in range(len(i_ids)):
+                ## Determine if this is an all local order or not
+                all_local = all_local and i_w_ids[i] == w_id
+                self._cursor.execute_sync(q["getItemInfo"].format(i_ids[i]))
+                r = self._cursor.fetchone_sync()
+                items.append(r)
+            assert len(items) == len(i_ids)
+            no_getitems = time.time()
+
+            ## TPCC defines 1% of neworder gives a wrong itemid, causing rollback.
+            ## Note that this will happen with 1% of transactions on purpose.
+            for item in items:
+                if item is None or len(item) == 0:
+                    self._cursor.execute_sync("ROLLBACK")
+                    return
+            ## FOR
+
+            ## ----------------
+            ## Collect Information from WAREHOUSE, DISTRICT, and CUSTOMER
+            ## ----------------
+            wdc_start = time.time()
+            get_warehouse = q["getWarehouseTaxRate"].format(w_id)
+            self._cursor.execute_sync(get_warehouse)
+            r = self._cursor.fetchone_sync()
+            w_tax = r[0]
+            wdc_warehouse_tax_rate = time.time()
+
+            get_district = q["getDistrict"].format(d_id, w_id)
+            self._cursor.execute_sync(get_district)
+            r = self._cursor.fetchone_sync()
+            district_info = r
+            d_tax = district_info[0]
+            d_next_o_id = district_info[1]
+            wdc_district = time.time()
+
+            get_customer = q["getCustomer"].format(w_id, d_id, c_id)
+            self._cursor.execute_sync(get_customer)
+            r = self._cursor.fetchone_sync()
+            customer_info = r
+            c_discount = customer_info[0]
+            no_get_wdc_info = time.time()
+
+            if self._query_log_file is not None:
+                print(get_warehouse, file=self._query_log_file)
+                print(get_district, file=self._query_log_file)
+                print(get_customer, file=self._query_log_file)
+
+            ## ----------------
+            ## Insert Order Information
+            ## ----------------
+            ol_cnt = len(i_ids)
+            o_carrier_id = constants.NULL_CARRIER_ID
+
+            self._cursor.execute_sync(
+                q["incrementNextOrderId"].format(d_next_o_id + 1, d_id, w_id)
+            )
+            createOrder = q["createOrder"].format(
+                d_next_o_id,
+                d_id,
+                w_id,
+                c_id,
+                o_entry_d.strftime("%Y-%m-%d %H:%M:%S"),
+                o_carrier_id,
+                ol_cnt,
+                1 if all_local else 0,
+            )
+            self._cursor.execute_sync(createOrder)
+            self._cursor.execute_sync(
+                q["createNewOrder"].format(d_next_o_id, d_id, w_id)
+            )
+            no_ins_order_info = time.time()
+
+            ## ----------------
+            ## Insert Order Item Information
+            ## ----------------
+            item_data = []
+            total = 0
+            insert_metadata = []
+            insert_value_strs = []
+            for i in range(len(i_ids)):
+                io_start = time.time()
+                ol_number = i + 1
+                ol_supply_w_id = i_w_ids[i]
+                ol_i_id = i_ids[i]
+                ol_quantity = i_qtys[i]
+
+                itemInfo = items[i]
+                i_name = itemInfo[1]
+                i_data = itemInfo[2]
+                i_price = decimal.Decimal(itemInfo[0])
+                io_init = time.time()
+
+                get_stock_info = q["getStockInfo"].format(d_id, ol_i_id, ol_supply_w_id)
+                self._cursor.execute_sync(get_stock_info)
+                r = self._cursor.fetchone_sync()
+                io_fetch_stock = time.time()
+                if r is None:
+                    logger.warning(
+                        "No STOCK record for (ol_i_id=%d, ol_supply_w_id=%d)",
+                        ol_i_id,
+                        ol_supply_w_id,
+                    )
+                    continue
+                stockInfo = r
+                s_quantity = stockInfo[0]
+                s_ytd = decimal.Decimal(stockInfo[2])
+                s_order_cnt = int(stockInfo[3])
+                s_remote_cnt = int(stockInfo[4])
+                s_data = stockInfo[1]
+                s_dist_xx = stockInfo[5]  # Fetches data from the s_dist_[d_id] column
+
+                ## Update stock
+                s_ytd += ol_quantity
+                if s_quantity >= ol_quantity + 10:
+                    s_quantity = s_quantity - ol_quantity
+                else:
+                    s_quantity = s_quantity + 91 - ol_quantity
+                s_order_cnt += 1
+
+                if ol_supply_w_id != w_id:
+                    s_remote_cnt += 1
+                io_stock_prep = time.time()
+
+                update_stock = q["updateStock"].format(
+                    s_quantity,
+                    s_ytd.quantize(decimal.Decimal("1.00")),
+                    s_order_cnt,
+                    s_remote_cnt,
+                    ol_i_id,
+                    ol_supply_w_id,
+                )
+                self._cursor.execute_sync(update_stock)
+                io_update_stock = time.time()
+
+                if (
+                    i_data.find(constants.ORIGINAL_STRING) != -1
+                    and s_data.find(constants.ORIGINAL_STRING) != -1
+                ):
+                    brand_generic = "B"
+                else:
+                    brand_generic = "G"
+
+                ## Transaction profile states to use "ol_quantity * i_price"
+                ol_amount = ol_quantity * i_price
+                total += ol_amount
+                io_ol_prep = time.time()
+
+                createOrderLineValues = q["createOrderLineValues"].format(
+                    d_next_o_id,
+                    d_id,
+                    w_id,
+                    ol_number,
+                    ol_i_id,
+                    ol_supply_w_id,
+                    o_entry_d.strftime("%Y-%m-%d %H:%M:%S"),
+                    ol_quantity,
+                    ol_amount,
+                    s_dist_xx,
+                )
+                insert_value_strs.append(createOrderLineValues)
+                io_ol_insert = time.time()
+
+                ## Add the info to be returned
+                item_data.append(
+                    (i_name, s_quantity, brand_generic, i_price, ol_amount)
+                )
+                io_ol_append = time.time()
+
+                insert_metadata.append(
+                    (
+                        io_init - io_start,
+                        io_fetch_stock - io_init,
+                        io_stock_prep - io_fetch_stock,
+                        io_update_stock - io_stock_prep,
+                        io_ol_prep - io_update_stock,
+                        io_ol_insert - io_ol_prep,
+                        io_ol_append - io_ol_insert,
+                        io_ol_append - io_start,
+                    )
+                )
+
+                if self._query_log_file is not None:
+                    print(get_stock_info, file=self._query_log_file)
+                    print(update_stock, file=self._query_log_file)
+
+            no_mv_insert_pre = time.time()
+            ## FOR
+            insert_order_line_query = q["createOrderLineMultivalue"] + ", ".join(
+                insert_value_strs
+            )
+            self._cursor.execute_sync(insert_order_line_query)
+            no_mv_insert_after = time.time()
+            if self._query_log_file is not None:
+                print(insert_order_line_query, file=self._query_log_file)
+            no_insert_order_line = time.time()
+
+            ## Commit!
+            self._cursor.execute_sync("COMMIT")
+            no_commit = time.time()
+
+            ## Adjust the total for the discount
+            # print "c_discount:", c_discount, type(c_discount)
+            # print "w_tax:", w_tax, type(w_tax)
+            # print "d_tax:", d_tax, type(d_tax)
+            total = int(
+                total
+                * (1 - decimal.Decimal(c_discount))
+                * (1 + decimal.Decimal(w_tax) + decimal.Decimal(d_tax))
+            )
+
+            ## Pack up values the client is missing (see TPC-C 2.4.3.5)
+            misc = [(w_tax, d_tax, d_next_o_id, total)]
+            no_collect = time.time()
+
+            if self._measure_file is not None:
+                init_time = no_pbegin - no_start
+                begin_time = no_abegin - no_pbegin
+                getitems_time = no_getitems - no_abegin
+                getwdc_time = no_get_wdc_info - no_getitems
+                getorder_time = no_ins_order_info - no_get_wdc_info
+                insertorder_time = no_insert_order_line - no_ins_order_info
+                commit_time = no_commit - no_insert_order_line
+                collect_time = no_collect - no_commit
+                total_time = no_collect - no_start
+                multi_insert_time = no_mv_insert_after - no_mv_insert_pre
+                print(
+                    f"{init_time},{begin_time},{getitems_time},{getwdc_time},{getorder_time},{insertorder_time},{commit_time},{collect_time},{multi_insert_time},{total_time}",
                     file=self._measure_file,
                 )
 

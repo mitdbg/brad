@@ -37,6 +37,7 @@ import traceback
 import logging
 import os
 import pathlib
+import numpy as np
 from datetime import datetime
 from pprint import pprint, pformat
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
@@ -62,6 +63,9 @@ class Executor:
         self.total_workers = 1
         self.worker_index = 0
 
+        self.skew_alpha = None
+        self.skew_prng = None
+
     ## DEF
 
     def execute(
@@ -70,6 +74,7 @@ class Executor:
         worker_index: int,
         total_workers: int,
         lat_sample_prob: float,
+        zipfian_alpha: Optional[float],
     ) -> results.Results:
         if RECORD_DETAILED_STATS_VAR in os.environ:
             import conductor.lib as cond
@@ -114,6 +119,17 @@ class Executor:
             self.worker_index,
             *self.local_warehouse_range
         )
+
+        if zipfian_alpha is not None:
+            self.skew_alpha = zipfian_alpha
+            self.skew_prng = np.random.default_rng(seed=42 ^ worker_index)
+            logging.info(
+                "Worker index %d - Selecting warehouse and items using a Zipfian distribution; a = %.2f",
+                worker_index,
+                self.skew_alpha,
+            )
+        else:
+            logging.info("Worker index %d - Not using a Zipfian distribution")
 
         r = results.Results(options)
         assert r
@@ -370,7 +386,19 @@ class Executor:
                 ):
                     break
         else:
-            w_id = rand.number(*self.local_warehouse_range)
+            if self.skew_prng is not None:
+                # Skewed warehouse choice
+                min_warehouse, max_warehouse = self.local_warehouse_range
+                warehouse_span = max_warehouse - min_warehouse + 1
+                while True:
+                    # Chosen in range [1, inf)
+                    candidate = self.skew_prng.zipf(a=self.skew_alpha)
+                    if candidate <= warehouse_span:
+                        break
+                return min_warehouse + (candidate - 1)
+            else:
+                # Uniformly randomly chosen warehouse
+                w_id = rand.number(*self.local_warehouse_range)
 
         assert w_id >= self.scaleParameters.starting_warehouse, (
             "Invalid W_ID: %d" % w_id
@@ -391,7 +419,14 @@ class Executor:
     ## DEF
 
     def makeItemId(self):
-        return rand.NURand(8191, 1, self.scaleParameters.items)
+        if self.skew_alpha is None:
+            return rand.NURand(8191, 1, self.scaleParameters.items)
+        else:
+            # Select item ID using a zipfian distribution.
+            while True:
+                candidate = self.skew_prng.zipf(a=self.skew_alpha)
+                if candidate <= self.scaleParameters.items:
+                    return candidate
 
     ## DEF
 

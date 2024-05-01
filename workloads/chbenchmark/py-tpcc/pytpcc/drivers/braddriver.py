@@ -35,6 +35,8 @@ TXN_QUERIES = {
         "getStockInfo": "SELECT s_quantity, s_data, s_ytd, s_order_cnt, s_remote_cnt, s_dist_{:02d} FROM stock WHERE s_i_id = {} AND s_w_id = {}",  # d_id, ol_i_id, ol_supply_w_id
         "updateStock": "UPDATE stock SET s_quantity = {}, s_ytd = {}, s_order_cnt = {}, s_remote_cnt = {} WHERE s_i_id = {} AND s_w_id = {}",  # s_quantity, s_order_cnt, s_remote_cnt, ol_i_id, ol_supply_w_id
         "createOrderLine": "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES ({}, {}, {}, {}, {}, {}, '{}', {}, {}, '{}')",  # o_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info
+        "createOrderLineMultivalue": "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES ",
+        "createOrderLineValues": "({}, {}, {}, {}, {}, {}, '{}', {}, {}, '{}')",
     },
     "ORDER_STATUS": {
         "getCustomerByCustomerId": "SELECT c_id, c_first, c_middle, c_last, c_balance FROM customer WHERE c_w_id = {} AND c_d_id = {} AND c_id = {}",  # w_id, d_id, c_id
@@ -119,7 +121,7 @@ class BradDriver(AbstractDriver):
             ol_delivery_d = params["ol_delivery_d"]
 
             result: List[Tuple[Any, ...]] = []
-            self._client.run_query_json("BEGIN")
+            self._client.run_query_ignore_results("BEGIN")
             for d_id in range(1, constants.DISTRICTS_PER_WAREHOUSE + 1):
                 r, _ = self._client.run_query_json(q["getNewOrder"].format(d_id, w_id))
                 if len(r) == 0:
@@ -137,17 +139,17 @@ class BradDriver(AbstractDriver):
                 )
                 ol_total = decimal.Decimal(r[0][0])
 
-                self._client.run_query_json(
+                self._client.run_query_ignore_results(
                     q["deleteNewOrder"].format(d_id, w_id, no_o_id)
                 )
                 updateOrders = q["updateOrders"].format(
                     o_carrier_id, no_o_id, d_id, w_id
                 )
-                self._client.run_query_json(updateOrders)
+                self._client.run_query_ignore_results(updateOrders)
                 updateOrderLine = q["updateOrderLine"].format(
                     ol_delivery_d.strftime("%Y-%m-%d %H:%M:%S"), no_o_id, d_id, w_id
                 )
-                self._client.run_query_json(updateOrderLine)
+                self._client.run_query_ignore_results(updateOrderLine)
 
                 # These must be logged in the "result file" according to TPC-C 2.7.2.2 (page 39)
                 # We remove the queued time, completed time, w_id, and o_carrier_id: the client can figure
@@ -158,7 +160,7 @@ class BradDriver(AbstractDriver):
                 ), "ol_total is NULL: there are no order lines. This should not happen"
                 assert ol_total > 0.0
 
-                self._client.run_query_json(
+                self._client.run_query_ignore_results(
                     q["updateCustomer"].format(
                         ol_total.quantize(decimal.Decimal("1.00")), c_id, d_id, w_id
                     )
@@ -166,7 +168,7 @@ class BradDriver(AbstractDriver):
 
                 result.append((d_id, no_o_id))
 
-            self._client.run_query_json("COMMIT")
+            self._client.run_query_ignore_results("COMMIT")
             return result
 
         except Exception as ex:
@@ -192,7 +194,7 @@ class BradDriver(AbstractDriver):
             assert len(i_ids) == len(i_w_ids)
             assert len(i_ids) == len(i_qtys)
 
-            self._client.run_query_json("BEGIN")
+            self._client.run_query_ignore_results("BEGIN")
             all_local = True
             items = []
             for i in range(len(i_ids)):
@@ -206,7 +208,7 @@ class BradDriver(AbstractDriver):
             ## Note that this will happen with 1% of transactions on purpose.
             for item in items:
                 if len(item) == 0:
-                    self._client.run_query_json("ROLLBACK")
+                    self._client.run_query_ignore_results("ROLLBACK")
                     return
             ## FOR
 
@@ -233,7 +235,7 @@ class BradDriver(AbstractDriver):
             ol_cnt = len(i_ids)
             o_carrier_id = constants.NULL_CARRIER_ID
 
-            self._client.run_query_json(
+            self._client.run_query_ignore_results(
                 q["incrementNextOrderId"].format(d_next_o_id + 1, d_id, w_id)
             )
             createOrder = q["createOrder"].format(
@@ -246,8 +248,8 @@ class BradDriver(AbstractDriver):
                 ol_cnt,
                 1 if all_local else 0,
             )
-            self._client.run_query_json(createOrder)
-            self._client.run_query_json(
+            self._client.run_query_ignore_results(createOrder)
+            self._client.run_query_ignore_results(
                 q["createNewOrder"].format(d_next_o_id, d_id, w_id)
             )
 
@@ -256,6 +258,7 @@ class BradDriver(AbstractDriver):
             ## ----------------
             item_data = []
             total = 0
+            insert_value_strings = []
             for i in range(len(i_ids)):
                 ol_number = i + 1
                 ol_supply_w_id = i_w_ids[i]
@@ -296,7 +299,7 @@ class BradDriver(AbstractDriver):
                 if ol_supply_w_id != w_id:
                     s_remote_cnt += 1
 
-                self._client.run_query_json(
+                self._client.run_query_ignore_results(
                     q["updateStock"].format(
                         s_quantity,
                         s_ytd.quantize(decimal.Decimal("1.00")),
@@ -319,7 +322,7 @@ class BradDriver(AbstractDriver):
                 ol_amount = ol_quantity * i_price
                 total += ol_amount
 
-                createOrderLine = q["createOrderLine"].format(
+                createOrderLineValues = q["createOrderLineValues"].format(
                     d_next_o_id,
                     d_id,
                     w_id,
@@ -331,7 +334,7 @@ class BradDriver(AbstractDriver):
                     ol_amount,
                     s_dist_xx,
                 )
-                self._client.run_query_json(createOrderLine)
+                insert_value_strings.append(createOrderLineValues)
 
                 ## Add the info to be returned
                 item_data.append(
@@ -339,8 +342,14 @@ class BradDriver(AbstractDriver):
                 )
             ## FOR
 
+            # Do one multivalue insert.
+            insertOrderLines = q["createOrderLineMultivalue"] + ", ".join(
+                insert_value_strings
+            )
+            self._client.run_query_ignore_results(insertOrderLines)
+
             ## Commit!
-            self._client.run_query_json("COMMIT")
+            self._client.run_query_ignore_results("COMMIT")
 
             ## Adjust the total for the discount
             # print "c_discount:", c_discount, type(c_discount)
@@ -373,7 +382,7 @@ class BradDriver(AbstractDriver):
             c_id = params["c_id"]
             c_last = params["c_last"]
 
-            self._client.run_query_json("BEGIN")
+            self._client.run_query_ignore_results("BEGIN")
             if c_id != None:
                 r, _ = self._client.run_query_json(
                     q["getCustomerByCustomerId"].format(w_id, d_id, c_id)
@@ -404,7 +413,7 @@ class BradDriver(AbstractDriver):
             else:
                 orderLines = []
 
-            self._client.run_query_json("COMMIT")
+            self._client.run_query_ignore_results("COMMIT")
             return [customer, order, orderLines]
 
         except Exception as ex:
@@ -427,7 +436,7 @@ class BradDriver(AbstractDriver):
             c_last = params["c_last"]
             h_date = params["h_date"]  # Python datetime
 
-            self._client.run_query_json("BEGIN")
+            self._client.run_query_ignore_results("BEGIN")
             if c_id != None:
                 r, _ = self._client.run_query_json(
                     q["getCustomerByCustomerId"].format(w_id, d_id, c_id)
@@ -456,10 +465,10 @@ class BradDriver(AbstractDriver):
             r, _ = self._client.run_query_json(q["getDistrict"].format(w_id, d_id))
             district = r[0]
 
-            self._client.run_query_json(
+            self._client.run_query_ignore_results(
                 q["updateWarehouseBalance"].format(h_amount, w_id)
             )
-            self._client.run_query_json(
+            self._client.run_query_ignore_results(
                 q["updateDistrictBalance"].format(h_amount, w_id, d_id)
             )
 
@@ -480,10 +489,10 @@ class BradDriver(AbstractDriver):
                     c_d_id,
                     c_id,
                 )
-                self._client.run_query_json(updateCustomer)
+                self._client.run_query_ignore_results(updateCustomer)
             else:
                 c_data = ""
-                self._client.run_query_json(
+                self._client.run_query_ignore_results(
                     q["updateGCCustomer"].format(
                         c_balance, c_ytd_payment, c_payment_cnt, c_w_id, c_d_id, c_id
                     ),
@@ -502,9 +511,9 @@ class BradDriver(AbstractDriver):
                 h_amount.quantize(decimal.Decimal("1.00")),
                 h_data,
             )
-            self._client.run_query_json(insertHistory)
+            self._client.run_query_ignore_results(insertHistory)
 
-            self._client.run_query_json("COMMIT")
+            self._client.run_query_ignore_results("COMMIT")
 
             # TPC-C 2.5.3.3: Must display the following fields:
             # W_ID, D_ID, C_ID, C_D_ID, C_W_ID, W_STREET_1, W_STREET_2, W_CITY, W_STATE, W_ZIP,
@@ -531,7 +540,7 @@ class BradDriver(AbstractDriver):
             d_id = params["d_id"]
             threshold = params["threshold"]
 
-            self._client.run_query_json("BEGIN")
+            self._client.run_query_ignore_results("BEGIN")
             r, _ = self._client.run_query_json(q["getOId"].format(w_id, d_id))
             result = r[0]
             assert result
@@ -544,7 +553,7 @@ class BradDriver(AbstractDriver):
             )
             result = r[0]
 
-            self._client.run_query_json("COMMIT")
+            self._client.run_query_ignore_results("COMMIT")
             return int(result[0])
 
         except Exception as ex:
