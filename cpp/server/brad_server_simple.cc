@@ -217,10 +217,10 @@ arrow::Result<std::unique_ptr<FlightInfo>>
     py::gil_scoped_acquire guard;
     auto result = handle_query_(query);
     result_schema = ArrowSchemaFromBradSchema(result.second);
-    result_record_batch = ResultToRecordBatch(std::move(result.first), result_schema).ValueOrDie();
+    result_record_batch = ResultToRecordBatch(result.first, result_schema).ValueOrDie();
   }
 
-  ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(result_record_batch, result_schema));
+  ARROW_ASSIGN_OR_RAISE(auto statement, BradStatement::Create(std::move(result_record_batch), result_schema));
   query_data_.insert(query_ticket, statement);
 
   std::vector<FlightEndpoint> endpoints{
