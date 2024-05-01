@@ -381,7 +381,19 @@ class Executor:
                 ):
                     break
         else:
-            w_id = rand.number(*self.local_warehouse_range)
+            if self.skew_prng is not None:
+                # Skewed warehouse choice
+                min_warehouse, max_warehouse = self.local_warehouse_range
+                warehouse_span = max_warehouse - min_warehouse + 1
+                while True:
+                    # Chosen in range [1, inf)
+                    candidate = self.skew_prng.zipf(a=self.skew_alpha)
+                    if candidate <= warehouse_span:
+                        break
+                return min_warehouse + (candidate - 1)
+            else:
+                # Uniformly randomly chosen warehouse
+                w_id = rand.number(*self.local_warehouse_range)
 
         assert w_id >= self.scaleParameters.starting_warehouse, (
             "Invalid W_ID: %d" % w_id
