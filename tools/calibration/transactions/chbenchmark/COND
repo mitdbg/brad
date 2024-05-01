@@ -13,6 +13,8 @@ COND_INSTANCES = {
   instance: instance.replace(".", "_").replace("db.", "") for instance in INSTANCES
 }
 
+ZIPFIAN_ALPHA = 5.0
+
 combine(
   name="all",
   deps=[
@@ -36,6 +38,7 @@ for instance in INSTANCES:
           "txn-warehouses": 1740,
           "txn-config-file": "aurora.config",
           "schema-name": "chbenchmark",
+          "txn-zipfian-alpha": ZIPFIAN_ALPHA,
           "instance": instance,
         },
       )

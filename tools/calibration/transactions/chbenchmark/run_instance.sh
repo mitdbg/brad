@@ -38,6 +38,10 @@ function extract_named_arguments() {
     if [[ $phys_arg =~ --instance=.+ ]]; then
       instance=${phys_arg:11}
     fi
+
+    if [[ $phys_arg =~ --txn-zipfian-alpha=.+ ]]; then
+      txn_zipfian_alpha=${phys_arg:20}
+    fi
   done
 }
 
@@ -74,7 +78,8 @@ RECORD_DETAILED_STATS=1 python3 -m pytpcc.tpcc aurora \
   --duration $run_for_s \
   --clients $t_clients \
   --scalefactor 1 \
-  --lat-sample-prob 0.25
+  --lat-sample-prob 0.25 \
+  --txn-zipfian-alpha $txn_zipfian_alpha
 popd
 
 >&2 echo "Waiting 10 seconds before retrieving metrics..."
