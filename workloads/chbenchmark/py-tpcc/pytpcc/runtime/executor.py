@@ -47,7 +47,6 @@ from .. import constants
 from ..util import *
 
 RECORD_DETAILED_STATS_VAR = "RECORD_DETAILED_STATS"
-SKEW_ALPHA_VAR = "SKEW_ALPHA"
 
 
 class Executor:
@@ -64,10 +63,7 @@ class Executor:
         self.total_workers = 1
         self.worker_index = 0
 
-        if SKEW_ALPHA_VAR in os.environ:
-            self.skew_alpha = float(os.environ[SKEW_ALPHA_VAR])
-        else:
-            self.skew_alpha = None
+        self.skew_alpha = None
         self.skew_prng = None
 
     ## DEF
@@ -78,6 +74,7 @@ class Executor:
         worker_index: int,
         total_workers: int,
         lat_sample_prob: float,
+        zipfian_alpha: Optional[float],
     ) -> results.Results:
         if RECORD_DETAILED_STATS_VAR in os.environ:
             import conductor.lib as cond
@@ -123,8 +120,16 @@ class Executor:
             *self.local_warehouse_range
         )
 
-        if self.skew_alpha is not None:
+        if zipfian_alpha is not None:
+            self.skew_alpha = zipfian_alpha
             self.skew_prng = np.random.default_rng(seed=42 ^ worker_index)
+            logging.info(
+                "Worker index %d - Selecting warehouse and items using a Zipfian distribution; a = %.2f",
+                worker_index,
+                self.skew_alpha,
+            )
+        else:
+            logging.info("Worker index %d - Not using a Zipfian distribution")
 
         r = results.Results(options)
         assert r
