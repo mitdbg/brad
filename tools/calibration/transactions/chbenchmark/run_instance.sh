@@ -79,7 +79,7 @@ RECORD_DETAILED_STATS=1 python3 -m pytpcc.tpcc aurora \
   --clients $t_clients \
   --scalefactor 1 \
   --lat-sample-prob 0.25 \
-  --txn-zipfian-alpha $txn_zipfian_alpha
+  --zipfian-alpha $txn_zipfian_alpha
 popd
 
 >&2 echo "Waiting 10 seconds before retrieving metrics..."
