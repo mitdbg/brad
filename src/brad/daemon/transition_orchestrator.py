@@ -631,7 +631,11 @@ class TransitionOrchestrator:
     ) -> None:
         # Drop removed tables
         to_drop = []
-        if table_diffs is not None and self._config.disable_table_movement is False:
+        if (
+            table_diffs is not None
+            and self._config.disable_table_movement is False
+            and self._config.skip_athena_table_deletion is False
+        ):
             for table_diff in table_diffs:
                 if Engine.Athena in table_diff.removed_locations():
                     to_drop.append(table_diff.table_name())
