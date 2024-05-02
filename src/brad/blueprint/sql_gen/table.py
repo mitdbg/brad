@@ -232,6 +232,23 @@ class TableSqlGenerator:
             queries.append(initialize_template.format(table_name=table_name))
         return (queries, Engine.Aurora)
 
+    def generate_rename_table_sql(
+        self, table: Table, location: Engine, new_name: str
+    ) -> Tuple[List[str], Engine]:
+        """
+        Generates the SQL statements needed to rename a table on the given engine.
+        """
+        if location == Engine.Aurora:
+            # Aurora is more complicated because we use a view with other
+            # metadata too. This is not currently needed.
+            raise RuntimeError("Aurora renames are currently unimplemented.")
+
+        elif location == Engine.Redshift or location == Engine.Athena:
+            return ([f"ALTER TABLE {table.name} RENAME TO {new_name}"], location)
+
+        else:
+            raise RuntimeError(f"Unsupported location {str(location)}")
+
 
 def generate_create_index_sql(
     table: Table, indexes: List[Tuple[Column, ...]]
