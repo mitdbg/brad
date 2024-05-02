@@ -191,6 +191,22 @@ class ConfigFile:
             return True
 
     @property
+    def skip_sync_before_movement(self) -> bool:
+        try:
+            return self._raw["skip_sync_before_table_movement"]
+        except KeyError:
+            # Skip by default.
+            return True
+
+    @property
+    def skip_athena_table_deletion(self) -> bool:
+        try:
+            return self._raw["skip_athena_table_deletion"]
+        except KeyError:
+            # Skip by default.
+            return True
+
+    @property
     def use_preset_redshift_clusters(self) -> bool:
         try:
             # We require that table movement is also disabled. Otherwise we need

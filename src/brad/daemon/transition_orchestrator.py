@@ -131,14 +131,17 @@ class TransitionOrchestrator:
 
         # 2. Sync tables (TODO: discuss more efficient alternatives -
         # possibly add a filter of tables to run_sync)
-        await self._data_sync_executor.establish_connections()
-        ran_sync = await self._data_sync_executor.run_sync(
-            self._blueprint_mgr.get_blueprint()
-        )
-        logger.debug(
-            """Completed data sync step during transition. """
-            f"""There were {'some' if ran_sync else 'no'} new writes to sync"""
-        )
+        if not self._config.skip_sync_before_movement:
+            await self._data_sync_executor.establish_connections()
+            ran_sync = await self._data_sync_executor.run_sync(
+                self._blueprint_mgr.get_blueprint()
+            )
+            logger.debug(
+                """Completed data sync step during transition. """
+                f"""There were {'some' if ran_sync else 'no'} new writes to sync"""
+            )
+        else:
+            logger.info("Not running table sync before movement.")
 
         # 3. Create tables in new locations as needed
         directory = self._blueprint_mgr.get_directory()
@@ -628,7 +631,11 @@ class TransitionOrchestrator:
     ) -> None:
         # Drop removed tables
         to_drop = []
-        if table_diffs is not None and self._config.disable_table_movement is False:
+        if (
+            table_diffs is not None
+            and self._config.disable_table_movement is False
+            and self._config.skip_athena_table_deletion is False
+        ):
             for table_diff in table_diffs:
                 if Engine.Athena in table_diff.removed_locations():
                     to_drop.append(table_diff.table_name())

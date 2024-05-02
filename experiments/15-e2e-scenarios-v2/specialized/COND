@@ -20,6 +20,16 @@ run_experiment(
 )
 
 run_experiment(
+  name="brad_100g_vector_tm",
+  run="./run_vector_workload_tm.sh",
+  options={
+    # NOTE: This has table movement enabled.
+    "system-config-file": "specialized_config_tm.yml",
+    **COMMON_CONFIGS,
+  },
+)
+
+run_experiment(
   name="hand_designed_100g_vector",
   run="./run_vector_workload.sh",
   options={
