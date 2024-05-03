@@ -29,7 +29,6 @@ _REDSHIFT_LOAD_TEMPLATE = """
     DELIMITER '{delimiter}'
     IGNOREHEADER {header_rows}
     REMOVEQUOTES
-    BLANKASNULL
     IGNOREALLERRORS
 """
 
