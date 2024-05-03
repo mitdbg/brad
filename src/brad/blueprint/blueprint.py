@@ -140,6 +140,8 @@ class Blueprint:
                 "---",
                 indefinite_policies,
                 definite_policy,
+                "---",
+                f"Schema name: {self.schema_name()}",
             ]
         )
 
