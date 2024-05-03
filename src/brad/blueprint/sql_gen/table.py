@@ -318,5 +318,12 @@ def _type_for(data_type: str, for_db: Engine) -> str:
         return "BIGINT"
     elif data_type_upper.startswith("VARCHAR") and for_db == Engine.Athena:
         return "STRING"
+    elif data_type_upper.startswith("VECTOR"):
+        if for_db == Engine.Athena:
+            return "BINARY"
+        elif for_db == Engine.Redshift:
+            return "VARBYTE"
+        else:
+            return data_type
     else:
         return data_type
