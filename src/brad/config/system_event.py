@@ -37,3 +37,9 @@ class SystemEvent(enum.Enum):
     # Used when a service level objective is changed while BRAD is running (used
     # for experiments).
     ChangedSlos = "changed_slos"
+
+    # Used to mark table movement progress.
+    PreTableMovementStarted = "pre_table_movement_started"
+    PreTableMovementCompleted = "pre_table_movement_completed"
+    PostTableMovementStarted = "post_table_movement_started"
+    PostTableMovementCompleted = "post_table_movement_completed"
