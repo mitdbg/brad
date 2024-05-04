@@ -58,6 +58,15 @@ run_experiment(
   },
 )
 
+run_experiment(
+  name="brad_100g_tm",
+  run="./run_workload.sh",
+  options={
+    "system-config-file": "scale_down_config_tm.yml",
+    **COMMON_100G_CONFIGS,
+  },
+)
+
 run_command(
   name="brad_100g_debug",
   run="./run_workload_debug.sh",
