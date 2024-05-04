@@ -484,6 +484,7 @@ class TransitionOrchestrator:
             table_diffs is not None
             and len(table_diffs) > 0
             and self._config.disable_table_movement is False
+            and self._config.skip_aurora_table_deletion is False
         ):
             if self._system_event_logger is not None:
                 self._system_event_logger.log(

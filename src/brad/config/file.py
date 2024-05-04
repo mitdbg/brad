@@ -207,6 +207,14 @@ class ConfigFile:
             return True
 
     @property
+    def skip_aurora_table_deletion(self) -> bool:
+        try:
+            return self._raw["skip_aurora_table_deletion"]
+        except KeyError:
+            # Skip by default.
+            return True
+
+    @property
     def use_preset_redshift_clusters(self) -> bool:
         try:
             # We require that table movement is also disabled. Otherwise we need
