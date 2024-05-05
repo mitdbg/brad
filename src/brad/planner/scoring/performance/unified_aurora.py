@@ -115,7 +115,9 @@ class AuroraProvisioningScore:
         next_has_replicas = next_prov.num_nodes() > 1
 
         curr_writer_cpu_util = float(ctx.metrics.aurora_writer_cpu_avg / 100)
-        curr_writer_cpu_util_denorm = float(curr_writer_cpu_util * aurora_num_cpus(curr_prov))
+        curr_writer_cpu_util_denorm = float(
+            curr_writer_cpu_util * aurora_num_cpus(curr_prov)
+        )
 
         # We take a very conservative approach to query movement. If new queries
         # are added onto Aurora, we increase the load. But if queries are
