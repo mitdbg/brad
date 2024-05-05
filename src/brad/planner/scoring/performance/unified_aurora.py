@@ -278,7 +278,7 @@ class AuroraProvisioningScore:
                 query_run_times * alpha, a_min=0.0, a_max=load_max
             )
             total_denorm = np.dot(per_query_cpu_denorm, arrival_weights)
-            max_query_cpu_denorm = per_query_cpu_denorm.max()
+            max_query_cpu_denorm = (per_query_cpu_denorm * arrival_weights).max()
         else:
             # Edge case: Query with 0 arrival count (used as a constraint).
             total_denorm = np.zeros_like(query_run_times)
