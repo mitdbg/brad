@@ -114,8 +114,10 @@ class AuroraProvisioningScore:
         current_has_replicas = curr_prov.num_nodes() > 1
         next_has_replicas = next_prov.num_nodes() > 1
 
-        curr_writer_cpu_util = ctx.metrics.aurora_writer_cpu_avg / 100
-        curr_writer_cpu_util_denorm = curr_writer_cpu_util * aurora_num_cpus(curr_prov)
+        curr_writer_cpu_util = float(ctx.metrics.aurora_writer_cpu_avg / 100)
+        curr_writer_cpu_util_denorm = float(
+            curr_writer_cpu_util * aurora_num_cpus(curr_prov)
+        )
 
         # We take a very conservative approach to query movement. If new queries
         # are added onto Aurora, we increase the load. But if queries are
@@ -209,7 +211,7 @@ class AuroraProvisioningScore:
             # We currently have read replicas.
             curr_num_read_replicas = curr_prov.num_nodes() - 1
             total_reader_cpu_denorm = (
-                (ctx.metrics.aurora_reader_cpu_avg / 100)
+                float(ctx.metrics.aurora_reader_cpu_avg / 100)
                 * aurora_num_cpus(curr_prov)
                 * curr_num_read_replicas
             )
@@ -277,11 +279,11 @@ class AuroraProvisioningScore:
             per_query_cpu_denorm = np.clip(
                 query_run_times * alpha, a_min=0.0, a_max=load_max
             )
-            total_denorm = np.dot(per_query_cpu_denorm, arrival_weights)
-            max_query_cpu_denorm = per_query_cpu_denorm.max()
+            total_denorm = np.dot(per_query_cpu_denorm, arrival_weights).item()
+            max_query_cpu_denorm = (per_query_cpu_denorm * arrival_weights).max().item()
         else:
             # Edge case: Query with 0 arrival count (used as a constraint).
-            total_denorm = np.zeros_like(query_run_times)
+            total_denorm = 0.0
             max_query_cpu_denorm = 0.0
         if debug_dict is not None:
             debug_dict["aurora_total_cpu_denorm"] = total_denorm
@@ -309,7 +311,7 @@ class AuroraProvisioningScore:
         total_next_latency = np.dot(
             curr_query_run_times, workload.get_arrival_counts_batch(query_indices)
         )
-        return total_next_latency / norm_factor
+        return total_next_latency.item() / norm_factor
 
     @classmethod
     def predict_query_latency_load_resources(
