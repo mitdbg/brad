@@ -1,10 +1,10 @@
 #! /bin/bash
 
 EXPT_OUT="expt_out"
-ANALYTICS_ENGINE="redshift"
-TRANSACTION_ENGINE="aurora"
+ANALYTICS_ENGINE="tidb"
+TRANSACTION_ENGINE="tidb"
 script_loc=$(cd $(dirname $0) && pwd -P)
-total_second_phase_time_s=3600
+total_second_phase_time_s=$(( 90 * 60 ))
 source $script_loc/../common.sh
 
 # TODO: This executor file should be adapted to run against the baselines too
@@ -34,13 +34,9 @@ log_workload_point "clients_starting"
 start_repeating_olap_runner 8 15 5 $ra_query_indexes "ra_8"
 rana_pid=$runner_pid
 
-start_txn_runner 4
+start_txn_runner_serial 4
 txn_pid=$runner_pid
 
-
-start_repeating_olap_runner 1 70 5 "61,71,75" "ra_1_special"
-rana2_pid=$runner_pid
-log_workload_point "clients_started"
 
 function inner_cancel_experiment() {
   cancel_experiment $rana_pid $txn_pid $rana2_pid

@@ -16,6 +16,7 @@ config/config_local.yml
 config/manifests/manifest.yml
 config/tidb.yml
 config/baseline.yml
+config/baseline-*.yml
 config/temp_config.yml
 query_logs/
 config/physical_config*.yml

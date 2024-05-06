@@ -144,13 +144,14 @@ def column_definition(column):
     if data_type.startswith("CHARACTER VAR"):
         data_type = "TEXT"
     sql = f"{column['name']} {data_type}"
-    if "primary_key" in column and column["primary_key"]:
-        sql += " PRIMARY KEY"
     return sql
 
 
 def table_definition(table):
     columns_sql = ",\n    ".join(column_definition(col) for col in table["columns"])
+    pks = [col["name"] for col in table["columns"] if "primary_key" in col and col["primary_key"]]
+    if len(pks) > 0:
+        columns_sql += ",\n    PRIMARY KEY (" + ", ".join(pks) + ")"
     sql = f"CREATE TABLE {table['table_name']} (\n    {columns_sql}\n);"
     return sql
 
@@ -163,13 +164,15 @@ def index_definition(table_name, index_columns):
 
 
 def yaml_main():
-    with open("config/schemas/imdb_extended.yml", "r", encoding="utf-8") as f:
+    with open("config/schemas/chbenchmark.yml", "r", encoding="utf-8") as f:
         tables = yaml.safe_load(f)
         print(f"Tables: {tables}")
 
+    table_names = []
     with open("tables.sql", "w", encoding="utf-8") as f:
         for table in tables["tables"]:
             # Table Definition
+            table_names.append(table["table_name"])
             f.write(f"DROP TABLE IF EXISTS {table['table_name']};\n")
             f.write(table_definition(table))
             f.write("\n\n")
@@ -183,7 +186,7 @@ def yaml_main():
                     f.write(index_definition(table["table_name"], index))
                     f.write("\n")
                 f.write("\n")
-
+    print(f"Table names: {table_names}")
 
 if __name__ == "__main__":
     yaml_main()

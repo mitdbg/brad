@@ -4,10 +4,8 @@ EXPT_OUT="expt_out"
 ANALYTICS_ENGINE="tidb"
 TRANSACTION_ENGINE="tidb"
 script_loc=$(cd $(dirname $0) && pwd -P)
-# total_first_phase_time_s=$(( 10 * 60 ))
-total_first_phase_time_s=$(( 30 ))
-# total_second_phase_time_s=$(( 60 * 60 ))
-total_second_phase_time_s=$(( 60 ))
+total_first_phase_time_s=$(( 10 * 60 ))
+total_second_phase_time_s=$(( 60 * 60 ))
 source $script_loc/../common.sh
 
 # Arguments:
@@ -27,7 +25,7 @@ ls $seq_query_bank_file || exit 1
 
 
 log_workload_point "clients_starting"
-# 12 clients, offset 20 (for the transactional clients)
+# 12 clients.
 start_repeating_olap_runner 12 5 2 $ra_query_indexes "ra_8" 20
 rana_pid=$runner_pid
 
