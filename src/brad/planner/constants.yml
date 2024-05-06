@@ -366,6 +366,16 @@ aurora_txns:
     b_p50: 0.0008631267119199038
     b_p90: 0.002251814818009734
 
+  # These constants are for the W = 1740 version of the dataset.
+  chbenchmark:
+    # Note that C_1, C_2 are meant to be the same for this dataset.
+    C_1: 0.008586008776871991
+    C_2: 0.008586008776871991
+
+    K: 1.0293710231781006
+    b_p50: 0.011220300570130348
+    b_p90: 0.022309081628918648
+
 
 aurora_scaling:
   # [Deprecated]
