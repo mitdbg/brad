@@ -1,5 +1,5 @@
 import pyodbc
-from typing import Generator, Tuple, Any
+from typing import Generator, Tuple, List, Any
 
 class BradFlightSqlClient:
     """
@@ -12,6 +12,9 @@ class BradFlightSqlClient:
             print(row)
     ```
     """
+
+    RowList = List[Tuple[Any, ...]]
+
 
     def __init__(self, host="localhost", port=31337):
         self._host = host
@@ -36,9 +39,12 @@ class BradFlightSqlClient:
         self._cursor.close()
         self._connection.close()
 
-    def run_query(self, query: str) -> Generator[Tuple[Any, ...], None, None]:
+    def run_query_generator(self, query: str) -> Generator[Tuple[Any, ...], None, None]:
         for row in self._cursor.execute(query):
             yield row
+
+    def run_query(self, query: str) -> RowList:
+        return self._cursor.execute(query)
 
 if __name__ == "__main__":
     with BradFlightSqlClient() as client:
