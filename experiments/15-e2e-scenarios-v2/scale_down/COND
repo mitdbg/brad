@@ -85,3 +85,12 @@ run_experiment(
     **COMMON_100G_CONFIGS,
   },
 )
+
+run_experiment(
+  name="ar_100g",
+  run="./run_ar_baseline.sh",
+  options={
+    # System config file not needed.
+    **COMMON_100G_CONFIGS,
+  },
+)
