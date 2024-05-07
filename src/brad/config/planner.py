@@ -255,14 +255,11 @@ class PlannerConfig:
     def aurora_txn_coefs(self, schema_name: str) -> Dict[str, float]:
         return self._raw["aurora_txns"][schema_name]
 
-    def aurora_new_scaling_coefs(self) -> npt.NDArray:
+    def aurora_new_scaling_coefs(self, schema_name: str) -> npt.NDArray:
         if self._aurora_new_scaling_coefs is None:
-            coefs = self._raw["aurora_scaling_new"]
+            coefs = self._raw["aurora_scaling_new"][schema_name]
             self._aurora_new_scaling_coefs = np.array([coefs["coef1"], coefs["coef2"]])
         return self._aurora_new_scaling_coefs
-
-    def aurora_new_scaling_alpha(self) -> float:
-        return self._raw["aurora_scaling_new"]["alpha"]
 
     ###
     ### Unified Redshift scaling
@@ -275,16 +272,13 @@ class PlannerConfig:
             )
         return self._redshift_scaling_coefs
 
-    def redshift_new_scaling_coefs(self) -> npt.NDArray:
+    def redshift_new_scaling_coefs(self, schema_name: str) -> npt.NDArray:
         if self._redshift_new_scaling_coefs is None:
-            coefs = self._raw["redshift_scaling_new"]
+            coefs = self._raw["redshift_scaling_new"][schema_name]
             self._redshift_new_scaling_coefs = np.array(
                 [coefs["coef1"], coefs["coef2"]]
             )
         return self._redshift_new_scaling_coefs
-
-    def redshift_new_scaling_alpha(self) -> float:
-        return self._raw["redshift_scaling_new"]["alpha"]
 
     def use_io_optimized_aurora(self) -> bool:
         if "use_io_optimized_aurora" not in self._raw:

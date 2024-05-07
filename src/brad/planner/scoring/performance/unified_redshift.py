@@ -365,7 +365,7 @@ class RedshiftProvisioningScore:
         rf = np.array(resource_factors)
         basis = np.stack([rf, np.ones_like(rf)])
         basis = np.transpose(basis)
-        coefs = ctx.planner_config.redshift_new_scaling_coefs()
+        coefs = ctx.planner_config.redshift_new_scaling_coefs(ctx.schema_name)
         coefs = np.multiply(coefs, basis)
 
         num_coefs = coefs.shape[1]
@@ -415,7 +415,7 @@ class RedshiftProvisioningScore:
         resource_factor = _REDSHIFT_BASE_RESOURCE_VALUE / (
             redshift_num_cpus(prov) * prov.num_nodes()
         )
-        coefs = ctx.planner_config.redshift_new_scaling_coefs()
+        coefs = ctx.planner_config.redshift_new_scaling_coefs(ctx.schema_name)
         coefs[0] *= resource_factor
         return latency / coefs.sum()
 

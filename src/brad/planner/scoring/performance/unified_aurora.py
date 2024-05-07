@@ -376,7 +376,7 @@ class AuroraProvisioningScore:
         rf = np.array(resource_factors)
         basis = np.stack([rf, np.ones_like(rf)])
         basis = np.transpose(basis)
-        coefs = ctx.planner_config.aurora_new_scaling_coefs()
+        coefs = ctx.planner_config.aurora_new_scaling_coefs(ctx.schema_name)
         coefs = np.multiply(coefs, basis)
 
         num_coefs = coefs.shape[1]
@@ -467,7 +467,7 @@ class AuroraProvisioningScore:
             return np.ones_like(latency) * np.inf
         # Ideally we should adjust for load as well.
         resource_factor = _AURORA_BASE_RESOURCE_VALUE / aurora_num_cpus(prov)
-        coefs = ctx.planner_config.aurora_new_scaling_coefs()
+        coefs = ctx.planner_config.aurora_new_scaling_coefs(ctx.schema_name)
         coefs[0] *= resource_factor
         return latency / coefs.sum()
 

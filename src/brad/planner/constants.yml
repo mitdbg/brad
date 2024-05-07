@@ -202,20 +202,43 @@ table_extract_bytes_per_row:
 ###
 
 aurora_scaling_new:
-  # Wait time (from queuing theory)
-  # alpha * avg_query_time * (u / (1 - u)) + base
-  alpha: 0.0464553
+  imdb_extended_100g:
+    # Wait time (from queuing theory)
+    # alpha * avg_query_time * (u / (1 - u)) + base
+    alpha: 0.0464553
 
-  # Resources
-  # [coef1 (s/d) + coef2] * base
-  coef1: 0.75851053
-  coef2: 0.5486482
+    # Resources
+    # [coef1 (s/d) + coef2] * base
+    coef1: 0.75851053
+    coef2: 0.5486482
+
+  imdb_specialized_100g:
+    alpha: 0.0464553
+    coef1: 0.75851053
+    coef2: 0.5486482
+
+  chbenchmark:
+    # Queries cannot complete in time on Aurora.
+    alpha: 1.0
+    coef1: 0.0
+    coef2: 1.0
 
 redshift_scaling_new:
   # Same model as above.
-  alpha: 0.730064
-  coef1: 0.89125617
-  coef2: 0.1139099
+  imdb_extended_100g:
+    alpha: 0.730064
+    coef1: 0.89125617
+    coef2: 0.1139099
+
+  imdb_specialized_100g:
+    alpha: 0.730064
+    coef1: 0.89125617
+    coef2: 0.1139099
+
+  chbenchmark:
+    alpha: 1.0  # Now unused
+    coef1: 0.16853629
+    coef2: 0.61977525
 
 run_time_to_denorm_cpu:
   aurora:
