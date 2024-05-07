@@ -42,7 +42,7 @@ front_end_query_latency_buffer_size: 100
 
 # `default` means to use the policy encoded in the blueprint. Other values will
 # override the blueprint.
-routing_policy: always_aurora
+routing_policy: always_redshift
 
 # Whether to disable table movement for benchmark purposes (i.e., keep all
 # tables on all engines.)
