@@ -30,6 +30,54 @@ function run_tpcc() {
   popd
 }
 
+function start_repeating_olap_runner() {
+  local ra_clients=$1
+  local ra_gap_s=$2
+  local ra_gap_std_s=$3
+  local query_indexes=$4
+  local results_name=$5
+  local client_offset=$6
+
+  local args=(
+    --num-clients $ra_clients
+    --num-front-ends $num_front_ends
+    --query-indexes $query_indexes
+    --query-bank-file $ra_query_bank_file
+    --avg-gap-s $ra_gap_s
+    --avg-gap-std-s $ra_gap_std_s
+  )
+
+  if [[ ! -z $ra_query_frequency_path ]]; then
+    args+=(--query-frequency-path $ra_query_frequency_path)
+  fi
+
+  if [[ ! -z $client_offset ]]; then
+    args+=(--client-offset $client_offset)
+  fi
+
+  >&2 echo "[Serial Repeating Analytics] Running with $ra_clients..."
+  results_dir=$COND_OUT/$results_name
+  mkdir -p $results_dir
+
+  log_workload_point $results_name
+  COND_OUT=$results_dir python3.11 ../../../workloads/IMDB_extended/run_repeating_analytics_serial.py "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
+function graceful_shutdown() {
+  for pid_var in "$@"; do
+    kill -INT $pid_var
+  done
+  for pid_var in "$@"; do
+    wait $pid_var
+  done
+
+  kill -INT $brad_pid
+  wait $brad_pid
+}
+
 function extract_named_arguments() {
   # Evaluates any environment variables in this script's arguments. This script
   # should only be run on trusted input.

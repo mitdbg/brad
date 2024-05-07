@@ -81,3 +81,20 @@ run_experiment(
     "txn-zipfian-alpha": ZIPFIAN_ALPHA,
   },
 )
+
+# Query indices.
+QUERIES = ",".join([str(v) for v in range(22)])
+
+run_experiment(
+  name="run_full",
+  run="./run_full.sh",
+  options={
+    "txn-config-file": "brad.config",
+    "txn-warehouses": 1740,
+    "txn-scale-factor": 1,  # TBD
+    "t-clients": 1,  # TBD
+    "run-for-s": 30,
+    "txn-zipfian-alpha": ZIPFIAN_ALPHA,
+    "ra-query-indexes": QUERIES,
+  },
+)

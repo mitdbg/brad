@@ -119,10 +119,8 @@ comparator:
 
 # Used for precomputed predictions.
 std_datasets:
-  - name: regular
-    path: workloads/IMDB_100GB/regular_test/
-  - name: adhoc
-    path: workloads/IMDB_100GB/adhoc_test/
+  - name: chbenchmark
+    path: workloads/chbenchmark/
 
 # Blueprint planning trigger configs.
 
