@@ -89,6 +89,9 @@ run_experiment(
   name="run_full",
   run="./run_full.sh",
   options={
+    "physical-config-file": "../../../config/physical_config_chbench.yml",
+    "system-config-file": "debug_config.yml",  # Relative to one level up.
+    "schema-name": "chbenchmark",
     "txn-config-file": "brad.config",
     "txn-warehouses": 1740,
     "txn-scale-factor": 1,  # TBD
