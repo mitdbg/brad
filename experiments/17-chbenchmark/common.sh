@@ -30,6 +30,12 @@ function run_tpcc() {
   popd
 }
 
+function log_workload_point() {
+  msg=$1
+  now=$(date --utc "+%Y-%m-%d %H:%M:%S")
+  echo "$now,$msg" >> $COND_OUT/points.log
+}
+
 function start_repeating_olap_runner() {
   local ra_clients=$1
   local ra_gap_s=$2
