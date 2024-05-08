@@ -120,7 +120,7 @@ class SessionManager:
         ):
             policy = blueprint.get_routing_policy()
             requires_estimator = isinstance(policy.definite_policy, ForestPolicy)
-            if self._config.stub_mode_path() is None or requires_estimator:
+            if self._config.stub_mode_path() is None and requires_estimator:
                 estimator: Optional[Estimator] = await PostgresEstimator.connect(
                     self._schema_name, self._config
                 )
