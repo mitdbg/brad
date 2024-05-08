@@ -66,6 +66,7 @@ from brad.planner.workload import Workload
 from brad.planner.workload.builder import WorkloadBuilder
 from brad.planner.workload.provider import LoggedWorkloadProvider
 from brad.routing.policy import RoutingPolicy
+from brad.routing.tree_based.forest_policy import ForestPolicy
 from brad.row_list import RowList
 from brad.utils.time_periods import period_start, universal_now
 from brad.ui.manager import UiManager
@@ -328,7 +329,10 @@ class BradDaemon:
             or self._config.routing_policy == RoutingPolicy.Default
         ):
             logger.info("Setting up the cardinality estimator...")
-            if is_stub_mode:
+            blueprint = self._blueprint_mgr.get_blueprint()
+            policy = blueprint.get_routing_policy()
+            requires_estimator = isinstance(policy.definite_policy, ForestPolicy)
+            if is_stub_mode or not requires_estimator:
                 estimator: Estimator = StubEstimator()
             else:
                 estimator = await PostgresEstimator.connect(
