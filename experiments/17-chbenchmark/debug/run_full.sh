@@ -19,8 +19,7 @@ run_tpcc "t_1"
 start_repeating_olap_runner 1 10 5 $ra_query_indexes "ch_1" $t_clients
 ra_pid=$runner_pid
 
-# Wait for 1 hour.
-sleep $(( 60 * 60 ))
+sleep $run_for_s
 
 # Shut down.
 graceful_shutdown $tpcc_pid $ra_pid
