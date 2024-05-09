@@ -513,9 +513,23 @@ class BradFrontEnd(BradInterface):
 
             # Extract and return the results, if any.
             try:
-                # Using `fetchall_sync()` is lower overhead than the async interface.
-                results = [tuple(row) for row in cursor.fetchall_sync()]
-                log_verbose(logger, "Responded with %d rows.", len(results))
+                result_row_limit = self._config.result_row_limit()
+                if result_row_limit is not None:
+                    results = []
+                    for _ in range(result_row_limit):
+                        row = cursor.fetchone_sync()
+                        if row is None:
+                            break
+                        results.append(tuple(row))
+                    log_verbose(
+                        logger,
+                        "Responded with %d rows (limited to %d rows).",
+                        len(results),
+                    )
+                else:
+                    # Using `fetchall_sync()` is lower overhead than the async interface.
+                    results = [tuple(row) for row in cursor.fetchall_sync()]
+                    log_verbose(logger, "Responded with %d rows.", len(results))
                 return (
                     results,
                     (cursor.result_schema(results) if retrieve_schema else None),

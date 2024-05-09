@@ -288,6 +288,12 @@ class ConfigFile:
         else:
             return 7583
 
+    def result_row_limit(self) -> Optional[int]:
+        try:
+            return self._raw["result_row_limit"]
+        except KeyError:
+            return None
+
     def _extract_log_path(self, config_key: str) -> Optional[pathlib.Path]:
         if config_key not in self._raw:
             return None

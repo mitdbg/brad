@@ -104,6 +104,8 @@ txn_latency_p90_ceiling_s: 0.030
 # clusters instead of resizing the main Redshift cluster.
 use_preset_redshift_clusters: false
 
+result_row_limit: 10
+
 # Used for ordering blueprints during planning.
 comparator:
   type: benefit_perf_ceiling  # or `perf_ceiling`

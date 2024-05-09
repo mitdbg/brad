@@ -13,6 +13,7 @@ function start_brad() {
 }
 
 function run_tpcc() {
+  local results_name=$1
   pushd ../../../workloads/chbenchmark/py-tpcc/
   local args=(
     --no-load
@@ -25,7 +26,8 @@ function run_tpcc() {
   if [[ ! -z $txn_zipfian_alpha ]]; then
     args+=(--zipfian-alpha $txn_zipfian_alpha)
   fi
-  RECORD_DETAILED_STATS=1 python3 -m pytpcc.tpcc brad "${args[@]}" &
+  mkdir -p $COND_OUT/$results_name
+  RECORD_DETAILED_STATS=1 COND_OUT=$COND_OUT/$results_name python3 -m pytpcc.tpcc brad "${args[@]}" &
   tpcc_pid=$!
   popd
 }

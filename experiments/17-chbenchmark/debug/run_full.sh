@@ -15,7 +15,7 @@ start_brad $abs_system_config_file $abs_physical_config_file
 
 sleep 30
 
-run_tpcc
+run_tpcc "t_1"
 start_repeating_olap_runner 1 10 5 $ra_query_indexes "ch_1" $t_clients
 ra_pid=$runner_pid
 
