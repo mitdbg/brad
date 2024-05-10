@@ -16,7 +16,7 @@ run_experiment(
     "txn-scale-factor": 1,  # TBD
     "t-clients": 4,  # TBD
     "num-front-ends": 5, # TBD
-    "run-for-s": 1 * 60 * 60,  # 1 hour
+    "run-for-s": 2 * 60 * 60,  # 1 hour
     "txn-zipfian-alpha": ZIPFIAN_ALPHA,
     "ra-query-indexes": QUERIES_STR,
     "ra-query-bank-file": "../../../workloads/chbenchmark/queries.sql",
