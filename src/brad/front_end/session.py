@@ -11,6 +11,7 @@ from brad.front_end.debug import ReestablishConnectionsReport
 from brad.front_end.engine_connections import EngineConnections
 from brad.planner.estimator import Estimator
 from brad.routing.policy import RoutingPolicy
+from brad.routing.tree_based.forest_policy import ForestPolicy
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_stats.stub_estimator import StubEstimator
 from brad.utils.time_periods import universal_now
@@ -117,7 +118,9 @@ class SessionManager:
             routing_policy_override == RoutingPolicy.ForestTableSelectivity
             or routing_policy_override == RoutingPolicy.Default
         ):
-            if self._config.stub_mode_path() is None:
+            policy = blueprint.get_routing_policy()
+            requires_estimator = isinstance(policy.definite_policy, ForestPolicy)
+            if self._config.stub_mode_path() is None and requires_estimator:
                 estimator: Optional[Estimator] = await PostgresEstimator.connect(
                     self._schema_name, self._config
                 )

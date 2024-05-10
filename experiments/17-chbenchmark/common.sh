@@ -13,6 +13,7 @@ function start_brad() {
 }
 
 function run_tpcc() {
+  local results_name=$1
   pushd ../../../workloads/chbenchmark/py-tpcc/
   local args=(
     --no-load
@@ -25,9 +26,64 @@ function run_tpcc() {
   if [[ ! -z $txn_zipfian_alpha ]]; then
     args+=(--zipfian-alpha $txn_zipfian_alpha)
   fi
-  RECORD_DETAILED_STATS=1 python3 -m pytpcc.tpcc brad "${args[@]}" &
+  mkdir -p $COND_OUT/$results_name
+  RECORD_DETAILED_STATS=1 COND_OUT=$COND_OUT/$results_name python3 -m pytpcc.tpcc brad "${args[@]}" &
   tpcc_pid=$!
   popd
+}
+
+function log_workload_point() {
+  msg=$1
+  now=$(date --utc "+%Y-%m-%d %H:%M:%S")
+  echo "$now,$msg" >> $COND_OUT/points.log
+}
+
+function start_repeating_olap_runner() {
+  local ra_clients=$1
+  local ra_gap_s=$2
+  local ra_gap_std_s=$3
+  local query_indexes=$4
+  local results_name=$5
+  local client_offset=$6
+
+  local args=(
+    --num-clients $ra_clients
+    --num-front-ends $num_front_ends
+    --query-indexes $query_indexes
+    --query-bank-file $ra_query_bank_file
+    --avg-gap-s $ra_gap_s
+    --avg-gap-std-s $ra_gap_std_s
+  )
+
+  if [[ ! -z $ra_query_frequency_path ]]; then
+    args+=(--query-frequency-path $ra_query_frequency_path)
+  fi
+
+  if [[ ! -z $client_offset ]]; then
+    args+=(--client-offset $client_offset)
+  fi
+
+  >&2 echo "[Serial Repeating Analytics] Running with $ra_clients..."
+  results_dir=$COND_OUT/$results_name
+  mkdir -p $results_dir
+
+  log_workload_point $results_name
+  COND_OUT=$results_dir python3.11 ../../../workloads/IMDB_extended/run_repeating_analytics_serial.py "${args[@]}" &
+
+  # This is a special return value variable that we use.
+  runner_pid=$!
+}
+
+function graceful_shutdown() {
+  for pid_var in "$@"; do
+    kill -INT $pid_var
+  done
+  for pid_var in "$@"; do
+    wait $pid_var
+  done
+
+  kill -INT $brad_pid
+  wait $brad_pid
 }
 
 function extract_named_arguments() {

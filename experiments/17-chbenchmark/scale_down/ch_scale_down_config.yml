@@ -97,8 +97,8 @@ aurora_min_load_removal_fraction: 0.8
 redshift_min_load_removal_fraction: 0.8
 
 # Blueprint planning performance ceilings.
-query_latency_p90_ceiling_s: 30.0
-txn_latency_p90_ceiling_s: 0.030
+query_latency_p90_ceiling_s: 360.0
+txn_latency_p90_ceiling_s: 0.080
 
 # If set to true, BRAD will attempt to use the specified preset Redshift
 # clusters instead of resizing the main Redshift cluster.
@@ -113,7 +113,7 @@ comparator:
   benefit_horizon:  # Only used by the `benefit_perf_ceiling` comparator
     weeks: 0
     days: 0
-    hours: 1
+    hours: 24
     minutes: 0
 
   penalty_threshold: 0.8  # Only used by the `benefit_perf_ceiling` comparator
@@ -135,7 +135,7 @@ triggers:
   # takes effect. Usually this should be greater than zero to give BRAD
   # sufficient time to observe the effect of the blueprint on the workload. BRAD
   # may wait longer to ensure metrics are also available for this many minutes.
-  observe_new_blueprint_mins: 3
+  observe_new_blueprint_mins: 5
 
   elapsed_time:
     disabled: true
@@ -156,11 +156,11 @@ triggers:
     threshold: 1.0
 
   query_latency_ceiling:
-    ceiling_s: 30.0
+    ceiling_s: 360.0
     sustained_epochs: 3
 
   txn_latency_ceiling:
-    ceiling_s: 0.030
+    ceiling_s: 0.080
     sustained_epochs: 3
 
   recent_change:
