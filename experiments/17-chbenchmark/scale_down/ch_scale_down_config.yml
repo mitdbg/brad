@@ -6,7 +6,7 @@
 # listen on successive ports (e.g., 6584, 6585, etc.).
 front_end_interface: "0.0.0.0"
 front_end_port: 6583
-num_front_ends: 2
+num_front_ends: 5
 
 # If installed and enabled, BRAD will serve its UI from a webserver that listens
 # for connections on this network interface and port.
@@ -127,7 +127,7 @@ std_datasets:
 # Blueprint planning trigger configs.
 
 triggers:
-  enabled: false
+  enabled: true
   check_period_s: 90  # Triggers are checked every X seconds.
   check_period_offset_s: 360  # Wait 6 mins before starting.
 
