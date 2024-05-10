@@ -1,0 +1,24 @@
+ZIPFIAN_ALPHA = 5.0
+
+# Query indices.
+QUERIES = list(range(22))
+QUERIES_STR = ",".join([str(v) for v in QUERIES])
+
+run_experiment(
+  name="run_full",
+  run="./run_full.sh",
+  options={
+    "physical-config-file": "../../../config/physical_config_chbench.yml",
+    "system-config-file": "ch_scale_down_config.yml",  # Relative to one level up.
+    "schema-name": "chbenchmark",
+    "txn-config-file": "brad.config",
+    "txn-warehouses": 1740,
+    "txn-scale-factor": 1,  # TBD
+    "t-clients": 1,  # TBD
+    "num-front-ends": 2, # TBD
+    "run-for-s": 2 * 60 * 60,  # 2 hours
+    "txn-zipfian-alpha": ZIPFIAN_ALPHA,
+    "ra-query-indexes": QUERIES_STR,
+    "ra-query-bank-file": "../../../workloads/chbenchmark/queries.sql",
+  },
+)
