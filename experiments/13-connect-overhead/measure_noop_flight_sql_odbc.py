@@ -1,6 +1,6 @@
 import argparse
 import time
-from brad.flight_sql_client import BradFlightSqlClient
+from brad.flight_sql_client_odbc import BradFlightSqlClientOdbc
 
 
 def main():
@@ -10,7 +10,7 @@ def main():
     parser.add_argument("--port", type=int, default=31337)
     args = parser.parse_args()
 
-    with BradFlightSqlClient(args.host, args.port) as client:
+    with BradFlightSqlClientOdbc(args.host, args.port) as client:
         start = time.time()
         for _ in range(args.repetitions):
             client.run_query("BRAD_NOOP")

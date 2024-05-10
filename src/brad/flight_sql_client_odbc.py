@@ -1,9 +1,9 @@
-import sqlite3
+import pyodbc
 from typing import Generator, Tuple, List, Any
 
-class BradFlightSqlClient:
+class BradFlightSqlClientOdbc:
     """
-    A client that communicates with BRAD directly against SQLite database.
+    A client that communicates with BRAD via Arrow Flight SQL ODBC driver.
 
     Usage:
     ```
@@ -16,8 +16,9 @@ class BradFlightSqlClient:
     RowList = List[Tuple[Any, ...]]
 
 
-    def __init__(self, database: str):
-        self._database = database
+    def __init__(self, host="localhost", port=31337):
+        self._host = host
+        self._port = port
 
     def __enter__(self):
         self.connect()
@@ -27,7 +28,11 @@ class BradFlightSqlClient:
         self.close()
 
     def connect(self):
-        self._connection = sqlite3.connect(self._database)
+        self._connection = pyodbc.connect(
+            "DRIVER={Arrow Flight SQL ODBC Driver};USEENCRYPTION=false;" + 
+            f"HOST={self._host};" +
+            f"PORT={self._port}",
+            autocommit=True)
         self._cursor = self._connection.cursor()
 
     def close(self):
@@ -42,6 +47,6 @@ class BradFlightSqlClient:
         return self._cursor.execute(query)
 
 if __name__ == "__main__":
-     with BradFlightSqlClient(database="/tmp/sophiez_brad_stub_db.sqlite") as client:
+    with BradFlightSqlClientOdbc() as client:
         for row in client.run_query("SELECT 1"):
             print(row)
