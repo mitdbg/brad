@@ -83,7 +83,10 @@ run_experiment(
 )
 
 # Query indices.
-QUERIES = ",".join([str(v) for v in range(22)])
+QUERIES = list(range(22))
+QUERIES.remove(4)
+QUERIES.remove(13)
+QUERIES_STR = ",".join([str(v) for v in QUERIES])
 
 run_experiment(
   name="run_full",
@@ -99,7 +102,7 @@ run_experiment(
     "num-front-ends": 2, # TBD
     "run-for-s": 60 * 60,  # One hour
     "txn-zipfian-alpha": ZIPFIAN_ALPHA,
-    "ra-query-indexes": QUERIES,
+    "ra-query-indexes": QUERIES_STR,
     "ra-query-bank-file": "../../../workloads/chbenchmark/queries.sql",
   },
 )
