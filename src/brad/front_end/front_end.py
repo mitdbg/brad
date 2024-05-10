@@ -456,8 +456,13 @@ class BradFrontEnd(BradInterface):
                     # HACK: To work around dialect differences between
                     # Athena/Aurora/Redshift for now. This should be replaced by
                     # a more robust translation layer.
-                    if engine_to_use == Engine.Athena and "ascii" in query_rep.raw_query:
-                        translated_query = query_rep.raw_query.replace("ascii", "codepoint")
+                    if (
+                        engine_to_use == Engine.Athena
+                        and "ascii" in query_rep.raw_query
+                    ):
+                        translated_query = query_rep.raw_query.replace(
+                            "ascii", "codepoint"
+                        )
                     else:
                         translated_query = query_rep.raw_query
                     start = universal_now()
