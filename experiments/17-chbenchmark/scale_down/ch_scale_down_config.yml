@@ -97,7 +97,7 @@ aurora_min_load_removal_fraction: 0.8
 redshift_min_load_removal_fraction: 0.8
 
 # Blueprint planning performance ceilings.
-query_latency_p90_ceiling_s: 360.0
+query_latency_p90_ceiling_s: 50.0
 txn_latency_p90_ceiling_s: 0.080
 
 # If set to true, BRAD will attempt to use the specified preset Redshift
@@ -156,7 +156,7 @@ triggers:
     threshold: 1.0
 
   query_latency_ceiling:
-    ceiling_s: 360.0
+    ceiling_s: 50.0
     sustained_epochs: 3
 
   txn_latency_ceiling:
