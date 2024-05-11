@@ -2,6 +2,9 @@ ZIPFIAN_ALPHA = 5.0
 
 # Query indices.
 QUERIES = list(range(22))
+QUERIES.remove(4)
+QUERIES.remove(9)
+QUERIES.remove(17)
 QUERIES_STR = ",".join([str(v) for v in QUERIES])
 
 run_experiment(
