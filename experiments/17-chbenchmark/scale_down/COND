@@ -5,6 +5,7 @@ QUERIES = list(range(22))
 QUERIES.remove(4)
 QUERIES.remove(9)
 QUERIES.remove(17)
+QUERIES.remove(20)
 QUERIES_STR = ",".join([str(v) for v in QUERIES])
 
 run_experiment(
