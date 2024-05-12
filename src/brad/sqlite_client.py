@@ -1,13 +1,13 @@
 import sqlite3
 from typing import Generator, Tuple, List, Any
 
-class BradFlightSqlClient:
+class BradSqliteClient:
     """
     A client that communicates with BRAD directly against SQLite database.
 
     Usage:
     ```
-    with BradFlightSqlClient(host, port) as client:
+    with BradSqlClient(host, port) as client:
         for row in client.run_query(session_id, "SELECT 1"):
             print(row)
     ```
@@ -42,6 +42,6 @@ class BradFlightSqlClient:
         return self._cursor.execute(query)
 
 if __name__ == "__main__":
-     with BradFlightSqlClient(database="/tmp/sophiez_brad_stub_db.sqlite") as client:
+     with BradSqliteClient(database="/tmp/sophiez_brad_stub_db.sqlite") as client:
         for row in client.run_query("SELECT 1"):
             print(row)

@@ -2,7 +2,7 @@ import argparse
 import time
 from brad.grpc_client import BradGrpcClient
 from brad.flight_sql_client_odbc import BradFlightSqlClientOdbc
-from brad.flight_sql_client import BradFlightSqlClient
+from brad.sqlite_client import BradSqliteClient
 from prettytable import PrettyTable
 
 
@@ -38,7 +38,7 @@ def main():
 
     table.add_row(["Flight SQL ODBC", args.repetitions, total, avg_lat])
 
-    with BradFlightSqlClient(database="/tmp/sophiez_brad_stub_db.sqlite") as client:
+    with BradSqliteClient(database="/tmp/sophiez_brad_stub_db.sqlite") as client:
         start = time.time()
         for _ in range(args.repetitions):
             client.run_query(args.query)
@@ -47,7 +47,7 @@ def main():
     total = end - start
     avg_lat = total / args.repetitions
 
-    table.add_row(["Flight SQL (direct)", args.repetitions, total, avg_lat])
+    table.add_row(["SQLite", args.repetitions, total, avg_lat])
 
     print(table)
 
