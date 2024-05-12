@@ -178,7 +178,14 @@ class Executor:
                 if self.stop_on_error:
                     raise
                 r.abortTransaction(txn_id)
-                self.driver.ensureRollback()
+
+                try:
+                    self.driver.ensureRollback()
+                except:  # pylint: disable=bare-except
+                    # This may happen if we try to issue a rollback when the connection has dropped.
+                    verbose_logger.exception(
+                        "[T %d] Ran into error when running rollback.", worker_index
+                    )
 
                 # Back off slightly.
                 if backoff is None:
