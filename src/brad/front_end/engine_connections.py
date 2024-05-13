@@ -274,6 +274,12 @@ class EngineConnections:
         except KeyError as ex:
             raise RuntimeError("Not connected to {}".format(engine)) from ex
 
+    def get_connection_if_exists(self, engine: Engine) -> Optional[Connection]:
+        try:
+            return self._connection_map[engine]
+        except KeyError:
+            return None
+
     def get_reader_connection(
         self, engine: Engine, specific_index: Optional[int] = None
     ) -> Connection:

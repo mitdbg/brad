@@ -30,7 +30,7 @@ def delete_s3_object(client, bucket: str, key: str) -> None:
 
 
 async def main_impl(args) -> None:
-    config = ConfigFile.load(args.config_file)
+    config = ConfigFile.load_from_physical_config(args.physical_config_file)
     assets = AssetManager(config)
     mgr = BlueprintManager(config, assets, args.schema_name)
     await mgr.load()
@@ -121,7 +121,7 @@ def main():
         "Run this after bootstrapping a schema to measure table sizing "
         "constants used by the blueprint planner."
     )
-    parser.add_argument("--config-file", type=str, required=True)
+    parser.add_argument("--physical-config-file", type=str, required=True)
     parser.add_argument("--schema-name", type=str, required=True)
     parser.add_argument("--debug", action="store_true")
     # Unloading is slow - we do not need to unload the entire table to get a

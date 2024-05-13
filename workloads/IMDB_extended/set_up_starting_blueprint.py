@@ -15,6 +15,7 @@ from brad.routing.abstract_policy import FullRoutingPolicy
 from brad.routing.cached import CachedLocationPolicy
 from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.forest_policy import ForestPolicy
+from brad.routing.always_one import AlwaysOneRouter
 from brad.utils import set_up_logging
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,11 @@ def main():
     parser.add_argument(
         "--aurora-provisioning", type=str, help="Format: <instance type>:<num. nodes>"
     )
+    parser.add_argument(
+        "--override-definite-routing",
+        type=str,
+        help="An engine to always route queries for if the indefinite policy does not capture it.",
+    )
     args = parser.parse_args()
     set_up_logging(debug_mode=True)
 
@@ -124,11 +130,15 @@ def main():
 
     # 5. Replace the policy.
     enum_blueprint = EnumeratedBlueprint(blueprint)
-    definite_policy = asyncio.run(
-        ForestPolicy.from_assets(
-            args.schema_name, RoutingPolicy.ForestTableCardinality, assets
+    if args.override_definite_routing is not None:
+        routing_engine = Engine.from_str(args.override_definite_routing)
+        definite_policy = AlwaysOneRouter(routing_engine)
+    else:
+        definite_policy = asyncio.run(
+            ForestPolicy.from_assets(
+                args.schema_name, RoutingPolicy.ForestTableCardinality, assets
+            )
         )
-    )
     replaced_policy = FullRoutingPolicy(
         indefinite_policies=[clp], definite_policy=definite_policy
     )

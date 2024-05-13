@@ -30,7 +30,7 @@ class DropTables(Operator):
         )
 
     async def execute(self, ctx: ExecutionContext) -> "Operator":
-        query_template = "DROP TABLE {}"
+        query_template = "DROP TABLE IF EXISTS {}"
 
         if self._engine == Engine.Aurora:
             for table in self._table_names:

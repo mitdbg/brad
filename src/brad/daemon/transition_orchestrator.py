@@ -131,14 +131,20 @@ class TransitionOrchestrator:
 
         # 2. Sync tables (TODO: discuss more efficient alternatives -
         # possibly add a filter of tables to run_sync)
-        await self._data_sync_executor.establish_connections()
-        ran_sync = await self._data_sync_executor.run_sync(
-            self._blueprint_mgr.get_blueprint()
-        )
-        logger.debug(
-            """Completed data sync step during transition. """
-            f"""There were {'some' if ran_sync else 'no'} new writes to sync"""
-        )
+        if not self._config.skip_sync_before_movement:
+            await self._data_sync_executor.establish_connections()
+            ran_sync = await self._data_sync_executor.run_sync(
+                self._blueprint_mgr.get_blueprint()
+            )
+            logger.debug(
+                """Completed data sync step during transition. """
+                f"""There were {'some' if ran_sync else 'no'} new writes to sync"""
+            )
+        else:
+            logger.info("Not running table sync before movement.")
+
+        if self._system_event_logger is not None:
+            self._system_event_logger.log(SystemEvent.PreTableMovementStarted)
 
         # 3. Create tables in new locations as needed
         directory = self._blueprint_mgr.get_directory()
@@ -188,7 +194,9 @@ class TransitionOrchestrator:
                 table_awaitables.append(self._enforce_table_diff_additions(diff))
         await asyncio.gather(*table_awaitables)
 
-        logger.debug("Table movement complete.")
+        logger.info("Table movement complete.")
+        if self._system_event_logger is not None:
+            self._system_event_logger.log(SystemEvent.PreTableMovementCompleted)
 
         # Close connections
         await self._cxns.close()
@@ -472,11 +480,20 @@ class TransitionOrchestrator:
         table_diffs: Optional[list[TableDiff]],
     ) -> None:
         # Drop removed tables.
+        assert self._curr_blueprint is not None
+        aurora_on = self._curr_blueprint.aurora_provisioning().num_nodes() > 0
         if (
-            table_diffs is not None
+            aurora_on
+            and table_diffs is not None
             and len(table_diffs) > 0
             and self._config.disable_table_movement is False
+            and self._config.skip_aurora_table_deletion is False
         ):
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.PostTableMovementStarted, "aurora"
+                )
+
             views_to_drop = []
             triggers_to_drop = []
             tables_to_drop = []
@@ -486,6 +503,12 @@ class TransitionOrchestrator:
                     triggers_to_drop.append(table_diff.table_name())
                     tables_to_drop.append(source_table_name(table_diff.table_name()))
                     tables_to_drop.append(shadow_table_name(table_diff.table_name()))
+
+            logger.info("In transition: Dropping Aurora views %s", str(views_to_drop))
+            logger.info(
+                "In transition: Dropping Aurora triggers %s", str(triggers_to_drop)
+            )
+            logger.info("In transition: Dropping Aurora tables %s", str(tables_to_drop))
 
             ctx = self._new_execution_context()
 
@@ -501,6 +524,11 @@ class TransitionOrchestrator:
             nonsilent_assert(self._cxns is not None)
             assert self._cxns is not None
             self._cxns.get_connection(Engine.Aurora).cursor_sync().commit_sync()
+
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.PostTableMovementCompleted, "aurora"
+                )
 
         # Change the provisioning.
         if diff is not None:
@@ -601,18 +629,34 @@ class TransitionOrchestrator:
         self, diff: Optional[ProvisioningDiff], table_diffs: Optional[list[TableDiff]]
     ) -> None:
         # Drop removed tables
-        if table_diffs is not None and self._config.disable_table_movement is False:
+        assert self._curr_blueprint is not None
+        redshift_on = self._curr_blueprint.redshift_provisioning().num_nodes() > 0
+        if (
+            redshift_on
+            and table_diffs is not None
+            and self._config.disable_table_movement is False
+        ):
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.PostTableMovementStarted, "redshift"
+                )
+
             to_drop = []
             for table_diff in table_diffs:
                 if Engine.Redshift in table_diff.removed_locations():
                     to_drop.append(table_diff.table_name())
-            logger.debug(f"Tables to drop: {to_drop}")
+            logger.info("In transition: Dropping Redshift tables %s", str(to_drop))
             d = DropTables(to_drop, Engine.Redshift)
             ctx = self._new_execution_context()
             await d.execute(ctx)
             nonsilent_assert(self._cxns is not None)
             assert self._cxns is not None
             self._cxns.get_connection(Engine.Redshift).cursor_sync().commit_sync()
+
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.PostTableMovementCompleted, "redshift"
+                )
 
         # Pause the cluster if we are transitioning to 0 nodes.
         if diff is not None:
@@ -628,13 +672,28 @@ class TransitionOrchestrator:
     ) -> None:
         # Drop removed tables
         to_drop = []
-        if table_diffs is not None and self._config.disable_table_movement is False:
+        if (
+            table_diffs is not None
+            and self._config.disable_table_movement is False
+            and self._config.skip_athena_table_deletion is False
+        ):
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.PostTableMovementStarted, "athena"
+                )
+
             for table_diff in table_diffs:
                 if Engine.Athena in table_diff.removed_locations():
                     to_drop.append(table_diff.table_name())
+            logger.info("In transition: Dropping Athena tables %s", str(to_drop))
             d = DropTables(to_drop, Engine.Athena)
             ctx = self._new_execution_context()
             await d.execute(ctx)
+
+            if self._system_event_logger is not None:
+                self._system_event_logger.log(
+                    SystemEvent.PostTableMovementCompleted, "athena"
+                )
 
     async def _enforce_table_diff_additions(self, diff: TableDiff) -> None:
         # Unload table to S3
@@ -670,28 +729,28 @@ class TransitionOrchestrator:
         if Engine.Redshift in curr_locations:  # Faster to write out from Redshift
             u = UnloadToS3(table_name, s3_path, engine=Engine.Redshift, delimiter=",")
             ctx = self._new_execution_context()
-            await u.execute(ctx)
-            logger.debug(
-                f"In transition: table {table_name} written to S3 from Redshift."
+            logger.info(
+                "In transition: table %s being written to S3 from Redshift.", table_name
             )
+            await u.execute(ctx)
         elif Engine.Aurora in curr_locations:
             u = UnloadToS3(table_name, s3_path, engine=Engine.Aurora, delimiter=",")
             ctx = self._new_execution_context()
-            await u.execute(ctx)
-            logger.debug(
-                f"In transition: table {table_name} written to S3 from Aurora."
+            logger.info(
+                "In transition: table %s being written to S3 from Aurora.", table_name
             )
+            await u.execute(ctx)
         elif Engine.Athena in curr_locations:
             u = UnloadToS3(table_name, s3_path, engine=Engine.Athena)
             ctx = self._new_execution_context()
-            await u.execute(ctx)
-            logger.debug(
-                f"In transition: table {table_name} written to S3 from Athena."
+            logger.info(
+                "In transition: table %s being written to S3 from Athena.", table_name
             )
+            await u.execute(ctx)
         else:
             logger.error(
-                f"""In transition: table {table_name} does not exist 
-                         on any engine in current blueprint."""
+                "In transition: table %s does not exist on any engine in current blueprint.",
+                table_name,
             )
 
     async def _load_table_to_engine(self, table_name: str, e: Engine) -> None:
@@ -708,6 +767,9 @@ class TransitionOrchestrator:
 
         if e == Engine.Aurora:
             # Load table to aurora from S3
+            logger.info(
+                "In transition: loading table %s into Aurora from S3", table_name
+            )
             response = ctx.s3_client().list_objects_v2(
                 Bucket=ctx.s3_bucket(), Prefix=ctx.s3_path() + s3_path_prefix
             )
@@ -751,12 +813,18 @@ class TransitionOrchestrator:
             await cursor.commit()
 
         elif e == Engine.Redshift:
+            logger.info(
+                "In transition: loading table %s into Redshift from S3", table_name
+            )
             l = LoadFromS3(table_name, s3_path_prefix, e, delimiter=",", header_rows=1)
             await l.execute(ctx)
             nonsilent_assert(self._cxns is not None)
             assert self._cxns is not None
             self._cxns.get_connection(Engine.Redshift).cursor_sync().commit_sync()
         elif e == Engine.Athena:
+            logger.info(
+                "In transition: loading table %s into Athena from S3", table_name
+            )
             l = LoadFromS3(table_name, s3_path_prefix, e, delimiter=",", header_rows=1)
             await l.execute(ctx)
 
@@ -766,9 +834,9 @@ class TransitionOrchestrator:
         nonsilent_assert(self._cxns is not None)
         assert self._cxns is not None
         return ExecutionContext(
-            aurora=self._cxns.get_connection(Engine.Aurora),
-            athena=self._cxns.get_connection(Engine.Athena),
-            redshift=self._cxns.get_connection(Engine.Redshift),
+            aurora=self._cxns.get_connection_if_exists(Engine.Aurora),
+            athena=self._cxns.get_connection_if_exists(Engine.Athena),
+            redshift=self._cxns.get_connection_if_exists(Engine.Redshift),
             blueprint=self._blueprint_mgr.get_blueprint(),
             config=self._config,
         )

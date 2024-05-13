@@ -181,25 +181,64 @@ table_extract_bytes_per_row:
     movie_info: 29.57191
     person_info: 133.458044
 
+  # TPC-C Warehouses: 1740
+  # Around ~120 GB of uncompressed data.
+  chbenchmark:
+    warehouse: 92.40747126436781
+    item: 75.62581
+    stock: 308.868974
+    district: 98.52431034482758
+    customer: 570.148704
+    history: 65.51127
+    orders: 40.134002
+    new_order: 9.937048
+    order_line: 68.538322
+    region: 216.8
+    nation: 185.03225806451613
+    supplier: 194.728
+
 ###
 ### Models used to account for hardware/system load.
 ###
 
 aurora_scaling_new:
-  # Wait time (from queuing theory)
-  # alpha * avg_query_time * (u / (1 - u)) + base
-  alpha: 0.0464553
+  imdb_extended_100g:
+    # Wait time (from queuing theory)
+    # alpha * avg_query_time * (u / (1 - u)) + base
+    alpha: 0.0464553
 
-  # Resources
-  # [coef1 (s/d) + coef2] * base
-  coef1: 0.75851053
-  coef2: 0.5486482
+    # Resources
+    # [coef1 (s/d) + coef2] * base
+    coef1: 0.75851053
+    coef2: 0.5486482
+
+  imdb_specialized_100g:
+    alpha: 0.0464553
+    coef1: 0.75851053
+    coef2: 0.5486482
+
+  chbenchmark:
+    # Queries cannot complete in time on Aurora.
+    alpha: 1.0
+    coef1: 0.0
+    coef2: 1.0
 
 redshift_scaling_new:
   # Same model as above.
-  alpha: 0.730064
-  coef1: 0.89125617
-  coef2: 0.1139099
+  imdb_extended_100g:
+    alpha: 0.730064
+    coef1: 0.89125617
+    coef2: 0.1139099
+
+  imdb_specialized_100g:
+    alpha: 0.730064
+    coef1: 0.89125617
+    coef2: 0.1139099
+
+  chbenchmark:
+    alpha: 1.0  # Now unused
+    coef1: 0.16853629
+    coef2: 0.61977525
 
 run_time_to_denorm_cpu:
   aurora:
@@ -349,6 +388,16 @@ aurora_txns:
     K: 1.0811012983322144
     b_p50: 0.0008631267119199038
     b_p90: 0.002251814818009734
+
+  # These constants are for the W = 1740 version of the dataset.
+  chbenchmark:
+    # Note that C_1, C_2 are meant to be the same for this dataset.
+    C_1: 0.008586008776871991
+    C_2: 0.008586008776871991
+
+    K: 1.0293710231781006
+    b_p50: 0.011220300570130348
+    b_p90: 0.022309081628918648
 
 
 aurora_scaling:

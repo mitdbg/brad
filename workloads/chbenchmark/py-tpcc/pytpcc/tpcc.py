@@ -43,6 +43,7 @@ from pprint import pprint, pformat
 from .util import *
 from .runtime import *
 from .drivers.auroradriver import AuroraDriver
+from .drivers.auroratimingdriver import AuroraTimingDriver
 from .drivers.braddriver import BradDriver
 from .drivers.tidbdriver import TiDBDriver
 
@@ -64,6 +65,8 @@ def createDriverClass(name):
         return AuroraDriver
     elif name == "tidb":
         return TiDBDriver
+    elif name == "auroratiming":
+        return AuroraTimingDriver
     else:
         raise NotImplementedError
 
@@ -218,7 +221,11 @@ def executorFunc(
         )
         driver.executeStart()
         results = e.execute(
-            args["duration"], worker_index, total_workers, args["lat_sample_prob"]
+            args["duration"],
+            worker_index,
+            total_workers,
+            args["lat_sample_prob"],
+            args["zipfian_alpha"],
         )
         driver.executeFinish()
 
@@ -304,6 +311,11 @@ if __name__ == "__main__":
         default=0.1,
         help="The fraction of the transaction latencies to record.",
     )
+    aparser.add_argument(
+        "--zipfian-alpha",
+        type=float,
+        help="The alpha parameter to use in a Zipfian distribution when selecting warehouse and item IDs.",
+    )
     args = vars(aparser.parse_args())
 
     if args["debug"]:
@@ -386,6 +398,7 @@ if __name__ == "__main__":
                 worker_index=0,
                 total_workers=1,
                 lat_sample_prob=args["lat_sample_prob"],
+                zipfian_alpha=args["zipfian_alpha"],
             )
             driver.executeFinish()
         else:

@@ -191,6 +191,30 @@ class ConfigFile:
             return True
 
     @property
+    def skip_sync_before_movement(self) -> bool:
+        try:
+            return self._raw["skip_sync_before_table_movement"]
+        except KeyError:
+            # Skip by default.
+            return True
+
+    @property
+    def skip_athena_table_deletion(self) -> bool:
+        try:
+            return self._raw["skip_athena_table_deletion"]
+        except KeyError:
+            # Skip by default.
+            return True
+
+    @property
+    def skip_aurora_table_deletion(self) -> bool:
+        try:
+            return self._raw["skip_aurora_table_deletion"]
+        except KeyError:
+            # Skip by default.
+            return True
+
+    @property
     def use_preset_redshift_clusters(self) -> bool:
         try:
             # We require that table movement is also disabled. Otherwise we need
@@ -263,6 +287,12 @@ class ConfigFile:
             return self._raw["ui_port"]
         else:
             return 7583
+
+    def result_row_limit(self) -> Optional[int]:
+        try:
+            return self._raw["result_row_limit"]
+        except KeyError:
+            return None
 
     def _extract_log_path(self, config_key: str) -> Optional[pathlib.Path]:
         if config_key not in self._raw:

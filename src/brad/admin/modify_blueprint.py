@@ -149,6 +149,13 @@ def register_admin_action(subparser) -> None:
         help="Set to abort an in-progress transition. "
         "Only do this if you know what you are doing!",
     )
+    parser.add_argument(
+        "--reset-schema-name",
+        action="store_true",
+        help="Set to ensure the serialized schema name is the same as the "
+        "passed-in schema name. Sometimes there may be a mismatch, which can "
+        "cause problems.",
+    )
     parser.set_defaults(admin_action=modify_blueprint)
 
 
@@ -350,7 +357,9 @@ def modify_blueprint(args) -> None:
         enum_blueprint.set_routing_policy(full_policy)
 
     # 6. Write the changes back.
-    modified_blueprint = enum_blueprint.to_blueprint()
+    modified_blueprint = enum_blueprint.to_blueprint(
+        forced_schema_name=args.schema_name if args.reset_schema_name else None
+    )
     if blueprint == modified_blueprint:
         logger.info("No changes made to the blueprint.")
         return

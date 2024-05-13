@@ -51,13 +51,13 @@ class EnumeratedBlueprint(Blueprint):
         self._current_routing_policy = routing_policy
         return self
 
-    def to_blueprint(self) -> Blueprint:
+    def to_blueprint(self, forced_schema_name: Optional[str] = None) -> Blueprint:
         """
         Makes a copy of this object as a `Blueprint`.
         """
 
         return Blueprint(
-            self.schema_name(),
+            self.schema_name() if forced_schema_name is None else forced_schema_name,
             self.tables(),
             table_locations={
                 name: locations.copy()

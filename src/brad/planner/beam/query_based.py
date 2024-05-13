@@ -75,7 +75,11 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
             # on at least one engine. This ensures that arbitrary unseen join
             # templates can always be immediately handled.
             all_tables = ", ".join(
-                [table.name for table in self._current_blueprint.tables()]
+                [
+                    table.name
+                    for table in self._current_blueprint.tables()
+                    if table.name != "embeddings"
+                ]
             )
             next_workload.add_priming_analytical_query(
                 f"SELECT 1 FROM {all_tables} LIMIT 1"

@@ -6,7 +6,7 @@
 # listen on successive ports (e.g., 6584, 6585, etc.).
 front_end_interface: "0.0.0.0"
 front_end_port: 6583
-num_front_ends: 1
+num_front_ends: 2
 
 # If installed and enabled, BRAD will serve its UI from a webserver that listens
 # for connections on this network interface and port.
@@ -42,7 +42,7 @@ front_end_query_latency_buffer_size: 100
 
 # `default` means to use the policy encoded in the blueprint. Other values will
 # override the blueprint.
-routing_policy: always_aurora
+routing_policy: default
 
 # Whether to disable table movement for benchmark purposes (i.e., keep all
 # tables on all engines.)
@@ -104,6 +104,8 @@ txn_latency_p90_ceiling_s: 0.030
 # clusters instead of resizing the main Redshift cluster.
 use_preset_redshift_clusters: false
 
+result_row_limit: 10
+
 # Used for ordering blueprints during planning.
 comparator:
   type: benefit_perf_ceiling  # or `perf_ceiling`
@@ -119,10 +121,8 @@ comparator:
 
 # Used for precomputed predictions.
 std_datasets:
-  - name: regular
-    path: workloads/IMDB_100GB/regular_test/
-  - name: adhoc
-    path: workloads/IMDB_100GB/adhoc_test/
+  - name: chbenchmark
+    path: workloads/chbenchmark/
 
 # Blueprint planning trigger configs.
 

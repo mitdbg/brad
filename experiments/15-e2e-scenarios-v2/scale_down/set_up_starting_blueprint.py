@@ -71,6 +71,7 @@ def main():
         help="Comma separated list of indices.",
         default="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46",
     )
+    parser.add_argument("--place-tables-both", action="store_true")
     args = parser.parse_args()
     set_up_logging(debug_mode=True)
 
@@ -130,7 +131,7 @@ def main():
     new_placement = {}
     aurora_txn = ["theatres", "showings", "ticket_orders", "movie_info", "aka_title"]
     for table in blueprint.tables():
-        if table.name in aurora_txn:
+        if args.place_tables_both or table.name in aurora_txn:
             new_placement[table.name] = [Engine.Aurora, Engine.Redshift]
         else:
             new_placement[table.name] = [Engine.Redshift]

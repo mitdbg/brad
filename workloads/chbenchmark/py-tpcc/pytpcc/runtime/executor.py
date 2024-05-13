@@ -37,9 +37,11 @@ import traceback
 import logging
 import os
 import pathlib
+import numpy as np
 from datetime import datetime
 from pprint import pprint, pformat
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
+from brad.utils import create_custom_logger
 from typing import Optional
 
 from .. import constants
@@ -62,6 +64,9 @@ class Executor:
         self.total_workers = 1
         self.worker_index = 0
 
+        self.skew_alpha = None
+        self.skew_prng = None
+
     ## DEF
 
     def execute(
@@ -70,6 +75,7 @@ class Executor:
         worker_index: int,
         total_workers: int,
         lat_sample_prob: float,
+        zipfian_alpha: Optional[float],
     ) -> results.Results:
         if RECORD_DETAILED_STATS_VAR in os.environ:
             import conductor.lib as cond
@@ -98,6 +104,13 @@ class Executor:
             logging.info("Not recording detailed stats.")
             options = {}
 
+        verbose_log_dir = out_path / "verbose_logs"
+        verbose_log_dir.mkdir(exist_ok=True)
+        verbose_logger = create_custom_logger(
+            "txn_runner_verbose", str(verbose_log_dir / f"runner_{worker_index}.log")
+        )
+        verbose_logger.info("[T %d] Workload starting...", worker_index)
+
         # Compute warehouse ranges.
         self.worker_index = worker_index
         self.total_workers = total_workers
@@ -112,8 +125,19 @@ class Executor:
         logging.info(
             "Worker index %d - Warehouse range: %d to %d (inclusive)",
             self.worker_index,
-            *self.local_warehouse_range
+            *self.local_warehouse_range,
         )
+
+        if zipfian_alpha is not None:
+            self.skew_alpha = zipfian_alpha
+            self.skew_prng = np.random.default_rng(seed=42 ^ worker_index)
+            logging.info(
+                "Worker index %d - Selecting warehouse and items using a Zipfian distribution; a = %.2f",
+                worker_index,
+                self.skew_alpha,
+            )
+        else:
+            logging.info("Worker index %d - Not using a Zipfian distribution")
 
         r = results.Results(options)
         assert r
@@ -129,9 +153,19 @@ class Executor:
             if debug:
                 logging.debug("Executing '%s' transaction" % txn)
             try:
+                verbose_logger.info("[T %d] Issuing transaction %s", worker_index, txn)
                 val = self.driver.executeTransaction(txn, params)
                 backoff = None
+                # if debug: logging.debug("%s\nParameters:\n%s\nResult:\n%s" % (txn, pformat(params), pformat(val)))
+                r.stopTransaction(txn_id)
+                verbose_logger.info(
+                    "[T %d] Finished transaction %s, %d", worker_index, txn, txn_id
+                )
+
             except KeyboardInterrupt:
+                verbose_logger.info(
+                    "[T %d] Aborting early due to KeyboardInterrupt", worker_index
+                )
                 return -1
             except (Exception, AssertionError) as ex:
                 if debug:
@@ -140,10 +174,18 @@ class Executor:
                 elif random.random() < 0.01:
                     logging.warning("Aborted transaction: %s: %s", txn, ex)
                     traceback.print_exc(file=sys.stdout)
+                verbose_logger.exception("[T %d] Ran into error", worker_index)
                 if self.stop_on_error:
                     raise
                 r.abortTransaction(txn_id)
-                self.driver.ensureRollback()
+
+                try:
+                    self.driver.ensureRollback()
+                except:  # pylint: disable=bare-except
+                    # This may happen if we try to issue a rollback when the connection has dropped.
+                    verbose_logger.exception(
+                        "[T %d] Ran into error when running rollback.", worker_index
+                    )
 
                 # Back off slightly.
                 if backoff is None:
@@ -152,16 +194,16 @@ class Executor:
                     )
                 wait_s = backoff.wait_time_s()
                 if wait_s is not None:
+                    verbose_logger.info(
+                        "[T %d] Backing off for %.4f seconds", worker_index, wait_s
+                    )
                     time.sleep(wait_s)
 
-                continue
-
-            # if debug: logging.debug("%s\nParameters:\n%s\nResult:\n%s" % (txn, pformat(params), pformat(val)))
-
-            r.stopTransaction(txn_id)
         ## WHILE
 
+        verbose_logger.info("[T %d] Benchmark stopping...", worker_index)
         r.stopBenchmark()
+        verbose_logger.info("[T %d] Benchmark done.", worker_index)
         return r
 
     ## DEF
@@ -370,7 +412,19 @@ class Executor:
                 ):
                     break
         else:
-            w_id = rand.number(*self.local_warehouse_range)
+            if self.skew_prng is not None:
+                # Skewed warehouse choice
+                min_warehouse, max_warehouse = self.local_warehouse_range
+                warehouse_span = max_warehouse - min_warehouse + 1
+                while True:
+                    # Chosen in range [1, inf)
+                    candidate = self.skew_prng.zipf(a=self.skew_alpha)
+                    if candidate <= warehouse_span:
+                        break
+                return min_warehouse + (candidate - 1)
+            else:
+                # Uniformly randomly chosen warehouse
+                w_id = rand.number(*self.local_warehouse_range)
 
         assert w_id >= self.scaleParameters.starting_warehouse, (
             "Invalid W_ID: %d" % w_id
@@ -391,7 +445,14 @@ class Executor:
     ## DEF
 
     def makeItemId(self):
-        return rand.NURand(8191, 1, self.scaleParameters.items)
+        if self.skew_alpha is None:
+            return rand.NURand(8191, 1, self.scaleParameters.items)
+        else:
+            # Select item ID using a zipfian distribution.
+            while True:
+                candidate = self.skew_prng.zipf(a=self.skew_alpha)
+                if candidate <= self.scaleParameters.items:
+                    return candidate
 
     ## DEF
 
