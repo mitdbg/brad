@@ -151,15 +151,23 @@ class TiDBLoader:
         cur.execute("SET GLOBAL local_infile = 1;")
         self.conn.commit()
 
-    def manually_copy_s3_data(self, table_names, source_dir="chbenchmark"):
+    def manually_copy_s3_data(self, table_names, source_dir="chbenchmark", source_bucket="geoffxy-research", source_ext="tbl"):
         s3 = boto3.resource("s3")
         for t in table_names:
-            source_key = f"{source_dir}/{t}/{t}.tbl"
+            source_key = f"{source_dir}/{t}/{t}.{source_ext}"
             target_key = f"{source_dir}/test.{t}.csv"
-            copy_source = {"Bucket": "geoffxy-research", "Key": source_key}
+            # copy_source = {"Bucket": "geoffxy-research", "Key": source_key}
+            copy_source = {"Bucket": source_bucket, "Key": source_key}
             print(f"Copying {t}")
             start_t = time.perf_counter()
-            s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
+            try:
+                s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
+            except Exception as e:
+                e = f"{e}"
+                if "Not Found" in e:
+                    source_key = f"{source_dir}/{t}/test.{t}.{source_ext}"
+                    copy_source = {"Bucket": source_bucket, "Key": source_key}
+                    s3.meta.client.copy(copy_source, self.s3_bucket, target_key)
             print(f"Copied {t} in {time.perf_counter() - start_t:.2f} secs")
 
     def fetch_metrics(self, start_time=None, end_time=None):
@@ -169,9 +177,9 @@ class TiDBLoader:
         with open(schema_file, "r", encoding="utf-8") as f:
             schema = f.read()
         self.submit_query(schema, until_success=True)
-        for t in table_names:
-            replica_cmd = f"ALTER TABLE {t} SET TIFLASH REPLICA 1"
-            self.submit_query(replica_cmd, until_success=True)
+        # for t in table_names:
+        #     replica_cmd = f"ALTER TABLE {t} SET TIFLASH REPLICA 1"
+        #     self.submit_query(replica_cmd, until_success=True)
 
         # print("Creating Indexes")
         # indexes_sql = load_schema_sql(dataset, "indexes.sql")
@@ -564,9 +572,10 @@ CREATE TABLE IF NOT EXISTS embeddings (
 
 if __name__ == "__main__":
     baseline = TiDBLoader()
-    chtables = ['warehouse', 'item', 'stock', 'district', 'customer', 'history', 'orders', 'new_order', 'order_line', 'region', 'nation', 'supplier']
-    # baseline.load_database("tables.sql", chtables)
-    baseline.manually_copy_s3_data(chtables, source_dir="chbenchmark")
+    imtables = ['homes', 'theatres', 'showings', 'ticket_orders', 'aka_name', 'aka_title', 'cast_info', 'char_name', 'comp_cast_type', 'company_name', 'company_type', 'complete_cast', 'info_type', 'keyword', 'kind_type', 'link_type', 'movie_companies', 'movie_info_idx', 'movie_keyword', 'movie_link', 'name', 'role_type', 'title', 'movie_info', 'person_info']
+    # chtables = ['warehouse', 'item', 'stock', 'district', 'customer', 'history', 'orders', 'new_order', 'order_line', 'region', 'nation', 'supplier']
+    baseline.load_database("tables.sql", imtables)
+    # baseline.manually_copy_s3_data(imtables, source_bucket="brad-personal-data", source_dir="imdb_extended", source_ext="csv")
     # baseline.manual_unload("imdb_extended", do_unload=False, start_chunk=-1, end_chunk=-1)
     # baseline.manual_count_all("imdb_extended")
     # import sys

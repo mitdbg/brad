@@ -129,9 +129,9 @@ def main():
         with open("good_adhoc_queries.sql", "w", encoding="utf-8") as f:
             f.write("\n".join(res))
 
-if __name__ == "__main__":
-    main()
-    sys.exit(0)
+# if __name__ == "__main__":
+#     main()
+#     sys.exit(0)
 
 import yaml
 
@@ -164,7 +164,7 @@ def index_definition(table_name, index_columns):
 
 
 def yaml_main():
-    with open("config/schemas/chbenchmark.yml", "r", encoding="utf-8") as f:
+    with open("config/schemas/imdb_extended.yml", "r", encoding="utf-8") as f:
         tables = yaml.safe_load(f)
         print(f"Tables: {tables}")
 
