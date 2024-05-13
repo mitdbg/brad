@@ -20,7 +20,25 @@ run_experiment(
     "txn-scale-factor": 1,  # TBD
     "t-clients": 4,  # TBD
     "num-front-ends": 5, # TBD
-    "run-for-s": 2 * 60 * 60,  # 1 hour
+    "run-for-s": 2 * 60 * 60,  # 2 hours
+    "txn-zipfian-alpha": ZIPFIAN_ALPHA,
+    "ra-query-indexes": QUERIES_STR,
+    "ra-query-bank-file": "../../../workloads/chbenchmark/queries.sql",
+  },
+)
+
+
+run_experiment(
+  name="run_full_ar",
+  run="./run_full_ar_baseline.sh",
+  options={
+    "physical-config-file": "../../../config/physical_config_chbench.yml",
+    "schema-name": "chbenchmark",
+    "txn-config-file": "aurora.config",
+    "txn-warehouses": 1740,
+    "txn-scale-factor": 1,  # TBD
+    "t-clients": 4,  # TBD
+    "run-for-s": 2 * 60 * 60,  # 2 hours
     "txn-zipfian-alpha": ZIPFIAN_ALPHA,
     "ra-query-indexes": QUERIES_STR,
     "ra-query-bank-file": "../../../workloads/chbenchmark/queries.sql",
