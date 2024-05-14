@@ -1,5 +1,6 @@
 import argparse
 import time
+
 from brad.flight_sql_client_odbc import BradFlightSqlClientOdbc
 
 

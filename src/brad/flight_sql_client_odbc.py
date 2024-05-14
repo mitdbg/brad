@@ -1,6 +1,7 @@
 import pyodbc
 from typing import Generator, Tuple, List, Any
 
+
 class BradFlightSqlClientOdbc:
     """
     A client that communicates with BRAD via Arrow Flight SQL ODBC driver.
@@ -15,10 +16,11 @@ class BradFlightSqlClientOdbc:
 
     RowList = List[Tuple[Any, ...]]
 
-
     def __init__(self, host="localhost", port=31337):
         self._host = host
         self._port = port
+        self._connection = None
+        self._cursor = None
 
     def __enter__(self):
         self.connect()
@@ -29,10 +31,11 @@ class BradFlightSqlClientOdbc:
 
     def connect(self):
         self._connection = pyodbc.connect(
-            "DRIVER={Arrow Flight SQL ODBC Driver};USEENCRYPTION=false;" + 
-            f"HOST={self._host};" +
-            f"PORT={self._port}",
-            autocommit=True)
+            "DRIVER={Arrow Flight SQL ODBC Driver};USEENCRYPTION=false;"
+            + f"HOST={self._host};"
+            + f"PORT={self._port}",
+            autocommit=True,
+        )
         self._cursor = self._connection.cursor()
 
     def close(self):
@@ -45,8 +48,3 @@ class BradFlightSqlClientOdbc:
 
     def run_query(self, query: str) -> RowList:
         return self._cursor.execute(query)
-
-if __name__ == "__main__":
-    with BradFlightSqlClientOdbc() as client:
-        for row in client.run_query("SELECT 1"):
-            print(row)
