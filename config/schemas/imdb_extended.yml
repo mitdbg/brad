@@ -17,7 +17,7 @@ tables:
     data_type: SERIAL
     primary_key: true
   - name: name
-    data_type: TEXT
+    data_type: VARCHAR(256)
   - name: location_x
     data_type: DECIMAL(10)
   - name: location_y

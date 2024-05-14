@@ -2,6 +2,7 @@ import random
 import numpy as np
 import logging
 from datetime import datetime, timedelta
+import time
 from typing import List, Tuple, Any
 
 from brad.grpc_client import RowList, BradClientError
@@ -84,7 +85,7 @@ class TransactionWorker:
 
         try:
             # Start the transaction.
-            db.execute_sync("BEGIN")
+            db.begin_sync()
 
             # 2. Select matching movie infos.
             infos = db.execute_sync(
@@ -139,7 +140,7 @@ class TransactionWorker:
 
         try:
             # Start the transaction.
-            db.execute_sync("BEGIN")
+            db.begin_sync()
 
             # 3. Verify that the movie actually exists.
             rows = db.execute_sync(f"SELECT id FROM title WHERE id = {movie_id}")
@@ -181,14 +182,12 @@ class TransactionWorker:
         - Insert into `ticket_order`
         - Update the `showing` entry
         """
-
         # 1. Select a random theatre number.
         theatre_num = self._sample_id(self.min_theatre_id, self.max_theatre_id)
 
         try:
             # Start the transaction.
-            db.execute_sync("BEGIN")
-
+            db.begin_sync()
             if select_using_name:
                 results = db.execute_sync(
                     f"SELECT id FROM theatres WHERE name = 'Theatre #{theatre_num}'"
@@ -210,7 +209,7 @@ class TransactionWorker:
             )
             if len(showing_options) == 0:
                 # No options. We still consider this as a "success" and return true.
-                db.execute_sync("COMMIT")
+                db.commit_sync()
                 return True
 
             # 3. Choose a showing.
@@ -228,7 +227,6 @@ class TransactionWorker:
                 "INSERT INTO ticket_orders (showing_id, quantity, contact_name, location_x, location_y) "
                 f"VALUES ({showing_id}, {quantity}, '{contact_name}', {loc_x:.4f}, {loc_y:.4f})"
             )
-
             # 5. Update the showing's seats left.
             db.execute_sync(
                 f"UPDATE showings SET seats_left = {seats_left - quantity} WHERE id = {showing_id}"

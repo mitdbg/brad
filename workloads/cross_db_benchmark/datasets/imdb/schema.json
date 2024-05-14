@@ -1,6 +1,9 @@
 {"name": "imdb",
   "csv_kwargs": {"sep": "|", "header": 0, "escapechar": "\\", "encoding": "utf-8", "quotechar": "\"", "on_bad_lines": "skip"},
-  "db_load_kwargs": {"postgres": "DELIMITER '|' QUOTE '\"' ESCAPE '\\' NULL '' CSV HEADER;"},
+  "db_load_kwargs": {
+    "postgres": "DELIMITER '|' QUOTE '\"' ESCAPE '\\' NULL '' CSV HEADER;",
+    "mysql": "FIELDS TERMINATED BY '|' ENCLOSED BY '\"' ESCAPED BY '\\\\'"
+  },
   "tables":
     ["title",
      "cast_info",

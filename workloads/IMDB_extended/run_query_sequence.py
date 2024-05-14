@@ -71,7 +71,7 @@ async def runner_impl(
 
         out_dir = cond.get_output_path()
     else:
-        out_dir = pathlib.Path(".")
+        out_dir = pathlib.Path(f"./{args.output_dir}").resolve()
 
     if args.engine is not None:
         engine = Engine.from_str(args.engine)
@@ -141,11 +141,17 @@ async def runner_impl(
                     start = time.time()
                     _, engine = db.execute_sync_with_engine(query)
                     end = time.time()
+                    if engine is None:
+                        engine_name = "tidb"
+                    elif isinstance(engine, Engine):
+                        engine_name = engine.value
+                    else:
+                        engine_name = engine
                     return QueryResult(
                         error=None,
                         timestamp=timestamp,
                         run_time_s=end - start,
-                        engine=engine.value,
+                        engine=engine_name,
                         query_idx=query_idx,
                         db=db,
                     )
@@ -335,6 +341,18 @@ def main():
     )
     parser.add_argument(
         "--engine", type=str, help="The engine to use, if connecting directly."
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=".",
+        help="Environment variable that stores the output directory of the results",
+    )
+    parser.add_argument(
+        "--baseline",
+        default="",
+        type=str,
+        help="Whether to use tidb, aurora or redshift",
     )
     parser.add_argument("--issue-slots", type=int, default=1)
     args = parser.parse_args()

@@ -45,6 +45,7 @@ from .runtime import *
 from .drivers.auroradriver import AuroraDriver
 from .drivers.auroratimingdriver import AuroraTimingDriver
 from .drivers.braddriver import BradDriver
+from .drivers.tidbtimingdriver import TiDBTimingDriver
 
 logging.basicConfig(
     level=logging.INFO,
@@ -62,6 +63,8 @@ def createDriverClass(name):
         return BradDriver
     elif name == "aurora":
         return AuroraDriver
+    elif name == "tidb":
+        return TiDBTimingDriver
     elif name == "auroratiming":
         return AuroraTimingDriver
     else:

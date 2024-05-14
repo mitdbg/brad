@@ -1,0 +1,6 @@
+host: fillme
+user: fillme
+password: fillme
+port: 4000
+public_key: fillme # TIDB Cloud Public Key
+private_key: fillme # TIDB Cloud Private Key

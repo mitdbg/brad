@@ -146,11 +146,17 @@ def get_run_query(
             start = time.time()
             _, engine = db.execute_sync_with_engine(query)
             end = time.time()
+            if engine is None:
+                engine_name = "tidb"
+            elif isinstance(engine, Engine):
+                engine_name = engine.value
+            else:
+                engine_name = engine
             return QueryResult(
                 error=None,
                 timestamp=timestamp,
                 run_time_s=end - start,
-                engine=engine.value if engine is not None else None,
+                engine=engine_name,
                 query_idx=query_idx,
                 time_since_execution_s=time_since_execution,
                 time_of_day=time_of_day,
@@ -212,7 +218,7 @@ async def runner_impl(
 
         out_dir = cond.get_output_path()
     else:
-        out_dir = pathlib.Path(".")
+        out_dir = pathlib.Path(f"./{args.output_dir}").resolve()
 
     verbose_log_dir = out_dir / "verbose_logs"
     verbose_log_dir.mkdir(exist_ok=True)
@@ -426,7 +432,18 @@ def main():
     )
     parser.add_argument("--issue-slots", type=int, default=10)
     parser.add_argument("--trace-manifest", type=str, required=True)
-    parser.add_argument("--serverless-redshift", action="store_true")
+    parser.add_argument(
+        "--baseline",
+        default="",
+        type=str,
+        help="Whether to use tidb, aurora or redshift",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=".",
+        help="Environment variable that stores the output directory of the results",
+    )
     args = parser.parse_args()
 
     set_up_logging()

@@ -16,6 +16,7 @@ from workload_utils.database import (
     BradDatabase,
     DirectConnection,
 )
+from workload_utils.baseline import make_tidb_conn, make_postgres_compatible_conn
 
 
 def connect_to_db(
@@ -90,7 +91,12 @@ def connect_to_db(
 
     elif args.cstr_var is not None:
         db = PyodbcDatabase(pyodbc.connect(os.environ[args.cstr_var], autocommit=True))
-
+    elif args.baseline == "tidb":
+        db = PyodbcDatabase(make_tidb_conn())
+    elif args.baseline in ["aurora", "redshift"]:
+        db = PyodbcDatabase(
+            make_postgres_compatible_conn(args.baseline), engine=args.baseline
+        )
     else:
         port_offset = (worker_index + args.client_offset) % args.num_front_ends
         port = args.brad_port + port_offset
@@ -103,5 +109,4 @@ def connect_to_db(
         if verbose_logger is not None:
             verbose_logger.info("[%d] Connected to BRAD.", worker_index)
         db = BradDatabase(brad)
-
     return db

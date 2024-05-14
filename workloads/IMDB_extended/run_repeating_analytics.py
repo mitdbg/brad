@@ -80,12 +80,18 @@ def get_run_query(
         try:
             start = time.time()
             _, engine = db.execute_sync_with_engine(query)
+            if engine is None:
+                engine_name = "tidb"
+            elif isinstance(engine, Engine):
+                engine_name = engine.value
+            else:
+                engine_name = engine
             end = time.time()
             return QueryResult(
                 error=None,
                 timestamp=timestamp,
                 run_time_s=end - start,
-                engine=engine.value,
+                engine=engine_name,
                 query_idx=query_idx,
                 time_since_execution_s=time_since_execution,
                 time_of_day=time_of_day,
@@ -151,7 +157,7 @@ async def runner_impl(
 
         out_dir = cond.get_output_path()
     else:
-        out_dir = pathlib.Path(".")
+        out_dir = pathlib.Path(f"./{args.output_dir}").resolve()
 
     verbose_log_dir = out_dir / "verbose_logs"
     verbose_log_dir.mkdir(exist_ok=True)
@@ -399,7 +405,7 @@ def simulation_runner(
 
         out_dir = cond.get_output_path()
     else:
-        out_dir = pathlib.Path(".")
+        out_dir = pathlib.Path(f"./{args.output_dir}").resolve()
 
     if query_frequency_original is not None:
         query_frequency = copy.deepcopy(query_frequency_original)
@@ -518,7 +524,7 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
 
         out_dir = cond.get_output_path()
     else:
-        out_dir = pathlib.Path(".")
+        out_dir = pathlib.Path(f"./{args.output_dir}").resolve()
 
     try:
         print(
@@ -638,7 +644,7 @@ def main():
     parser.add_argument(
         "--time-scale-factor",
         type=int,
-        default=100,
+        default=50,
         help="trace 1s of simulation as X seconds in real-time to match the num-concurrent-query",
     )
     parser.add_argument(
@@ -648,6 +654,18 @@ def main():
         help="The multiplier to the number of clients for each period of a day",
     )
     parser.add_argument("--query-indexes", type=str)
+    parser.add_argument(
+        "--baseline",
+        default="",
+        type=str,
+        help="Whether to use tidb, aurora or redshift",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=".",
+        help="Environment variable that stores the output directory of the results",
+    )
     parser.add_argument(
         "--brad-direct",
         action="store_true",
@@ -713,7 +731,7 @@ def main():
     else:
         num_client_trace = None
 
-    if args.query_indexes is None:
+    if args.query_indexes is None or args.query_indexes == "":
         queries = list(range(len(query_bank)))
     else:
         queries = list(map(int, args.query_indexes.split(",")))
@@ -863,9 +881,11 @@ def main():
             if args.run_for_s - total_exec_time_in_s <= (time_in_s - curr_time_in_s):
                 wait_time = args.run_for_s - total_exec_time_in_s
                 if wait_time > 0:
+                    print(f"[Analytics] Waiting for {wait_time}s")
                     time.sleep(wait_time)
                 finished_one_day = False
                 break
+            print(f"[Analytics] Waiting for {time_in_s-curr_time_in_s}s")
             time.sleep(time_in_s - curr_time_in_s)
             num_client_required = min(num_expected_clients, args.num_clients)
             if num_client_required > num_running_client:

@@ -8,6 +8,7 @@ import signal
 import threading
 import time
 import os
+import pickle
 import pytz
 import multiprocessing as mp
 import logging
@@ -95,7 +96,7 @@ async def runner_impl(
 
         out_dir = cond.get_output_path()
     else:
-        out_dir = pathlib.Path(".")
+        out_dir = pathlib.Path(f"./{args.output_dir}").resolve()
 
     verbose_log_dir = out_dir / "verbose_logs"
     verbose_log_dir.mkdir(exist_ok=True)
@@ -113,9 +114,10 @@ async def runner_impl(
                 directory=directory,
                 verbose_logger=verbose_logger,
             )
-            db.execute_sync(
-                f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
-            )
+            if args.baseline != "tidb":
+                db.execute_sync(
+                    f"SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL {args.isolation_level}"
+                )
             db_conns.append(db)
     except BradClientError as ex:
         logger.error("[T %d] Failed to connect to BRAD: %s", worker_idx, str(ex))
@@ -171,6 +173,8 @@ async def runner_impl(
 
             if result.error is not None:
                 ex = result.error
+                verbose_logger.warning(f"ERR: {ex}")
+                # Check if object has a `is_transient` method.
                 if ex.is_transient():
                     verbose_logger.warning("Transient txn error: %s", ex.message())
 
@@ -343,6 +347,18 @@ def main():
         help="Environment variable that holds a ODBC connection string. Set to connect directly (i.e., not through BRAD)",
     )
     parser.add_argument(
+        "--baseline",
+        default="",
+        type=str,
+        help="Whether to use tidb, aurora or redshift",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=".",
+        help="Environment variable that stores the output directory of the results",
+    )
+    parser.add_argument(
         "--scale-factor",
         type=int,
         default=1,
@@ -438,10 +454,12 @@ def main():
         num_client_trace = None
         logger.info("[T] Preparing to run a steady workload")
 
+
     mgr = mp.Manager()
     start_queue = [mgr.Queue() for _ in range(args.num_clients)]
     # pylint: disable-next=no-member
     control_semaphore = [mgr.Semaphore(value=0) for _ in range(args.num_clients)]
+
 
     if args.brad_direct:
         assert args.config_file is not None

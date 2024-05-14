@@ -1,0 +1,8 @@
+run_experiment(
+  name="redshift_direct",
+  run="./run_redshift_direct.sh",
+  args=[
+    "../../../config/physical_config_100gb_dl_servl_ar.yml",
+    "imdb_extended_100g",
+  ],
+)
