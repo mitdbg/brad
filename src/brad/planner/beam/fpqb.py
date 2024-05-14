@@ -48,9 +48,10 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         self._disable_external_logging = disable_external_logging
 
     async def _run_replan_impl(
-        self, window_multiplier: int = 1
+        self, window_multiplier: int = 1, beam_override: int = 1
     ) -> Optional[Tuple[Blueprint, Score]]:
         logger.info("Running a fixed provisioning query-based beam replan...")
+        logger.info("Using beam override %d", beam_override)
 
         # 1. Fetch the next workload and apply predictions.
         metrics, metrics_timestamp = self._providers.metrics_provider.get_metrics()
@@ -167,7 +168,7 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         all_provs = list(product(aurora_options, redshift_options))
         if ctx.planner_config.flag("use_sequential_fpqb_search"):
             candidates = await self._do_sequential_search(
-                all_provs, query_indices, planning_router, ctx
+                all_provs, query_indices, planning_router, ctx, beam_override
             )
         else:
             max_workers = self._planner_config.planner_max_workers()
@@ -178,6 +179,7 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
                 ctx,
                 batch_size=20,
                 max_workers=max_workers,
+                beam_size=beam_override,
             )
         candidates.sort(reverse=True)
         if len(candidates) == 0:
@@ -224,7 +226,7 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
                 self._config, "scoring_context", ctx
             )
 
-        return best_blueprint, best_blueprint_score
+        return best_blueprint, best_blueprint_score, debug_values
 
     async def _do_sequential_search(
         self,
@@ -232,6 +234,7 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         query_order: List[int],
         planning_router: Router,
         ctx: ScoringContext,
+        beam_size: int,
     ) -> List[BlueprintCandidate]:
         comparator = self._providers.comparator_provider.get_comparator(
             ctx.metrics,
@@ -245,7 +248,13 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
             if j % 10 == 0:
                 logger.debug("Processing provisioning %d of %d", j, len(provisionings))
             candidate = await self._do_query_beam_search(
-                aurora, redshift, comparator, query_order, planning_router, ctx
+                aurora,
+                redshift,
+                comparator,
+                query_order,
+                planning_router,
+                ctx,
+                beam_size,
             )
             if candidate is None:
                 continue
@@ -264,6 +273,7 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         ctx: ScoringContext,
         batch_size: int,
         max_workers: int,
+        beam_size: int,
     ) -> List[BlueprintCandidate]:
         loop = asyncio.get_running_loop()
         ppe = ProcessPoolExecutor(max_workers=max_workers)
@@ -282,6 +292,7 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
                 self._providers.comparator_provider,
                 query_order,
                 ctx,
+                beam_size,
             )
             futures.append(asyncio.ensure_future(awaitable))
             offset += batch_size
@@ -324,6 +335,7 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         comparator_provider: BlueprintComparatorProvider,
         query_order: List[int],
         ctx: ScoringContext,
+        beam_size: int,
     ) -> List[Optional[BlueprintCandidate]]:
         """
         This is used when running a parallel search. Not meant to be called
@@ -343,7 +355,13 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
             results.append(
                 asyncio.run(
                     FixedProvisioningQueryBasedBeamPlanner._do_query_beam_search(
-                        aurora, redshift, comparator, query_order, planning_router, ctx
+                        aurora,
+                        redshift,
+                        comparator,
+                        query_order,
+                        planning_router,
+                        ctx,
+                        beam_size,
                     )
                 )
             )
@@ -357,6 +375,7 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         query_order: List[int],
         planning_router: Router,
         ctx: ScoringContext,
+        beam_size: int,
     ) -> Optional[BlueprintCandidate]:
         """
         Performs a query based beam search on the given provisioning. Returns
@@ -365,7 +384,6 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         """
         current_top_k: List[BlueprintCandidate] = []
         analytical_queries = ctx.next_workload.analytical_queries()
-        beam_size = ctx.planner_config.beam_size()
 
         first_query_idx = query_order[0]
         first_query = analytical_queries[first_query_idx]

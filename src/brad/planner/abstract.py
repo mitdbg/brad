@@ -120,7 +120,7 @@ class BlueprintPlanner:
             self._replan_in_progress = False
 
     async def _run_replan_impl(
-        self, window_multiplier: int = 1
+        self, window_multiplier: int = 1, beam_override: int = 1
     ) -> Optional[Tuple[Blueprint, Score]]:
         """
         Implementers should override this method to define the blueprint

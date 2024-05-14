@@ -1,7 +1,9 @@
 import asyncio
 import logging
+import math
 from typing import Optional
 
+import conductor.lib as cond
 from brad.asset_manager import AssetManager
 from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
@@ -19,18 +21,6 @@ def register_admin_action(subparser) -> None:
         help="Replay a recorded blueprint planning run for debugging.",
     )
     parser.add_argument(
-        "--system-config-file",
-        type=str,
-        required=True,
-        help="Path to BRAD's system configuration file.",
-    )
-    parser.add_argument(
-        "--physical-config-file",
-        type=str,
-        required=True,
-        help="Path to BRAD's physical configuration file.",
-    )
-    parser.add_argument(
         "--schema-name",
         type=str,
         required=True,
@@ -42,11 +32,7 @@ def register_admin_action(subparser) -> None:
         required=True,
         help="Path to the file containing the recorded planning run.",
     )
-    parser.add_argument(
-        "--ignore-estimator",
-        action="store_true",
-        help="If set, do not attempt to set up the estimator.",
-    )
+    parser.add_argument("--beam-size", type=int, required=True)
     parser.set_defaults(admin_action=replay_planner)
 
 
@@ -62,24 +48,24 @@ class _EstimatorProvider(EstimatorProvider):
 
 
 async def replay_planner_impl(args) -> None:
-    config = ConfigFile.load_from_new_configs(
-        phys_config=args.physical_config_file, system_config=args.system_config_file
-    )
-
     provider = _EstimatorProvider()
-    if not args.ignore_estimator:
-        assets = AssetManager(config)
-        blueprint_mgr = BlueprintManager(config, assets, args.schema_name)
-        await blueprint_mgr.load()
-        estimator = await PostgresEstimator.connect(args.schema_name, config)
-        await estimator.analyze(blueprint_mgr.get_blueprint())
-        provider.set_estimator(estimator)
-
     recorded_run = RecordedPlanningRun.load(args.recorded_run)
     planner = recorded_run.create_planner(provider)
 
     logger.info("Re-running recorded run of type: %s", str(type(recorded_run)))
-    await planner._run_replan_impl()  # pylint: disable=protected-access
+    result = await planner._run_replan_impl(1, args.beam_size)  # pylint: disable=protected-access
+
+    out_dir = cond.get_output_path()
+    with open(out_dir / "result.csv", "w", encoding="UTF-8") as file:
+        print("beam_size,cost_score", file=file)
+        score = math.nan
+        if result is not None:
+            _, _, score_debug = result
+            try:
+                score = score_debug["cost_score"]
+            except KeyError:
+                pass
+        print(f"{args.beam_size},{score}", file=file)
 
 
 # This method is called by `brad.exec.admin.main`.
