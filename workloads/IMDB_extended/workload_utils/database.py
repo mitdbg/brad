@@ -39,7 +39,7 @@ class PyodbcDatabase(Database):
         self._cursor = None
 
     def should_fetch(self, query, cur) -> bool:
-        is_select = query.strip().lower().startswith("select")
+        is_select = query.strip().lower().startswith("select") or query.strip().lower().startswith("with")
         has_rows = cur.rowcount is not None and cur.rowcount > 0
         if self._engine == Engine.Aurora or self._engine == Engine.Redshift:
             return is_select

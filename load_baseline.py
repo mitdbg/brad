@@ -6,7 +6,9 @@ from workloads.IMDB_extended.workload_utils.baseline import (
     PostgresCompatibleLoader,
     TiDBLoader,
     redshift_stress_test,
+    make_tidb_conn,
 )
+from workloads.IMDB_extended.workload_utils.database import PyodbcDatabase
 import time
 import pickle
 import numpy as np
@@ -129,9 +131,9 @@ def main():
         with open("good_adhoc_queries.sql", "w", encoding="utf-8") as f:
             f.write("\n".join(res))
 
-# if __name__ == "__main__":
-#     main()
-#     sys.exit(0)
+if __name__ == "__main__":
+    main()
+    sys.exit(0)
 
 import yaml
 

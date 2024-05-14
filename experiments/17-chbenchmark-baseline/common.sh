@@ -14,7 +14,6 @@ function run_tpcc_tidb() {
   mkdir -p $results_dir
   RECORD_DETAILED_STATS=1 COND_OUT=$results_dir python3 -m pytpcc.tpcc tidb "${args[@]}" &
   tpcc_pid=$!
-  popd
 }
 
 function log_workload_point() {
