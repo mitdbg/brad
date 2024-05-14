@@ -37,10 +37,10 @@ class BradSqliteClient:
         self._connection.close()
 
     def run_query_generator(self, query: str) -> Generator[Tuple[Any, ...], None, None]:
-        assert(self._cursor)
+        assert self._cursor
         for row in self._cursor.execute(query):
             yield row
 
     def run_query(self, query: str) -> RowList:
-        assert(self._cursor)
+        assert self._cursor
         return self._cursor.execute(query)
