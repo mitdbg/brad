@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: py-tpcc
+Version: 0.0
+Summary: Python implementation of the TPC-C benchmark
+Home-page: http://www.cs.brown.edu/~pavlo/
+Author: Andy Pavlo
+Author-email: pavlo@cs.brown.edu
+License: BSD

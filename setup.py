@@ -36,6 +36,7 @@ INSTALL_REQUIRES = [
     "sqlglot",
     "pandas",
     "scikit-learn==1.3.0",
+    "pytz",
     "types-pytz",
     "numpy",
     "imbalanced-learn",
