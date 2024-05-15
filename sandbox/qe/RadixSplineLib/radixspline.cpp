@@ -1,6 +1,6 @@
 #include "radixspline.hpp"
 
-void* build(uint64_t* ks, uint64_t size) {
+void* build(const uint64_t* ks, uint64_t size) {
     RSData* rs = new RSData;
     rs->keys = std::vector<uint64_t>(size);
     memcpy(rs->keys.data(), ks, size * sizeof(uint64_t));
