@@ -10,7 +10,7 @@ struct RSData {
 extern "C" {
 
     int32_t add(int32_t a, int32_t b);
-    void* build(uint64_t* ks, uint64_t size);
+    void* build(const uint64_t* ks, uint64_t size);
 
     bool lookup(void* ptr, uint64_t key);
 
