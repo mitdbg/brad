@@ -23,6 +23,14 @@ pub mod ops;
 /// Utilities for rewriting DataFusion `ExecutionPlan`s.
 pub mod rewrite;
 
+pub mod radixspline {
+    #![allow(non_upper_case_globals)]
+    #![allow(non_camel_case_types)]
+    #![allow(non_snake_case)]
+
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
+
 /// Represents an "open" IOHTAP database. Eventually, the DB should run as a
 /// daemon process. For now it is just an embedded DB (similar to SQLite).
 pub struct DB {

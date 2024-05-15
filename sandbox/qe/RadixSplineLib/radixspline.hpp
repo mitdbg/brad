@@ -7,8 +7,12 @@ struct RSData {
     rs::RadixSpline<uint64_t> rspline;
 };
 
-void* build(std::vector<uint64_t> ks);
+extern "C" {
 
-bool lookup(void* ptr, uint64_t key);
+    int32_t add(int32_t a, int32_t b);
+    void* build(uint64_t* ks, uint64_t size);
 
-void clear(void* ptr);
+    bool lookup(void* ptr, uint64_t key);
+
+    void clear(void* ptr);
+}

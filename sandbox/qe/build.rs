@@ -20,16 +20,9 @@ fn main() {
     // This is the path to the static library file.
     let lib_path = libdir_path.join("libradixspline.a");
 
-    // Tell cargo to look for shared libraries in the specified directory
-    println!("cargo:rustc-link-search={}", libdir_path.to_str().unwrap());
-
-    // Tell cargo to tell rustc to link our `hello` library. Cargo will
-    // automatically know it must look for a `libhello.a` file.
-    println!("cargo:rustc-link-lib=radixspline");
-
     // Run `clang` to compile the `hello.c` file into a `hello.o` object file.
     // Unwrap if it is not possible to spawn the process.
-    if !std::process::Command::new("clang")
+    if !std::process::Command::new("clang++")
         .arg("-c")
         .arg("-o")
         .arg(&obj_path)
@@ -46,7 +39,7 @@ fn main() {
     // Run `ar` to generate the `libhello.a` file from the `hello.o` file.
     // Unwrap if it is not possible to spawn the process.
     if !std::process::Command::new("ar")
-        .arg("rcs")
+        .arg("rcus")
         .arg(lib_path)
         .arg(obj_path)
         .output()
@@ -58,6 +51,24 @@ fn main() {
         panic!("could not emit library file");
     }
 
+    // Build::new()
+    //     .file(headers_path_str)
+    //     .include(libdir_path)
+    //     .compile("radixspline");
+
+    // Build::new()
+    //     .file(libdir_path.join("radixspline.cpp"))
+    //     .cpp(true) // Indicates that this is C++ code
+    //     .compile(libdir_path.join("libradixspline.a").to_str().unwrap());
+
+    // Tell cargo to look for shared libraries in the specified directory
+    println!("cargo:rustc-link-search=native={}", libdir_path.to_str().unwrap());
+
+    // Tell cargo to tell rustc to link our `hello` library. Cargo will
+    // automatically know it must look for a `libhello.a` file.
+    println!("cargo:rustc-link-lib=radixspline");
+    println!("cargo:rustc-link-lib=stdc++");
+    
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
@@ -66,6 +77,9 @@ fn main() {
         .allowlist_function("build")
         .allowlist_function("lookup")
         .allowlist_function("clear")
+        // .allowlist_file("^(.*radixspline.hpp)$")
+        .allowlist_function("add")
+        // .allowlist_function("multiply")
         // The input header we would like to generate
         // bindings for.
         .header(headers_path_str)
