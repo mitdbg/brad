@@ -51,16 +51,6 @@ fn main() {
         panic!("could not emit library file");
     }
 
-    // Build::new()
-    //     .file(headers_path_str)
-    //     .include(libdir_path)
-    //     .compile("radixspline");
-
-    // Build::new()
-    //     .file(libdir_path.join("radixspline.cpp"))
-    //     .cpp(true) // Indicates that this is C++ code
-    //     .compile(libdir_path.join("libradixspline.a").to_str().unwrap());
-
     // Tell cargo to look for shared libraries in the specified directory
     println!("cargo:rustc-link-search=native={}", libdir_path.to_str().unwrap());
 
