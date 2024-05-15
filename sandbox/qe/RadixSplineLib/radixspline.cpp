@@ -1,14 +1,25 @@
 #include "radixspline.hpp"
+#include <iostream>
 
-void* build(std::vector<uint64_t> ks) {
-    RSData* rs = (RSData*)malloc(sizeof(RSData));
-    rs->keys = ks;
+int32_t add(int32_t a, int32_t b) {
+    return a + b;
+}
+
+void* build(uint64_t* ks, uint64_t size) {
+    std::cout << "flag" << std::endl;
+    // RSData* rs = (RSData*)malloc(sizeof(RSData));
+    RSData* rs = new RSData;
+    std::cout << "flag 2" << std::endl;
+    // rs->keys = std::vector<uint64_t>(ks, ks + size);
+    rs->keys = std::vector<uint64_t>(size);
+    memcpy(rs->keys.data(), ks, size * sizeof(uint64_t));
     uint64_t min = rs->keys.front();
     uint64_t max = rs->keys.back();
     rs::Builder<uint64_t> rsb(min, max);
     for (const auto& key : rs->keys) rsb.AddKey(key);
     rs::RadixSpline<uint64_t> rso = rsb.Finalize();
-    memcpy(&(rs->rspline), &rso, sizeof(rs::RadixSpline<uint64_t>));
+    // memcpy(&(rs->rspline), &rso, sizeof(rs::RadixSpline<uint64_t>));
+    rs->rspline = rso;
     return (void*)rs;
 }
 
