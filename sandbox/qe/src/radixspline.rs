@@ -7,10 +7,6 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 use arrow::{array::{UInt64Array, Array}, record_batch::RecordBatch};
 use std::os::raw::c_void;
 
-// pub use build;
-// pub use lookup;
-// pub use clear;
-
 pub struct RadixSpline {
     rs_ptr: *mut c_void,
 }
