@@ -18,7 +18,9 @@ from brad.planner.beam.fpqb_candidate import BlueprintCandidate as FpqbCandidate
 
 class RecordedRun:
     @classmethod
-    def load(cls, exp_dir: str, is_trace: bool = False) -> "RecordedRun":
+    def load(
+        cls, exp_dir: str, is_trace: bool = False, ignore_txn_stats: bool = False
+    ) -> "RecordedRun":
         base = pathlib.Path(exp_dir)
 
         if (base / "brad_metrics_front_end.log").exists():
@@ -35,7 +37,7 @@ class RecordedRun:
             if not inner.is_dir() or not inner.name.startswith("t_"):
                 continue
             clients = int(inner.name.split("_")[1])
-            oltp_stats, oltp_ind_lats = _load_txn_data(inner, clients)
+            oltp_stats, oltp_ind_lats = _load_txn_data(inner, clients, ignore_txn_stats)
             if oltp_stats is not None:
                 stats.append(oltp_stats)
             if oltp_ind_lats is not None:
@@ -533,7 +535,7 @@ def compute_cumulative_cost(minutes: npt.NDArray, monthly_costs: npt.NDArray) ->
 
 
 def _load_txn_data(
-    data_dir: pathlib.Path, num_clients: int
+    data_dir: pathlib.Path, num_clients: int, ignore_txn_stats: bool
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     all_lats = []
     all_stats = []
@@ -562,7 +564,7 @@ def _load_txn_data(
     else:
         comb_lats = None
 
-    if len(all_stats) > 0:
+    if not ignore_txn_stats and len(all_stats) > 0:
         comb_stats = pd.concat(all_stats, ignore_index=True)
         comb_stats = (
             comb_stats.groupby("num_clients")
