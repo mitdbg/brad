@@ -226,6 +226,8 @@ class ScoringContext:
             elif engine == Engine.Athena:
                 # No provisioning.
                 adjusted_latencies = predicted_base_latencies
+            else:
+                raise RuntimeError(f"Unsupported engine {str(engine)}")
 
             # 3. Extract query weights (based on arrival frequency) and scale
             # the run times.

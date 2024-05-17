@@ -194,6 +194,9 @@ async def run_planner_impl(args) -> None:
             )
         ).build()
 
+    else:
+        raise RuntimeError(f"Unsupported workload source {args.workload_source}")
+
     # 5. Load the pre-computed predictions.
     prediction_dir = pathlib.Path(args.predictions_dir)
     prediction_provider = PrecomputedPredictions.load(

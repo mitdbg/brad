@@ -76,6 +76,8 @@ class PhysicalProvisioning:
                     df = redshift
                 elif engine == "aurora":
                     df = aurora
+                else:
+                    raise RuntimeError(f"Unsupported engine {engine}")
                 metric_value = df[metric_name].iloc[-1]
 
                 print(f"Metric {metric_name}: {metric_value}")

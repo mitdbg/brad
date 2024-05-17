@@ -95,6 +95,8 @@ class TrainedModel:
                 self._feature_stats,
                 "AthenaEstSystemCardDetail",
             )
+        else:
+            raise RuntimeError(f"Unsupported engine {str(self._engine)}")
 
         preds = _infer_one_engine(loader, self._model)
 

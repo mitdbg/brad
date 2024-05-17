@@ -60,6 +60,8 @@ class TableSizer:
             conn = self._engines.get_connection(Engine.Redshift)
         elif location == Engine.Athena:
             conn = self._engines.get_connection(Engine.Athena)
+        else:
+            raise RuntimeError(f"Unsupported engine location {str(location)}")
 
         if approximate_allowed and location == Engine.Aurora:
             # Special case since SELECT COUNT(*) on Aurora is generally slow.
