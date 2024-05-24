@@ -16,23 +16,23 @@ class BradSqliteClient:
 
     RowList = List[Tuple[Any, ...]]
 
-    def __init__(self, database: str):
+    def __init__(self, database: str) -> None:
         self._database = database
         self._connection = None
         self._cursor = None
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.close()
 
-    def connect(self):
+    def connect(self) -> None:
         self._connection = sqlite3.connect(self._database)
         self._cursor = self._connection.cursor()
 
-    def close(self):
+    def close(self) -> None:
         self._cursor.close()
         self._connection.close()
 

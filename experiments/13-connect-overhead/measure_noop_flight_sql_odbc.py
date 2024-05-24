@@ -4,7 +4,7 @@ import time
 from brad.flight_sql_client_odbc import BradFlightSqlClientOdbc
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repetitions", type=int, default=1000)
     parser.add_argument("--host", type=str, default="localhost")

@@ -37,7 +37,8 @@ def run_client(
 
         average_latencies.append(latency)
 
-    return np.mean(adjusted_data(average_latencies)), np.std(average_latencies)
+    adjusted_average_latencies = adjusted_data(average_latencies)
+    return np.mean(adjusted_average_latencies), np.std(adjusted_average_latencies)
 
 
 def build_dataframe() -> pd.DataFrame:
@@ -114,7 +115,7 @@ def plot_from_csv(filename: str) -> None:
     fig.savefig("measurement_comparisons_plot.png", bbox_inches="tight")
 
 
-def main():
+def main() -> None:
     dataframe = build_dataframe()
     csv_filename = "measurement_comparisons.csv"
     print_to_csv(dataframe, csv_filename)

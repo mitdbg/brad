@@ -16,20 +16,20 @@ class BradFlightSqlClientOdbc:
 
     RowList = List[Tuple[Any, ...]]
 
-    def __init__(self, host="localhost", port=31337):
+    def __init__(self, host="localhost", port=31337) -> None:
         self._host = host
         self._port = port
         self._connection = None
         self._cursor = None
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.close()
 
-    def connect(self):
+    def connect(self) -> None:
         self._connection = pyodbc.connect(
             "DRIVER={Arrow Flight SQL ODBC Driver};USEENCRYPTION=false;"
             + f"HOST={self._host};"
@@ -38,7 +38,7 @@ class BradFlightSqlClientOdbc:
         )
         self._cursor = self._connection.cursor()
 
-    def close(self):
+    def close(self) -> None:
         self._cursor.close()
         self._connection.close()
 
