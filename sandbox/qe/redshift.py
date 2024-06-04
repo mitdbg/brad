@@ -244,6 +244,8 @@ if __name__ == "__main__":
 
     cs = conn.cursor()
 
+    cs.execute("SET enable_result_cache_for_session TO OFF")
+
     if args.task == "init":
         init(cs)
     elif args.task == "run":
