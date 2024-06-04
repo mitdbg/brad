@@ -19,8 +19,8 @@ def converttbldatatocsvformat(filename, header):
     tbl.close()
     csv.close()
 
-
-json_file = "/home/axing/brad/sandbox/qe/tpch/headers.json"
+# TODO: Need to change this path later
+json_file = '/home/axing/brad/sandbox/qe/tpch/headers.json'
 if __name__ == "__main__":
     # Load the schema definitions from the YAML file
     with open(json_file, "r") as f:

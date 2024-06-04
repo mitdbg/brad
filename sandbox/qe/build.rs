@@ -1,8 +1,6 @@
 use std::env;
 use std::path::PathBuf;
 
-// use bindgen::CargoCallbacks;
-
 fn main() {
     // This is the directory where the `c` library is located.
     let libdir_path = PathBuf::from("RadixSplineLib")
@@ -12,7 +10,7 @@ fn main() {
         .expect("cannot canonicalize path");
 
     // This is the path to the `c` headers file.
-    let headers_path = libdir_path.join("radixspline.hpp");
+    let headers_path = libdir_path.join("radixspline.h");
     let headers_path_str = headers_path.to_str().expect("Path is not a valid string");
 
     // This is the path to the intermediate object file for our library.
@@ -20,7 +18,7 @@ fn main() {
     // This is the path to the static library file.
     let lib_path = libdir_path.join("libradixspline.a");
 
-    // Run `clang` to compile the `hello.c` file into a `hello.o` object file.
+    // Run `clang` to compile the `radixspline.cpp` file into a `radixspline.o` object file.
     // Unwrap if it is not possible to spawn the process.
     if !std::process::Command::new("clang++")
         .arg("-c")
@@ -36,7 +34,7 @@ fn main() {
         panic!("could not compile object file");
     }
 
-    // Run `ar` to generate the `libhello.a` file from the `hello.o` file.
+    // Run `ar` to generate the `libradixspline.a` file from the `radixspline.o` file.
     // Unwrap if it is not possible to spawn the process.
     if !std::process::Command::new("ar")
         .arg("rcus")
@@ -54,8 +52,8 @@ fn main() {
     // Tell cargo to look for shared libraries in the specified directory
     println!("cargo:rustc-link-search=native={}", libdir_path.to_str().unwrap());
 
-    // Tell cargo to tell rustc to link our `hello` library. Cargo will
-    // automatically know it must look for a `libhello.a` file.
+    // Tell cargo to tell rustc to link our `radixspline` library. Cargo will
+    // automatically know it must look for a `libradixspline.a` file.
     println!("cargo:rustc-link-lib=radixspline");
     println!("cargo:rustc-link-lib=stdc++");
     
@@ -67,9 +65,6 @@ fn main() {
         .allowlist_function("build")
         .allowlist_function("lookup")
         .allowlist_function("clear")
-        // .allowlist_file("^(.*radixspline.hpp)$")
-        .allowlist_function("add")
-        // .allowlist_function("multiply")
         // The input header we would like to generate
         // bindings for.
         .header(headers_path_str)

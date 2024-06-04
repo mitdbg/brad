@@ -23,5 +23,5 @@ bool lookup(void* ptr, uint64_t key) {
 
 void clear(void* ptr) {
     RSData* rs = (RSData*) ptr;
-    free(rs);
+    delete rs;
 }

@@ -22,5 +22,7 @@ bindgen = "0.69.4"
 cc = "1.0.96"
 
 [[bin]]
+name = "bench_q3"
+path = "src/bin/bench_q3.rs"
 name = "test_radixspline"
 path = "src/bin/test_radixspline.rs"

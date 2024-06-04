@@ -9,9 +9,9 @@
 if [ $# -gt 0 ]; then
   # generate data for specified Scale Factor
   cd ~/TPC-Hv3.0.1/dbgen
-  ./dbgen -f -s $1
-  mv *.tbl /tmp/tpcdata
-  python3 ~/brad/sandbox/qe/tpch/tbl_to_csv.py /tmp/tpcdata
+  # ./dbgen -f -s $1
+  # mv *.tbl /tmp/tpcdata
+  # python3 ~/brad/sandbox/qe/tpch/tbl_to_csv.py /tmp/tpcdata
   cd -
 
   # Uncomment if want to save generated info somewhere other than /tmp
@@ -32,4 +32,3 @@ fi
 # time { 
 #     for q in `seq 1 22`;do docker exec -ti postgres psql -U postgres -d tpch -o /dev/null -c '\i /data/queries/'$q'.sql' | cat; done;
 # }
-
