@@ -23,3 +23,6 @@ target_include_directories(gRPC INTERFACE
 
 add_executable(proxy_socket proxy_socket.cc)
 target_link_libraries(proxy_socket PRIVATE gflags)
+
+add_executable(brad_grpc brad_grpc.cc brad.grpc.pb.cc brad.grpc.pb.h brad.pb.cc)
+target_link_libraries(brad_grpc PRIVATE gRPC)
