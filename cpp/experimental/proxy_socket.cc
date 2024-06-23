@@ -1,5 +1,7 @@
 #include <iostream>
 #include <stdexcept>
+#include <csignal>
+#include <functional>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -115,6 +117,59 @@ class ServerSocket {
   int fd_;
 };
 
+class SentinelPipe {
+ public:
+  SentinelPipe() {
+    if (pipe(fd_) < 0) {
+      perror("Pipe failed.");
+      throw std::runtime_error("Pipe failed");
+    }
+  }
+
+  ~SentinelPipe() {
+    for (int i = 0; i < 2; ++i) {
+      if (fd_[i] > 0) {
+        close(fd_[i]);
+        fd_[i] = -1;
+      }
+    }
+  }
+
+  SentinelPipe(const SentinelPipe&) = delete;
+  SentinelPipe& operator=(const SentinelPipe&) = delete;
+
+  int read_fd() const { return fd_[0]; }
+  int write_fd() const { return fd_[1]; }
+
+ private:
+  int fd_[2];
+};
+
+class Buffer {
+ public:
+  Buffer(size_t size) : buf_(nullptr) {
+    buf_ = new uint8_t[size];
+  }
+
+  ~Buffer() {
+    if (buf_ == nullptr) return;
+    delete buf_;
+    buf_ = nullptr;
+  }
+
+  uint8_t* buffer() const { return buf_; }
+
+ private:
+  uint8_t* buf_;
+};
+
+std::function<void(int)> g_handle_signal;
+
+void signal_wrapper(int signal) {
+  if (!g_handle_signal) return;
+  g_handle_signal(signal);
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -142,7 +197,79 @@ int main(int argc, char* argv[]) {
   const Socket to_underlying = Socket::Connect(FLAGS_proxy_to_host, FLAGS_proxy_to_port);
   std::cerr << "Connection succeeded." << std::endl;
 
-  // TODO: Shuffle bytes between the connections.
+  // Handle early exit (Ctrl+C or SIGTERM).
+  SentinelPipe sentinel;
+  g_handle_signal = [&sentinel](int signal) {
+    char null_char = '\0';
+    write(sentinel.write_fd(), &null_char, sizeof(null_char));
+  };
+  std::signal(SIGINT, signal_wrapper);
+  std::signal(SIGTERM, signal_wrapper);
 
+  const size_t buffer_size = 4096;
+  Buffer client_to_underlying(buffer_size), underlying_to_client(buffer_size), scratch(buffer_size);
+
+  fd_set descriptors;
+  while (true) {
+    FD_ZERO(&descriptors);
+    FD_SET(to_client.fd(), &descriptors);
+    FD_SET(to_underlying.fd(), &descriptors);
+    FD_SET(sentinel.read_fd(), &descriptors);
+
+    const int result = select(3, &descriptors, nullptr, nullptr, nullptr);
+    if (result < 0) {
+      perror("Select");
+      break;
+    }
+
+    if (FD_ISSET(to_client.fd(), &descriptors)) {
+      // Forward client message to underlying.
+      const ssize_t bytes_read = read(to_client.fd(), client_to_underlying.buffer(), buffer_size);
+      if (bytes_read < 0) {
+        perror("Read from client");
+        break;
+      }
+
+      ssize_t left_to_write = bytes_read;
+      uint8_t* buffer = client_to_underlying.buffer();
+      while (left_to_write > 0) {
+        const ssize_t bytes_written = write(to_underlying.fd(), buffer, left_to_write);
+        if (bytes_written < 0) {
+          perror("Write to underlying");
+          break;
+        }
+        left_to_write -= bytes_written;
+        buffer += bytes_written;
+      }
+    }
+
+    if (FD_ISSET(to_underlying.fd(), &descriptors)) {
+      // Forward underlying message to client.
+      const ssize_t bytes_read = read(to_underlying.fd(), underlying_to_client.buffer(), buffer_size);
+      if (bytes_read < 0) {
+        perror("Read from underlying");
+        break;
+      }
+
+      ssize_t left_to_write = bytes_read;
+      uint8_t* buffer = underlying_to_client.buffer();
+      while (left_to_write > 0) {
+        const ssize_t bytes_written = write(to_client.fd(), buffer, left_to_write);
+        if (bytes_written < 0) {
+          perror("Write to client");
+          break;
+        }
+        left_to_write -= bytes_written;
+        buffer += bytes_written;
+      }
+    }
+
+    if (FD_ISSET(sentinel.read_fd(), &descriptors)) {
+      read(sentinel.read_fd(), scratch.buffer(), 1);
+      break;
+    }
+  }
+
+  std::cerr << "Done and exiting." << std::endl;
   return 0;
 }
