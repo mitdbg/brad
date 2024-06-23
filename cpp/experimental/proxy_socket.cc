@@ -31,7 +31,7 @@ class Socket {
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
 
-    if(inet_pton(AF_INET, host.c_str(), &serv_addr.sin_addr) <= 0) {
+    if(inet_pton(AF_INET, host.c_str(), &serv_addr.sin_addr) < 0) {
       perror("Host conversion.");
       throw std::runtime_error("Host conversion.");
     }
@@ -95,7 +95,7 @@ class ServerSocket {
 
   Socket Accept() const {
     struct sockaddr_in address;
-    socklen_t addrlen;
+    socklen_t addrlen = sizeof(address);
     const int new_fd = accept(fd_, reinterpret_cast<struct sockaddr *>(&address), &addrlen);
     if (new_fd < 0) {
       perror("Accept failed");
@@ -210,13 +210,14 @@ int main(int argc, char* argv[]) {
   Buffer client_to_underlying(buffer_size), underlying_to_client(buffer_size), scratch(buffer_size);
 
   fd_set descriptors;
+  const int nfds = std::max(std::max(to_client.fd(), to_underlying.fd()), sentinel.read_fd()) + 1;
   while (true) {
     FD_ZERO(&descriptors);
     FD_SET(to_client.fd(), &descriptors);
     FD_SET(to_underlying.fd(), &descriptors);
     FD_SET(sentinel.read_fd(), &descriptors);
 
-    const int result = select(3, &descriptors, nullptr, nullptr, nullptr);
+    const int result = select(nfds, &descriptors, nullptr, nullptr, nullptr);
     if (result < 0) {
       perror("Select");
       break;
