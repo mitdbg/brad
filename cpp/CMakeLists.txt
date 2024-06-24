@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
+option(BRAD_BUILD_EXPERIMENTAL OFF "Set to build the experimental code.")
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fPIC")
@@ -15,6 +17,10 @@ find_package(SQLite3 REQUIRED)
 find_package(Boost REQUIRED)
 
 add_subdirectory(third_party)
+
+if(BRAD_BUILD_EXPERIMENTAL)
+  add_subdirectory(experimental)
+endif()
 
 add_library(sqlite_server_lib OBJECT
             sqlite_server/sqlite_server.cc

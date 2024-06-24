@@ -37,7 +37,7 @@ INSTALL_REQUIRES = [
     "pandas",
     "scikit-learn==1.3.0",
     "types-pytz",
-    "numpy",
+    "numpy==1.25.2",
     "imbalanced-learn",
     "redshift_connector",
     "tabulate",
