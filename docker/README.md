@@ -1,5 +1,5 @@
-Habitat Docker Image
-=====================
+BRAD Docker Image
+=================
 The Dockerfile in this directory specifies a Docker image that is useful for
 development. Run `setup.sh` to build the Docker image.
 
