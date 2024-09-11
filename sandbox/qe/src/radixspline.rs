@@ -25,7 +25,7 @@ impl RadixSpline {
     pub fn build(record_batch: &RecordBatch, column_index: usize) -> RadixSpline {
         let column = record_batch.column(column_index);
         let u64_array = column.as_any().downcast_ref::<UInt64Array>().unwrap();
-        
+
         let ptr = u64_array.values().as_ptr();
         let size = column.len() as u64;
         unsafe {

@@ -23,7 +23,8 @@ pub mod ops;
 /// Utilities for rewriting DataFusion `ExecutionPlan`s.
 pub mod rewrite;
 
-pub mod radixspline;
+// RadixSpline bindings. Currently not working.
+// pub mod radixspline;
 
 /// Represents an "open" IOHTAP database. Eventually, the DB should run as a
 /// daemon process. For now it is just an embedded DB (similar to SQLite).

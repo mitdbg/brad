@@ -1,4 +1,4 @@
-#include "radixspline.hpp"
+#include "radixspline.h"
 
 void* build(const uint64_t* ks, uint64_t size) {
     RSData* rs = new RSData;

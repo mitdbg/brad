@@ -2,7 +2,8 @@
 name = "brad_qe"
 version = "0.1.0"
 edition = "2021"
-build = "build.rs"
+# NOTE: This currently does not work. (C++ standard library linking error)
+# build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -24,5 +25,11 @@ cc = "1.0.96"
 [[bin]]
 name = "bench_q3"
 path = "src/bin/bench_q3.rs"
-name = "test_radixspline"
-path = "src/bin/test_radixspline.rs"
+
+[[bin]]
+name = "brad_qe_repl"
+path = "src/bin/repl.rs"
+
+# [[bin]]
+# name = "test_radixspline"
+# path = "src/bin/test_radixspline.rs"

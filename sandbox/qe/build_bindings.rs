@@ -1,6 +1,8 @@
 use std::env;
 use std::path::PathBuf;
 
+// NOTE: This file should be named `build.rs` once it is working.
+
 fn main() {
     // This is the directory where the `c` library is located.
     let libdir_path = PathBuf::from("RadixSplineLib")
@@ -56,7 +58,7 @@ fn main() {
     // automatically know it must look for a `libradixspline.a` file.
     println!("cargo:rustc-link-lib=radixspline");
     println!("cargo:rustc-link-lib=stdc++");
-    
+
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
