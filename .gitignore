@@ -35,3 +35,7 @@ sandbox/qe/.brad_qe_repl_history
 # BRAD UI.
 ui/dist/
 ui/node_modules/
+
+*.tmp
+*.o
+*.a

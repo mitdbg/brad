@@ -1,0 +1,3 @@
+[submodule "sandbox/qe/RadixSpline"]
+	path = sandbox/qe/RadixSpline
+	url = https://github.com/learnedsystems/RadixSpline
