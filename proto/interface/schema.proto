@@ -4,20 +4,23 @@ syntax = "proto3";
 
 package vdbe;
 
+// Represents a relational table.
 message Table {
   string name = 1;
   repeated TableColumn columns = 2;
 }
 
+// Represents a column in a relational table.
 message TableColumn {
   string name = 1;
   DataType type = 2;
   bool nullable = 3;
 }
 
+// The data types we currently support.
 enum DataType {
-  UNKNOWN = 0;
-  INT_32 = 1;
-  INT_64 = 2;
-  STRING = 3;
+  DT_UNKNOWN = 0;
+  DT_INT_32 = 1;
+  DT_INT_64 = 2;
+  DT_STRING = 3;
 }

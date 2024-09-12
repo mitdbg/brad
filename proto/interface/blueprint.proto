@@ -1,11 +1,14 @@
+// This file contains definitions for the blueprint (physical realization of a
+// set of VDBEs).
+
 syntax = "proto3";
 
 package vdbe;
 
 message Blueprint {
-  Provisioning aurora = 1;
-  Provisioning redshift = 2;
-  RoutingPolicy policy = 3;
+  Provisioning aurora = 101;
+  Provisioning redshift = 102;
+  RoutingPolicy policy = 201;
 }
 
 message RoutingPolicy {

@@ -1,3 +1,5 @@
+// This file contains definitions for virtual database engines (VDBEs).
+
 syntax = "proto3";
 
 package vdbe;
@@ -17,6 +19,7 @@ message VirtualTable {
   bool writable = 2;
 }
 
+// These are the query interfaces we currently support.
 enum QueryInterface {
   QI_UNKNOWN = 0;
 
