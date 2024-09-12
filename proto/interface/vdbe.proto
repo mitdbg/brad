@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+message VirtualEngine {
+  string name = 1;
+  QueryInterface qi = 2;
+  repeated VirtualTable tables = 3;
+  uint64 max_staleness_ms = 4;
+  // TODO: Meaningful representation for performance properties.
+}
+
+message VirtualTable {
+  // Name must reference a table that has a schema definition.
+  string name = 1;
+  bool writable = 2;
+}
+
+enum QueryInterface {
+  UNKNOWN = 0;
+
+  // 1xx - Open source SQL DBMSes.
+  SQL_POSTGRESQL = 101;
+  SQL_MYSQL = 102;
+
+  // 2xx - AWS SQL DBMSes.
+  SQL_AWS_REDSHIFT = 201;
+  SQL_AWS_ATHENA = 202;
+}

@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package vdbe;
+
+import "interface/blueprint.proto";
+import "interface/schema.proto";
+import "interface/vdbe.proto";
+
+message SystemState {
+  repeated Table tables = 1;
+  repeated VirtualEngine vdbes = 2;
+  Blueprint blueprint = 3;
+}

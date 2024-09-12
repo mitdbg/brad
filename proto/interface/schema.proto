@@ -1,0 +1,23 @@
+// This file contains definitions for table schema information.
+
+syntax = "proto3";
+
+package vdbe;
+
+message Table {
+  string name = 1;
+  repeated TableColumn columns = 2;
+}
+
+message TableColumn {
+  string name = 1;
+  DataType type = 2;
+  bool nullable = 3;
+}
+
+enum DataType {
+  UNKNOWN = 0;
+  INT_32 = 1;
+  INT_64 = 2;
+  STRING = 3;
+}

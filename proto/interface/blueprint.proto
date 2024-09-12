@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package vdbe;
+
+message Blueprint {
+  Provisioning aurora = 1;
+  Provisioning redshift = 2;
+  RoutingPolicy policy = 3;
+}
+
+message RoutingPolicy {
+  // A serialized form of the routing policy.
+  bytes policy = 1;
+}
+
+message PhysicalSnapshot {
+  // The VDBEs that are mapped to this physical snapshot.
+  repeated string vdbes = 1;
+  // The tables in this physical snapshot.
+  repeated string tables = 2;
+  // Where the data in this physical snapshot resides.
+  Engine location = 3;
+}
+
+// Used to indicate the location of data.
+enum Engine {
+  UNKNOWN = 0;
+  // The data is stored in Aurora.
+  AURORA = 1;
+  // The data is stored in Redshift.
+  REDSHIFT = 2;
+  // The data is stored on S3 in an Iceberg table and registered with Athena.
+  ATHENA = 3;
+}
