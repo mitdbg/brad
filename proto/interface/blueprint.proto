@@ -24,11 +24,16 @@ message PhysicalSnapshot {
 
 // Used to indicate the location of data.
 enum Engine {
-  UNKNOWN = 0;
+  ENGINE_UNKNOWN = 0;
   // The data is stored in Aurora.
-  AURORA = 1;
+  ENGINE_AURORA = 1;
   // The data is stored in Redshift.
-  REDSHIFT = 2;
+  ENGINE_REDSHIFT = 2;
   // The data is stored on S3 in an Iceberg table and registered with Athena.
-  ATHENA = 3;
+  ENGINE_ATHENA = 3;
+}
+
+message Provisioning {
+  string instance_type = 1;
+  uint32 num_nodes = 2;
 }
