@@ -45,6 +45,7 @@ INSTALL_REQUIRES = [
     "ddsketch",
     "tqdm",
     "psycopg[binary]",
+    "pydantic",
 ]
 
 DEV_REQUIRES = [
@@ -68,7 +69,6 @@ DEV_REQUIRES = [
 UI_REQUIRES = [
     "fastapi",
     "uvicorn[standard]",
-    "pydantic",
     "requests",
     "types-requests",
 ]

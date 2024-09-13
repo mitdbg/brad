@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19interface/blueprint.proto\x12\x04vdbe\"{\n\tBlueprint\x12\"\n\x06\x61urora\x18\x65 \x01(\x0b\x32\x12.vdbe.Provisioning\x12$\n\x08redshift\x18\x66 \x01(\x0b\x32\x12.vdbe.Provisioning\x12$\n\x06policy\x18\xc9\x01 \x01(\x0b\x32\x13.vdbe.RoutingPolicy\"\x1f\n\rRoutingPolicy\x12\x0e\n\x06policy\x18\x01 \x01(\x0c\"Q\n\x10PhysicalSnapshot\x12\r\n\x05vdbes\x18\x01 \x03(\t\x12\x0e\n\x06tables\x18\x02 \x03(\t\x12\x1e\n\x08location\x18\x03 \x01(\x0e\x32\x0c.vdbe.Engine\"8\n\x0cProvisioning\x12\x15\n\rinstance_type\x18\x01 \x01(\t\x12\x11\n\tnum_nodes\x18\x02 \x01(\r*W\n\x06\x45ngine\x12\x12\n\x0e\x45NGINE_UNKNOWN\x10\x00\x12\x11\n\rENGINE_AURORA\x10\x01\x12\x13\n\x0f\x45NGINE_REDSHIFT\x10\x02\x12\x11\n\rENGINE_ATHENA\x10\x03\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19interface/blueprint.proto\x12\x04vdbe\"\xa7\x01\n\tBlueprint\x12\"\n\x06\x61urora\x18\x65 \x01(\x0b\x32\x12.vdbe.Provisioning\x12$\n\x08redshift\x18\x66 \x01(\x0b\x32\x12.vdbe.Provisioning\x12$\n\x06policy\x18\xc9\x01 \x01(\x0b\x32\x13.vdbe.RoutingPolicy\x12*\n\tsnapshots\x18\xad\x02 \x03(\x0b\x32\x16.vdbe.PhysicalSnapshot\"\x1f\n\rRoutingPolicy\x12\x0e\n\x06policy\x18\x01 \x01(\x0c\"Q\n\x10PhysicalSnapshot\x12\r\n\x05vdbes\x18\x01 \x03(\t\x12\x0e\n\x06tables\x18\x02 \x03(\t\x12\x1e\n\x08location\x18\x03 \x01(\x0e\x32\x0c.vdbe.Engine\"8\n\x0cProvisioning\x12\x15\n\rinstance_type\x18\x01 \x01(\t\x12\x11\n\tnum_nodes\x18\x02 \x01(\r*W\n\x06\x45ngine\x12\x12\n\x0e\x45NGINE_UNKNOWN\x10\x00\x12\x11\n\rENGINE_AURORA\x10\x01\x12\x13\n\x0f\x45NGINE_REDSHIFT\x10\x02\x12\x11\n\rENGINE_ATHENA\x10\x03\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -21,14 +21,14 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'interface.blueprint_pb2', _
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _globals['_ENGINE']._serialized_start=334
-  _globals['_ENGINE']._serialized_end=421
-  _globals['_BLUEPRINT']._serialized_start=35
-  _globals['_BLUEPRINT']._serialized_end=158
-  _globals['_ROUTINGPOLICY']._serialized_start=160
-  _globals['_ROUTINGPOLICY']._serialized_end=191
-  _globals['_PHYSICALSNAPSHOT']._serialized_start=193
-  _globals['_PHYSICALSNAPSHOT']._serialized_end=274
-  _globals['_PROVISIONING']._serialized_start=276
-  _globals['_PROVISIONING']._serialized_end=332
+  _globals['_ENGINE']._serialized_start=379
+  _globals['_ENGINE']._serialized_end=466
+  _globals['_BLUEPRINT']._serialized_start=36
+  _globals['_BLUEPRINT']._serialized_end=203
+  _globals['_ROUTINGPOLICY']._serialized_start=205
+  _globals['_ROUTINGPOLICY']._serialized_end=236
+  _globals['_PHYSICALSNAPSHOT']._serialized_start=238
+  _globals['_PHYSICALSNAPSHOT']._serialized_end=319
+  _globals['_PROVISIONING']._serialized_start=321
+  _globals['_PROVISIONING']._serialized_end=377
 # @@protoc_insertion_point(module_scope)

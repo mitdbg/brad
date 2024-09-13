@@ -9,6 +9,7 @@ message Blueprint {
   Provisioning aurora = 101;
   Provisioning redshift = 102;
   RoutingPolicy policy = 201;
+  repeated PhysicalSnapshot snapshots = 301;
 }
 
 message RoutingPolicy {

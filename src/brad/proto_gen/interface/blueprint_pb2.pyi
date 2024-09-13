@@ -18,14 +18,16 @@ ENGINE_REDSHIFT: Engine
 ENGINE_ATHENA: Engine
 
 class Blueprint(_message.Message):
-    __slots__ = ["aurora", "redshift", "policy"]
+    __slots__ = ["aurora", "redshift", "policy", "snapshots"]
     AURORA_FIELD_NUMBER: _ClassVar[int]
     REDSHIFT_FIELD_NUMBER: _ClassVar[int]
     POLICY_FIELD_NUMBER: _ClassVar[int]
+    SNAPSHOTS_FIELD_NUMBER: _ClassVar[int]
     aurora: Provisioning
     redshift: Provisioning
     policy: RoutingPolicy
-    def __init__(self, aurora: _Optional[_Union[Provisioning, _Mapping]] = ..., redshift: _Optional[_Union[Provisioning, _Mapping]] = ..., policy: _Optional[_Union[RoutingPolicy, _Mapping]] = ...) -> None: ...
+    snapshots: _containers.RepeatedCompositeFieldContainer[PhysicalSnapshot]
+    def __init__(self, aurora: _Optional[_Union[Provisioning, _Mapping]] = ..., redshift: _Optional[_Union[Provisioning, _Mapping]] = ..., policy: _Optional[_Union[RoutingPolicy, _Mapping]] = ..., snapshots: _Optional[_Iterable[_Union[PhysicalSnapshot, _Mapping]]] = ...) -> None: ...
 
 class RoutingPolicy(_message.Message):
     __slots__ = ["policy"]
