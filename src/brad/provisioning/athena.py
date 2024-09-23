@@ -25,6 +25,7 @@ class AthenaProvisioning:
             print("Bucket {} created successfully.".format(self._bucket_name))
         except ClientError as e:
             e_str = f"{e}"
+            # pylint: disable-next=unsupported-membership-test
             if "BucketAlready" in e_str:
                 print("Workgroup {} already exists.".format(self._athena_id))
                 return
@@ -49,6 +50,7 @@ class AthenaProvisioning:
             print(f"Workgroup Results: {response}!")
         except ClientError as e:
             e_str = f"{e}"
+            # pylint: disable-next=unsupported-membership-test
             if "WorkGroup is already" in e_str:
                 print("Workgroup {} already exists.".format(self._athena_id))
                 return

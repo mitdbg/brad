@@ -496,6 +496,7 @@ class RedshiftProvisioning:
                 continue
             except Exception as e:
                 e_str = f"{e}"
+                # pylint: disable-next=unsupported-membership-test
                 if "NotFound" in e_str:
                     # Create First.
                     logging.info(f"Redshift Cluster {self.cluster_name}. Creating...")

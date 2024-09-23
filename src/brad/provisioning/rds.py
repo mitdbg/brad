@@ -358,6 +358,7 @@ class RdsProvisioning:
                 )
             except Exception as e:
                 e_str = f"{e}"
+                # pylint: disable-next=unsupported-membership-test
                 if "AlreadyExists" in e_str:
                     continue
                 else:
@@ -400,6 +401,7 @@ class RdsProvisioning:
                 continue
             except Exception as e:
                 e_str = f"{e}"
+                # pylint: disable-next=unsupported-membership-test
                 if "AlreadyExists" in e_str:
                     print("Rds Instance already exists...")
                     time.sleep(5.0)
@@ -417,6 +419,7 @@ class RdsProvisioning:
             )
         except Exception as e:
             e_str = f"{e}"
+            # pylint: disable-next=unsupported-membership-test
             if "NotFound" in e_str:
                 print(f"Rds Instance {instance_id} already does not exits.")
                 return
