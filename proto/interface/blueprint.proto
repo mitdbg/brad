@@ -1,0 +1,43 @@
+// This file contains definitions for the blueprint (physical realization of a
+// set of VDBEs).
+
+syntax = "proto3";
+
+package vdbe;
+
+message Blueprint {
+  Provisioning aurora = 101;
+  Provisioning redshift = 102;
+  RoutingPolicy policy = 201;
+  repeated PhysicalSnapshot snapshots = 301;
+}
+
+message RoutingPolicy {
+  // A serialized form of the routing policy.
+  bytes policy = 1;
+}
+
+message PhysicalSnapshot {
+  // The VDBEs that are mapped to this physical snapshot.
+  repeated string vdbes = 1;
+  // The tables in this physical snapshot.
+  repeated string tables = 2;
+  // Where the data in this physical snapshot resides.
+  Engine location = 3;
+}
+
+// Used to indicate the location of data.
+enum Engine {
+  ENGINE_UNKNOWN = 0;
+  // The data is stored in Aurora.
+  ENGINE_AURORA = 1;
+  // The data is stored in Redshift.
+  ENGINE_REDSHIFT = 2;
+  // The data is stored on S3 in an Iceberg table and registered with Athena.
+  ENGINE_ATHENA = 3;
+}
+
+message Provisioning {
+  string instance_type = 1;
+  uint32 num_nodes = 2;
+}

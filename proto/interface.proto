@@ -1,0 +1,20 @@
+// This file is the entrypoint for the virtual database engine (VDBE) interface
+// definitions. We have split the definitions across multiple files to make them
+// managable to read.
+
+syntax = "proto3";
+
+package vdbe;
+
+import "interface/blueprint.proto";
+import "interface/schema.proto";
+import "interface/vdbe.proto";
+
+// All the information needed to describe a data infrastructure deployment.
+message SystemState {
+  // Used to uniquely identify the system state.
+  string schema_name = 1;
+  repeated Table tables = 2;
+  repeated VirtualEngine vdbes = 3;
+  Blueprint blueprint = 4;
+}

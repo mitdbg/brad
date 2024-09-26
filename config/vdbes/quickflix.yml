@@ -1,0 +1,50 @@
+schema_name: quickflix
+
+vdbes:
+  - name: order_flow
+    tables:
+      - name: tickets
+        writable: true
+      - name: customers
+        writable: true
+    max_staleness_ms: 0
+    query_interface: SQL_POSTGRESQL
+
+  - name: transform
+    tables:
+      - name: tickets
+      - name: customers
+      - name: sales_history
+        writable: true
+    max_staleness_ms: 3600000  # 1 hour
+    query_interface: SQL_AWS_REDSHIFT
+
+  - name: analysis
+    tables:
+      - name: sales_history
+    max_staleness_ms: 0
+    query_interface: SQL_AWS_REDSHIFT
+
+tables:
+  - name: tickets
+    columns:
+      - name: t_customer_id
+        type: INT_64
+      - name: t_movie_id
+        type: INT_64
+
+  - name: customers
+    columns:
+      - name: c_customer_id
+        type: INT_64
+      - name: c_name
+        type: STRING
+
+  - name: sales_history
+    columns:
+      - name: sh_customer_id
+        type: INT_64
+      - name: sh_movie_id
+        type: INT_64
+      - name: sh_name
+        type: STRING
