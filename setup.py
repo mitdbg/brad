@@ -68,6 +68,7 @@ DEV_REQUIRES = [
 UI_REQUIRES = [
     "fastapi",
     "uvicorn[standard]",
+    "pydantic",
     "requests",
     "types-requests",
 ]
