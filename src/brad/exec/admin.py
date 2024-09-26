@@ -16,7 +16,6 @@ import brad.admin.replay_planner as replay_planner
 import brad.admin.clean_dataset as clean_dataset
 import brad.admin.alter_schema as alter_schema
 import brad.admin.table_adjustments as table_adjustments
-import brad.admin.bootstrap_vdbes as bootstrap_vdbes
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,6 @@ def register_command(subparsers) -> None:
         help="Set to enable debug logging.",
     )
     admin_subparsers = parser.add_subparsers(title="Administrative Actions")
-    bootstrap_vdbes.register_admin_action(admin_subparsers)
     bootstrap_schema.register_admin_action(admin_subparsers)
     drop_schema.register_admin_action(admin_subparsers)
     bulk_load.register_admin_action(admin_subparsers)

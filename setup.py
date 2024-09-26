@@ -45,7 +45,6 @@ INSTALL_REQUIRES = [
     "ddsketch",
     "tqdm",
     "psycopg[binary]",
-    "pydantic",
 ]
 
 DEV_REQUIRES = [
