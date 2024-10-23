@@ -497,7 +497,7 @@ async def bulk_load_impl(args, manifest: Dict[str, Any]) -> None:
         # Athena does not support transactions.
 
         # Update the sync tables.
-        if Engine.Aurora in engines_filter:
+        if Engine.Aurora in engines_filter and not args.bare_aurora_tables:
             await _update_sync_progress(
                 manifest, blueprint, engines.get_connection(Engine.Aurora)
             )
