@@ -36,7 +36,7 @@ class TableSqlGenerator:
         self._blueprint = blueprint
 
     def generate_create_table_sql(
-        self, table: Table, location: Engine
+        self, table: Table, location: Engine, bare_aurora_tables: bool = False
     ) -> Tuple[List[str], Engine]:
         """
         Returns SQL queries that should be used to create `table` on `location`,
@@ -44,7 +44,10 @@ class TableSqlGenerator:
         """
 
         if location == Engine.Aurora:
-            if table.name in self._blueprint.base_table_names():
+            if (
+                not bare_aurora_tables
+                and table.name in self._blueprint.base_table_names()
+            ):
                 # This table needs to support incremental extraction. We need to
                 # create several additional structures to support this extraction.
                 columns_with_types = comma_separated_column_names_and_types(

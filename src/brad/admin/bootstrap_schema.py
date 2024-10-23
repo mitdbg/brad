@@ -42,6 +42,12 @@ def register_admin_action(subparser) -> None:
         help="Set this flag to avoid persisting the blueprint. "
         "Only meant to be used if you know what you are doing!",
     )
+    parser.add_argument(
+        "--bare-aurora-tables",
+        action="store_true",
+        help="If set, do not create the shadow tables and triggers "
+        "for Aurora. Only meant to be used if you know what you are doing!",
+    )
     parser.set_defaults(admin_action=bootstrap_schema)
 
 
@@ -100,7 +106,9 @@ def bootstrap_schema(args):
                 table.name,
                 location,
             )
-            queries, db_type = sql_gen.generate_create_table_sql(table, location)
+            queries, db_type = sql_gen.generate_create_table_sql(
+                table, location, args.bare_aurora_tables
+            )
             conn = cxns.get_connection(db_type)
             cursor = conn.cursor_sync()
             for q in queries:
@@ -108,7 +116,7 @@ def bootstrap_schema(args):
                 cursor.execute_sync(q)
 
     # 7. Create and set up the extraction progress table.
-    if Engine.Aurora in engines_filter:
+    if Engine.Aurora in engines_filter and not args.bare_aurora_tables:
         queries, db_type = sql_gen.generate_extraction_progress_set_up_table_sql()
         conn = cxns.get_connection(db_type)
         cursor = conn.cursor_sync()
