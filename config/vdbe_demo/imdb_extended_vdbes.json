@@ -1,0 +1,218 @@
+{
+  "schema_name": "imdb_extended",
+  "engines": [
+    {
+      "name": "VDBE [T]",
+      "max_staleness_ms": 0,
+      "p90_latency_slo_ms": 30,
+      "interface": "postgresql",
+      "tables": [
+        {
+          "name": "theatres",
+          "writable": true
+        },
+        {
+          "name": "showings",
+          "writable": true
+        },
+        {
+          "name": "ticket_orders",
+          "writable": true
+        },
+        {
+          "name": "movie_info",
+          "writable": true
+        },
+        {
+          "name": "aka_title",
+          "writable": true
+        }
+      ]
+    },
+    {
+      "name": "VDBE [A]",
+      "max_staleness_ms": 0,
+      "p90_latency_slo_ms": 30000,
+      "interface": "postgresql",
+      "tables": [
+        {
+          "name": "homes",
+          "writable": false
+        },
+        {
+          "name": "theatres",
+          "writable": false
+        },
+        {
+          "name": "showings",
+          "writable": false
+        },
+        {
+          "name": "ticket_orders",
+          "writable": false
+        },
+        {
+          "name": "aka_name",
+          "writable": false
+        },
+        {
+          "name": "aka_title",
+          "writable": false
+        },
+        {
+          "name": "cast_info",
+          "writable": false
+        },
+        {
+          "name": "char_name",
+          "writable": false
+        },
+        {
+          "name": "comp_cast_type",
+          "writable": false
+        },
+        {
+          "name": "company_name",
+          "writable": false
+        },
+        {
+          "name": "company_type",
+          "writable": false
+        },
+        {
+          "name": "complete_cast",
+          "writable": false
+        },
+        {
+          "name": "info_type",
+          "writable": false
+        },
+        {
+          "name": "keyword",
+          "writable": false
+        },
+        {
+          "name": "kind_type",
+          "writable": false
+        },
+        {
+          "name": "link_type",
+          "writable": false
+        },
+        {
+          "name": "movie_companies",
+          "writable": false
+        },
+        {
+          "name": "movie_info_idx",
+          "writable": false
+        },
+        {
+          "name": "movie_keyword",
+          "writable": false
+        },
+        {
+          "name": "movie_link",
+          "writable": false
+        },
+        {
+          "name": "name",
+          "writable": false
+        },
+        {
+          "name": "role_type",
+          "writable": false
+        },
+        {
+          "name": "title",
+          "writable": false
+        },
+        {
+          "name": "movie_info",
+          "writable": false
+        },
+        {
+          "name": "person_info",
+          "writable": false
+        }
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "name": "homes"
+    },
+    {
+      "name": "theatres"
+    },
+    {
+      "name": "showings"
+    },
+    {
+      "name": "ticket_orders"
+    },
+    {
+      "name": "aka_name"
+    },
+    {
+      "name": "aka_title"
+    },
+    {
+      "name": "cast_info"
+    },
+    {
+      "name": "char_name"
+    },
+    {
+      "name": "comp_cast_type"
+    },
+    {
+      "name": "company_name"
+    },
+    {
+      "name": "company_type"
+    },
+    {
+      "name": "complete_cast"
+    },
+    {
+      "name": "info_type"
+    },
+    {
+      "name": "keyword"
+    },
+    {
+      "name": "kind_type"
+    },
+    {
+      "name": "link_type"
+    },
+    {
+      "name": "movie_companies"
+    },
+    {
+      "name": "movie_info_idx"
+    },
+    {
+      "name": "movie_keyword"
+    },
+    {
+      "name": "movie_link"
+    },
+    {
+      "name": "name"
+    },
+    {
+      "name": "role_type"
+    },
+    {
+      "name": "title"
+    },
+    {
+      "name": "movie_info"
+    },
+    {
+      "name": "person_info"
+    }
+  ]
+}
