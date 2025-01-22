@@ -65,20 +65,20 @@ function App() {
     });
   };
 
-  // Fetch updated system state periodically.
-  useEffect(async () => {
-    const refreshData = async () => {
-      const newSystemState = await fetchSystemState(
-        /*filterTablesForDemo=*/ false,
-      );
-      // TODO: Not the best way to check for equality.
-      if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
-        setSystemState(newSystemState);
-      }
-    };
+  const refreshData = async () => {
+    const newSystemState = await fetchSystemState(
+      /*filterTablesForDemo=*/ false,
+    );
+    // TODO: Not the best way to check for equality.
+    if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
+      setSystemState(newSystemState);
+    }
+  };
 
+  // Fetch updated system state periodically.
+  useEffect(() => {
     // Run first fetch immediately.
-    await refreshData();
+    refreshData();
     const intervalId = setInterval(refreshData, REFRESH_INTERVAL_MS);
     return () => {
       if (intervalId === null) {

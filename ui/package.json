@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "watch": "vite build --watch",
+    "watch": "vite build --mode development --watch",
     "format": "prettier --write .",
     "check": "prettier --check . ; eslint .",
     "fcheck": "prettier --check ."

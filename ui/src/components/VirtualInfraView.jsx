@@ -45,13 +45,16 @@ function VirtualInfraView({
     [endpoints, workloadStates],
   );
 
-  useEffect(async () => {
-    const { workloadRunners } = endpoints;
-    const promises = workloadRunners.map((endpoint) =>
-      fetchWorkloadClients(endpoint.port),
-    );
-    const results = await Promise.all(promises);
-    setWorkloadStates(results);
+  useEffect(() => {
+    async function fetchRunnerState() {
+      const { workloadRunners } = endpoints;
+      const promises = workloadRunners.map((endpoint) =>
+        fetchWorkloadClients(endpoint.port),
+      );
+      const results = await Promise.all(promises);
+      setWorkloadStates(results);
+    }
+    fetchRunnerState();
   }, [endpoints]);
 
   return (
