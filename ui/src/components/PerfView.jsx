@@ -78,25 +78,25 @@ function PerfView({ virtualInfra }) {
     return metricsManagerRef.current;
   }
 
-  useEffect(async () => {
-    const refreshData = async () => {
-      const rawMetrics = await fetchMetrics(60, /*useGenerated=*/ false);
-      const fetchedMetrics = parseMetrics(rawMetrics);
-      const metricsManager = getMetricsManager();
-      const addedNewMetrics = metricsManager.mergeInMetrics(fetchedMetrics);
-      if (addedNewMetrics) {
-        setMetricsData({
+  const refreshData = async () => {
+    const rawMetrics = await fetchMetrics(60, /*useGenerated=*/ false);
+    const fetchedMetrics = parseMetrics(rawMetrics);
+    const metricsManager = getMetricsManager();
+    const addedNewMetrics = metricsManager.mergeInMetrics(fetchedMetrics);
+    if (addedNewMetrics) {
+      setMetricsData({
+        windowSizeMinutes,
+        metrics: metricsManager.getMetricsInWindow(
           windowSizeMinutes,
-          metrics: metricsManager.getMetricsInWindow(
-            windowSizeMinutes,
-            /*extendForward=*/ true,
-          ),
-        });
-      }
-    };
+          /*extendForward=*/ true,
+        ),
+      });
+    }
+  };
 
+  useEffect(() => {
     // Run first fetch immediately.
-    await refreshData();
+    refreshData();
     const intervalId = setInterval(refreshData, REFRESH_INTERVAL_MS);
     return () => {
       if (intervalId === null) {

@@ -257,6 +257,8 @@ def modify_blueprint(args) -> None:
     blueprint = blueprint_mgr.get_blueprint()
 
     if args.fetch_only:
+        active_version = blueprint_mgr.get_active_blueprint_version()
+        print(f"Active version: {active_version}")
         print(blueprint)
         return
 

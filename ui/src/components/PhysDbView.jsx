@@ -47,11 +47,11 @@ function PhysDbView({
         </div>
       )}
       <div class="db-table-set">
-        {sortedTables.map(({ name, is_writer, mapped_to }) => (
+        {sortedTables.map(({ name, writable, mapped_to }) => (
           <TableView
             key={name}
             name={name}
-            isWriter={is_writer}
+            isWriter={writable}
             color="blue"
             highlightClass={highlightTableViewClass(
               highlight,
@@ -65,11 +65,11 @@ function PhysDbView({
             onTableHoverExit={onTableHoverExit}
           />
         ))}
-        {addedTablesList.map(({ name, is_writer }) => (
+        {addedTablesList.map(({ name, writable }) => (
           <TableView
             key={name}
             name={name}
-            isWriter={is_writer}
+            isWriter={writable}
             color="blue"
             highlightClass="dim"
             onTableHoverEnter={() => {}}

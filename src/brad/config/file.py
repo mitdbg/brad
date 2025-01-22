@@ -294,6 +294,12 @@ class ConfigFile:
         except KeyError:
             return None
 
+    def bootstrap_vdbe_path(self) -> Optional[pathlib.Path]:
+        try:
+            return pathlib.Path(self._raw["bootstrap_vdbe_path"])
+        except KeyError:
+            return None
+
     def _extract_log_path(self, config_key: str) -> Optional[pathlib.Path]:
         if config_key not in self._raw:
             return None

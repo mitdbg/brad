@@ -45,22 +45,24 @@ function VirtualInfraView({
     [endpoints, workloadStates],
   );
 
-  useEffect(async () => {
-    const { workloadRunners } = endpoints;
-    const promises = workloadRunners.map((endpoint) =>
-      fetchWorkloadClients(endpoint.port),
-    );
-    const results = await Promise.all(promises);
-    setWorkloadStates(results);
+  useEffect(() => {
+    async function fetchRunnerState() {
+      const { workloadRunners } = endpoints;
+      const promises = workloadRunners.map((endpoint) =>
+        fetchWorkloadClients(endpoint.port),
+      );
+      const results = await Promise.all(promises);
+      setWorkloadStates(results);
+    }
+    fetchRunnerState();
   }, [endpoints]);
 
   return (
     <Panel heading="Virtual Database Engines" className="infra-column-panel">
       <div class="vdbe-view-wrap">
-        {virtualInfra?.engines?.map(({ name, ...props }, index) => (
+        {virtualInfra?.engines?.map((vdbe, index) => (
           <VdbeView
-            key={name}
-            name={name}
+            key={vdbe.name}
             highlight={highlight}
             onTableHoverEnter={onTableHoverEnter}
             onTableHoverExit={onTableHoverExit}
@@ -68,7 +70,7 @@ function VirtualInfraView({
             updateWorkloadNumClients={(numClients) =>
               updateWorkloadNumClients(index, numClients)
             }
-            {...props}
+            vdbe={vdbe}
           />
         ))}
       </div>
