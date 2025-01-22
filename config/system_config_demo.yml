@@ -124,6 +124,8 @@ std_datasets:
   - name: adhoc
     path: workloads/IMDB_100GB/adhoc_test/
 
+bootstrap_vdbe_path: config/vdbe_demo/imdb_extended_vdbes.json
+
 # Blueprint planning trigger configs.
 
 triggers:

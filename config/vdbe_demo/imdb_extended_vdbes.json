@@ -2,7 +2,7 @@
   "schema_name": "imdb_extended",
   "engines": [
     {
-      "name": "VDBE [T]",
+      "name": "VDBE (T)",
       "max_staleness_ms": 0,
       "p90_latency_slo_ms": 30,
       "interface": "postgresql",
@@ -27,11 +27,12 @@
           "name": "aka_title",
           "writable": true
         }
-      ]
+      ],
+      "mapped_to": "aurora"
     },
     {
-      "name": "VDBE [A]",
-      "max_staleness_ms": 0,
+      "name": "VDBE (A)",
+      "max_staleness_ms": 3600000,
       "p90_latency_slo_ms": 30000,
       "interface": "postgresql",
       "tables": [
@@ -135,7 +136,8 @@
           "name": "person_info",
           "writable": false
         }
-      ]
+      ],
+      "mapped_to": "redshift"
     }
   ],
   "tables": [

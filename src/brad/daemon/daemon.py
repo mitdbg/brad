@@ -70,6 +70,7 @@ from brad.routing.tree_based.forest_policy import ForestPolicy
 from brad.row_list import RowList
 from brad.utils.time_periods import period_start, universal_now
 from brad.ui.manager import UiManager
+from brad.vdbe.manager import VdbeManager
 
 logger = logging.getLogger(__name__)
 
@@ -128,17 +129,30 @@ class BradDaemon:
         self._system_event_logger = SystemEventLogger.create_if_requested(self._config)
         self._watchdog = BlueprintWatchdog(self._system_event_logger)
 
+        load_vdbe_path = self._config.bootstrap_vdbe_path()
+        if load_vdbe_path is not None:
+            self._vdbe_manager: Optional[VdbeManager] = VdbeManager.load_from(
+                load_vdbe_path
+            )
+        else:
+            self._vdbe_manager = None
+
         # This is used to hold references to internal command tasks we create.
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
         self._internal_command_tasks: Set[asyncio.Task] = set()
 
         self._startup_timestamp = universal_now()
 
-        if self._start_ui and UiManager.is_supported():
+        if (
+            self._start_ui
+            and UiManager.is_supported()
+            and self._vdbe_manager is not None
+        ):
             self._ui_mgr: Optional[UiManager] = UiManager.create(
                 self._config,
                 self._monitor,
                 self._blueprint_mgr,
+                self._vdbe_manager,
                 self._system_event_logger,
             )
         else:
@@ -147,6 +161,10 @@ class BradDaemon:
                 logger.warning(
                     "Cannot start the BRAD UI because it is not supported. "
                     "Please make sure you install BRAD with the [ui] option."
+                )
+            if self._vdbe_manager is None:
+                logger.warning(
+                    "Cannot start the BRAD UI because a VDBE definition is not available."
                 )
 
     async def run_forever(self) -> None:

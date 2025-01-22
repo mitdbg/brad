@@ -4,6 +4,7 @@ from pydantic import BaseModel, AwareDatetime
 
 from brad.blueprint import Blueprint
 from brad.config.engine import Engine
+from brad.vdbe.models import VirtualInfrastructure
 
 
 class TimestampedMetrics(BaseModel):
@@ -82,18 +83,6 @@ class DisplayableBlueprint(BaseModel):
             )
 
         return cls(engines=engines)
-
-
-class DisplayableVirtualEngine(BaseModel):
-    name: str
-    freshness: str
-    dialect: str
-    peak_latency_s: Optional[float] = None
-    tables: List[DisplayableTable] = []
-
-
-class VirtualInfrastructure(BaseModel):
-    engines: List[DisplayableVirtualEngine]
 
 
 class Status(enum.Enum):

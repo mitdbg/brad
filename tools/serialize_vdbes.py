@@ -8,6 +8,7 @@ from brad.vdbe.models import (
     SchemaTable,
     QueryInterface,
 )
+from brad.config.engine import Engine
 
 
 # Define your virtual infrastructure here.
@@ -25,18 +26,20 @@ def to_serialize(schema: Dict[str, Any]) -> VirtualInfrastructure:
     ]
     a_tables = [VirtualTable(name=name, writable=False) for name in all_table_names]
     t_engine = VirtualEngine(
-        name="VDBE [T]",
+        name="VDBE (T)",
         max_staleness_ms=0,
         p90_latency_slo_ms=30,
         interface=QueryInterface.PostgreSQL,
         tables=t_tables,
+        mapped_to=Engine.Aurora,
     )
     a_engine = VirtualEngine(
-        name="VDBE [A]",
-        max_staleness_ms=0,
+        name="VDBE (A)",
+        max_staleness_ms=60 * 60 * 1000,  # 1 hour
         p90_latency_slo_ms=30 * 1000,
         interface=QueryInterface.PostgreSQL,
         tables=a_tables,
+        mapped_to=Engine.Redshift,
     )
     return VirtualInfrastructure(
         schema_name=schema["schema_name"],

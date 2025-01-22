@@ -9,29 +9,51 @@ import {
 } from "../highlight";
 import { useState, useCallback } from "react";
 
-function formatLatencySeconds(latencySeconds) {
-  const precision = 1;
-  if (latencySeconds < 1.0) {
+function formatMilliseconds(milliseconds) {
+  const precision = 2;
+  if (milliseconds >= 1000 * 60 * 60) {
+    // Use hours.
+    const latencyHours = milliseconds / (1000 * 60 * 60);
+    return `${latencyHours.toFixed(precision)} hr`;
+  } else if (milliseconds >= 1000) {
     // Use milliseconds.
-    const latencyMs = latencySeconds * 1000;
-    return `${latencyMs.toFixed(precision)} ms`;
+    const latencySeconds = milliseconds / 1000;
+    return `${latencySeconds.toFixed(precision)} s`;
   }
-  return `${latencySeconds.toFixed(precision)} s`;
+  return `${milliseconds} ms`;
+}
+
+function formatFreshness(maxStalenessMs) {
+  if (maxStalenessMs === 0) {
+    return "No staleness";
+  }
+  return `Staleness ≤ ${formatMilliseconds(maxStalenessMs)}`;
+}
+
+function formatDialect(queryInterface) {
+  if (queryInterface === "postgresql") {
+    return "PostgreSQL SQL";
+  } else if (queryInterface === "athena") {
+    return "Athena SQL";
+  } else if (queryInterface === "common") {
+    return "SQL-99";
+  }
 }
 
 function VdbeView({
-  name,
-  freshness,
-  dialect,
-  peak_latency_s,
-  tables,
+  vdbe,
   highlight,
   onTableHoverEnter,
   onTableHoverExit,
   workloadState,
   updateWorkloadNumClients,
 }) {
-  const vengName = name;
+  const vengName = vdbe.name;
+  const tables = vdbe.tables;
+  const freshness = formatFreshness(vdbe.max_staleness_ms);
+  const peakLatency = formatMilliseconds(vdbe.p90_latency_slo_ms);
+  const dialect = formatDialect(vdbe.interface);
+
   const sortedTables = sortTablesToHoist(highlight, vengName, true, tables);
 
   const [showWorkloadAdjuster, setShowWorkloadAdjuster] = useState(false);
@@ -58,18 +80,16 @@ function VdbeView({
       <div class="vdbe-view-props">
         <ul>
           <li>🌿: {freshness}</li>
-          {peak_latency_s && (
-            <li>⏱️: Query Latency ≤ {formatLatencySeconds(peak_latency_s)}</li>
-          )}
+          <li>⏱️: p90 Query Latency ≤ {peakLatency}</li>
           <li>🗣: {dialect}</li>
         </ul>
       </div>
       <div class="db-table-set">
-        {sortedTables.map(({ name, is_writer, mapped_to }) => (
+        {sortedTables.map(({ name, writable, mapped_to }) => (
           <TableView
             key={name}
             name={name}
-            isWriter={is_writer}
+            isWriter={writable}
             color="green"
             highlightClass={highlightTableViewClass(
               highlight,

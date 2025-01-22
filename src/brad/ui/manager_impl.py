@@ -22,15 +22,13 @@ from brad.ui.models import (
     TimestampedMetrics,
     DisplayableBlueprint,
     SystemState,
-    DisplayableVirtualEngine,
-    VirtualInfrastructure,
-    DisplayableTable,
     Status,
     ClientState,
     SetClientState,
 )
 from brad.daemon.front_end_metrics import FrontEndMetric
 from brad.daemon.system_event_logger import SystemEventLogger, SystemEventRecord
+from brad.vdbe.manager import VdbeManager
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +39,13 @@ class UiManagerImpl:
         config: ConfigFile,
         monitor: Monitor,
         blueprint_mgr: BlueprintManager,
+        vdbe_mgr: VdbeManager,
         system_event_logger: Optional[SystemEventLogger],
     ) -> None:
         self.config = config
         self.monitor = monitor
         self.blueprint_mgr = blueprint_mgr
+        self.vdbe_mgr = vdbe_mgr
         self.system_event_logger = system_event_logger
         self.planner: Optional[BlueprintPlanner] = None
 
@@ -109,7 +109,6 @@ def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
 
     # TODO: Hardcoded virtualized infrasturcture and writers.
     txn_tables = ["theatres", "showings", "ticket_orders", "movie_info", "aka_title"]
-    txn_only = ["theatres", "showings", "ticket_orders"]
 
     if filter_tables_for_demo:
         # To improve how the UI looks in a screenshot, we filter out some tables
@@ -134,47 +133,7 @@ def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
         )
 
     dbp = DisplayableBlueprint.from_blueprint(blueprint)
-    vdbe1 = DisplayableVirtualEngine(
-        name="VDBE 1",
-        freshness="No staleness (SI)",
-        dialect="PostgreSQL SQL",
-        peak_latency_s=0.030,
-        tables=[
-            DisplayableTable(name=name, is_writer=True, mapped_to=["Aurora"])
-            for name in [
-                "theatres",
-                "showings",
-                "ticket_orders",
-                "movie_info",
-                "aka_title",
-            ]
-        ],
-    )
-    vdbe1.tables.sort(key=lambda t: t.name)
-    vdbe2 = DisplayableVirtualEngine(
-        name="VDBE 2",
-        freshness="≤ 10 minutes stale (SI)",
-        dialect="PostgreSQL SQL",
-        peak_latency_s=30.0,
-        tables=[
-            DisplayableTable(
-                name=table.name,
-                is_writer=False,
-                mapped_to=_analytics_table_mapper_temp(table.name, blueprint),
-            )
-            for table in blueprint.tables()
-            if table.name not in txn_only
-        ],
-    )
-    vdbe2.tables.sort(key=lambda t: t.name)
-    for engine in dbp.engines:
-        if engine.name != "Aurora":
-            continue
-        for t in engine.tables:
-            if t.name in txn_tables:
-                t.is_writer = True
-    virtual_infra = VirtualInfrastructure(engines=[vdbe1, vdbe2])
-
+    virtual_infra = manager.vdbe_mgr.infra()
     status = _determine_current_status(manager)
     if status is Status.Transitioning:
         next_blueprint = manager.blueprint_mgr.get_transition_metadata().next_blueprint
@@ -188,7 +147,6 @@ def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
         blueprint=dbp,
         next_blueprint=next_dbp,
     )
-    _add_reverse_mapping_temp(system_state)
     return system_state
 
 

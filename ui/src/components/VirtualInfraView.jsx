@@ -60,10 +60,9 @@ function VirtualInfraView({
   return (
     <Panel heading="Virtual Database Engines" className="infra-column-panel">
       <div class="vdbe-view-wrap">
-        {virtualInfra?.engines?.map(({ name, ...props }, index) => (
+        {virtualInfra?.engines?.map((vdbe, index) => (
           <VdbeView
-            key={name}
-            name={name}
+            key={vdbe.name}
             highlight={highlight}
             onTableHoverEnter={onTableHoverEnter}
             onTableHoverExit={onTableHoverExit}
@@ -71,7 +70,7 @@ function VirtualInfraView({
             updateWorkloadNumClients={(numClients) =>
               updateWorkloadNumClients(index, numClients)
             }
-            {...props}
+            vdbe={vdbe}
           />
         ))}
       </div>

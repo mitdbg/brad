@@ -5,6 +5,7 @@ from brad.daemon.monitor import Monitor
 from brad.blueprint.manager import BlueprintManager
 from brad.daemon.system_event_logger import SystemEventLogger
 from brad.planner.abstract import BlueprintPlanner
+from brad.vdbe.manager import VdbeManager
 
 
 class UiManager:
@@ -33,11 +34,14 @@ class UiManager:
         config: ConfigFile,
         monitor: Monitor,
         blueprint_mgr: BlueprintManager,
+        vdbe_mgr: VdbeManager,
         system_event_logger: Optional[SystemEventLogger],
     ) -> "UiManager":
         from brad.ui.manager_impl import UiManagerImpl
 
-        return cls(UiManagerImpl(config, monitor, blueprint_mgr, system_event_logger))
+        return cls(
+            UiManagerImpl(config, monitor, blueprint_mgr, vdbe_mgr, system_event_logger)
+        )
 
     # We hide away the implementation details to allow external code to import
     # `UiManager` without worrying about import errors (e.g., because the
