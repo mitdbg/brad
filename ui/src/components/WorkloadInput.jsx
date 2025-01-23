@@ -1,5 +1,6 @@
 import Button from "@mui/material/Button";
 import Slider from "@mui/material/Slider";
+import InsetPanel from "./InsetPanel";
 import AutoFixHighRoundedIcon from "@mui/icons-material/AutoFixHighRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import HelpRoundedIcon from "@mui/icons-material/HelpRounded";
@@ -30,7 +31,7 @@ function WorkloadInput({ min, max }) {
     "Then, click 'Show Predicted Changes' to see BRAD's predictions for how " +
     "the physical infrastructure will change.";
   return (
-    <div class="workload-input-wrap">
+    <InsetPanel className="workload-input-wrap">
       <h2>
         <TuneRoundedIcon style={{ marginRight: "10px" }} />
         Adjust Workload
@@ -52,7 +53,7 @@ function WorkloadInput({ min, max }) {
           Show Predicted Changes
         </Button>
       </div>
-    </div>
+    </InsetPanel>
   );
 }
 

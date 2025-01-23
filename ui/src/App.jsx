@@ -4,6 +4,7 @@ import VirtualInfraView from "./components/VirtualInfraView";
 import BlueprintView from "./components/BlueprintView";
 import PerfView from "./components/PerfView";
 import WorkloadInput from "./components/WorkloadInput";
+import CreateEditVdbeForm from "./components/CreateEditVdbeForm";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
 import Panel from "./components/Panel";
 import SystemConfig from "./components/SystemConfig";
@@ -127,6 +128,7 @@ function App() {
           <div class="column-inner">
             <Panel>
               <WorkloadInput min={1} max={10} />
+              <CreateEditVdbeForm isEdit={false} />
               <VirtualInfraView
                 virtualInfra={systemState.virtual_infra}
                 highlight={highlight}
