@@ -3,6 +3,10 @@ import Header from "./components/Header";
 import VirtualInfraView from "./components/VirtualInfraView";
 import BlueprintView from "./components/BlueprintView";
 import PerfView from "./components/PerfView";
+import WorkloadInput from "./components/WorkloadInput";
+import CreateEditVdbeForm from "./components/CreateEditVdbeForm";
+import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
+import Panel from "./components/Panel";
 import SystemConfig from "./components/SystemConfig";
 import { fetchSystemState } from "./api";
 
@@ -117,22 +121,30 @@ function App() {
       <Header status={systemState.status} />
       <div class="body-container">
         <div class="column" style={{ flexGrow: 3 }}>
-          <h2 class="col-h2">Data Infrastructure</h2>
+          <h2 class="col-h2">
+            <StorageRoundedIcon style={{ marginRight: "8px" }} />
+            Data Infrastructure
+          </h2>
           <div class="column-inner">
-            <VirtualInfraView
-              virtualInfra={systemState.virtual_infra}
-              highlight={highlight}
-              onTableHoverEnter={onTableHoverEnter}
-              onTableHoverExit={onTableHoverExit}
-              endpoints={endpoints}
-            />
-            <BlueprintView
-              blueprint={systemState.blueprint}
-              nextBlueprint={systemState.next_blueprint}
-              highlight={highlight}
-              onTableHoverEnter={onTableHoverEnter}
-              onTableHoverExit={onTableHoverExit}
-            />
+            <Panel>
+              <WorkloadInput min={1} max={10} />
+              <CreateEditVdbeForm isEdit={false} />
+              <VirtualInfraView
+                virtualInfra={systemState.virtual_infra}
+                highlight={highlight}
+                onTableHoverEnter={onTableHoverEnter}
+                onTableHoverExit={onTableHoverExit}
+                endpoints={endpoints}
+              />
+              <div class="infra-separator" />
+              <BlueprintView
+                blueprint={systemState.blueprint}
+                nextBlueprint={systemState.next_blueprint}
+                highlight={highlight}
+                onTableHoverEnter={onTableHoverEnter}
+                onTableHoverExit={onTableHoverExit}
+              />
+            </Panel>
           </div>
         </div>
         <PerfView virtualInfra={systemState.virtual_infra} />

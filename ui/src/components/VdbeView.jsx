@@ -1,15 +1,25 @@
+import { useState } from "react";
 import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
-import WorkloadAdjuster from "./WorkloadAdjuster";
+import ExpandableTableSet from "./ExpandableTableSet";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
+import Snackbar from "@mui/material/Snackbar";
 import "./styles/VdbeView.css";
 import {
   highlightTableViewClass,
   highlightEngineViewClass,
   sortTablesToHoist,
 } from "../highlight";
-import { useState, useCallback } from "react";
 
 function formatMilliseconds(milliseconds) {
+  if (milliseconds == null) {
+    return null;
+  }
+
   const precision = 2;
   if (milliseconds >= 1000 * 60 * 60) {
     // Use hours.
@@ -24,6 +34,10 @@ function formatMilliseconds(milliseconds) {
 }
 
 function formatFreshness(maxStalenessMs) {
+  if (maxStalenessMs == null) {
+    return null;
+  }
+
   if (maxStalenessMs === 0) {
     return "No staleness";
   }
@@ -31,60 +45,103 @@ function formatFreshness(maxStalenessMs) {
 }
 
 function formatDialect(queryInterface) {
+  if (queryInterface == null) {
+    return null;
+  }
+
   if (queryInterface === "postgresql") {
     return "PostgreSQL SQL";
   } else if (queryInterface === "athena") {
     return "Athena SQL";
   } else if (queryInterface === "common") {
     return "SQL-99";
+  } else {
+    console.error("Unknown", queryInterface);
+    return null;
   }
+}
+
+function EditControls({ onEditClick, onDeleteClick }) {
+  return (
+    <div className="vdbe-edit-controls">
+      <Tooltip title="Edit" placement="right">
+        <IconButton onClick={onEditClick} className="vdbe-edit-button">
+          <EditRoundedIcon />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Delete" placement="right">
+        <IconButton onClick={onDeleteClick} className="vdbe-edit-button">
+          <DeleteRoundedIcon />
+        </IconButton>
+      </Tooltip>
+    </div>
+  );
+}
+
+function VdbeEndpoint({ endpoint, setShowSnackbar }) {
+  const handleCopy = () => {
+    navigator.clipboard.writeText(endpoint);
+    setShowSnackbar(true);
+  };
+  return (
+    <div class="vdbe-endpoint" onClick={handleCopy}>
+      <LinkRoundedIcon style={{ marginRight: "8px" }} />
+      <Tooltip title="Click to copy endpoint" placement="right">
+        <span>{endpoint}</span>
+      </Tooltip>
+    </div>
+  );
 }
 
 function VdbeView({
   vdbe,
+  endpoint,
   highlight,
   onTableHoverEnter,
   onTableHoverExit,
-  workloadState,
-  updateWorkloadNumClients,
+  editable,
 }) {
   const vengName = vdbe.name;
   const tables = vdbe.tables;
   const freshness = formatFreshness(vdbe.max_staleness_ms);
   const peakLatency = formatMilliseconds(vdbe.p90_latency_slo_ms);
   const dialect = formatDialect(vdbe.interface);
-
   const sortedTables = sortTablesToHoist(highlight, vengName, true, tables);
+  const [showSnackbar, setShowSnackbar] = useState(false);
 
-  const [showWorkloadAdjuster, setShowWorkloadAdjuster] = useState(false);
-  const toggleWorkloadAdjuster = useCallback(() => {
-    setShowWorkloadAdjuster(!showWorkloadAdjuster);
-  }, [showWorkloadAdjuster]);
+  const handleClose = (event, reason) => {
+    if (reason === "clickaway") {
+      return;
+    }
+    setShowSnackbar(false);
+  };
 
   return (
     <div
       class={`vdbe-view ${highlightEngineViewClass(highlight, vengName, true)}`}
     >
-      {workloadState && showWorkloadAdjuster && (
-        <WorkloadAdjuster
-          min={0}
-          max={workloadState.max_clients}
-          value={workloadState.curr_clients}
-          onChange={updateWorkloadNumClients}
-          debounceMs={800}
-        />
+      <div className="vdbe-db-wrap">
+        <DbCylinder color="green">{vengName}</DbCylinder>
+        {editable && (
+          <EditControls onEditClick={() => {}} onDeleteClick={() => {}} />
+        )}
+      </div>
+      {endpoint && (
+        <VdbeEndpoint endpoint={endpoint} setShowSnackbar={setShowSnackbar} />
       )}
-      <DbCylinder color="green" onClick={toggleWorkloadAdjuster}>
-        {vengName}
-      </DbCylinder>
       <div class="vdbe-view-props">
         <ul>
-          <li>🌿: {freshness}</li>
-          <li>⏱️: p90 Query Latency ≤ {peakLatency}</li>
-          <li>🗣: {dialect}</li>
+          <li>🌿: {freshness != null ? freshness : "-----"}</li>
+          <li>
+            ⏱️:{" "}
+            {peakLatency != null
+              ? `p90 Query Latency ≤ ${peakLatency}`
+              : "-----"}
+          </li>
+          <li>🗣: {dialect != null ? dialect : "-----"}</li>
         </ul>
       </div>
-      <div class="db-table-set">
+      <ExpandableTableSet>
         {sortedTables.map(({ name, writable, mapped_to }) => (
           <TableView
             key={name}
@@ -103,7 +160,13 @@ function VdbeView({
             onTableHoverExit={onTableHoverExit}
           />
         ))}
-      </div>
+      </ExpandableTableSet>
+      <Snackbar
+        open={showSnackbar}
+        autoHideDuration={3000}
+        message="Endpoint copied to clipboard"
+        onClose={handleClose}
+      />
     </div>
   );
 }

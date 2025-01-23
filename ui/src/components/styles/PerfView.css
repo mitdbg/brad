@@ -18,11 +18,13 @@
 .perf-view-winsel-button {
   border-radius: 5px;
   width: 80px;
+  height: 100%;
   background-color: #f2f2f2;
   margin: 0 5px;
   border: 0;
   font-weight: 400;
   font-size: 0.8em;
+  cursor: pointer;
 }
 
 .perf-view-winsel-button:hover {

@@ -1,0 +1,26 @@
+.workload-input-sliders {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  margin-bottom: 20px;
+}
+
+.workload-slider {
+  max-width: 400px;
+  flex-grow: 1;
+  margin-right: 30px;
+}
+
+.workload-slider h3 {
+  font-weight: 600;
+  margin: 10px 0 5px 0;
+}
+
+.workload-input-buttons {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.workload-input-buttons button {
+  margin-left: 20px;
+}

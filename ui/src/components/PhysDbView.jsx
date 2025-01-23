@@ -1,5 +1,6 @@
 import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
+import ExpandableTableSet from "./ExpandableTableSet";
 import "./styles/PhysDbView.css";
 import {
   highlightTableViewClass,
@@ -34,6 +35,38 @@ function PhysDbView({
   const sortedTables = sortTablesToHoist(highlight, physDbName, false, tables);
   const addedTablesList = addedTables(tables, nextEngine);
 
+  const sortedTableComponents = sortedTables.map(
+    ({ name, writable, mapped_to }) => (
+      <TableView
+        key={name}
+        name={name}
+        isWriter={writable}
+        color="blue"
+        highlightClass={highlightTableViewClass(
+          highlight,
+          physDbName,
+          name,
+          false,
+        )}
+        onTableHoverEnter={() =>
+          onTableHoverEnter(physDbName, name, false, mapped_to)
+        }
+        onTableHoverExit={onTableHoverExit}
+      />
+    ),
+  );
+  const addedTableComponents = addedTablesList.map(({ name, writable }) => (
+    <TableView
+      key={name}
+      name={name}
+      isWriter={writable}
+      color="blue"
+      highlightClass="dim"
+      onTableHoverEnter={() => {}}
+      onTableHoverExit={() => {}}
+    />
+  ));
+
   return (
     <div
       class={`physdb-view ${highlightEngineViewClass(highlight, physDbName, false)}`}
@@ -46,37 +79,9 @@ function PhysDbView({
           {nextEngine.provisioning}
         </div>
       )}
-      <div class="db-table-set">
-        {sortedTables.map(({ name, writable, mapped_to }) => (
-          <TableView
-            key={name}
-            name={name}
-            isWriter={writable}
-            color="blue"
-            highlightClass={highlightTableViewClass(
-              highlight,
-              physDbName,
-              name,
-              false,
-            )}
-            onTableHoverEnter={() =>
-              onTableHoverEnter(physDbName, name, false, mapped_to)
-            }
-            onTableHoverExit={onTableHoverExit}
-          />
-        ))}
-        {addedTablesList.map(({ name, writable }) => (
-          <TableView
-            key={name}
-            name={name}
-            isWriter={writable}
-            color="blue"
-            highlightClass="dim"
-            onTableHoverEnter={() => {}}
-            onTableHoverExit={() => {}}
-          />
-        ))}
-      </div>
+      <ExpandableTableSet>
+        {[...sortedTableComponents, ...addedTableComponents]}
+      </ExpandableTableSet>
     </div>
   );
 }
