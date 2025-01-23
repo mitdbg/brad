@@ -3,3 +3,11 @@
   display: flex;
   justify-content: space-around;
 }
+
+.infra-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin: 20px 0 -20px 0;
+}

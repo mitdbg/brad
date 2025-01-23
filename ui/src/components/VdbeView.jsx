@@ -1,14 +1,16 @@
 import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
-import WorkloadAdjuster from "./WorkloadAdjuster";
 import ExpandableTableSet from "./ExpandableTableSet";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import "./styles/VdbeView.css";
 import {
   highlightTableViewClass,
   highlightEngineViewClass,
   sortTablesToHoist,
 } from "../highlight";
-import { useState, useCallback } from "react";
 
 function formatMilliseconds(milliseconds) {
   const precision = 2;
@@ -41,43 +43,39 @@ function formatDialect(queryInterface) {
   }
 }
 
-function VdbeView({
-  vdbe,
-  highlight,
-  onTableHoverEnter,
-  onTableHoverExit,
-  workloadState,
-  updateWorkloadNumClients,
-}) {
+function EditControls({ onEditClick, onDeleteClick }) {
+  return (
+    <div className="vdbe-edit-controls">
+      <Tooltip title="Edit" placement="right">
+        <IconButton onClick={onEditClick} className="vdbe-edit-button">
+          <EditRoundedIcon />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Delete" placement="right">
+        <IconButton onClick={onDeleteClick} className="vdbe-edit-button">
+          <DeleteRoundedIcon />
+        </IconButton>
+      </Tooltip>
+    </div>
+  );
+}
+
+function VdbeView({ vdbe, highlight, onTableHoverEnter, onTableHoverExit }) {
   const vengName = vdbe.name;
   const tables = vdbe.tables;
   const freshness = formatFreshness(vdbe.max_staleness_ms);
   const peakLatency = formatMilliseconds(vdbe.p90_latency_slo_ms);
   const dialect = formatDialect(vdbe.interface);
-
   const sortedTables = sortTablesToHoist(highlight, vengName, true, tables);
-
-  const [showWorkloadAdjuster, setShowWorkloadAdjuster] = useState(false);
-  const toggleWorkloadAdjuster = useCallback(() => {
-    setShowWorkloadAdjuster(!showWorkloadAdjuster);
-  }, [showWorkloadAdjuster]);
 
   return (
     <div
       class={`vdbe-view ${highlightEngineViewClass(highlight, vengName, true)}`}
     >
-      {workloadState && showWorkloadAdjuster && (
-        <WorkloadAdjuster
-          min={0}
-          max={workloadState.max_clients}
-          value={workloadState.curr_clients}
-          onChange={updateWorkloadNumClients}
-          debounceMs={800}
-        />
-      )}
-      <DbCylinder color="green" onClick={toggleWorkloadAdjuster}>
-        {vengName}
-      </DbCylinder>
+      <div className="vdbe-db-wrap">
+        <DbCylinder color="green">{vengName}</DbCylinder>
+        <EditControls onEditClick={() => {}} onDeleteClick={() => {}} />
+      </div>
       <div class="vdbe-view-props">
         <ul>
           <li>🌿: {freshness}</li>
