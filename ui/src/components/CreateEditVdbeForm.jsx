@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTheme } from "@mui/material/styles";
 import InsetPanel from "./InsetPanel";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import FormControl from "@mui/material/FormControl";
@@ -10,8 +11,84 @@ import Button from "@mui/material/Button";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import Select from "@mui/material/Select";
+import Chip from "@mui/material/Chip";
+import Box from "@mui/material/Box";
+import OutlinedInput from "@mui/material/OutlinedInput";
 import VdbeView from "./VdbeView";
 import "./styles/CreateEditVdbeForm.css";
+
+const ITEM_HEIGHT = 47;
+const ITEM_PADDING_TOP = 7;
+const MenuProps = {
+  PaperProps: {
+    style: {
+      maxHeight: ITEM_HEIGHT * 3.5 + ITEM_PADDING_TOP,
+      width: 249,
+    },
+  },
+};
+
+function getStyles(name, selectedTables, theme) {
+  return {
+    fontWeight: selectedTables.includes(name)
+      ? theme.typography.fontWeightMedium
+      : theme.typography.fontWeightRegular,
+  };
+}
+
+function TableSelector({ tables }) {
+  const theme = useTheme();
+  const [selectedTables, setSelectedTables] = useState([]);
+
+  const handleChange = (event) => {
+    const {
+      target: { value },
+    } = event;
+    setSelectedTables(
+      // On autofill we get a stringified value.
+      typeof value === "string" ? value.split(",") : value,
+    );
+  };
+
+  return (
+    <div>
+      <FormControl fullWidth>
+        <InputLabel id="cev-table-selector-label">Tables</InputLabel>
+        <Select
+          labelId="cev-table-selector-label"
+          label="Tables"
+          id="cev-table-selector"
+          multiple
+          value={selectedTables}
+          onChange={handleChange}
+          input={<OutlinedInput id="cev-table-selector-field" label="Tables" />}
+          renderValue={(selected) => (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: -1.5 }}>
+              {selected.map((value) => (
+                <Chip
+                  key={value}
+                  label={value}
+                  style={{ marginRight: "8px" }}
+                />
+              ))}
+            </Box>
+          )}
+          MenuProps={MenuProps}
+        >
+          {tables.map((name) => (
+            <MenuItem
+              key={name}
+              value={name}
+              style={getStyles(name, selectedTables, theme)}
+            >
+              {name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </div>
+  );
+}
 
 function CreateEditFormFields({ vdbe, setVdbe }) {
   const onStalenessChange = (event) => {
@@ -31,6 +108,8 @@ function CreateEditFormFields({ vdbe, setVdbe }) {
     }
     setVdbe({ ...vdbe, p90_latency_slo_ms: sloMs });
   };
+
+  const tables = ["tickets", "theatres", "movies"];
 
   return (
     <div className="cev-form-fields">
@@ -87,6 +166,7 @@ function CreateEditFormFields({ vdbe, setVdbe }) {
           <MenuItem value="postgresql">PostgreSQL SQL</MenuItem>
           <MenuItem value="athena">Athena SQL</MenuItem>
         </Select>
+        <TableSelector tables={tables} />
       </FormControl>
     </div>
   );
