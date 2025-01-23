@@ -1,6 +1,7 @@
 import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
 import WorkloadAdjuster from "./WorkloadAdjuster";
+import ExpandableTableSet from "./ExpandableTableSet";
 import "./styles/VdbeView.css";
 import {
   highlightTableViewClass,
@@ -84,7 +85,7 @@ function VdbeView({
           <li>🗣: {dialect}</li>
         </ul>
       </div>
-      <div class="db-table-set">
+      <ExpandableTableSet>
         {sortedTables.map(({ name, writable, mapped_to }) => (
           <TableView
             key={name}
@@ -103,7 +104,7 @@ function VdbeView({
             onTableHoverExit={onTableHoverExit}
           />
         ))}
-      </div>
+      </ExpandableTableSet>
     </div>
   );
 }

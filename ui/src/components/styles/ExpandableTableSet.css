@@ -1,0 +1,91 @@
+.expandable-table-set-wrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.expandable-table-set {
+  width: 350px;
+}
+
+.expandable-table-set.expandable {
+  overflow: hidden;
+  max-height: 180px;
+  mask-image: linear-gradient(180deg, #000 50%, transparent);
+}
+
+.expandable-table-set-inner {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 340px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.expandable-table-set-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  margin-top: 10px;
+  opacity: 0.35;
+  transition: all 0.25s;
+}
+
+.expandable-table-set-button:hover {
+  opacity: 1;
+}
+
+.show-more {
+  animation-duration: 0.75s;
+  animation-fill-mode: both;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: 1;
+}
+
+.show-more:hover {
+  animation-name: bounce-down;
+}
+
+.show-less {
+  animation-duration: 0.75s;
+  animation-fill-mode: both;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: 1;
+}
+
+.show-less:hover {
+  animation-name: bounce-up;
+}
+
+@keyframes bounce-down {
+  0% {
+    transform: translateY(0);
+  }
+  20% {
+    transform: translateY(3px);
+  }
+  40% {
+    transform: translateY(1px);
+  }
+  100% {
+    transform: translateY(1px);
+  }
+}
+
+@keyframes bounce-up {
+  0% {
+    transform: translateY(0);
+  }
+  20% {
+    transform: translateY(-3px);
+  }
+  40% {
+    transform: translateY(-1px);
+  }
+  100% {
+    transform: translateY(-1px);
+  }
+}
