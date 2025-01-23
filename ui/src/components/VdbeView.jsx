@@ -1,3 +1,4 @@
+import { useState } from "react";
 import DbCylinder from "./DbCylinder";
 import TableView from "./TableView";
 import ExpandableTableSet from "./ExpandableTableSet";
@@ -5,6 +6,8 @@ import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
+import Snackbar from "@mui/material/Snackbar";
 import "./styles/VdbeView.css";
 import {
   highlightTableViewClass,
@@ -75,8 +78,24 @@ function EditControls({ onEditClick, onDeleteClick }) {
   );
 }
 
+function VdbeEndpoint({ endpoint, setShowSnackbar }) {
+  const handleCopy = () => {
+    navigator.clipboard.writeText(endpoint);
+    setShowSnackbar(true);
+  };
+  return (
+    <div class="vdbe-endpoint" onClick={handleCopy}>
+      <LinkRoundedIcon style={{ marginRight: "8px" }} />
+      <Tooltip title="Click to copy endpoint" placement="right">
+        <span>{endpoint}</span>
+      </Tooltip>
+    </div>
+  );
+}
+
 function VdbeView({
   vdbe,
+  endpoint,
   highlight,
   onTableHoverEnter,
   onTableHoverExit,
@@ -88,6 +107,14 @@ function VdbeView({
   const peakLatency = formatMilliseconds(vdbe.p90_latency_slo_ms);
   const dialect = formatDialect(vdbe.interface);
   const sortedTables = sortTablesToHoist(highlight, vengName, true, tables);
+  const [showSnackbar, setShowSnackbar] = useState(false);
+
+  const handleClose = (event, reason) => {
+    if (reason === "clickaway") {
+      return;
+    }
+    setShowSnackbar(false);
+  };
 
   return (
     <div
@@ -99,6 +126,9 @@ function VdbeView({
           <EditControls onEditClick={() => {}} onDeleteClick={() => {}} />
         )}
       </div>
+      {endpoint && (
+        <VdbeEndpoint endpoint={endpoint} setShowSnackbar={setShowSnackbar} />
+      )}
       <div class="vdbe-view-props">
         <ul>
           <li>🌿: {freshness != null ? freshness : "-----"}</li>
@@ -131,6 +161,12 @@ function VdbeView({
           />
         ))}
       </ExpandableTableSet>
+      <Snackbar
+        open={showSnackbar}
+        autoHideDuration={3000}
+        message="Endpoint copied to clipboard"
+        onClose={handleClose}
+      />
     </div>
   );
 }

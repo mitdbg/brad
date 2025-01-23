@@ -52,3 +52,22 @@
 .vdbe-view:hover .vdbe-edit-controls {
   opacity: 1;
 }
+
+.vdbe-endpoint {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  font-size: 1em;
+  margin: 0 0 15px 0;
+  cursor: pointer;
+  color: #1d8033;
+  transition: all 0.2s ease-in-out;
+
+  background-color: #f6fdf7;
+  border-radius: 20px;
+  padding: 3px 8px;
+}
+
+.vdbe-endpoint:hover {
+  color: #51a965;
+}
