@@ -69,6 +69,7 @@ function VirtualInfraView({
             onTableHoverEnter={onTableHoverEnter}
             onTableHoverExit={onTableHoverExit}
             vdbe={vdbe}
+            editable={true}
           />
         ))}
       </div>

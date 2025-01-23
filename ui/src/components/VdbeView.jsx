@@ -13,6 +13,10 @@ import {
 } from "../highlight";
 
 function formatMilliseconds(milliseconds) {
+  if (milliseconds == null) {
+    return null;
+  }
+
   const precision = 2;
   if (milliseconds >= 1000 * 60 * 60) {
     // Use hours.
@@ -27,6 +31,10 @@ function formatMilliseconds(milliseconds) {
 }
 
 function formatFreshness(maxStalenessMs) {
+  if (maxStalenessMs == null) {
+    return null;
+  }
+
   if (maxStalenessMs === 0) {
     return "No staleness";
   }
@@ -34,12 +42,19 @@ function formatFreshness(maxStalenessMs) {
 }
 
 function formatDialect(queryInterface) {
+  if (queryInterface == null) {
+    return null;
+  }
+
   if (queryInterface === "postgresql") {
     return "PostgreSQL SQL";
   } else if (queryInterface === "athena") {
     return "Athena SQL";
   } else if (queryInterface === "common") {
     return "SQL-99";
+  } else {
+    console.error("Unknown", queryInterface);
+    return null;
   }
 }
 
@@ -60,7 +75,13 @@ function EditControls({ onEditClick, onDeleteClick }) {
   );
 }
 
-function VdbeView({ vdbe, highlight, onTableHoverEnter, onTableHoverExit }) {
+function VdbeView({
+  vdbe,
+  highlight,
+  onTableHoverEnter,
+  onTableHoverExit,
+  editable,
+}) {
   const vengName = vdbe.name;
   const tables = vdbe.tables;
   const freshness = formatFreshness(vdbe.max_staleness_ms);
@@ -74,13 +95,20 @@ function VdbeView({ vdbe, highlight, onTableHoverEnter, onTableHoverExit }) {
     >
       <div className="vdbe-db-wrap">
         <DbCylinder color="green">{vengName}</DbCylinder>
-        <EditControls onEditClick={() => {}} onDeleteClick={() => {}} />
+        {editable && (
+          <EditControls onEditClick={() => {}} onDeleteClick={() => {}} />
+        )}
       </div>
       <div class="vdbe-view-props">
         <ul>
-          <li>🌿: {freshness}</li>
-          <li>⏱️: p90 Query Latency ≤ {peakLatency}</li>
-          <li>🗣: {dialect}</li>
+          <li>🌿: {freshness != null ? freshness : "-----"}</li>
+          <li>
+            ⏱️:{" "}
+            {peakLatency != null
+              ? `p90 Query Latency ≤ ${peakLatency}`
+              : "-----"}
+          </li>
+          <li>🗣: {dialect != null ? dialect : "-----"}</li>
         </ul>
       </div>
       <ExpandableTableSet>
