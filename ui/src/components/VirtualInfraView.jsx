@@ -1,4 +1,3 @@
-import Panel from "./Panel";
 import VdbeView from "./VdbeView";
 import "./styles/VirtualInfraView.css";
 import { useEffect, useState, useCallback } from "react";
@@ -58,8 +57,9 @@ function VirtualInfraView({
   }, [endpoints]);
 
   return (
-    <Panel heading="Virtual Database Engines" className="infra-column-panel">
-      <div class="vdbe-view-wrap">
+    <div class="infra-region vdbe-view-wrap">
+      <h2>Virtual</h2>
+      <div class="vdbe-view-engines-wrap">
         {virtualInfra?.engines?.map((vdbe, index) => (
           <VdbeView
             key={vdbe.name}
@@ -74,7 +74,7 @@ function VirtualInfraView({
           />
         ))}
       </div>
-    </Panel>
+    </div>
   );
 }
 

@@ -1,4 +1,3 @@
-import Panel from "./Panel";
 import PhysDbView from "./PhysDbView";
 import "./styles/BlueprintView.css";
 
@@ -20,8 +19,9 @@ function BlueprintView({
   onTableHoverExit,
 }) {
   return (
-    <Panel heading="Physical Infrastructure" className="infra-column-panel">
-      <div class="bp-view-wrap">
+    <div class="infra-region bp-view-wrap">
+      <h2>Physical</h2>
+      <div class="bp-view-engines-wrap">
         {blueprint &&
           blueprint.engines &&
           blueprint.engines.map(({ name, ...props }) => (
@@ -36,7 +36,7 @@ function BlueprintView({
             />
           ))}
       </div>
-    </Panel>
+    </div>
   );
 }
 

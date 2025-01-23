@@ -66,6 +66,27 @@ body {
   flex-grow: 1;
 }
 
+.infra-separator {
+  box-shadow: 0px 20px 20px -15px rgba(0, 0, 0, 0.1);
+  height: 40px;
+  width: 95%;
+  margin: 20px auto 40px auto;
+}
+
+.infra-region {
+  position: relative;
+}
+
+.infra-region h2 {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: 1.75em;
+  color: #ababab;
+  transform-origin: top left;
+  transform: rotate(-90deg) translate(calc(-100% - 20px), -10px);
+}
+
 /* Responsive layout */
 @media only screen and (max-width: 800px) {
   .body-container {
