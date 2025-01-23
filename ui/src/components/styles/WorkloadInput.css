@@ -1,0 +1,42 @@
+.workload-input-wrap {
+  display: flex;
+  flex-direction: column;
+  background-color: #f8f8f8;
+  border-radius: 20px;
+  padding: 30px;
+  margin-bottom: 20px;
+}
+
+.workload-input-wrap h2 {
+  display: flex;
+  align-items: center;
+  font-size: 1.5em;
+  margin: 0 0 5px 0;
+}
+
+.workload-input-sliders {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  margin-bottom: 20px;
+}
+
+.workload-slider {
+  max-width: 400px;
+  flex-grow: 1;
+  margin-right: 30px;
+}
+
+.workload-slider h3 {
+  font-weight: 600;
+  margin: 10px 0 5px 0;
+}
+
+.workload-input-buttons {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.workload-input-buttons button {
+  margin-left: 20px;
+}

@@ -44,6 +44,8 @@ body {
   margin: 0;
   font-size: 1.75em;
   font-weight: 600;
+  display: flex;
+  align-items: center;
 }
 
 .column-inner {

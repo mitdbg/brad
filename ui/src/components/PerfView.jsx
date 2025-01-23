@@ -3,6 +3,7 @@ import { fetchMetrics } from "../api";
 import MetricsManager from "../metrics";
 import Panel from "./Panel";
 import LatencyPlot from "./LatencyPlot";
+import TroubleshootRoundedIcon from "@mui/icons-material/TroubleshootRounded";
 import "./styles/PerfView.css";
 
 const REFRESH_INTERVAL_MS = 30 * 1000;
@@ -134,7 +135,10 @@ function PerfView({ virtualInfra }) {
   return (
     <div class="column" style={{ flexGrow: 2 }}>
       <div class="perf-view-heading">
-        <h2 class="col-h2">Performance Monitoring</h2>
+        <h2 class="col-h2">
+          <TroubleshootRoundedIcon style={{ marginRight: "8px" }} />
+          Performance Monitoring
+        </h2>
         <WindowSelector
           windowSizeMinutes={windowSizeMinutes}
           onWindowSizeChange={setWindowSizeMinutes}
