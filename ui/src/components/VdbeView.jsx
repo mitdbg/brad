@@ -99,6 +99,7 @@ function VdbeView({
   highlight,
   onTableHoverEnter,
   onTableHoverExit,
+  onTableClick,
   editable,
 }) {
   const vengName = vdbe.name;
@@ -158,6 +159,7 @@ function VdbeView({
               onTableHoverEnter(vengName, name, true, mapped_to)
             }
             onTableHoverExit={onTableHoverExit}
+            onTableClick={onTableClick}
           />
         ))}
       </ExpandableTableSet>

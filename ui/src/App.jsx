@@ -116,6 +116,18 @@ function App() {
     [endpoints],
   );
 
+  const allTables = [
+    "tickets",
+    "theatres",
+    "movies",
+    "showings",
+    "aka_title",
+    "homes",
+    "movie_info",
+    "title",
+    "company_name",
+  ];
+
   return (
     <>
       <Header status={systemState.status} />
@@ -128,7 +140,7 @@ function App() {
           <div class="column-inner">
             <Panel>
               <WorkloadInput min={1} max={10} />
-              <CreateEditVdbeForm isEdit={false} />
+              <CreateEditVdbeForm isEdit={false} allTables={allTables} />
               <VirtualInfraView
                 virtualInfra={systemState.virtual_infra}
                 highlight={highlight}
