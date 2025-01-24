@@ -95,6 +95,10 @@ function App() {
   // Bind keyboard shortcut for internal config menu.
   const handleKeyPress = useCallback(
     (event) => {
+      if (document.activeElement !== document.body) {
+        // We only want to handle key presses when no input is focused.
+        return;
+      }
       if (event.key === "d" && !configModalOpen) {
         setConfigModalOpen(true);
       }
