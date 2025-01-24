@@ -125,10 +125,10 @@ function PerfView({ virtualInfra }) {
   let vdbe2Peak = null;
   if (virtualInfra?.engines != null) {
     if (virtualInfra.engines.length > 0) {
-      vdbe1Peak = virtualInfra.engines[0].peak_latency_s;
+      vdbe1Peak = virtualInfra.engines[0].p90_latency_slo_ms / 1000;
     }
     if (virtualInfra.engines.length > 1) {
-      vdbe2Peak = virtualInfra.engines[1].peak_latency_s;
+      vdbe2Peak = virtualInfra.engines[1].p90_latency_slo_ms / 1000;
     }
   }
 
