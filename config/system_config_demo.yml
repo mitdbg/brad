@@ -126,6 +126,16 @@ std_datasets:
 
 bootstrap_vdbe_path: config/vdbe_demo/imdb_extended_vdbes.json
 
+aurora_max_query_factor: 4.0
+aurora_max_query_factor_replace: 10000.0
+
+redshift_peak_load_threshold: 95.0
+redshift_peak_load_multiplier: 2.0
+
+planner_max_workers: 16
+aurora_provisioning_search_distance: 900.0
+redshift_provisioning_search_distance: 900.0
+
 # Blueprint planning trigger configs.
 
 triggers:
@@ -137,7 +147,7 @@ triggers:
   # takes effect. Usually this should be greater than zero to give BRAD
   # sufficient time to observe the effect of the blueprint on the workload. BRAD
   # may wait longer to ensure metrics are also available for this many minutes.
-  observe_new_blueprint_mins: 3
+  observe_new_blueprint_mins: 10
 
   elapsed_time:
     disabled: true
