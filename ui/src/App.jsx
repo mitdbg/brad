@@ -1,12 +1,7 @@
 import { useCallback, useState, useEffect } from "react";
 import Header from "./components/Header";
-import VirtualInfraView from "./components/VirtualInfraView";
-import BlueprintView from "./components/BlueprintView";
 import PerfView from "./components/PerfView";
-import WorkloadInput from "./components/WorkloadInput";
-import CreateEditVdbeForm from "./components/CreateEditVdbeForm";
-import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
-import Panel from "./components/Panel";
+import OverallInfraView from "./components/OverallInfraView";
 import { fetchSystemState } from "./api";
 
 import "./App.css";
@@ -14,70 +9,32 @@ import "./App.css";
 const REFRESH_INTERVAL_MS = 30 * 1000;
 
 function App() {
-  const [systemState, setSystemState] = useState({
-    status: "running",
-    blueprint: null,
-    virtual_infra: null,
-    next_blueprint: null,
+  const [appState, setAppState] = useState({
+    systemState: {
+      status: "running",
+      blueprint: null,
+      virtual_infra: null,
+      next_blueprint: null,
+    },
+    workloadInputOpen: false,
+    vdbeForm: {
+      open: false,
+      shownVdbe: null,
+    },
   });
-  const [highlight, setHighlight] = useState({
-    hoverEngine: null,
-    virtualEngines: {},
-    physicalEngines: {},
-  });
-  const [workloadInputState, setWorkloadInputState] = useState({
-    open: false,
-    engineIntensity: [],
-    min: 1,
-    max: 10,
-  });
-  const [vdbeFormState, setVdbeFormState] = useState({
-    open: false,
-    currentVdbe: null,
-  });
-
-  const onTableHoverEnter = (engineMarker, tableName, isVirtual, mappedTo) => {
-    const virtualEngines = {};
-    const physicalEngines = {};
-    if (isVirtual) {
-      virtualEngines[engineMarker] = tableName;
-      for (const physMarker of mappedTo) {
-        physicalEngines[physMarker] = tableName;
-      }
-    } else {
-      physicalEngines[engineMarker] = tableName;
-      for (const virtMarker of mappedTo) {
-        virtualEngines[virtMarker] = tableName;
-      }
-    }
-    setHighlight({
-      hoverEngine: engineMarker,
-      virtualEngines,
-      physicalEngines,
-    });
-  };
-
-  const onTableHoverExit = () => {
-    setHighlight({
-      hoverEngine: null,
-      virtualEngines: {},
-      physicalEngines: {},
-    });
-  };
 
   const refreshData = useCallback(async () => {
-    const newSystemState = await fetchSystemState(
-      /*filterTablesForDemo=*/ false,
-    );
+    const newSystemState = await fetchSystemState();
     // TODO: Not the best way to check for equality.
-    if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
-      setSystemState(newSystemState);
+    if (
+      JSON.stringify(appState.systemState) !== JSON.stringify(newSystemState)
+    ) {
+      setAppState({ ...appState, systemState: newSystemState });
     }
-  }, [systemState, setSystemState]);
+  }, [appState, setAppState]);
 
   // Fetch updated system state periodically.
   useEffect(() => {
-    // Run first fetch immediately.
     refreshData();
     const intervalId = setInterval(refreshData, REFRESH_INTERVAL_MS);
     return () => {
@@ -104,76 +61,43 @@ function App() {
     };
   }, [handleKeyPress]);
 
-  const allTables = [
-    "tickets",
-    "theatres",
-    "movies",
-    "showings",
-    "aka_title",
-    "homes",
-    "movie_info",
-    "title",
-    "company_name",
-  ];
+  const { systemState, workloadInputOpen, vdbeForm } = appState;
+
+  // Callbacks used to control forms in the UI.
+  const openWorkloadInput = () => {
+    if (workloadInputOpen) return;
+    setAppState({ ...appState, workloadInputOpen: true });
+  };
+  const closeWorkloadInput = () => {
+    if (!workloadInputOpen) return;
+    setAppState({ ...appState, workloadInputOpen: false });
+  };
+
+  const openVdbeForm = (vdbe) => {
+    const { open } = vdbeForm;
+    if (open) return;
+    setAppState({ ...appState, vdbeForm: { open: true, shownVdbe: vdbe } });
+  };
+  const closeVdbeForm = () => {
+    const { open } = vdbeForm;
+    if (!open) return;
+    setAppState({ ...appState, vdbeForm: { open: false, shownVdbe: null } });
+  };
 
   return (
     <>
       <Header
         status={systemState.status}
-        workloadDisabled={false}
-        onWorkloadClick={() => {
-          if (workloadInputState.open) return;
-          setWorkloadInputState({ ...workloadInputState, open: true });
-        }}
+        workloadDisabled={workloadInputOpen || vdbeForm.open}
+        onWorkloadClick={openWorkloadInput}
       />
       <div class="body-container">
-        <div class="column" style={{ flexGrow: 3 }}>
-          <h2 class="col-h2">
-            <StorageRoundedIcon style={{ marginRight: "8px" }} />
-            Data Infrastructure
-          </h2>
-          <div class="column-inner">
-            <Panel>
-              {workloadInputState.open && (
-                <WorkloadInput
-                  workloadInputState={workloadInputState}
-                  setWorkloadInputState={setWorkloadInputState}
-                />
-              )}
-              {vdbeFormState.open && (
-                <CreateEditVdbeForm
-                  currentVdbe={vdbeFormState.currentVdbe}
-                  allTables={allTables}
-                  onCloseClick={() =>
-                    setVdbeFormState({ open: false, currentVdbe: null })
-                  }
-                />
-              )}
-              <VirtualInfraView
-                virtualInfra={systemState.virtual_infra}
-                highlight={highlight}
-                onTableHoverEnter={onTableHoverEnter}
-                onTableHoverExit={onTableHoverExit}
-                onAddVdbeClick={() => {
-                  if (vdbeFormState.open) return;
-                  setVdbeFormState({ open: true, currentVdbe: null });
-                }}
-                onEditVdbeClick={(vdbe) => {
-                  if (vdbeFormState.open) return;
-                  setVdbeFormState({ open: true, currentVdbe: vdbe });
-                }}
-              />
-              <div class="infra-separator" />
-              <BlueprintView
-                blueprint={systemState.blueprint}
-                nextBlueprint={systemState.next_blueprint}
-                highlight={highlight}
-                onTableHoverEnter={onTableHoverEnter}
-                onTableHoverExit={onTableHoverExit}
-              />
-            </Panel>
-          </div>
-        </div>
+        <OverallInfraView
+          appState={appState}
+          closeWorkloadInput={closeWorkloadInput}
+          openVdbeForm={openVdbeForm}
+          closeVdbeForm={closeVdbeForm}
+        />
         <PerfView virtualInfra={systemState.virtual_infra} />
       </div>
     </>
