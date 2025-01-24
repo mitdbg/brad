@@ -45,7 +45,7 @@ function HeaderButton({ icon, children, onClick, disabled }) {
   );
 }
 
-function Header({ status }) {
+function Header({ status, onWorkloadClick, workloadDisabled }) {
   return (
     <div class="header">
       <div class="header-inner">
@@ -58,7 +58,11 @@ function Header({ status }) {
               <strong>BRAD</strong> Dashboard
             </div>
           </div>
-          <HeaderButton icon={<QueryStatsRoundedIcon />}>
+          <HeaderButton
+            icon={<QueryStatsRoundedIcon />}
+            onClick={onWorkloadClick}
+            disabled={workloadDisabled}
+          >
             Adjust Workload
           </HeaderButton>
         </div>

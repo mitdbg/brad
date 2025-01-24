@@ -101,7 +101,12 @@ function VdbeView({
   onTableHoverExit,
   onTableClick,
   editable,
+  onEditClick,
 }) {
+  if (onEditClick == null) {
+    onEditClick = () => {};
+  }
+
   const vengName = vdbe.name;
   const tables = vdbe.tables;
   const freshness = formatFreshness(vdbe.max_staleness_ms);
@@ -124,7 +129,10 @@ function VdbeView({
       <div className="vdbe-db-wrap">
         <DbCylinder color="green">{vengName}</DbCylinder>
         {editable && (
-          <EditControls onEditClick={() => {}} onDeleteClick={() => {}} />
+          <EditControls
+            onEditClick={() => onEditClick(vdbe)}
+            onDeleteClick={() => {}}
+          />
         )}
       </div>
       {endpoint && (

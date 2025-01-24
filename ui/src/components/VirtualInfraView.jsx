@@ -11,6 +11,8 @@ function VirtualInfraView({
   onTableHoverEnter,
   onTableHoverExit,
   endpoints,
+  onAddVdbeClick,
+  onEditVdbeClick,
 }) {
   const [workloadStates, setWorkloadStates] = useState([]);
   const updateWorkloadNumClients = useCallback(
@@ -70,6 +72,7 @@ function VirtualInfraView({
             onTableHoverExit={onTableHoverExit}
             vdbe={vdbe}
             editable={true}
+            onEditClick={onEditVdbeClick}
           />
         ))}
       </div>
@@ -82,6 +85,7 @@ function VirtualInfraView({
             "&:hover": { bgcolor: "#f5f5f5", opacity: 1 },
             opacity: 0.8,
           }}
+          onClick={onAddVdbeClick}
         >
           Add New VDBE
         </Button>

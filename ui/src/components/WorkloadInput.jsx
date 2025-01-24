@@ -25,7 +25,17 @@ function WorkloadSlider({ engineName, min, max, value, setValue }) {
   );
 }
 
-function WorkloadInput({ min, max }) {
+function WorkloadInput({ workloadInputState, setWorkloadInputState }) {
+  const { min, max, engineIntensity } = workloadInputState;
+
+  const handleClose = () => {
+    setWorkloadInputState({
+      ...workloadInputState,
+      engineIntensity: [],
+      open: false,
+    });
+  };
+
   const instructions =
     "Use the sliders to change the workload intensity for each VDBE (number " +
     "of clients accessing each VDBE). Then, click 'Show Predicted Changes' to " +
@@ -48,7 +58,9 @@ function WorkloadInput({ min, max }) {
         <WorkloadSlider engineName="VDBE (C)" min={min} max={max} value={5} />
       </div>
       <div className="workload-input-buttons">
-        <Button variant="outlined">Reset and Close</Button>
+        <Button variant="outlined" onClick={handleClose}>
+          Reset and Close
+        </Button>
         <Button variant="contained" startIcon={<AutoFixHighRoundedIcon />}>
           Show Predicted Changes
         </Button>

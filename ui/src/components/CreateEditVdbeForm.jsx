@@ -224,7 +224,8 @@ function getEmptyVdbe() {
   };
 }
 
-function CreateEditVdbeForm({ isEdit, currentVdbe, allTables }) {
+function CreateEditVdbeForm({ currentVdbe, allTables, onCloseClick }) {
+  const isEdit = currentVdbe != null;
   const [vdbe, setVdbe] = useState(
     currentVdbe != null ? currentVdbe : getEmptyVdbe(),
   );
@@ -268,7 +269,9 @@ function CreateEditVdbeForm({ isEdit, currentVdbe, allTables }) {
         </div>
       </div>
       <div className="cev-buttons">
-        <Button variant="outlined">Cancel</Button>
+        <Button variant="outlined" onClick={onCloseClick}>
+          Cancel
+        </Button>
         <Button
           variant="contained"
           startIcon={<CheckCircleOutlineRoundedIcon />}

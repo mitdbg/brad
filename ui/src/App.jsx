@@ -39,6 +39,16 @@ function App() {
     ],
   });
   const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [workloadInputState, setWorkloadInputState] = useState({
+    open: false,
+    engineIntensity: [],
+    min: 1,
+    max: 10,
+  });
+  const [vdbeFormState, setVdbeFormState] = useState({
+    open: false,
+    currentVdbe: null,
+  });
 
   const onTableHoverEnter = (engineMarker, tableName, isVirtual, mappedTo) => {
     const virtualEngines = {};
@@ -134,7 +144,14 @@ function App() {
 
   return (
     <>
-      <Header status={systemState.status} />
+      <Header
+        status={systemState.status}
+        workloadDisabled={false}
+        onWorkloadClick={() => {
+          if (workloadInputState.open) return;
+          setWorkloadInputState({ ...workloadInputState, open: true });
+        }}
+      />
       <div class="body-container">
         <div class="column" style={{ flexGrow: 3 }}>
           <h2 class="col-h2">
@@ -143,14 +160,35 @@ function App() {
           </h2>
           <div class="column-inner">
             <Panel>
-              <WorkloadInput min={1} max={10} />
-              <CreateEditVdbeForm isEdit={false} allTables={allTables} />
+              {workloadInputState.open && (
+                <WorkloadInput
+                  workloadInputState={workloadInputState}
+                  setWorkloadInputState={setWorkloadInputState}
+                />
+              )}
+              {vdbeFormState.open && (
+                <CreateEditVdbeForm
+                  currentVdbe={vdbeFormState.currentVdbe}
+                  allTables={allTables}
+                  onCloseClick={() =>
+                    setVdbeFormState({ open: false, currentVdbe: null })
+                  }
+                />
+              )}
               <VirtualInfraView
                 virtualInfra={systemState.virtual_infra}
                 highlight={highlight}
                 onTableHoverEnter={onTableHoverEnter}
                 onTableHoverExit={onTableHoverExit}
                 endpoints={endpoints}
+                onAddVdbeClick={() => {
+                  if (vdbeFormState.open) return;
+                  setVdbeFormState({ open: true, currentVdbe: null });
+                }}
+                onEditVdbeClick={(vdbe) => {
+                  if (vdbeFormState.open) return;
+                  setVdbeFormState({ open: true, currentVdbe: vdbe });
+                }}
               />
               <div class="infra-separator" />
               <BlueprintView
