@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { fetchMetrics } from "../api";
 import MetricsManager from "../metrics";
 import Panel from "./Panel";
@@ -79,7 +79,7 @@ function PerfView({ virtualInfra }) {
     return metricsManagerRef.current;
   }
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     const rawMetrics = await fetchMetrics(60, /*useGenerated=*/ false);
     const fetchedMetrics = parseMetrics(rawMetrics);
     const metricsManager = getMetricsManager();
@@ -93,7 +93,7 @@ function PerfView({ virtualInfra }) {
         ),
       });
     }
-  };
+  }, [metricsManagerRef, windowSizeMinutes, setMetricsData]);
 
   useEffect(() => {
     // Run first fetch immediately.
@@ -105,7 +105,7 @@ function PerfView({ virtualInfra }) {
       }
       clearInterval(intervalId);
     };
-  }, [metricsData, windowSizeMinutes]);
+  }, [refreshData]);
 
   if (metricsData.windowSizeMinutes !== windowSizeMinutes) {
     const metricsManager = getMetricsManager();

@@ -7,7 +7,6 @@ import WorkloadInput from "./components/WorkloadInput";
 import CreateEditVdbeForm from "./components/CreateEditVdbeForm";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
 import Panel from "./components/Panel";
-import SystemConfig from "./components/SystemConfig";
 import { fetchSystemState } from "./api";
 
 import "./App.css";
@@ -26,19 +25,6 @@ function App() {
     virtualEngines: {},
     physicalEngines: {},
   });
-  const [endpoints, setEndpoints] = useState({
-    workloadRunners: [
-      {
-        host: "localhost",
-        port: 8585,
-      },
-      {
-        host: "localhost",
-        port: 8586,
-      },
-    ],
-  });
-  const [configModalOpen, setConfigModalOpen] = useState(false);
   const [workloadInputState, setWorkloadInputState] = useState({
     open: false,
     engineIntensity: [],
@@ -79,7 +65,7 @@ function App() {
     });
   };
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     const newSystemState = await fetchSystemState(
       /*filterTablesForDemo=*/ false,
     );
@@ -87,7 +73,7 @@ function App() {
     if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
       setSystemState(newSystemState);
     }
-  };
+  }, [systemState, setSystemState]);
 
   // Fetch updated system state periodically.
   useEffect(() => {
@@ -100,21 +86,16 @@ function App() {
       }
       clearInterval(intervalId);
     };
-  }, [systemState]);
+  }, [refreshData]);
 
   // Bind keyboard shortcut for internal config menu.
-  const handleKeyPress = useCallback(
-    (event) => {
-      if (document.activeElement !== document.body) {
-        // We only want to handle key presses when no input is focused.
-        return;
-      }
-      if (event.key === "d" && !configModalOpen) {
-        setConfigModalOpen(true);
-      }
-    },
-    [configModalOpen],
-  );
+  const handleKeyPress = useCallback((event) => {
+    if (document.activeElement !== document.body) {
+      // We only want to handle key presses when no input is focused.
+      return;
+    }
+    // Currently a no-op.
+  }, []);
 
   useEffect(() => {
     document.addEventListener("keyup", handleKeyPress);
@@ -122,13 +103,6 @@ function App() {
       document.removeEventListener("keyup", handleKeyPress);
     };
   }, [handleKeyPress]);
-
-  const handleSystemConfigChange = useCallback(
-    ({ field, value }) => {
-      setEndpoints({ ...endpoints, [field]: value });
-    },
-    [endpoints],
-  );
 
   const allTables = [
     "tickets",
@@ -180,7 +154,6 @@ function App() {
                 highlight={highlight}
                 onTableHoverEnter={onTableHoverEnter}
                 onTableHoverExit={onTableHoverExit}
-                endpoints={endpoints}
                 onAddVdbeClick={() => {
                   if (vdbeFormState.open) return;
                   setVdbeFormState({ open: true, currentVdbe: null });
@@ -202,12 +175,6 @@ function App() {
           </div>
         </div>
         <PerfView virtualInfra={systemState.virtual_infra} />
-        <SystemConfig
-          endpoints={endpoints}
-          open={configModalOpen}
-          onCloseClick={() => setConfigModalOpen(false)}
-          onChange={handleSystemConfigChange}
-        />
       </div>
     </>
   );
