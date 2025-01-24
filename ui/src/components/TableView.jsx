@@ -10,13 +10,19 @@ function TableView({
   color,
   onTableHoverEnter,
   onTableHoverExit,
+  onTableClick,
   highlightClass,
 }) {
+  let handleTableClick = onTableClick;
+  if (handleTableClick == null) {
+    handleTableClick = () => {};
+  }
   return (
     <div
-      class={`db-table-view ${highlightClass}`}
+      class={`db-table-view ${highlightClass} ${onTableClick != null ? "clickable" : ""}`}
       onMouseEnter={onTableHoverEnter}
       onMouseLeave={onTableHoverExit}
+      onClick={() => handleTableClick(name)}
     >
       {name}
       {isWriter && <WriterMarker color={color} />}

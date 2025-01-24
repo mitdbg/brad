@@ -28,6 +28,10 @@
   opacity: 0.2;
 }
 
+.db-table-view.clickable {
+  cursor: pointer;
+}
+
 .db-table-view-writer {
   border-radius: 50%;
   width: 28px;

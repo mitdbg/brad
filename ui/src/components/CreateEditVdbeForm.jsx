@@ -11,9 +11,14 @@ import Button from "@mui/material/Button";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import Select from "@mui/material/Select";
+import FormHelperText from "@mui/material/FormHelperText";
 import Chip from "@mui/material/Chip";
 import Box from "@mui/material/Box";
 import OutlinedInput from "@mui/material/OutlinedInput";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import FormLabel from "@mui/material/FormLabel";
 import VdbeView from "./VdbeView";
 import "./styles/CreateEditVdbeForm.css";
 
@@ -36,9 +41,8 @@ function getStyles(name, selectedTables, theme) {
   };
 }
 
-function TableSelector({ tables }) {
+function TableSelector({ selectedTables, setSelectedTables, allTables }) {
   const theme = useTheme();
-  const [selectedTables, setSelectedTables] = useState([]);
 
   const handleChange = (event) => {
     const {
@@ -63,19 +67,15 @@ function TableSelector({ tables }) {
           onChange={handleChange}
           input={<OutlinedInput id="cev-table-selector-field" label="Tables" />}
           renderValue={(selected) => (
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: -1.5 }}>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: "10px 10px" }}>
               {selected.map((value) => (
-                <Chip
-                  key={value}
-                  label={value}
-                  style={{ marginRight: "8px" }}
-                />
+                <Chip key={value} label={value} />
               ))}
             </Box>
           )}
           MenuProps={MenuProps}
         >
-          {tables.map((name) => (
+          {allTables.map((name) => (
             <MenuItem
               key={name}
               value={name}
@@ -85,12 +85,38 @@ function TableSelector({ tables }) {
             </MenuItem>
           ))}
         </Select>
+        <FormHelperText>
+          Click the tables in the preview to toggle their write flags.
+        </FormHelperText>
+      </FormControl>
+      <FormControl fullWidth style={{ marginTop: "15px" }}>
+        <FormLabel id="map-vdbe-label">Map VDBE To</FormLabel>
+        <RadioGroup row name="position" defaultValue="top">
+          <FormControlLabel
+            value="aurora"
+            control={<Radio />}
+            label="Aurora"
+            labelPlacement="end"
+          />
+          <FormControlLabel
+            value="redshift"
+            control={<Radio style={{ marginLeft: "8px" }} />}
+            label="Redshift"
+            labelPlacement="end"
+          />
+          <FormControlLabel
+            value="athena"
+            control={<Radio style={{ marginLeft: "8px" }} />}
+            label="Athena"
+            labelPlacement="end"
+          />
+        </RadioGroup>
       </FormControl>
     </div>
   );
 }
 
-function CreateEditFormFields({ vdbe, setVdbe }) {
+function CreateEditFormFields({ vdbe, setVdbe, allTables }) {
   const onStalenessChange = (event) => {
     const maxStalenessMins = parseInt(event.target.value);
     if (isNaN(maxStalenessMins)) {
@@ -109,7 +135,18 @@ function CreateEditFormFields({ vdbe, setVdbe }) {
     setVdbe({ ...vdbe, p90_latency_slo_ms: sloMs });
   };
 
-  const tables = ["tickets", "theatres", "movies"];
+  const setSelectedTables = (tables) => {
+    const nextTables = [];
+    for (const table of tables) {
+      let existingTable = vdbe.tables.find(({ name }) => name === table);
+      if (existingTable != null) {
+        nextTables.push(existingTable);
+      } else {
+        nextTables.push({ name: table, writable: false, mapped_to: null });
+      }
+    }
+    setVdbe({ ...vdbe, tables: nextTables });
+  };
 
   return (
     <div className="cev-form-fields">
@@ -166,8 +203,13 @@ function CreateEditFormFields({ vdbe, setVdbe }) {
           <MenuItem value="postgresql">PostgreSQL SQL</MenuItem>
           <MenuItem value="athena">Athena SQL</MenuItem>
         </Select>
-        <TableSelector tables={tables} />
+        <TableSelector
+          selectedTables={vdbe.tables.map(({ name }) => name)}
+          setSelectedTables={setSelectedTables}
+          allTables={allTables}
+        />
       </FormControl>
+      <FormControl fullWidth></FormControl>
     </div>
   );
 }
@@ -182,10 +224,22 @@ function getEmptyVdbe() {
   };
 }
 
-function CreateEditVdbeForm({ isEdit, currentVdbe }) {
+function CreateEditVdbeForm({ isEdit, currentVdbe, allTables }) {
   const [vdbe, setVdbe] = useState(
     currentVdbe != null ? currentVdbe : getEmptyVdbe(),
   );
+
+  const onTableClick = (tableName) => {
+    const nextTables = [];
+    for (const table of vdbe.tables) {
+      if (table.name === tableName) {
+        nextTables.push({ ...table, writable: !table.writable });
+      } else {
+        nextTables.push(table);
+      }
+    }
+    setVdbe({ ...vdbe, tables: nextTables });
+  };
 
   return (
     <InsetPanel className="create-edit-vdbe-form">
@@ -198,9 +252,19 @@ function CreateEditVdbeForm({ isEdit, currentVdbe }) {
         {isEdit ? "Edit VDBE" : "Create VDBE"}
       </h2>
       <div className="cev-form-body">
-        <CreateEditFormFields vdbe={vdbe} setVdbe={setVdbe} />
+        <CreateEditFormFields
+          vdbe={vdbe}
+          setVdbe={setVdbe}
+          allTables={allTables}
+        />
         <div className="cev-preview">
-          <VdbeView vdbe={vdbe} highlight={{}} editable={false} />
+          <h2>Preview</h2>
+          <VdbeView
+            vdbe={vdbe}
+            highlight={{}}
+            editable={false}
+            onTableClick={onTableClick}
+          />
         </div>
       </div>
       <div className="cev-buttons">
