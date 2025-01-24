@@ -23,6 +23,18 @@
   align-items: stretch;
 }
 
+.header-left {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 40px;
+}
+
+.header-right {
+  display: flex;
+  align-items: stretch;
+}
+
 .header-logo {
   display: flex;
   align-items: center;
@@ -45,6 +57,31 @@
 .header-logo-txt {
   font-size: 2.2em;
   font-weight: 400;
+}
+
+.header-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25em;
+  cursor: pointer;
+  padding: 0 20px;
+  transition: all 0.2s ease;
+  gap: 10px;
+  color: #144f8e;
+}
+
+.header-button:hover {
+  color: #228dff;
+}
+
+.header-button.disabled {
+  color: #c4c4c4 !important;
+  cursor: default;
+}
+
+.header-button.disabled:hover {
+  color: #b0b0b0 !important;
 }
 
 .header-status {

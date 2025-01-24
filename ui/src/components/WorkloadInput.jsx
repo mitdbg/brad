@@ -10,7 +10,7 @@ import "./styles/WorkloadInput.css";
 function WorkloadSlider({ engineName, min, max, value, setValue }) {
   return (
     <div class="workload-slider">
-      <h3>Clients on {engineName}</h3>
+      <h3>Workload Intensity on {engineName}</h3>
       <Slider
         value={value}
         marks={[
@@ -27,14 +27,14 @@ function WorkloadSlider({ engineName, min, max, value, setValue }) {
 
 function WorkloadInput({ min, max }) {
   const instructions =
-    "Use the sliders to change the number of clients accessing each VDBE. " +
-    "Then, click 'Show Predicted Changes' to see BRAD's predictions for how " +
-    "the physical infrastructure will change.";
+    "Use the sliders to change the workload intensity for each VDBE (number " +
+    "of clients accessing each VDBE). Then, click 'Show Predicted Changes' to " +
+    "see BRAD's predictions for how the physical infrastructure will change.";
   return (
     <InsetPanel className="workload-input-wrap">
       <h2>
         <TuneRoundedIcon style={{ marginRight: "10px" }} />
-        Adjust Workload
+        Predict the Impact of Workload Intensity Changes
         <Tooltip title={instructions} placement="right">
           <HelpRoundedIcon
             style={{ marginLeft: "10px", opacity: "0.25", cursor: "pointer" }}
