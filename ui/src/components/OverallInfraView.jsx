@@ -7,12 +7,13 @@ import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
 import Panel from "./Panel";
 
 function OverallInfraView({
+  systemState,
   appState,
-  closeWorkloadInput,
+  closePreviewForm,
   openVdbeForm,
   closeVdbeForm,
 }) {
-  const { systemState, workloadInputOpen, vdbeForm } = appState;
+  const { previewForm, vdbeForm } = appState;
   const [highlight, setHighlight] = useState({
     hoverEngine: null,
     virtualEngines: {},
@@ -68,12 +69,12 @@ function OverallInfraView({
       </h2>
       <div className="column-inner">
         <Panel>
-          {workloadInputOpen && (
+          {previewForm.open && (
             <WorkloadInput
               engineIntensity={[]}
               min={1}
               max={10}
-              onClose={closeWorkloadInput}
+              onClose={closePreviewForm}
             />
           )}
           {vdbeForm.open && (
@@ -90,6 +91,7 @@ function OverallInfraView({
             onTableHoverExit={onTableHoverExit}
             onAddVdbeClick={() => openVdbeForm(null)}
             onEditVdbeClick={openVdbeForm}
+            disableVdbeChanges={previewForm.open || vdbeForm.open}
           />
           <div className="infra-separator" />
           <BlueprintView

@@ -9,14 +9,17 @@ import "./App.css";
 const REFRESH_INTERVAL_MS = 30 * 1000;
 
 function App() {
+  const [systemState, setSystemState] = useState({
+    status: "running",
+    blueprint: null,
+    virtual_infra: null,
+    next_blueprint: null,
+  });
   const [appState, setAppState] = useState({
-    systemState: {
-      status: "running",
-      blueprint: null,
-      virtual_infra: null,
-      next_blueprint: null,
+    previewForm: {
+      open: false,
+      shownPreviewBlueprint: null,
     },
-    workloadInputOpen: false,
     vdbeForm: {
       open: false,
       shownVdbe: null,
@@ -25,13 +28,11 @@ function App() {
 
   const refreshData = useCallback(async () => {
     const newSystemState = await fetchSystemState();
-    // TODO: Not the best way to check for equality.
-    if (
-      JSON.stringify(appState.systemState) !== JSON.stringify(newSystemState)
-    ) {
-      setAppState({ ...appState, systemState: newSystemState });
+    // Not the best way to check for equality.
+    if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
+      setSystemState(newSystemState);
     }
-  }, [appState, setAppState]);
+  }, [systemState, setSystemState]);
 
   // Fetch updated system state periodically.
   useEffect(() => {
@@ -61,16 +62,22 @@ function App() {
     };
   }, [handleKeyPress]);
 
-  const { systemState, workloadInputOpen, vdbeForm } = appState;
+  const { previewForm, vdbeForm } = appState;
 
   // Callbacks used to control forms in the UI.
-  const openWorkloadInput = () => {
-    if (workloadInputOpen) return;
-    setAppState({ ...appState, workloadInputOpen: true });
+  const openPreviewForm = () => {
+    if (previewForm.open) return;
+    setAppState({
+      ...appState,
+      previewForm: { ...previewForm, open: true },
+    });
   };
-  const closeWorkloadInput = () => {
-    if (!workloadInputOpen) return;
-    setAppState({ ...appState, workloadInputOpen: false });
+  const closePreviewForm = () => {
+    if (!previewForm.open) return;
+    setAppState({
+      ...appState,
+      previewForm: { open: false, shownPreviewBlueprint: false },
+    });
   };
 
   const openVdbeForm = (vdbe) => {
@@ -88,13 +95,14 @@ function App() {
     <>
       <Header
         status={systemState.status}
-        workloadDisabled={workloadInputOpen || vdbeForm.open}
-        onWorkloadClick={openWorkloadInput}
+        workloadDisabled={previewForm.open || vdbeForm.open}
+        onWorkloadClick={openPreviewForm}
       />
       <div class="body-container">
         <OverallInfraView
+          systemState={systemState}
           appState={appState}
-          closeWorkloadInput={closeWorkloadInput}
+          closePreviewForm={closePreviewForm}
           openVdbeForm={openVdbeForm}
           closeVdbeForm={closeVdbeForm}
         />

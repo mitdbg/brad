@@ -2,8 +2,6 @@ import VdbeView from "./VdbeView";
 import AddCircleOutlineRoundedIcon from "@mui/icons-material/AddCircleOutlineRounded";
 import Button from "@mui/material/Button";
 import "./styles/VirtualInfraView.css";
-import { useEffect, useState, useCallback } from "react";
-import { fetchWorkloadClients, setWorkloadClients } from "../api";
 
 function VirtualInfraView({
   virtualInfra,
@@ -12,6 +10,7 @@ function VirtualInfraView({
   onTableHoverExit,
   onAddVdbeClick,
   onEditVdbeClick,
+  disableVdbeChanges,
 }) {
   return (
     <div class="infra-region vdbe-view-wrap">
@@ -24,7 +23,7 @@ function VirtualInfraView({
             onTableHoverEnter={onTableHoverEnter}
             onTableHoverExit={onTableHoverExit}
             vdbe={vdbe}
-            editable={true}
+            editable={!disableVdbeChanges}
             onEditClick={onEditVdbeClick}
           />
         ))}
@@ -39,6 +38,7 @@ function VirtualInfraView({
             opacity: 0.8,
           }}
           onClick={onAddVdbeClick}
+          disabled={disableVdbeChanges}
         >
           Add New VDBE
         </Button>
