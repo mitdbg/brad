@@ -119,8 +119,25 @@ class BlueprintPlanner:
         finally:
             self._replan_in_progress = False
 
+    async def run_replan_direct(
+        self, intensity_multipliers: Tuple[float, float] = (1.0, 1.0)
+    ) -> Optional[Tuple[Blueprint, Score]]:
+        """
+        Initiates a replan without a trigger. This is used for manual
+        invokations of the planner where we just want to see the result.
+        """
+        try:
+            self._replan_in_progress = True
+            return await self._run_replan_impl(
+                window_multiplier=1, intensity_multipliers=intensity_multipliers
+            )
+        finally:
+            self._replan_in_progress = False
+
     async def _run_replan_impl(
-        self, window_multiplier: int = 1
+        self,
+        window_multiplier: int = 1,
+        intensity_multipliers: Tuple[float, float] = (1.0, 1.0),
     ) -> Optional[Tuple[Blueprint, Score]]:
         """
         Implementers should override this method to define the blueprint

@@ -19,7 +19,11 @@ from brad.planner.compare.provider import BlueprintComparatorProvider
 from brad.planner.debug_logger import BlueprintPickleDebugLogger
 from brad.planner.enumeration.provisioning import ProvisioningEnumerator
 from brad.planner.estimator import EstimatorProvider
-from brad.planner.metrics import Metrics, FixedMetricsProvider
+from brad.planner.metrics import (
+    Metrics,
+    FixedMetricsProvider,
+    apply_multipliers_to_metrics,
+)
 from brad.planner.providers import BlueprintProviders
 from brad.planner.recorded_run import RecordedPlanningRun
 from brad.planner.scoring.context import ScoringContext
@@ -48,18 +52,54 @@ class FixedProvisioningQueryBasedBeamPlanner(BlueprintPlanner):
         self._disable_external_logging = disable_external_logging
 
     async def _run_replan_impl(
-        self, window_multiplier: int = 1
+        self,
+        window_multiplier: int = 1,
+        # Used for hypothetical planning.
+        intensity_multipliers: Tuple[float, float] = (1.0, 1.0),
     ) -> Optional[Tuple[Blueprint, Score]]:
         logger.info("Running a fixed provisioning query-based beam replan...")
 
         # 1. Fetch the next workload and apply predictions.
         metrics, metrics_timestamp = self._providers.metrics_provider.get_metrics()
+        num_redshift_nodes = self._current_blueprint.redshift_provisioning().num_nodes()
+        if intensity_multipliers != (1.0, 1.0):
+            logger.info("Applying intensity multipliers: %s", intensity_multipliers)
+            logger.info(
+                "Original metrics: %s",
+                json.dumps(metrics._asdict(), indent=2, default=str),
+            )
+            metrics = apply_multipliers_to_metrics(
+                metrics, intensity_multipliers, has_redshift=num_redshift_nodes > 0
+            )
+            logger.info(
+                "Modified metrics: %s",
+                json.dumps(metrics._asdict(), indent=2, default=str),
+            )
+
         (
             current_workload,
             next_workload,
         ) = await self._providers.workload_provider.get_workloads(
             metrics_timestamp, window_multiplier, desired_period=timedelta(hours=1)
         )
+
+        if intensity_multipliers != (1.0, 1.0):
+            logger.info(
+                "Applying intensity multipliers to next workload: %s",
+                str(intensity_multipliers[1]),
+            )
+            logger.info(
+                "Next workload before intensity multipliers: %s",
+                # pylint: disable-next=protected-access
+                next_workload._analytical_query_arrival_counts,
+            )
+            next_workload.apply_intensity_multiplier(intensity_multipliers[1])
+            logger.info(
+                "Next workload after intensity multipliers: %s",
+                # pylint: disable-next=protected-access
+                next_workload._analytical_query_arrival_counts,
+            )
+
         self._providers.analytics_latency_scorer.apply_predicted_latencies(
             next_workload
         )

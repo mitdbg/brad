@@ -7,10 +7,6 @@ source ../common.sh
 initial_queries="99,56,32,92,91,49,30,83,94,38,87,86,76,37,31,46"
 heavier_queries="58,61,62,64,69,73,74,51,57,60"
 
-echo "Received args:"
-echo $@
-echo "---------"
-
 # Arguments:
 # --system-config-file
 # --physical-config-file

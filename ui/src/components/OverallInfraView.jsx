@@ -12,6 +12,7 @@ function OverallInfraView({
   closePreviewForm,
   openVdbeForm,
   closeVdbeForm,
+  setPreviewBlueprint,
 }) {
   const { previewForm, vdbeForm } = appState;
   const [highlight, setHighlight] = useState({
@@ -72,11 +73,12 @@ function OverallInfraView({
           {previewForm.open && (
             <WorkloadInput
               initialEngineIntensities={systemState.virtual_infra.engines.map(
-                (engine) => ({ name: engine.name, intensity: 5 }),
+                (engine) => ({ name: engine.name, intensity: 1 }),
               )}
               min={1}
               max={10}
               onClose={closePreviewForm}
+              setPreviewBlueprint={setPreviewBlueprint}
             />
           )}
           {vdbeForm.open && (
@@ -99,6 +101,7 @@ function OverallInfraView({
           <BlueprintView
             blueprint={systemState.blueprint}
             nextBlueprint={systemState.next_blueprint}
+            previewBlueprint={previewForm.shownPreviewBlueprint}
             highlight={highlight}
             onTableHoverEnter={onTableHoverEnter}
             onTableHoverExit={onTableHoverExit}

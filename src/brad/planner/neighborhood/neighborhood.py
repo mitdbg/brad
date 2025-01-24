@@ -85,7 +85,9 @@ class NeighborhoodSearchPlanner(BlueprintPlanner):
                 self._metrics_out.close()
 
     async def _run_replan_impl(
-        self, window_multiplier: int = 1
+        self,
+        window_multiplier: int = 1,
+        intensity_multipliers: Tuple[float, float] = (1.0, 1.0),
     ) -> Optional[Tuple[Blueprint, Score]]:
         # This will be long-running and will block the event loop. For our
         # current needs, this is fine since the planner is the main component in

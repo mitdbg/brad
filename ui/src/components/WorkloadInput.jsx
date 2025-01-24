@@ -6,6 +6,7 @@ import AutoFixHighRoundedIcon from "@mui/icons-material/AutoFixHighRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import HelpRoundedIcon from "@mui/icons-material/HelpRounded";
 import Tooltip from "@mui/material/Tooltip";
+import { getPredictedChanges } from "../api";
 import "./styles/WorkloadInput.css";
 
 function WorkloadSlider({ engineName, min, max, value, setValue }) {
@@ -26,7 +27,14 @@ function WorkloadSlider({ engineName, min, max, value, setValue }) {
   );
 }
 
-function WorkloadInput({ initialEngineIntensities, min, max, onClose }) {
+function WorkloadInput({
+  initialEngineIntensities,
+  min,
+  max,
+  onClose,
+  setPreviewBlueprint,
+}) {
+  const [loading, setLoading] = useState(false);
   const [engineIntensities, setEngineIntensities] = useState(
     initialEngineIntensities,
   );
@@ -46,6 +54,26 @@ function WorkloadInput({ initialEngineIntensities, min, max, onClose }) {
       break;
     }
   }
+
+  const triggerGetPredictedChanges = async () => {
+    try {
+      setLoading(true);
+      let tMultiplier = 1.0;
+      let aMultiplier = 1.0;
+      if (engineIntensities.length >= 1) {
+        tMultiplier = ((engineIntensities[0].intensity - 1) / 10) * 10;
+      }
+      if (engineIntensities.length >= 2) {
+        aMultiplier = ((engineIntensities[1].intensity - 1) / 10) * 300;
+      }
+      const blueprint = await getPredictedChanges(tMultiplier, aMultiplier);
+      setPreviewBlueprint(blueprint);
+    } catch (error) {
+      console.error("Error fetching predicted changes:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const instructions =
     "Use the sliders to change the workload intensity for each VDBE (number " +
@@ -76,13 +104,15 @@ function WorkloadInput({ initialEngineIntensities, min, max, onClose }) {
         ))}
       </div>
       <div className="workload-input-buttons">
-        <Button variant="outlined" onClick={onClose}>
+        <Button variant="outlined" onClick={onClose} disabled={loading}>
           Reset and Close
         </Button>
         <Button
           variant="contained"
           startIcon={<AutoFixHighRoundedIcon />}
-          disabled={!hasChanges}
+          disabled={!hasChanges || loading}
+          onClick={triggerGetPredictedChanges}
+          loading={loading}
         >
           Show Predicted Changes
         </Button>

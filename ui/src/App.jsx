@@ -76,7 +76,13 @@ function App() {
     if (!previewForm.open) return;
     setAppState({
       ...appState,
-      previewForm: { open: false, shownPreviewBlueprint: false },
+      previewForm: { open: false, shownPreviewBlueprint: null },
+    });
+  };
+  const setPreviewBlueprint = (blueprint) => {
+    setAppState({
+      ...appState,
+      previewForm: { open: true, shownPreviewBlueprint: blueprint },
     });
   };
 
@@ -105,6 +111,7 @@ function App() {
           closePreviewForm={closePreviewForm}
           openVdbeForm={openVdbeForm}
           closeVdbeForm={closeVdbeForm}
+          setPreviewBlueprint={setPreviewBlueprint}
         />
         <PerfView virtualInfra={systemState.virtual_infra} />
       </div>
