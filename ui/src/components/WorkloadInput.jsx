@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Button from "@mui/material/Button";
 import Slider from "@mui/material/Slider";
 import InsetPanel from "./InsetPanel";
@@ -25,7 +26,27 @@ function WorkloadSlider({ engineName, min, max, value, setValue }) {
   );
 }
 
-function WorkloadInput({ engineIntensity, min, max, onClose }) {
+function WorkloadInput({ initialEngineIntensities, min, max, onClose }) {
+  const [engineIntensities, setEngineIntensities] = useState(
+    initialEngineIntensities,
+  );
+  const setIntensity = (index, newValue) => {
+    setEngineIntensities(
+      engineIntensities.map((intensity, i) =>
+        i === index ? { ...intensity, intensity: newValue } : intensity,
+      ),
+    );
+  };
+  let hasChanges = false;
+  for (let i = 0; i < engineIntensities.length; i++) {
+    if (
+      engineIntensities[i].intensity !== initialEngineIntensities[i].intensity
+    ) {
+      hasChanges = true;
+      break;
+    }
+  }
+
   const instructions =
     "Use the sliders to change the workload intensity for each VDBE (number " +
     "of clients accessing each VDBE). Then, click 'Show Predicted Changes' to " +
@@ -43,15 +64,26 @@ function WorkloadInput({ engineIntensity, min, max, onClose }) {
         </Tooltip>
       </h2>
       <div className="workload-input-sliders">
-        <WorkloadSlider engineName="VDBE (A)" min={min} max={max} value={3} />
-        <WorkloadSlider engineName="VDBE (B)" min={min} max={max} value={5} />
-        <WorkloadSlider engineName="VDBE (C)" min={min} max={max} value={5} />
+        {engineIntensities.map(({ name, intensity }, index) => (
+          <WorkloadSlider
+            key={name}
+            engineName={name}
+            min={min}
+            max={max}
+            value={intensity}
+            setValue={(newValue) => setIntensity(index, newValue)}
+          />
+        ))}
       </div>
       <div className="workload-input-buttons">
         <Button variant="outlined" onClick={onClose}>
           Reset and Close
         </Button>
-        <Button variant="contained" startIcon={<AutoFixHighRoundedIcon />}>
+        <Button
+          variant="contained"
+          startIcon={<AutoFixHighRoundedIcon />}
+          disabled={!hasChanges}
+        >
           Show Predicted Changes
         </Button>
       </div>

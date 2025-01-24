@@ -71,7 +71,9 @@ function OverallInfraView({
         <Panel>
           {previewForm.open && (
             <WorkloadInput
-              engineIntensity={[]}
+              initialEngineIntensities={systemState.virtual_infra.engines.map(
+                (engine) => ({ name: engine.name, intensity: 5 }),
+              )}
               min={1}
               max={10}
               onClose={closePreviewForm}
