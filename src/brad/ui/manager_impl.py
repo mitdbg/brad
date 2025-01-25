@@ -141,11 +141,14 @@ def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
         next_dbp = DisplayableBlueprint.from_blueprint(next_blueprint)
     else:
         next_dbp = None
+    all_tables = [t.name for t in blueprint.tables()]
+    all_tables.sort()
     system_state = SystemState(
         status=status,
         virtual_infra=virtual_infra,
         blueprint=dbp,
         next_blueprint=next_dbp,
+        all_tables=all_tables,
     )
     return system_state
 

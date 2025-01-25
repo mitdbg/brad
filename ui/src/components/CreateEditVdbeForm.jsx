@@ -89,29 +89,6 @@ function TableSelector({ selectedTables, setSelectedTables, allTables }) {
           Click the tables in the preview to toggle their write flags.
         </FormHelperText>
       </FormControl>
-      <FormControl fullWidth style={{ marginTop: "15px" }}>
-        <FormLabel id="map-vdbe-label">Map VDBE To</FormLabel>
-        <RadioGroup row name="position" defaultValue="top">
-          <FormControlLabel
-            value="aurora"
-            control={<Radio />}
-            label="Aurora"
-            labelPlacement="end"
-          />
-          <FormControlLabel
-            value="redshift"
-            control={<Radio style={{ marginLeft: "8px" }} />}
-            label="Redshift"
-            labelPlacement="end"
-          />
-          <FormControlLabel
-            value="athena"
-            control={<Radio style={{ marginLeft: "8px" }} />}
-            label="Athena"
-            labelPlacement="end"
-          />
-        </RadioGroup>
-      </FormControl>
     </div>
   );
 }
@@ -147,6 +124,12 @@ function CreateEditFormFields({ vdbe, setVdbe, allTables }) {
     }
     setVdbe({ ...vdbe, tables: nextTables });
   };
+
+  const onMappedToChange = (event) => {
+    setVdbe({ ...vdbe, mapped_to: event.target.value });
+  };
+
+  const mappedToEngine = vdbe.mapped_to;
 
   return (
     <div className="cev-form-fields">
@@ -209,7 +192,35 @@ function CreateEditFormFields({ vdbe, setVdbe, allTables }) {
           allTables={allTables}
         />
       </FormControl>
-      <FormControl fullWidth></FormControl>
+      <FormControl fullWidth style={{ marginTop: "15px" }}>
+        <FormLabel id="map-vdbe-label">Map VDBE To</FormLabel>
+        <RadioGroup row name="position" defaultValue="top">
+          <FormControlLabel
+            value="aurora"
+            control={<Radio />}
+            label="Aurora"
+            labelPlacement="end"
+            checked={mappedToEngine === "aurora"}
+            onClick={onMappedToChange}
+          />
+          <FormControlLabel
+            value="redshift"
+            control={<Radio style={{ marginLeft: "8px" }} />}
+            label="Redshift"
+            labelPlacement="end"
+            checked={mappedToEngine === "redshift"}
+            onClick={onMappedToChange}
+          />
+          <FormControlLabel
+            value="athena"
+            control={<Radio style={{ marginLeft: "8px" }} />}
+            label="Athena"
+            labelPlacement="end"
+            checked={mappedToEngine === "athena"}
+            onClick={onMappedToChange}
+          />
+        </RadioGroup>
+      </FormControl>
     </div>
   );
 }

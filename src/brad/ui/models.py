@@ -127,6 +127,7 @@ class SystemState(BaseModel):
     virtual_infra: VirtualInfrastructure
     blueprint: DisplayableBlueprint
     next_blueprint: Optional[DisplayableBlueprint]
+    all_tables: List[str]
 
 
 class ClientState(BaseModel):

@@ -36,18 +36,6 @@ function OverallInfraView({
     clearHighlight,
   };
 
-  const allTables = [
-    "tickets",
-    "theatres",
-    "movies",
-    "showings",
-    "aka_title",
-    "homes",
-    "movie_info",
-    "title",
-    "company_name",
-  ];
-
   return (
     <HighlightContext.Provider value={highlightContextValue}>
       <div className="infra-view column" style={{ flexGrow: 3 }}>
@@ -71,7 +59,7 @@ function OverallInfraView({
             {vdbeForm.open && (
               <CreateEditVdbeForm
                 currentVdbe={vdbeForm.shownVdbe}
-                allTables={allTables}
+                allTables={systemState.all_tables}
                 onCloseClick={closeVdbeForm}
               />
             )}
