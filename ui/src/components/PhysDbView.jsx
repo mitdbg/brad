@@ -32,29 +32,26 @@ function PhysDbView({
   nextEngine,
 }) {
   const physDbName = name;
-  const sortedTables = sortTablesToHoist(highlight, physDbName, false, tables);
+  // const sortedTables = sortTablesToHoist(highlight, physDbName, false, tables);
+  const sortedTables = tables;
   const addedTablesList = addedTables(tables, nextEngine);
 
-  const sortedTableComponents = sortedTables.map(
-    ({ name, writable, mapped_to }) => (
-      <TableView
-        key={name}
-        name={name}
-        isWriter={writable}
-        color="blue"
-        highlightClass={highlightTableViewClass(
-          highlight,
-          physDbName,
-          name,
-          false,
-        )}
-        onTableHoverEnter={() =>
-          onTableHoverEnter(physDbName, name, false, mapped_to)
-        }
-        onTableHoverExit={onTableHoverExit}
-      />
-    ),
-  );
+  const sortedTableComponents = sortedTables.map(({ name, writable }) => (
+    <TableView
+      key={name}
+      name={name}
+      isWriter={writable}
+      color="blue"
+      highlightClass={highlightTableViewClass(
+        highlight,
+        physDbName,
+        name,
+        false,
+      )}
+      onTableHoverEnter={() => {}}
+      onTableHoverExit={onTableHoverExit}
+    />
+  ));
   const addedTableComponents = addedTablesList.map(({ name, writable }) => (
     <TableView
       key={name}

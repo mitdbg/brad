@@ -112,7 +112,8 @@ function VdbeView({
   const freshness = formatFreshness(vdbe.max_staleness_ms);
   const peakLatency = formatMilliseconds(vdbe.p90_latency_slo_ms);
   const dialect = formatDialect(vdbe.interface);
-  const sortedTables = sortTablesToHoist(highlight, vengName, true, tables);
+  const sortedTables = tables;
+  // const sortedTables = sortTablesToHoist(highlight, vengName, true, tables);
   const [showSnackbar, setShowSnackbar] = useState(false);
 
   const handleClose = (event, reason) => {
@@ -151,7 +152,7 @@ function VdbeView({
         </ul>
       </div>
       <ExpandableTableSet>
-        {sortedTables.map(({ name, writable, mapped_to }) => (
+        {sortedTables.map(({ name, writable }) => (
           <TableView
             key={name}
             name={name}
@@ -163,9 +164,7 @@ function VdbeView({
               name,
               true,
             )}
-            onTableHoverEnter={() =>
-              onTableHoverEnter(vengName, name, true, mapped_to)
-            }
+            onTableHoverEnter={() => {}}
             onTableHoverExit={onTableHoverExit}
             onTableClick={onTableClick}
           />

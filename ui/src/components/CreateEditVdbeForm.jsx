@@ -142,7 +142,7 @@ function CreateEditFormFields({ vdbe, setVdbe, allTables }) {
       if (existingTable != null) {
         nextTables.push(existingTable);
       } else {
-        nextTables.push({ name: table, writable: false, mapped_to: null });
+        nextTables.push({ name: table, writable: false });
       }
     }
     setVdbe({ ...vdbe, tables: nextTables });
