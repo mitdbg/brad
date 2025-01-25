@@ -5,9 +5,6 @@ import "./styles/VirtualInfraView.css";
 
 function VirtualInfraView({
   virtualInfra,
-  highlight,
-  onTableHoverEnter,
-  onTableHoverExit,
   onAddVdbeClick,
   onEditVdbeClick,
   disableVdbeChanges,
@@ -19,9 +16,6 @@ function VirtualInfraView({
         {virtualInfra?.engines?.map((vdbe) => (
           <VdbeView
             key={vdbe.name}
-            highlight={highlight}
-            onTableHoverEnter={onTableHoverEnter}
-            onTableHoverExit={onTableHoverExit}
             vdbe={vdbe}
             editable={!disableVdbeChanges}
             onEditClick={onEditVdbeClick}

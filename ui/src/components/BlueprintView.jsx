@@ -25,14 +25,7 @@ function ShowingPreviewIndicator() {
   );
 }
 
-function BlueprintView({
-  blueprint,
-  nextBlueprint,
-  previewBlueprint,
-  highlight,
-  onTableHoverEnter,
-  onTableHoverExit,
-}) {
+function BlueprintView({ blueprint, nextBlueprint, previewBlueprint }) {
   let blueprintToShow = blueprint;
   if (previewBlueprint != null) {
     blueprintToShow = previewBlueprint;
@@ -53,10 +46,7 @@ function BlueprintView({
               key={name}
               name={name}
               {...props}
-              highlight={highlight}
-              onTableHoverEnter={onTableHoverEnter}
-              onTableHoverExit={onTableHoverExit}
-              // nextEngine={findNextEngine(name, nextBlueprint)}
+              nextEngine={findNextEngine(name, nextBlueprint)}
             />
           ))}
       </div>

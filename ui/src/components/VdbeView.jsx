@@ -9,11 +9,6 @@ import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import Snackbar from "@mui/material/Snackbar";
 import "./styles/VdbeView.css";
-import {
-  highlightTableViewClass,
-  highlightEngineViewClass,
-  sortTablesToHoist,
-} from "../highlight";
 
 function formatMilliseconds(milliseconds) {
   if (milliseconds == null) {
@@ -93,16 +88,7 @@ function VdbeEndpoint({ endpoint, setShowSnackbar }) {
   );
 }
 
-function VdbeView({
-  vdbe,
-  endpoint,
-  highlight,
-  onTableHoverEnter,
-  onTableHoverExit,
-  onTableClick,
-  editable,
-  onEditClick,
-}) {
+function VdbeView({ vdbe, endpoint, onTableClick, editable, onEditClick }) {
   if (onEditClick == null) {
     onEditClick = () => {};
   }
@@ -124,9 +110,7 @@ function VdbeView({
   };
 
   return (
-    <div
-      class={`vdbe-view ${highlightEngineViewClass(highlight, vengName, true)}`}
-    >
+    <div className="vdbe-view">
       <div className="vdbe-db-wrap">
         <DbCylinder color="green">{vengName}</DbCylinder>
         {editable && (
@@ -158,14 +142,6 @@ function VdbeView({
             name={name}
             isWriter={writable}
             color="green"
-            highlightClass={highlightTableViewClass(
-              highlight,
-              vengName,
-              name,
-              true,
-            )}
-            onTableHoverEnter={() => {}}
-            onTableHoverExit={onTableHoverExit}
             onTableClick={onTableClick}
           />
         ))}
