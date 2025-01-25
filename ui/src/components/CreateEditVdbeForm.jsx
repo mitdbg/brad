@@ -93,7 +93,7 @@ function TableSelector({ selectedTables, setSelectedTables, allTables }) {
   );
 }
 
-function CreateEditFormFields({ vdbe, setVdbe, allTables }) {
+function CreateEditFormFields({ vdbe, setVdbe, allTables, validEngines }) {
   const onStalenessChange = (event) => {
     const maxStalenessMins = parseInt(event.target.value);
     if (isNaN(maxStalenessMins)) {
@@ -202,6 +202,7 @@ function CreateEditFormFields({ vdbe, setVdbe, allTables }) {
             labelPlacement="end"
             checked={mappedToEngine === "aurora"}
             onClick={onMappedToChange}
+            disabled={!validEngines.includes("aurora")}
           />
           <FormControlLabel
             value="redshift"
@@ -210,6 +211,7 @@ function CreateEditFormFields({ vdbe, setVdbe, allTables }) {
             labelPlacement="end"
             checked={mappedToEngine === "redshift"}
             onClick={onMappedToChange}
+            disabled={!validEngines.includes("redshift")}
           />
           <FormControlLabel
             value="athena"
@@ -218,6 +220,7 @@ function CreateEditFormFields({ vdbe, setVdbe, allTables }) {
             labelPlacement="end"
             checked={mappedToEngine === "athena"}
             onClick={onMappedToChange}
+            disabled={!validEngines.includes("athena")}
           />
         </RadioGroup>
       </FormControl>
@@ -235,11 +238,63 @@ function getEmptyVdbe() {
   };
 }
 
-function CreateEditVdbeForm({ currentVdbe, allTables, onCloseClick }) {
+function vdbesEqual(vdbe1, vdbe2) {
+  if (vdbe1 == null || vdbe2 == null) {
+    return false;
+  }
+  if (
+    !(
+      vdbe1.name === vdbe2.name &&
+      vdbe1.max_staleness_ms === vdbe2.max_staleness_ms &&
+      vdbe1.p90_latency_slo_ms === vdbe2.p90_latency_slo_ms &&
+      vdbe1.interface === vdbe2.interface &&
+      vdbe1.tables.length === vdbe2.tables.length &&
+      vdbe1.mapped_to === vdbe2.mapped_to
+    )
+  ) {
+    return false;
+  }
+
+  // Check for table equality without regard to order.
+  return vdbe1.tables.every(({ name, writable }) => {
+    const matching = vdbe2.tables.find(
+      (table2) => table2.name === name && table2.writable === writable,
+    );
+    return matching != null;
+  });
+}
+
+function isValid(vdbe) {
+  return (
+    vdbe.name != null &&
+    vdbe.max_staleness_ms != null &&
+    vdbe.max_staleness_ms >= 0 &&
+    vdbe.p90_latency_slo_ms != null &&
+    vdbe.p90_latency_slo_ms > 0 &&
+    vdbe.interface != null &&
+    vdbe.tables.length > 0 &&
+    vdbe.mapped_to != null
+  );
+}
+
+function validEngines(blueprint) {
+  if (blueprint == null) {
+    return [];
+  }
+  return blueprint.engines.map((engine) => engine.engine);
+}
+
+function CreateEditVdbeForm({
+  currentVdbe,
+  blueprint,
+  allTables,
+  onCloseClick,
+}) {
   const isEdit = currentVdbe != null;
   const [vdbe, setVdbe] = useState(
     currentVdbe != null ? currentVdbe : getEmptyVdbe(),
   );
+  const hasChanges = currentVdbe == null || !vdbesEqual(currentVdbe, vdbe);
 
   const onTableClick = (tableName) => {
     const nextTables = [];
@@ -268,9 +323,12 @@ function CreateEditVdbeForm({ currentVdbe, allTables, onCloseClick }) {
           vdbe={vdbe}
           setVdbe={setVdbe}
           allTables={allTables}
+          validEngines={validEngines(blueprint)}
         />
         <div className="cev-preview">
-          <h2>Preview</h2>
+          <div className="cev-preview-label">
+            <Chip label="Preview" variant="outlined" />
+          </div>
           <VdbeView
             vdbe={vdbe}
             highlight={{}}
@@ -287,6 +345,7 @@ function CreateEditVdbeForm({ currentVdbe, allTables, onCloseClick }) {
         <Button
           variant="contained"
           startIcon={<CheckCircleOutlineRoundedIcon />}
+          disabled={!hasChanges || !isValid(vdbe)}
         >
           {isEdit ? "Save" : "Create"}
         </Button>

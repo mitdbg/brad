@@ -59,6 +59,7 @@ function OverallInfraView({
             {vdbeForm.open && (
               <CreateEditVdbeForm
                 currentVdbe={vdbeForm.shownVdbe}
+                blueprint={systemState.blueprint}
                 allTables={systemState.all_tables}
                 onCloseClick={closeVdbeForm}
               />
