@@ -1,5 +1,5 @@
 import enum
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 from brad.config.engine import Engine
@@ -30,6 +30,7 @@ class VirtualEngine(BaseModel):
     interface: QueryInterface
     tables: List[VirtualTable]
     mapped_to: Engine
+    endpoint: Optional[str] = None
 
 
 class VirtualInfrastructure(BaseModel):

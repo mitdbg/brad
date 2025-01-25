@@ -276,6 +276,7 @@ function CreateEditVdbeForm({ currentVdbe, allTables, onCloseClick }) {
             highlight={{}}
             editable={false}
             onTableClick={onTableClick}
+            hideEndpoint={true}
           />
         </div>
       </div>

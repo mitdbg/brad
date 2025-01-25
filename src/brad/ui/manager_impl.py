@@ -29,6 +29,7 @@ from brad.ui.models import (
 from brad.daemon.front_end_metrics import FrontEndMetric
 from brad.daemon.system_event_logger import SystemEventLogger, SystemEventRecord
 from brad.vdbe.manager import VdbeManager
+from brad.vdbe.models import VirtualEngine
 
 logger = logging.getLogger(__name__)
 
@@ -215,6 +216,39 @@ async def get_predicted_changes(args: PredictedChangesArgs) -> DisplayableBluepr
         raise HTTPException(500, "Failed to run a replan.")
     blueprint, _ = result
     return DisplayableBlueprint.from_blueprint(blueprint)
+
+
+@app.post("/api/1/vdbe")
+def create_update_vdbe(engine: VirtualEngine) -> VirtualEngine:
+    assert manager is not None
+    assert manager.vdbe_mgr is not None
+
+    # Do some simple validation.
+    if engine.name == "":
+        raise HTTPException(400, "name must be non-empty.")
+    if engine.max_staleness_ms < 0:
+        raise HTTPException(400, "max_staleness_ms must be non-negative.")
+    if engine.p90_latency_slo_ms <= 0:
+        raise HTTPException(400, "p90_latency_slo_ms must be positive.")
+
+    return manager.vdbe_mgr.add_update_engine(engine)
+
+
+class DeleteVdbeArgs(BaseModel):
+    engine_name: str
+
+
+@app.post("/api/1/delete_vdbe")
+def delete_vdbe(args: DeleteVdbeArgs) -> None:
+    assert manager is not None
+    assert manager.vdbe_mgr is not None
+
+    if args.engine_name == "":
+        raise HTTPException(400, "name must be non-empty.")
+
+    deleted = manager.vdbe_mgr.delete_engine(args.engine_name)
+    if not deleted:
+        raise HTTPException(400, "No engine with the given name found.")
 
 
 def _determine_current_status(manager_impl: UiManagerImpl) -> Status:

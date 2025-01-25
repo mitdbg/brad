@@ -75,7 +75,9 @@ function EditControls({ onEditClick, onDeleteClick }) {
 
 function VdbeEndpoint({ endpoint, setShowSnackbar }) {
   const handleCopy = () => {
-    navigator.clipboard.writeText(endpoint);
+    if (navigator.clipboard != null) {
+      navigator.clipboard.writeText(endpoint);
+    }
     setShowSnackbar(true);
   };
   return (
@@ -88,7 +90,7 @@ function VdbeEndpoint({ endpoint, setShowSnackbar }) {
   );
 }
 
-function VdbeView({ vdbe, endpoint, onTableClick, editable, onEditClick }) {
+function VdbeView({ vdbe, onTableClick, editable, onEditClick, hideEndpoint }) {
   if (onEditClick == null) {
     onEditClick = () => {};
   }
@@ -121,8 +123,11 @@ function VdbeView({ vdbe, endpoint, onTableClick, editable, onEditClick }) {
             />
           )}
         </div>
-        {endpoint && (
-          <VdbeEndpoint endpoint={endpoint} setShowSnackbar={setShowSnackbar} />
+        {vdbe.endpoint && !hideEndpoint && (
+          <VdbeEndpoint
+            endpoint={vdbe.endpoint}
+            setShowSnackbar={setShowSnackbar}
+          />
         )}
         <div class="vdbe-view-props">
           <ul>

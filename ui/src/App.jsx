@@ -72,7 +72,9 @@ function App() {
       ...appState,
       previewForm: { ...previewForm, open: true },
     });
-    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    }, 0);
   };
   const closePreviewForm = () => {
     if (!previewForm.open) return;
@@ -92,7 +94,9 @@ function App() {
     const { open } = vdbeForm;
     if (open) return;
     setAppState({ ...appState, vdbeForm: { open: true, shownVdbe: vdbe } });
-    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    }, 0);
   };
   const closeVdbeForm = () => {
     const { open } = vdbeForm;
