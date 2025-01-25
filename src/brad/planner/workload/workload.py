@@ -222,6 +222,9 @@ class Workload:
             query_indices, self.EngineLatencyIndex[engine]
         ] = run_times
 
+    def apply_intensity_multiplier(self, multiplier: float) -> None:
+        self._analytical_query_arrival_counts *= multiplier
+
     def get_predicted_analytical_latency(self, query_idx: int, engine: Engine) -> float:
         assert self._predicted_analytical_latencies is not None
         return self._predicted_analytical_latencies[

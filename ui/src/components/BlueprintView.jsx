@@ -1,4 +1,6 @@
 import PhysDbView from "./PhysDbView";
+import Chip from "@mui/material/Chip";
+import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import "./styles/BlueprintView.css";
 
 function findNextEngine(engineName, nextBlueprint) {
@@ -11,20 +13,42 @@ function findNextEngine(engineName, nextBlueprint) {
   return null;
 }
 
+function ShowingPreviewIndicator() {
+  return (
+    <div className="bp-preview-indicator">
+      <Chip
+        color="primary"
+        icon={<AutoAwesomeRoundedIcon />}
+        label="Showing Predicted Changes"
+      />
+    </div>
+  );
+}
+
 function BlueprintView({
   blueprint,
   nextBlueprint,
+  previewBlueprint,
   highlight,
   onTableHoverEnter,
   onTableHoverExit,
 }) {
+  let blueprintToShow = blueprint;
+  if (previewBlueprint != null) {
+    blueprintToShow = previewBlueprint;
+  }
   return (
     <div class="infra-region bp-view-wrap">
       <h2>Physical</h2>
+      {previewBlueprint != null && (
+        <div className="bp-preview-indicator-wrap">
+          <ShowingPreviewIndicator />
+        </div>
+      )}
       <div class="bp-view-engines-wrap">
-        {blueprint &&
-          blueprint.engines &&
-          blueprint.engines.map(({ name, ...props }) => (
+        {blueprintToShow &&
+          blueprintToShow.engines &&
+          blueprintToShow.engines.map(({ name, ...props }) => (
             <PhysDbView
               key={name}
               name={name}
@@ -32,7 +56,7 @@ function BlueprintView({
               highlight={highlight}
               onTableHoverEnter={onTableHoverEnter}
               onTableHoverExit={onTableHoverExit}
-              nextEngine={findNextEngine(name, nextBlueprint)}
+              // nextEngine={findNextEngine(name, nextBlueprint)}
             />
           ))}
       </div>

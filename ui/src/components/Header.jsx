@@ -1,4 +1,5 @@
 import "./styles/Header.css";
+import BuildRoundedIcon from "@mui/icons-material/BuildRounded";
 import bradLogo from "../assets/brad_logo.png";
 
 function statusToDisplay(status) {
@@ -32,19 +33,42 @@ function StatusIndicator({ status, schema }) {
   );
 }
 
-function Header({ status }) {
+function HeaderButton({ icon, children, onClick, disabled }) {
+  return (
+    <div
+      className={`header-button ${disabled ? "disabled" : ""}`}
+      onClick={onClick}
+    >
+      {icon}
+      <span>{children}</span>
+    </div>
+  );
+}
+
+function Header({ status, onWorkloadClick, workloadDisabled }) {
   return (
     <div class="header">
       <div class="header-inner">
-        <div class="header-logo">
-          <div class="header-logo-img">
-            <img src={bradLogo} />
+        <div className="header-left">
+          <div class="header-logo">
+            <div class="header-logo-img">
+              <img src={bradLogo} />
+            </div>
+            <div class="header-logo-txt">
+              <strong>BRAD</strong> Dashboard
+            </div>
           </div>
-          <div class="header-logo-txt">
-            <strong>BRAD</strong> Dashboard
-          </div>
+          <HeaderButton
+            icon={<BuildRoundedIcon />}
+            onClick={onWorkloadClick}
+            disabled={workloadDisabled}
+          >
+            Adjust Workload
+          </HeaderButton>
         </div>
-        <StatusIndicator status={status} schema="imdb_extended_100g" />
+        <div className="header-right">
+          <StatusIndicator status={status} schema="imdb_extended_100g" />
+        </div>
       </div>
     </div>
   );

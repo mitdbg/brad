@@ -38,6 +38,8 @@ body {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
+
+  transition: opacity 0.3s ease;
 }
 
 .col-h2 {

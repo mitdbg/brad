@@ -6,7 +6,7 @@
 # listen on successive ports (e.g., 6584, 6585, etc.).
 front_end_interface: "0.0.0.0"
 front_end_port: 6583
-num_front_ends: 1
+num_front_ends: 8
 
 # If installed and enabled, BRAD will serve its UI from a webserver that listens
 # for connections on this network interface and port.
@@ -64,8 +64,8 @@ strategy: fp_query_based_beam
 planning_window:
   weeks: 0
   days: 0
-  hours: 1
-  minutes: 0
+  hours: 0
+  minutes: 10
 
 # Used to aggregate metrics collected in the planning window.
 metrics_agg:
@@ -110,8 +110,8 @@ comparator:
 
   benefit_horizon:  # Only used by the `benefit_perf_ceiling` comparator
     weeks: 0
-    days: 0
-    hours: 1
+    days: 1
+    hours: 0
     minutes: 0
 
   penalty_threshold: 0.8  # Only used by the `benefit_perf_ceiling` comparator
@@ -126,6 +126,16 @@ std_datasets:
 
 bootstrap_vdbe_path: config/vdbe_demo/imdb_extended_vdbes.json
 
+aurora_max_query_factor: 4.0
+aurora_max_query_factor_replace: 10000.0
+
+redshift_peak_load_threshold: 95.0
+redshift_peak_load_multiplier: 2.0
+
+planner_max_workers: 16
+aurora_provisioning_search_distance: 900.0
+redshift_provisioning_search_distance: 900.0
+
 # Blueprint planning trigger configs.
 
 triggers:
@@ -137,7 +147,7 @@ triggers:
   # takes effect. Usually this should be greater than zero to give BRAD
   # sufficient time to observe the effect of the blueprint on the workload. BRAD
   # may wait longer to ensure metrics are also available for this many minutes.
-  observe_new_blueprint_mins: 3
+  observe_new_blueprint_mins: 10
 
   elapsed_time:
     disabled: true

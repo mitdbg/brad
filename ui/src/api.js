@@ -35,9 +35,18 @@ async function setWorkloadClients(port, numClients) {
   return result.data;
 }
 
+async function getPredictedChanges(tMultiplier, aMultiplier) {
+  const result = await axios.post(`${API_PREFIX}/predicted_changes`, {
+    t_multiplier: tMultiplier,
+    a_multiplier: aMultiplier,
+  });
+  return result.data;
+}
+
 export {
   fetchMetrics,
   fetchSystemState,
   fetchWorkloadClients,
   setWorkloadClients,
+  getPredictedChanges,
 };

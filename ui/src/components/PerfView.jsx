@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { fetchMetrics } from "../api";
 import MetricsManager from "../metrics";
 import Panel from "./Panel";
@@ -64,7 +64,7 @@ function WindowSelector({ windowSizeMinutes, onWindowSizeChange }) {
   );
 }
 
-function PerfView({ virtualInfra }) {
+function PerfView({ virtualInfra, showingPreview }) {
   const [windowSizeMinutes, setWindowSizeMinutes] = useState(10);
   const [metricsData, setMetricsData] = useState({
     windowSizeMinutes,
@@ -79,7 +79,7 @@ function PerfView({ virtualInfra }) {
     return metricsManagerRef.current;
   }
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     const rawMetrics = await fetchMetrics(60, /*useGenerated=*/ false);
     const fetchedMetrics = parseMetrics(rawMetrics);
     const metricsManager = getMetricsManager();
@@ -93,7 +93,7 @@ function PerfView({ virtualInfra }) {
         ),
       });
     }
-  };
+  }, [metricsManagerRef, windowSizeMinutes, setMetricsData]);
 
   useEffect(() => {
     // Run first fetch immediately.
@@ -105,7 +105,7 @@ function PerfView({ virtualInfra }) {
       }
       clearInterval(intervalId);
     };
-  }, [metricsData, windowSizeMinutes]);
+  }, [refreshData]);
 
   if (metricsData.windowSizeMinutes !== windowSizeMinutes) {
     const metricsManager = getMetricsManager();
@@ -125,15 +125,22 @@ function PerfView({ virtualInfra }) {
   let vdbe2Peak = null;
   if (virtualInfra?.engines != null) {
     if (virtualInfra.engines.length > 0) {
-      vdbe1Peak = virtualInfra.engines[0].peak_latency_s;
+      vdbe1Peak = virtualInfra.engines[0].p90_latency_slo_ms / 1000;
     }
     if (virtualInfra.engines.length > 1) {
-      vdbe2Peak = virtualInfra.engines[1].peak_latency_s;
+      vdbe2Peak = virtualInfra.engines[1].p90_latency_slo_ms / 1000;
     }
   }
 
+  const columnStyle = {
+    flexGrow: 2,
+  };
+  if (showingPreview) {
+    columnStyle.opacity = 0.333;
+  }
+
   return (
-    <div class="column" style={{ flexGrow: 2 }}>
+    <div class="column" style={columnStyle}>
       <div class="perf-view-heading">
         <h2 class="col-h2">
           <TroubleshootRoundedIcon style={{ marginRight: "8px" }} />

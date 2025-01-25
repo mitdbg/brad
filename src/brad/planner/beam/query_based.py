@@ -49,7 +49,9 @@ class QueryBasedBeamPlanner(BlueprintPlanner):
         self._disable_external_logging = disable_external_logging
 
     async def _run_replan_impl(
-        self, window_multiplier: int = 1
+        self,
+        window_multiplier: int = 1,
+        intensity_multipliers: Tuple[float, float] = (1.0, 1.0),
     ) -> Optional[Tuple[Blueprint, Score]]:
         logger.info("Running a query-based beam replan...")
 

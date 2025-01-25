@@ -1,13 +1,7 @@
 import { useCallback, useState, useEffect } from "react";
 import Header from "./components/Header";
-import VirtualInfraView from "./components/VirtualInfraView";
-import BlueprintView from "./components/BlueprintView";
 import PerfView from "./components/PerfView";
-import WorkloadInput from "./components/WorkloadInput";
-import CreateEditVdbeForm from "./components/CreateEditVdbeForm";
-import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
-import Panel from "./components/Panel";
-import SystemConfig from "./components/SystemConfig";
+import OverallInfraView from "./components/OverallInfraView";
 import { fetchSystemState } from "./api";
 
 import "./App.css";
@@ -21,67 +15,27 @@ function App() {
     virtual_infra: null,
     next_blueprint: null,
   });
-  const [highlight, setHighlight] = useState({
-    hoverEngine: null,
-    virtualEngines: {},
-    physicalEngines: {},
+  const [appState, setAppState] = useState({
+    previewForm: {
+      open: false,
+      shownPreviewBlueprint: null,
+    },
+    vdbeForm: {
+      open: false,
+      shownVdbe: null,
+    },
   });
-  const [endpoints, setEndpoints] = useState({
-    workloadRunners: [
-      {
-        host: "localhost",
-        port: 8585,
-      },
-      {
-        host: "localhost",
-        port: 8586,
-      },
-    ],
-  });
-  const [configModalOpen, setConfigModalOpen] = useState(false);
 
-  const onTableHoverEnter = (engineMarker, tableName, isVirtual, mappedTo) => {
-    const virtualEngines = {};
-    const physicalEngines = {};
-    if (isVirtual) {
-      virtualEngines[engineMarker] = tableName;
-      for (const physMarker of mappedTo) {
-        physicalEngines[physMarker] = tableName;
-      }
-    } else {
-      physicalEngines[engineMarker] = tableName;
-      for (const virtMarker of mappedTo) {
-        virtualEngines[virtMarker] = tableName;
-      }
-    }
-    setHighlight({
-      hoverEngine: engineMarker,
-      virtualEngines,
-      physicalEngines,
-    });
-  };
-
-  const onTableHoverExit = () => {
-    setHighlight({
-      hoverEngine: null,
-      virtualEngines: {},
-      physicalEngines: {},
-    });
-  };
-
-  const refreshData = async () => {
-    const newSystemState = await fetchSystemState(
-      /*filterTablesForDemo=*/ false,
-    );
-    // TODO: Not the best way to check for equality.
+  const refreshData = useCallback(async () => {
+    const newSystemState = await fetchSystemState();
+    // Not the best way to check for equality.
     if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
       setSystemState(newSystemState);
     }
-  };
+  }, [systemState, setSystemState]);
 
   // Fetch updated system state periodically.
   useEffect(() => {
-    // Run first fetch immediately.
     refreshData();
     const intervalId = setInterval(refreshData, REFRESH_INTERVAL_MS);
     return () => {
@@ -90,21 +44,16 @@ function App() {
       }
       clearInterval(intervalId);
     };
-  }, [systemState]);
+  }, [refreshData]);
 
   // Bind keyboard shortcut for internal config menu.
-  const handleKeyPress = useCallback(
-    (event) => {
-      if (document.activeElement !== document.body) {
-        // We only want to handle key presses when no input is focused.
-        return;
-      }
-      if (event.key === "d" && !configModalOpen) {
-        setConfigModalOpen(true);
-      }
-    },
-    [configModalOpen],
-  );
+  const handleKeyPress = useCallback((event) => {
+    if (document.activeElement !== document.body) {
+      // We only want to handle key presses when no input is focused.
+      return;
+    }
+    // Currently a no-op.
+  }, []);
 
   useEffect(() => {
     document.addEventListener("keyup", handleKeyPress);
@@ -113,62 +62,60 @@ function App() {
     };
   }, [handleKeyPress]);
 
-  const handleSystemConfigChange = useCallback(
-    ({ field, value }) => {
-      setEndpoints({ ...endpoints, [field]: value });
-    },
-    [endpoints],
-  );
+  const { previewForm, vdbeForm } = appState;
 
-  const allTables = [
-    "tickets",
-    "theatres",
-    "movies",
-    "showings",
-    "aka_title",
-    "homes",
-    "movie_info",
-    "title",
-    "company_name",
-  ];
+  // Callbacks used to control forms in the UI.
+  const openPreviewForm = () => {
+    if (previewForm.open) return;
+    setAppState({
+      ...appState,
+      previewForm: { ...previewForm, open: true },
+    });
+  };
+  const closePreviewForm = () => {
+    if (!previewForm.open) return;
+    setAppState({
+      ...appState,
+      previewForm: { open: false, shownPreviewBlueprint: null },
+    });
+  };
+  const setPreviewBlueprint = (blueprint) => {
+    setAppState({
+      ...appState,
+      previewForm: { open: true, shownPreviewBlueprint: blueprint },
+    });
+  };
+
+  const openVdbeForm = (vdbe) => {
+    const { open } = vdbeForm;
+    if (open) return;
+    setAppState({ ...appState, vdbeForm: { open: true, shownVdbe: vdbe } });
+  };
+  const closeVdbeForm = () => {
+    const { open } = vdbeForm;
+    if (!open) return;
+    setAppState({ ...appState, vdbeForm: { open: false, shownVdbe: null } });
+  };
 
   return (
     <>
-      <Header status={systemState.status} />
+      <Header
+        status={systemState.status}
+        workloadDisabled={previewForm.open || vdbeForm.open}
+        onWorkloadClick={openPreviewForm}
+      />
       <div class="body-container">
-        <div class="column" style={{ flexGrow: 3 }}>
-          <h2 class="col-h2">
-            <StorageRoundedIcon style={{ marginRight: "8px" }} />
-            Data Infrastructure
-          </h2>
-          <div class="column-inner">
-            <Panel>
-              <WorkloadInput min={1} max={10} />
-              <CreateEditVdbeForm isEdit={false} allTables={allTables} />
-              <VirtualInfraView
-                virtualInfra={systemState.virtual_infra}
-                highlight={highlight}
-                onTableHoverEnter={onTableHoverEnter}
-                onTableHoverExit={onTableHoverExit}
-                endpoints={endpoints}
-              />
-              <div class="infra-separator" />
-              <BlueprintView
-                blueprint={systemState.blueprint}
-                nextBlueprint={systemState.next_blueprint}
-                highlight={highlight}
-                onTableHoverEnter={onTableHoverEnter}
-                onTableHoverExit={onTableHoverExit}
-              />
-            </Panel>
-          </div>
-        </div>
-        <PerfView virtualInfra={systemState.virtual_infra} />
-        <SystemConfig
-          endpoints={endpoints}
-          open={configModalOpen}
-          onCloseClick={() => setConfigModalOpen(false)}
-          onChange={handleSystemConfigChange}
+        <OverallInfraView
+          systemState={systemState}
+          appState={appState}
+          closePreviewForm={closePreviewForm}
+          openVdbeForm={openVdbeForm}
+          closeVdbeForm={closeVdbeForm}
+          setPreviewBlueprint={setPreviewBlueprint}
+        />
+        <PerfView
+          virtualInfra={systemState.virtual_infra}
+          showingPreview={previewForm.shownPreviewBlueprint != null}
         />
       </div>
     </>

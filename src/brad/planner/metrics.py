@@ -45,6 +45,44 @@ Metrics = namedtuple(
 AggCfg = Dict[str, Any]
 
 
+def apply_multipliers_to_metrics(
+    metrics: Metrics, intensity_multipliers: Tuple[float, float], has_redshift: bool
+) -> Metrics:
+    tmult, amult = intensity_multipliers
+    if has_redshift:
+        aurora_multiplier = tmult
+        aurora_reader_multiplier = amult
+        redshift_multiplier = amult
+    else:
+        aurora_multiplier = max(tmult, amult)
+        aurora_reader_multiplier = amult
+        redshift_multiplier = amult
+    return Metrics(
+        redshift_cpu_avg=min(metrics.redshift_cpu_avg * redshift_multiplier, 100.0),
+        aurora_writer_cpu_avg=min(
+            metrics.aurora_writer_cpu_avg * aurora_multiplier, 100.0
+        ),
+        aurora_reader_cpu_avg=min(
+            metrics.aurora_reader_cpu_avg * aurora_reader_multiplier, 100.0
+        ),
+        aurora_writer_buffer_hit_pct_avg=metrics.aurora_writer_buffer_hit_pct_avg,
+        aurora_reader_buffer_hit_pct_avg=metrics.aurora_reader_buffer_hit_pct_avg,
+        aurora_writer_load_minute_avg=metrics.aurora_writer_load_minute_avg
+        * aurora_multiplier,
+        aurora_reader_load_minute_avg=metrics.aurora_reader_load_minute_avg
+        * aurora_reader_multiplier,
+        txn_completions_per_s=metrics.txn_completions_per_s * aurora_multiplier,
+        txn_lat_s_p50=metrics.txn_lat_s_p50 * tmult,
+        txn_lat_s_p90=metrics.txn_lat_s_p90 * tmult,
+        query_lat_s_p50=metrics.query_lat_s_p50 * amult,
+        query_lat_s_p90=metrics.query_lat_s_p90 * amult,
+        # Numpy array.
+        redshift_cpu_list=np.clip(
+            metrics.redshift_cpu_list * redshift_multiplier, a_min=None, a_max=100.0
+        ),
+    )
+
+
 class MetricsProvider:
     """
     An abstract interface over a component that can provide metrics (for

@@ -7,6 +7,7 @@ import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from typing import Optional, List
+from pydantic import BaseModel
 
 import brad.ui.static as brad_app
 from brad.blueprint import Blueprint
@@ -190,6 +191,28 @@ def set_clients(clients: SetClientState) -> ClientState:
             raise HTTPException(
                 400, f"Unable to connect to port {clients.runner_port}"
             ) from ex
+
+
+class PredictedChangesArgs(BaseModel):
+    t_multiplier: float
+    a_multiplier: float
+
+
+@app.post("/api/1/predicted_changes")
+async def get_predicted_changes(args: PredictedChangesArgs) -> DisplayableBlueprint:
+    """
+    Predict the changed blueprint if the workload intensity changed by the given
+    multipliers.
+    """
+    assert manager is not None
+    assert manager.planner is not None
+    result = await manager.planner.run_replan_direct(
+        intensity_multipliers=(args.t_multiplier, args.a_multiplier)
+    )
+    if result is None:
+        raise HTTPException(500, "Failed to run a replan.")
+    blueprint, _ = result
+    return DisplayableBlueprint.from_blueprint(blueprint)
 
 
 def _analytics_table_mapper_temp(table_name: str, blueprint: Blueprint) -> List[str]:

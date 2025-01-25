@@ -2,62 +2,16 @@ import VdbeView from "./VdbeView";
 import AddCircleOutlineRoundedIcon from "@mui/icons-material/AddCircleOutlineRounded";
 import Button from "@mui/material/Button";
 import "./styles/VirtualInfraView.css";
-import { useEffect, useState, useCallback } from "react";
-import { fetchWorkloadClients, setWorkloadClients } from "../api";
 
 function VirtualInfraView({
   virtualInfra,
   highlight,
   onTableHoverEnter,
   onTableHoverExit,
-  endpoints,
+  onAddVdbeClick,
+  onEditVdbeClick,
+  disableVdbeChanges,
 }) {
-  const [workloadStates, setWorkloadStates] = useState([]);
-  const updateWorkloadNumClients = useCallback(
-    async (vdbeIndex, numClients) => {
-      const { workloadRunners } = endpoints;
-      if (
-        vdbeIndex >= workloadRunners.length ||
-        vdbeIndex >= workloadStates.length
-      ) {
-        return;
-      }
-      const endpoint = workloadRunners[vdbeIndex];
-      const newWorkloadState = await setWorkloadClients(
-        endpoint.port,
-        numClients,
-      );
-
-      // Skip the state update if there was no change.
-      const existingWorkloadState = workloadStates[vdbeIndex];
-      if (
-        newWorkloadState.curr_clients === existingWorkloadState.curr_clients &&
-        newWorkloadState.max_clients === existingWorkloadState.max_clients
-      ) {
-        return;
-      }
-
-      setWorkloadStates(
-        workloadStates.map((ws, index) =>
-          index === vdbeIndex ? newWorkloadState : ws,
-        ),
-      );
-    },
-    [endpoints, workloadStates],
-  );
-
-  useEffect(() => {
-    async function fetchRunnerState() {
-      const { workloadRunners } = endpoints;
-      const promises = workloadRunners.map((endpoint) =>
-        fetchWorkloadClients(endpoint.port),
-      );
-      const results = await Promise.all(promises);
-      setWorkloadStates(results);
-    }
-    fetchRunnerState();
-  }, [endpoints]);
-
   return (
     <div class="infra-region vdbe-view-wrap">
       <h2>Virtual</h2>
@@ -69,7 +23,8 @@ function VirtualInfraView({
             onTableHoverEnter={onTableHoverEnter}
             onTableHoverExit={onTableHoverExit}
             vdbe={vdbe}
-            editable={true}
+            editable={!disableVdbeChanges}
+            onEditClick={onEditVdbeClick}
           />
         ))}
       </div>
@@ -82,6 +37,8 @@ function VirtualInfraView({
             "&:hover": { bgcolor: "#f5f5f5", opacity: 1 },
             opacity: 0.8,
           }}
+          onClick={onAddVdbeClick}
+          disabled={disableVdbeChanges}
         >
           Add New VDBE
         </Button>

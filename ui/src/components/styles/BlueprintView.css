@@ -1,6 +1,19 @@
+.bp-view-wrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .bp-view-engines-wrap {
   height: auto;
   display: flex;
   justify-content: space-around;
   align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.bp-preview-indicator-wrap {
+  display: flex;
+  flex-direction: row-reverse;
+  margin: 10px 0;
 }
