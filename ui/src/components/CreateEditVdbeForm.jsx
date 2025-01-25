@@ -20,6 +20,7 @@ import RadioGroup from "@mui/material/RadioGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import FormLabel from "@mui/material/FormLabel";
 import VdbeView from "./VdbeView";
+import { createVdbe, updateVdbe, deleteVdbe } from "../api";
 import "./styles/CreateEditVdbeForm.css";
 
 const ITEM_HEIGHT = 47;
@@ -289,11 +290,13 @@ function CreateEditVdbeForm({
   blueprint,
   allTables,
   onCloseClick,
+  onVdbeChangeSuccess,
 }) {
   const isEdit = currentVdbe != null;
   const [vdbe, setVdbe] = useState(
     currentVdbe != null ? currentVdbe : getEmptyVdbe(),
   );
+  const [inFlight, setInFlight] = useState(false);
   const hasChanges = currentVdbe == null || !vdbesEqual(currentVdbe, vdbe);
 
   const onTableClick = (tableName) => {
@@ -306,6 +309,18 @@ function CreateEditVdbeForm({
       }
     }
     setVdbe({ ...vdbe, tables: nextTables });
+  };
+
+  const onSaveClick = async () => {
+    setInFlight(true);
+    if (isEdit) {
+      await updateVdbe(vdbe);
+    } else {
+      await createVdbe(vdbe);
+    }
+    await onVdbeChangeSuccess();
+    setInFlight(false);
+    onCloseClick();
   };
 
   return (
@@ -339,13 +354,15 @@ function CreateEditVdbeForm({
         </div>
       </div>
       <div className="cev-buttons">
-        <Button variant="outlined" onClick={onCloseClick}>
+        <Button variant="outlined" onClick={onCloseClick} disabled={inFlight}>
           Cancel
         </Button>
         <Button
           variant="contained"
           startIcon={<CheckCircleOutlineRoundedIcon />}
           disabled={!hasChanges || !isValid(vdbe)}
+          loading={inFlight}
+          onClick={onSaveClick}
         >
           {isEdit ? "Save" : "Create"}
         </Button>

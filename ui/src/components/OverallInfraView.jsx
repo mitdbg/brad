@@ -4,6 +4,7 @@ import BlueprintView from "./BlueprintView";
 import WorkloadInput from "./WorkloadInput";
 import CreateEditVdbeForm from "./CreateEditVdbeForm";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
+import Snackbar from "@mui/material/Snackbar";
 import HighlightContext from "./HighlightContext";
 import Panel from "./Panel";
 
@@ -14,8 +15,10 @@ function OverallInfraView({
   openVdbeForm,
   closeVdbeForm,
   setPreviewBlueprint,
+  refreshData,
 }) {
   const { previewForm, vdbeForm } = appState;
+  const [showVdbeChangeSuccess, setShowVdbeChangeSuccess] = useState(false);
   const [highlight, setHighlight] = useState({
     hoveredVdbe: null,
     hoveredEngine: null,
@@ -34,6 +37,17 @@ function OverallInfraView({
     setVdbeHighlight,
     setEngineHighlight,
     clearHighlight,
+  };
+
+  const onVdbeChangeSuccess = async () => {
+    await refreshData();
+    setShowVdbeChangeSuccess(true);
+  };
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === "clickaway") {
+      return;
+    }
+    setShowVdbeChangeSuccess(false);
   };
 
   return (
@@ -62,6 +76,7 @@ function OverallInfraView({
                 blueprint={systemState.blueprint}
                 allTables={systemState.all_tables}
                 onCloseClick={closeVdbeForm}
+                onVdbeChangeSuccess={onVdbeChangeSuccess}
               />
             )}
             <VirtualInfraView
@@ -78,6 +93,12 @@ function OverallInfraView({
             />
           </Panel>
         </div>
+        <Snackbar
+          open={showVdbeChangeSuccess}
+          autoHideDuration={3000}
+          message="VDBE changes successfully saved."
+          onClose={handleSnackbarClose}
+        />
       </div>
     </HighlightContext.Provider>
   );

@@ -119,6 +119,7 @@ function App() {
           openVdbeForm={openVdbeForm}
           closeVdbeForm={closeVdbeForm}
           setPreviewBlueprint={setPreviewBlueprint}
+          refreshData={refreshData}
         />
         <PerfView
           virtualInfra={systemState.virtual_infra}

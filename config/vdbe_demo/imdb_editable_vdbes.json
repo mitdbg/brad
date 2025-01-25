@@ -2,6 +2,7 @@
   "schema_name": "imdb_extended_editable_100g",
   "engines": [
     {
+      "internal_id": 1,
       "name": "Ticketing",
       "max_staleness_ms": 0,
       "p90_latency_slo_ms": 30,
@@ -31,6 +32,7 @@
       "mapped_to": "aurora"
     },
     {
+      "internal_id": 2,
       "name": "Analytics",
       "max_staleness_ms": 3600000,
       "p90_latency_slo_ms": 30000,

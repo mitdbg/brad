@@ -24,6 +24,7 @@ class QueryInterface(enum.Enum):
 
 
 class VirtualEngine(BaseModel):
+    internal_id: int
     name: str
     max_staleness_ms: int
     p90_latency_slo_ms: int
@@ -37,3 +38,12 @@ class VirtualInfrastructure(BaseModel):
     schema_name: str
     engines: List[VirtualEngine]
     tables: List[SchemaTable]
+
+
+class CreateVirtualEngineArgs(BaseModel):
+    name: str
+    max_staleness_ms: int
+    p90_latency_slo_ms: int
+    interface: QueryInterface
+    tables: List[VirtualTable]
+    mapped_to: Engine

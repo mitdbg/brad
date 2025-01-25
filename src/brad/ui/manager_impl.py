@@ -29,7 +29,7 @@ from brad.ui.models import (
 from brad.daemon.front_end_metrics import FrontEndMetric
 from brad.daemon.system_event_logger import SystemEventLogger, SystemEventRecord
 from brad.vdbe.manager import VdbeManager
-from brad.vdbe.models import VirtualEngine
+from brad.vdbe.models import VirtualEngine, CreateVirtualEngineArgs
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +219,7 @@ async def get_predicted_changes(args: PredictedChangesArgs) -> DisplayableBluepr
 
 
 @app.post("/api/1/vdbe")
-def create_update_vdbe(engine: VirtualEngine) -> VirtualEngine:
+def create_vdbe(engine: CreateVirtualEngineArgs) -> VirtualEngine:
     assert manager is not None
     assert manager.vdbe_mgr is not None
 
@@ -231,24 +231,37 @@ def create_update_vdbe(engine: VirtualEngine) -> VirtualEngine:
     if engine.p90_latency_slo_ms <= 0:
         raise HTTPException(400, "p90_latency_slo_ms must be positive.")
 
-    return manager.vdbe_mgr.add_update_engine(engine)
+    return manager.vdbe_mgr.add_engine(engine)
 
 
-class DeleteVdbeArgs(BaseModel):
-    engine_name: str
-
-
-@app.post("/api/1/delete_vdbe")
-def delete_vdbe(args: DeleteVdbeArgs) -> None:
+@app.put("/api/1/vdbe")
+def update_vdbe(engine: VirtualEngine) -> VirtualEngine:
     assert manager is not None
     assert manager.vdbe_mgr is not None
 
-    if args.engine_name == "":
+    # Do some simple validation.
+    if engine.name == "":
         raise HTTPException(400, "name must be non-empty.")
+    if engine.max_staleness_ms < 0:
+        raise HTTPException(400, "max_staleness_ms must be non-negative.")
+    if engine.p90_latency_slo_ms <= 0:
+        raise HTTPException(400, "p90_latency_slo_ms must be positive.")
 
-    deleted = manager.vdbe_mgr.delete_engine(args.engine_name)
-    if not deleted:
-        raise HTTPException(400, "No engine with the given name found.")
+    try:
+        return manager.vdbe_mgr.update_engine(engine)
+    except ValueError as ex:
+        raise HTTPException(400, str(ex)) from ex
+
+
+@app.delete("/api/1/delete_vdbe/{engine_id}")
+def delete_vdbe(engine_id: int) -> None:
+    assert manager is not None
+    assert manager.vdbe_mgr is not None
+
+    try:
+        manager.vdbe_mgr.delete_engine(engine_id)
+    except ValueError as ex:
+        raise HTTPException(400, str(ex)) from ex
 
 
 def _determine_current_status(manager_impl: UiManagerImpl) -> Status:

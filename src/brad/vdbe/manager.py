@@ -1,6 +1,10 @@
 import pathlib
 from typing import List, Optional
-from brad.vdbe.models import VirtualInfrastructure, VirtualEngine
+from brad.vdbe.models import (
+    VirtualInfrastructure,
+    VirtualEngine,
+    CreateVirtualEngineArgs,
+)
 
 
 class VdbeManager:
@@ -23,6 +27,9 @@ class VdbeManager:
         self._infra = infra
         self._hostname = hostname
         self._next_port = starting_port
+        self._next_id = 1
+        for engine in self._infra.engines:
+            self._next_id = max(self._next_id, engine.internal_id)
 
         if self._hostname is not None:
             for engine in self._infra.engines:
@@ -35,23 +42,41 @@ class VdbeManager:
     def engines(self) -> List[VirtualEngine]:
         return self._infra.engines
 
-    def add_update_engine(self, engine: VirtualEngine) -> VirtualEngine:
+    def add_engine(self, create: CreateVirtualEngineArgs) -> VirtualEngine:
+        engine = VirtualEngine(
+            internal_id=self._next_id,
+            name=create.name,
+            max_staleness_ms=create.max_staleness_ms,
+            p90_latency_slo_ms=create.p90_latency_slo_ms,
+            interface=create.interface,
+            tables=create.tables,
+            mapped_to=create.mapped_to,
+            endpoint=None,
+        )
+        self._next_id += 1
+
+        if self._hostname is not None:
+            engine.endpoint = f"{self._hostname}:{self._assign_port()}"
+
+        self._infra.engines.append(engine)
+        return engine
+
+    def update_engine(self, engine: VirtualEngine) -> VirtualEngine:
         if engine.endpoint is None and self._hostname is not None:
             engine.endpoint = f"{self._hostname}:{self._assign_port()}"
 
         for i in range(len(self._infra.engines)):
-            if self._infra.engines[i].name == engine.name:
+            if self._infra.engines[i].internal_id == engine.internal_id:
                 self._infra.engines[i] = engine
                 return engine
-        self._infra.engines.append(engine)
-        return engine
+        raise ValueError(f"Engine with id {engine.internal_id} not found")
 
-    def delete_engine(self, engine_name: str) -> bool:
+    def delete_engine(self, engine_id: int) -> None:
         for engine in self._infra.engines:
-            if engine.name == engine_name:
+            if engine.internal_id == engine_id:
                 self._infra.engines.remove(engine)
-                return True
-        return False
+                return
+        raise ValueError(f"Engine with id {engine_id} not found")
 
     def _assign_port(self) -> int:
         port = self._next_port
