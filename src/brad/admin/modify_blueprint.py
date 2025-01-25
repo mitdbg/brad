@@ -22,6 +22,7 @@ from brad.routing.always_one import AlwaysOneRouter
 from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.forest_policy import ForestPolicy
 from brad.routing.rule_based import RuleBased
+from brad.vdbe.models import VirtualInfrastructure
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +102,11 @@ def register_admin_action(subparser) -> None:
         help="Updates the blueprint's table placement and places the specified tables "
         "on the specified engines. Overridden by --place-tables-everywhere. Format "
         "argument as a string of the form: table1=engine1,engine2;table2=engine3;",
+    )
+    parser.add_argument(
+        "--place-vdbe-tables",
+        type=str,
+        help="Places tables on the specified engines in the given VDBE JSON file.",
     )
     parser.add_argument(
         "--set-routing-policy",
@@ -321,6 +327,18 @@ def modify_blueprint(args) -> None:
         new_placement = {}
         for tbl in blueprint.table_locations().keys():
             new_placement[tbl] = Engine.from_bitmap(Engine.bitmap_all())
+        enum_blueprint.set_table_locations(new_placement)
+
+    if args.place_vdbe_tables is not None:
+        new_placement = {}
+        with open(args.place_vdbe_tables, "r", encoding="utf-8") as f:
+            vinfra = VirtualInfrastructure.model_validate_json(f.read())
+        for engine in vinfra.engines:
+            for table in engine.tables:
+                try:
+                    new_placement[table.name].append(engine.mapped_to)
+                except KeyError:
+                    new_placement[table.name] = [engine.mapped_to]
         enum_blueprint.set_table_locations(new_placement)
 
     # 5. Modify routing policy as needed.
