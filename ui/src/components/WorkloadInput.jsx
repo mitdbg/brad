@@ -66,6 +66,8 @@ function WorkloadInput({
       if (engineIntensities.length >= 2) {
         aMultiplier = ((engineIntensities[1].intensity - 1) / 10) * 300;
       }
+      tMultiplier = Math.min(tMultiplier, 1.0);
+      aMultiplier = Math.min(aMultiplier, 1.0);
       const blueprint = await getPredictedChanges(tMultiplier, aMultiplier);
       setPreviewBlueprint(blueprint);
     } catch (error) {

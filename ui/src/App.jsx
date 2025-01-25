@@ -113,7 +113,10 @@ function App() {
           closeVdbeForm={closeVdbeForm}
           setPreviewBlueprint={setPreviewBlueprint}
         />
-        <PerfView virtualInfra={systemState.virtual_infra} />
+        <PerfView
+          virtualInfra={systemState.virtual_infra}
+          showingPreview={previewForm.shownPreviewBlueprint != null}
+        />
       </div>
     </>
   );

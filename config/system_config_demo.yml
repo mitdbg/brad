@@ -64,8 +64,8 @@ strategy: fp_query_based_beam
 planning_window:
   weeks: 0
   days: 0
-  hours: 1
-  minutes: 0
+  hours: 0
+  minutes: 10
 
 # Used to aggregate metrics collected in the planning window.
 metrics_agg:

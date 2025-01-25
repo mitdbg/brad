@@ -66,22 +66,23 @@
   font-size: 1.25em;
   cursor: pointer;
   padding: 0 20px;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   gap: 10px;
-  color: #144f8e;
+  /* color: #7892af; */
+  color: #868686;
 }
 
 .header-button:hover {
-  color: #228dff;
+  color: #306aac;
 }
 
 .header-button.disabled {
-  color: #c4c4c4 !important;
+  color: #dbdbdb !important;
   cursor: default;
 }
 
 .header-button.disabled:hover {
-  color: #b0b0b0 !important;
+  color: #dbdbdb !important;
 }
 
 .header-status {

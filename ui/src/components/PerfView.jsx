@@ -64,7 +64,7 @@ function WindowSelector({ windowSizeMinutes, onWindowSizeChange }) {
   );
 }
 
-function PerfView({ virtualInfra }) {
+function PerfView({ virtualInfra, showingPreview }) {
   const [windowSizeMinutes, setWindowSizeMinutes] = useState(10);
   const [metricsData, setMetricsData] = useState({
     windowSizeMinutes,
@@ -132,8 +132,15 @@ function PerfView({ virtualInfra }) {
     }
   }
 
+  const columnStyle = {
+    flexGrow: 2,
+  };
+  if (showingPreview) {
+    columnStyle.opacity = 0.333;
+  }
+
   return (
-    <div class="column" style={{ flexGrow: 2 }}>
+    <div class="column" style={columnStyle}>
       <div class="perf-view-heading">
         <h2 class="col-h2">
           <TroubleshootRoundedIcon style={{ marginRight: "8px" }} />

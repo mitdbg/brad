@@ -1,5 +1,5 @@
 import "./styles/Header.css";
-import QueryStatsRoundedIcon from "@mui/icons-material/QueryStatsRounded";
+import BuildRoundedIcon from "@mui/icons-material/BuildRounded";
 import bradLogo from "../assets/brad_logo.png";
 
 function statusToDisplay(status) {
@@ -59,7 +59,7 @@ function Header({ status, onWorkloadClick, workloadDisabled }) {
             </div>
           </div>
           <HeaderButton
-            icon={<QueryStatsRoundedIcon />}
+            icon={<BuildRoundedIcon />}
             onClick={onWorkloadClick}
             disabled={workloadDisabled}
           >
