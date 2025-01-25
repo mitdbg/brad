@@ -1,3 +1,31 @@
+function highlightVdbeClass(highlightState, vdbeName, mappedToEngine) {
+  const { hoveredVdbe, hoveredEngine } = highlightState;
+  if (hoveredVdbe == null && hoveredEngine == null) {
+    return "";
+  }
+
+  if (hoveredVdbe != null) {
+    return hoveredVdbe === vdbeName ? "highlight" : "dim";
+  } else {
+    return hoveredEngine === mappedToEngine ? "highlight" : "dim";
+  }
+}
+
+function highlightEngineClass(highlightState, engineName, vdbeNames) {
+  const { hoveredVdbe, hoveredEngine } = highlightState;
+  if (hoveredVdbe == null && hoveredEngine == null) {
+    return "";
+  }
+
+  if (hoveredEngine != null) {
+    return hoveredEngine === engineName ? "highlight" : "dim";
+  } else {
+    return vdbeNames.includes(hoveredVdbe) ? "highlight" : "dim";
+  }
+}
+
+// The functions below are legacy implementations of the highlight logic.
+
 function highlightTableViewClass(
   highlightState,
   engineName,
@@ -72,4 +100,12 @@ function sortTablesToHoist(highlightState, currentEngine, isVirtual, tables) {
   return tableCopy;
 }
 
-export { highlightTableViewClass, highlightEngineViewClass, sortTablesToHoist };
+export {
+  highlightVdbeClass,
+  highlightEngineClass,
+
+  // The functions below are legacy implementations of the highlight logic.
+  highlightTableViewClass,
+  highlightEngineViewClass,
+  sortTablesToHoist,
+};

@@ -5,16 +5,15 @@
   align-items: center;
   margin-top: 10px;
   position: relative;
+  transition: opacity 0.3s;
 }
 
-.vdbe-view.dim .vdbe-view-props,
-.vdbe-view.dim .db-cylinder {
-  opacity: 0.3;
+.dim .vdbe-view {
+  opacity: 0.5;
 }
 
 .vdbe-view-props {
   margin: 0 0 15px 0;
-  transition: opacity 0.3s;
 }
 
 .vdbe-view-props ul {

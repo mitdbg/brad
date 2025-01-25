@@ -110,49 +110,51 @@ function VdbeView({ vdbe, endpoint, onTableClick, editable, onEditClick }) {
   };
 
   return (
-    <div className="vdbe-view">
-      <div className="vdbe-db-wrap">
-        <DbCylinder color="green">{vengName}</DbCylinder>
-        {editable && (
-          <EditControls
-            onEditClick={() => onEditClick(vdbe)}
-            onDeleteClick={() => {}}
-          />
+    <>
+      <div className="vdbe-view">
+        <div className="vdbe-db-wrap">
+          <DbCylinder color="green">{vengName}</DbCylinder>
+          {editable && (
+            <EditControls
+              onEditClick={() => onEditClick(vdbe)}
+              onDeleteClick={() => {}}
+            />
+          )}
+        </div>
+        {endpoint && (
+          <VdbeEndpoint endpoint={endpoint} setShowSnackbar={setShowSnackbar} />
         )}
+        <div class="vdbe-view-props">
+          <ul>
+            <li>🌿: {freshness != null ? freshness : "-----"}</li>
+            <li>
+              ⏱️:{" "}
+              {peakLatency != null
+                ? `p90 Query Latency ≤ ${peakLatency}`
+                : "-----"}
+            </li>
+            <li>🗣: {dialect != null ? dialect : "-----"}</li>
+          </ul>
+        </div>
+        <ExpandableTableSet>
+          {sortedTables.map(({ name, writable }) => (
+            <TableView
+              key={name}
+              name={name}
+              isWriter={writable}
+              color="green"
+              onTableClick={onTableClick}
+            />
+          ))}
+        </ExpandableTableSet>
       </div>
-      {endpoint && (
-        <VdbeEndpoint endpoint={endpoint} setShowSnackbar={setShowSnackbar} />
-      )}
-      <div class="vdbe-view-props">
-        <ul>
-          <li>🌿: {freshness != null ? freshness : "-----"}</li>
-          <li>
-            ⏱️:{" "}
-            {peakLatency != null
-              ? `p90 Query Latency ≤ ${peakLatency}`
-              : "-----"}
-          </li>
-          <li>🗣: {dialect != null ? dialect : "-----"}</li>
-        </ul>
-      </div>
-      <ExpandableTableSet>
-        {sortedTables.map(({ name, writable }) => (
-          <TableView
-            key={name}
-            name={name}
-            isWriter={writable}
-            color="green"
-            onTableClick={onTableClick}
-          />
-        ))}
-      </ExpandableTableSet>
       <Snackbar
         open={showSnackbar}
         autoHideDuration={3000}
         message="Endpoint copied to clipboard"
         onClose={handleClose}
       />
-    </div>
+    </>
   );
 }
 

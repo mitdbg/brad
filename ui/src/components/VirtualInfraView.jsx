@@ -1,4 +1,5 @@
-import VdbeView from "./VdbeView";
+// import VdbeView from "./VdbeView";
+import HighlightableVdbe from "./HighlightableVdbe";
 import AddCircleOutlineRoundedIcon from "@mui/icons-material/AddCircleOutlineRounded";
 import Button from "@mui/material/Button";
 import "./styles/VirtualInfraView.css";
@@ -14,7 +15,7 @@ function VirtualInfraView({
       <h2>Virtual</h2>
       <div class="vdbe-view-engines-wrap">
         {virtualInfra?.engines?.map((vdbe) => (
-          <VdbeView
+          <HighlightableVdbe
             key={vdbe.name}
             vdbe={vdbe}
             editable={!disableVdbeChanges}
