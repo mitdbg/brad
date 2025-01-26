@@ -2,8 +2,8 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { fetchMetrics } from "../api";
 import MetricsManager from "../metrics";
 import Panel from "./Panel";
-import LatencyPlot from "./LatencyPlot";
 import TroubleshootRoundedIcon from "@mui/icons-material/TroubleshootRounded";
+import VdbeMetricsView from "./VdbeMetricsView";
 import "./styles/PerfView.css";
 
 const REFRESH_INTERVAL_MS = 30 * 1000;
@@ -121,17 +121,6 @@ function PerfView({ virtualInfra, showingPreview }) {
   const queryLatMetrics = extractMetrics(metricsData, "query_latency_s_p90");
   const txnLatMetrics = extractMetrics(metricsData, "txn_latency_s_p90");
 
-  let vdbe1Peak = null;
-  let vdbe2Peak = null;
-  if (virtualInfra?.engines != null) {
-    if (virtualInfra.engines.length > 0) {
-      vdbe1Peak = virtualInfra.engines[0].p90_latency_slo_ms / 1000;
-    }
-    if (virtualInfra.engines.length > 1) {
-      vdbe2Peak = virtualInfra.engines[1].p90_latency_slo_ms / 1000;
-    }
-  }
-
   const columnStyle = {
     flexGrow: 2,
   };
@@ -154,28 +143,13 @@ function PerfView({ virtualInfra, showingPreview }) {
       <div class="column-inner">
         <Panel>
           <div class="perf-view-wrap">
-            <div class="perf-view-plot-wrap">
-              <h2>VDBE 1 Query Latency</h2>
-              <LatencyPlot
-                seriesName="VDBE 1 Query Latency"
-                labels={txnLatMetrics.x}
-                values={txnLatMetrics.y}
-                xLabel="Time"
-                yLabel="p90 Latency (s)"
-                shadeSeconds={vdbe1Peak}
+            {virtualInfra?.engines?.map((vdbe, idx) => (
+              <VdbeMetricsView
+                key={vdbe.internal_id}
+                vdbe={vdbe}
+                metrics={idx === 0 ? txnLatMetrics : queryLatMetrics}
               />
-            </div>
-            <div class="perf-view-plot-wrap" style={{ marginTop: "30px" }}>
-              <h2>VDBE 2 Query Latency</h2>
-              <LatencyPlot
-                seriesName="VDBE 2 Query Latency"
-                labels={queryLatMetrics.x}
-                values={queryLatMetrics.y}
-                xLabel="Time"
-                yLabel="p90 Latency (s)"
-                shadeSeconds={vdbe2Peak}
-              />
-            </div>
+            ))}
           </div>
         </Panel>
       </div>
