@@ -355,6 +355,7 @@ class BradDaemon:
                     self._schema_name,
                     self._path_to_system_config,
                     self._debug_mode,
+                    self._blueprint_mgr.get_directory(),
                     self._vdbe_manager.infra(),
                     v_input_queue,
                     v_output_queue,

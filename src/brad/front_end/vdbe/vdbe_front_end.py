@@ -127,17 +127,17 @@ class BradVdbeFrontEnd:
             session_mgr=self._sessions,
             handler=self._run_query_impl,
         )
+        self._shutdown_event = asyncio.Event()
 
     async def serve_forever(self):
         await self._run_setup()
         try:
-            # Wait forever. The server is shut down when we receive a shutdown
-            # message and this task gets cancelled externally.
-            event = asyncio.Event()
-            await event.wait()
+            # The server is shut down when we receive a shutdown message.
+            await self._shutdown_event.wait()
         finally:
+            logger.info("BRAD VDBE front end is shutting down...")
             await self._run_teardown()
-            logger.debug("BRAD VDBE front end _run_teardown() complete.")
+            logger.info("BRAD VDBE front end _run_teardown() complete.")
 
     async def _run_setup(self) -> None:
         self._main_thread_loop = asyncio.get_running_loop()
@@ -165,8 +165,6 @@ class BradVdbeFrontEnd:
         await self._endpoint_mgr.initialize()
 
     async def _run_teardown(self):
-        logger.debug("Starting BRAD VDBE front end _run_teardown()")
-
         # Stop all VDBE endpoints (this will also end the sessions).
         await self._endpoint_mgr.shutdown()
 
@@ -218,6 +216,9 @@ class BradVdbeFrontEnd:
         await self._sessions.end_session(session_id)
         if self._verbose_logger is not None:
             self._verbose_logger.info("Session ended %d", session_id.value())
+
+    def set_shutdown(self) -> None:
+        self._shutdown_event.set()
 
     async def _run_query_impl(
         self,
@@ -371,8 +372,8 @@ class BradVdbeFrontEnd:
                     continue
 
                 if isinstance(message, ShutdownFrontEnd):
-                    logger.debug("The BRAD front end is initiating a shut down...")
-                    loop.create_task(_orchestrate_shutdown())
+                    logger.debug("The BRAD VDBE front end is initiating a shut down...")
+                    loop.create_task(_orchestrate_shutdown(self))
                     break
 
                 elif isinstance(message, NewBlueprint):
@@ -538,11 +539,19 @@ class BradVdbeFrontEnd:
         self._query_latency_sketch = DDSketch(relative_accuracy=sketch_rel_accuracy)
 
 
-async def _orchestrate_shutdown() -> None:
+async def _orchestrate_shutdown(fe: BradVdbeFrontEnd) -> None:
+    fe.set_shutdown()
     tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
     for task in tasks:
         task.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
+
+    # We need to do this a second time because stopping the grpc server(s)
+    # creates additional tasks that need to be awaited. Unfortunately, their API
+    # does not return a future so we cannot wait for them in the correct
+    # shutdown spot.
+    remaining = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    await asyncio.gather(*remaining, return_exceptions=True)
 
     loop = asyncio.get_event_loop()
     loop.stop()

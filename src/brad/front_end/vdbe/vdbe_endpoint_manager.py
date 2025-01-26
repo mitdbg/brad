@@ -74,7 +74,7 @@ class VdbeEndpointManager:
         try:
             port, grpc_server, query_service = self._endpoints[vdbe_id]
             await query_service.end_all_sessions()
-            await grpc_server.stop(None)
+            # See `brad.front_end.BradFrontEnd.serve_forever`.
             grpc_server.__del__()
             del self._endpoints[vdbe_id]
             logger.info("Removed VDBE endpoint for ID %d (was port %d).", vdbe_id, port)
