@@ -26,6 +26,7 @@ def to_serialize(schema: Dict[str, Any]) -> VirtualInfrastructure:
     ]
     a_tables = [VirtualTable(name=name, writable=False) for name in all_table_names]
     t_engine = VirtualEngine(
+        internal_id=1,
         name="VDBE (T)",
         max_staleness_ms=0,
         p90_latency_slo_ms=30,
@@ -34,6 +35,7 @@ def to_serialize(schema: Dict[str, Any]) -> VirtualInfrastructure:
         mapped_to=Engine.Aurora,
     )
     a_engine = VirtualEngine(
+        internal_id=2,
         name="VDBE (A)",
         max_staleness_ms=60 * 60 * 1000,  # 1 hour
         p90_latency_slo_ms=30 * 1000,
