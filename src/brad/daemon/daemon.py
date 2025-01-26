@@ -364,6 +364,10 @@ class BradDaemon:
             self._vdbe_process = _VdbeFrontEndProcess(
                 process, v_input_queue, v_output_queue
             )
+            reader_task = asyncio.create_task(
+                self._read_vdbe_messages(self._vdbe_process)
+            )
+            self._vdbe_process.message_reader_task = reader_task
             self._vdbe_process.process.start()
 
         if (
@@ -500,6 +504,67 @@ class BradDaemon:
                     logger.exception(
                         "Unexpected error when handling front end message. Front end: %d",
                         front_end.fe_index,
+                    )
+
+    async def _read_vdbe_messages(self, vdbe_process: "_VdbeFrontEndProcess") -> None:
+        loop = asyncio.get_running_loop()
+        while True:
+            try:
+                message = await loop.run_in_executor(
+                    None, vdbe_process.output_queue.get
+                )
+                if message.fe_index != BradVdbeFrontEnd.NUMERIC_IDENTIFIER:
+                    logger.warning(
+                        "Received message with invalid front end index. Expected %d. Received %d.",
+                        BradVdbeFrontEnd.NUMERIC_IDENTIFIER,
+                        message.fe_index,
+                    )
+                    continue
+
+                if isinstance(message, NewBlueprintAck):
+                    if self._transition_orchestrator is None:
+                        logger.error(
+                            "Received blueprint ack message but no transition is in progress. Version: %d, Front end: %d",
+                            message.version,
+                            message.fe_index,
+                        )
+                        continue
+
+                    # Sanity check.
+                    next_version = self._transition_orchestrator.next_version()
+                    if next_version != message.version:
+                        logger.error(
+                            "Received a blueprint ack for a mismatched version. Received %d, Expected %d",
+                            message.version,
+                            next_version,
+                        )
+                        continue
+
+                    logger.info(
+                        "Received blueprint ack. Version: %d, Front end: %d",
+                        message.version,
+                        message.fe_index,
+                    )
+
+                    self._transition_orchestrator.decrement_waiting_for_front_ends()
+                    if self._transition_orchestrator.waiting_for_front_ends() == 0:
+                        # Schedule the second half of the transition.
+                        self._transition_task = asyncio.create_task(
+                            self._run_transition_part_two()
+                        )
+
+                else:
+                    logger.debug(
+                        "Received unexpected message from front end %d: %s",
+                        BradVdbeFrontEnd.NUMERIC_IDENTIFIER,
+                        str(message),
+                    )
+
+            except Exception as ex:
+                if not isinstance(ex, asyncio.CancelledError):
+                    logger.exception(
+                        "Unexpected error when handling front end message. Front end: %d",
+                        BradVdbeFrontEnd.NUMERIC_IDENTIFIER,
                     )
 
     async def _handle_new_blueprint(
@@ -894,9 +959,6 @@ class BradDaemon:
                 "Notifying %d front ends about the new blueprint.",
                 len(self._front_ends),
             )
-            self._transition_orchestrator.set_waiting_for_front_ends(
-                len(self._front_ends)
-            )
             for fe in self._front_ends:
                 fe.input_queue.put(
                     NewBlueprint(
@@ -906,6 +968,18 @@ class BradDaemon:
                     )
                 )
 
+            total_wait = len(self._front_ends)
+            if self._vdbe_process is not None:
+                self._vdbe_process.input_queue.put(
+                    NewBlueprint(
+                        BradVdbeFrontEnd.NUMERIC_IDENTIFIER,
+                        tm.next_version,
+                        self._blueprint_mgr.get_directory(),
+                    )
+                )
+                total_wait += 1
+
+            self._transition_orchestrator.set_waiting_for_front_ends(total_wait)
             self._transition_task = None
 
             # We finish the transition after all front ends acknowledge that they
