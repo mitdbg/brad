@@ -219,7 +219,7 @@ async def get_predicted_changes(args: PredictedChangesArgs) -> DisplayableBluepr
 
 
 @app.post("/api/1/vdbe")
-def create_vdbe(engine: CreateVirtualEngineArgs) -> VirtualEngine:
+async def create_vdbe(engine: CreateVirtualEngineArgs) -> VirtualEngine:
     assert manager is not None
     assert manager.vdbe_mgr is not None
 
@@ -231,11 +231,11 @@ def create_vdbe(engine: CreateVirtualEngineArgs) -> VirtualEngine:
     if engine.p90_latency_slo_ms <= 0:
         raise HTTPException(400, "p90_latency_slo_ms must be positive.")
 
-    return manager.vdbe_mgr.add_engine(engine)
+    return await manager.vdbe_mgr.add_engine(engine)
 
 
 @app.put("/api/1/vdbe")
-def update_vdbe(engine: VirtualEngine) -> VirtualEngine:
+async def update_vdbe(engine: VirtualEngine) -> VirtualEngine:
     assert manager is not None
     assert manager.vdbe_mgr is not None
 
@@ -248,18 +248,18 @@ def update_vdbe(engine: VirtualEngine) -> VirtualEngine:
         raise HTTPException(400, "p90_latency_slo_ms must be positive.")
 
     try:
-        return manager.vdbe_mgr.update_engine(engine)
+        return await manager.vdbe_mgr.update_engine(engine)
     except ValueError as ex:
         raise HTTPException(400, str(ex)) from ex
 
 
 @app.delete("/api/1/vdbe/{engine_id}")
-def delete_vdbe(engine_id: int) -> None:
+async def delete_vdbe(engine_id: int) -> None:
     assert manager is not None
     assert manager.vdbe_mgr is not None
 
     try:
-        manager.vdbe_mgr.delete_engine(engine_id)
+        await manager.vdbe_mgr.delete_engine(engine_id)
     except ValueError as ex:
         raise HTTPException(400, str(ex)) from ex
 

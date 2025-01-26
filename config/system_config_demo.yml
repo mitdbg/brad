@@ -125,6 +125,7 @@ std_datasets:
     path: workloads/IMDB_100GB/adhoc_test/
 
 bootstrap_vdbe_path: config/vdbe_demo/imdb_extended_vdbes.json
+# bootstrap_vdbe_path: config/vdbe_demo/imdb_editable_vdbes.json
 
 aurora_max_query_factor: 4.0
 aurora_max_query_factor_replace: 10000.0

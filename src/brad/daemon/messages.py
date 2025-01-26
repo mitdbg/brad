@@ -1,8 +1,10 @@
+from typing import Tuple, List
 from ddsketch import DDSketch
 from ddsketch.pb.proto import DDSketchProto, pb as ddspb
 
 from brad.provisioning.directory import Directory
 from brad.row_list import RowList
+from brad.vdbe.models import VirtualInfrastructure
 
 
 class IpcMessage:
@@ -88,6 +90,40 @@ class MetricsReport(IpcMessage):
         return DDSketchProto.from_proto(pb_sketch)
 
 
+class VdbeMetricsReport(IpcMessage):
+    """
+    Sent from the VDBE front end to the daemon to report BRAD's client-side metrics.
+    """
+
+    @classmethod
+    def from_data(
+        cls,
+        fe_index: int,
+        latency_sketches: List[Tuple[int, DDSketch]],
+    ) -> "VdbeMetricsReport":
+        serialized_sketches = [
+            (vdbe_id, DDSketchProto.to_proto(sketch).SerializeToString())
+            for vdbe_id, sketch in latency_sketches
+        ]
+        return cls(fe_index, latency_sketches=serialized_sketches)
+
+    def __init__(
+        self,
+        fe_index: int,
+        latency_sketches: List[Tuple[int, bytes]],
+    ) -> None:
+        super().__init__(fe_index)
+        self.serialized_latency_sketches = latency_sketches
+
+    def query_latency_sketches(self) -> List[Tuple[int, DDSketch]]:
+        results = []
+        for vdbe_id, serialized_sketch in self.serialized_latency_sketches:
+            pb_sketch = ddspb.DDSketch()
+            pb_sketch.ParseFromString(serialized_sketch)
+            results.append((vdbe_id, DDSketchProto.from_proto(pb_sketch)))
+        return results
+
+
 class InternalCommandRequest(IpcMessage):
     """
     Sent from the front end to the daemon to handle an internal command.
@@ -106,6 +142,27 @@ class InternalCommandResponse(IpcMessage):
     def __init__(self, fe_index: int, response: RowList) -> None:
         super().__init__(fe_index)
         self.response = response
+
+
+class ReconcileVirtualInfrastructure(IpcMessage):
+    """
+    Sent from the daemon to the VDBE front end to update its virtual infrastructure.
+    """
+
+    def __init__(self, fe_index: int, virtual_infra: VirtualInfrastructure) -> None:
+        super().__init__(fe_index)
+        self.virtual_infra = virtual_infra
+
+
+class ReconcileVirtualInfrastructureAck(IpcMessage):
+    """
+    Sent from the VDBE front end back to the daemon to acknowledge the virtual infrastructure update.
+    """
+
+    def __init__(self, fe_index: int, num_added: int, num_removed: int) -> None:
+        super().__init__(fe_index)
+        self.num_added = num_added
+        self.num_removed = num_removed
 
 
 class ShutdownFrontEnd(IpcMessage):

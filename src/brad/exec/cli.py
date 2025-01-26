@@ -2,7 +2,7 @@ import cmd
 import pathlib
 import readline
 import time
-from typing import List
+from typing import List, Tuple
 from tabulate import tabulate
 
 import brad
@@ -16,28 +16,30 @@ def register_command(subparsers):
         help="Start a BRAD client session.",
     )
     parser.add_argument(
-        "--host",
-        type=str,
-        default="localhost",
-        help="The host where the BRAD server is running.",
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=6583,
-        help="The port on which BRAD is listening for connections.",
-    )
-    parser.add_argument(
         "-c",
         "--command",
         type=str,
         help="Run a single SQL query (or internal command) and exit.",
     )
+    parser.add_argument(
+        "endpoint",
+        nargs="?",
+        help="The BRAD endpoint to connect to. Defaults to localhost:6583.",
+        default="localhost:6583",
+    )
     parser.set_defaults(func=main)
 
 
+def parse_endpoint(endpoint: str) -> Tuple[str, int]:
+    parts = endpoint.split(":")
+    if len(parts) != 2:
+        raise ValueError("Invalid endpoint format.")
+    return parts[0], int(parts[1])
+
+
 def run_command(args) -> None:
-    with BradGrpcClient(args.host, args.port) as client:
+    host, port = parse_endpoint(args.endpoint)
+    with BradGrpcClient(host, port) as client:
         run_query(client, args.command)
 
 
@@ -132,11 +134,12 @@ def main(args) -> None:
         run_command(args)
         return
 
+    host, port = parse_endpoint(args.endpoint)
     print("BRAD Interactive Shell v{}".format(brad.__version__))
     print()
-    print("Connecting to BRAD at {}:{}...".format(args.host, args.port))
+    print("Connecting to BRAD VDBE at {}:{}...".format(host, port))
 
-    with BradGrpcClient(args.host, args.port) as client:
+    with BradGrpcClient(host, port) as client:
         print("Connected!")
         print()
         print("Terminate all SQL queries with a semicolon (;). Hit Ctrl-D to exit.")

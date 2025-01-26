@@ -28,6 +28,10 @@ class ConnectionFactory:
         if config.stub_mode_path() is not None:
             return cls.connect_to_stub(config)
 
+        # HACK: Schema aliasing for convenience.
+        if schema_name is not None and schema_name == "imdb_editable_100g":
+            schema_name = "imdb_extended_100g"
+
         connection_details = config.get_connection_details(engine)
         if engine == Engine.Redshift:
             cluster = directory.redshift_cluster()
@@ -152,6 +156,10 @@ class ConnectionFactory:
     ) -> Connection:
         if config.stub_mode_path() is not None:
             return cls.connect_to_stub(config)
+
+        # HACK: Schema aliasing for convenience.
+        if schema_name is not None and schema_name == "imdb_editable_100g":
+            schema_name = "imdb_extended_100g"
 
         connection_details = config.get_sidecar_db_details()
         if (
