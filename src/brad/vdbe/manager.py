@@ -30,6 +30,7 @@ class VdbeManager:
         self._next_id = 1
         for engine in self._infra.engines:
             self._next_id = max(self._next_id, engine.internal_id)
+        self._next_id += 1
 
         if self._hostname is not None:
             for engine in self._infra.engines:
