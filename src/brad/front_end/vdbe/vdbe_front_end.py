@@ -88,7 +88,7 @@ class BradVdbeFrontEnd:
         )
 
         self._sessions = SessionManager(
-            self._config, self._blueprint_mgr, self._schema_name
+            self._config, self._blueprint_mgr, self._schema_name, for_vdbes=True
         )
         self._daemon_messages_task: Optional[asyncio.Task[None]] = None
 
@@ -131,8 +131,10 @@ class BradVdbeFrontEnd:
     async def serve_forever(self):
         await self._run_setup()
         try:
-            # TODO: Add wait
-            pass
+            # Wait forever. The server is shut down when we receive a shutdown
+            # message and this task gets cancelled externally.
+            event = asyncio.Event()
+            await event.wait()
         finally:
             await self._run_teardown()
             logger.debug("BRAD VDBE front end _run_teardown() complete.")

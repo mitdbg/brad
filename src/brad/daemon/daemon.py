@@ -37,7 +37,8 @@ from brad.data_stats.estimator import Estimator
 from brad.data_stats.postgres_estimator import PostgresEstimator
 from brad.data_stats.stub_estimator import StubEstimator
 from brad.data_sync.execution.executor import DataSyncExecutor
-from brad.front_end.start_front_end import start_front_end
+from brad.front_end.start_front_end import start_front_end, start_vdbe_front_end
+from brad.front_end.vdbe.vdbe_front_end import BradVdbeFrontEnd
 from brad.planner.abstract import BlueprintPlanner
 from brad.planner.compare.provider import (
     BlueprintComparatorProvider,
@@ -137,6 +138,7 @@ class BradDaemon:
             )
         else:
             self._vdbe_manager = None
+        self._vdbe_process: Optional[_VdbeFrontEndProcess] = None
 
         # This is used to hold references to internal command tasks we create.
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
@@ -343,6 +345,26 @@ class BradDaemon:
         for fe in self._front_ends:
             fe.process.start()
 
+        if self._vdbe_manager is not None:
+            v_input_queue = self._process_manager.Queue()
+            v_output_queue = self._process_manager.Queue()
+            process = mp.Process(
+                target=start_vdbe_front_end,
+                args=(
+                    self._config,
+                    self._schema_name,
+                    self._path_to_system_config,
+                    self._debug_mode,
+                    self._vdbe_manager.infra(),
+                    v_input_queue,
+                    v_output_queue,
+                ),
+            )
+            self._vdbe_process = _VdbeFrontEndProcess(
+                process, v_input_queue, v_output_queue
+            )
+            self._vdbe_process.process.start()
+
         if (
             self._config.routing_policy == RoutingPolicy.ForestTableSelectivity
             or self._config.routing_policy == RoutingPolicy.Default
@@ -375,6 +397,15 @@ class BradDaemon:
             if fe.message_reader_task is not None:
                 fe.output_queue.put(Sentinel(fe_index))
 
+        if self._vdbe_process is not None:
+            logger.info("Telling the VDBE front end to shut down...")
+            self._vdbe_process.input_queue.put(
+                ShutdownFrontEnd(BradVdbeFrontEnd.NUMERIC_IDENTIFIER)
+            )
+            self._vdbe_process.output_queue.put(
+                Sentinel(BradVdbeFrontEnd.NUMERIC_IDENTIFIER)
+            )
+
         if self._timed_sync_task is not None:
             self._timed_sync_task.cancel()
             self._timed_sync_task = None
@@ -393,6 +424,11 @@ class BradDaemon:
         for fe in self._front_ends:
             fe.process.join()
         self._front_ends.clear()
+
+        if self._vdbe_process is not None:
+            logger.info("Waiting for the VDBE front end to shut down...")
+            self._vdbe_process.process.join()
+            self._vdbe_process = None
 
     async def _read_front_end_messages(self, front_end: "_FrontEndProcess") -> None:
         """
@@ -995,6 +1031,23 @@ class _FrontEndProcess:
         output_queue: queue.Queue,
     ) -> None:
         self.fe_index = fe_index
+        self.process = process
+        self.input_queue = input_queue
+        self.output_queue = output_queue
+        self.message_reader_task: Optional[asyncio.Task] = None
+
+
+class _VdbeFrontEndProcess:
+    """
+    Used to manage state associated with the VDBE front end process.
+    """
+
+    def __init__(
+        self,
+        process: mp.Process,
+        input_queue: queue.Queue,
+        output_queue: queue.Queue,
+    ) -> None:
         self.process = process
         self.input_queue = input_queue
         self.output_queue = output_queue

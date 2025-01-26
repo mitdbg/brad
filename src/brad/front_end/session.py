@@ -77,7 +77,11 @@ class Session:
 
 class SessionManager:
     def __init__(
-        self, config: ConfigFile, blueprint_mgr: "BlueprintManager", schema_name: str
+        self,
+        config: ConfigFile,
+        blueprint_mgr: "BlueprintManager",
+        schema_name: str,
+        for_vdbes: bool = False,
     ) -> None:
         self._config = config
         self._blueprint_mgr = blueprint_mgr
@@ -89,6 +93,7 @@ class SessionManager:
         # project. For now we assume that we always operate against one schema
         # and that it is provided up front when starting BRAD.
         self._schema_name = schema_name
+        self._for_vdbes = for_vdbes
 
     async def create_new_session(self) -> Tuple[SessionId, Session]:
         logger.debug("Creating a new session...")
@@ -114,7 +119,7 @@ class SessionManager:
         # Create an estimator if needed. The estimator should be
         # session-specific since it currently depends on a DB connection.
         routing_policy_override = self._config.routing_policy
-        if (
+        if not self._for_vdbes and (
             routing_policy_override == RoutingPolicy.ForestTableSelectivity
             or routing_policy_override == RoutingPolicy.Default
         ):
