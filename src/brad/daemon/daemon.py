@@ -564,7 +564,7 @@ class BradDaemon:
                         message.num_added,
                         message.num_removed,
                     )
-                    vdbe_process.mailbox.on_new_message(None)
+                    vdbe_process.mailbox.on_new_message((None,))
 
                 else:
                     logger.debug(
@@ -586,7 +586,7 @@ class BradDaemon:
         on the VDBE front end. This returns after the change is applied.
         """
         assert self._vdbe_process is not None
-        return await self._vdbe_process.mailbox.send_recv(virtual_infra)
+        await self._vdbe_process.mailbox.send_recv(virtual_infra)
 
     async def _handle_new_blueprint(
         self, blueprint: Blueprint, score: Score, trigger: Optional[Trigger]
@@ -1148,7 +1148,7 @@ class _VdbeFrontEndProcess:
         self.input_queue = input_queue
         self.output_queue = output_queue
         self.message_reader_task: Optional[asyncio.Task] = None
-        self.mailbox: Mailbox[VirtualInfrastructure, None] = Mailbox(
+        self.mailbox: Mailbox[VirtualInfrastructure, Tuple] = Mailbox(
             do_send_msg=self._send_message
         )
 

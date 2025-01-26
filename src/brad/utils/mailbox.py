@@ -35,6 +35,7 @@ class Mailbox(Generic[S, R]):
 
     async def _recv(self) -> R:
         await self._event.wait()
+        assert self._inbox is not None
         return self._inbox
 
     def on_new_message(self, msg: R) -> None:
