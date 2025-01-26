@@ -6,7 +6,9 @@ import CreateEditVdbeForm from "./CreateEditVdbeForm";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
 import Snackbar from "@mui/material/Snackbar";
 import HighlightContext from "./HighlightContext";
+import ConfirmDialog from "./ConfirmDialog";
 import Panel from "./Panel";
+import { deleteVdbe } from "../api";
 
 function OverallInfraView({
   systemState,
@@ -50,6 +52,20 @@ function OverallInfraView({
     setShowVdbeChangeSuccess(false);
   };
 
+  const [deletionState, setDeletionState] = useState({
+    showConfirm: false,
+    deletingVdbe: null,
+  });
+  const openConfirmDelete = (vdbe) => {
+    setDeletionState({ showConfirm: true, deletingVdbe: vdbe });
+  };
+  const doDeleteVdbe = async () => {
+    await deleteVdbe(deletionState.deletingVdbe.internal_id);
+    await refreshData();
+    setDeletionState({ showConfirm: false, deletingVdbe: null });
+    setShowVdbeChangeSuccess(true);
+  };
+
   return (
     <HighlightContext.Provider value={highlightContextValue}>
       <div className="infra-view column" style={{ flexGrow: 3 }}>
@@ -83,6 +99,7 @@ function OverallInfraView({
               virtualInfra={systemState.virtual_infra}
               onAddVdbeClick={() => openVdbeForm(null)}
               onEditVdbeClick={openVdbeForm}
+              onDeleteVdbeClick={openConfirmDelete}
               disableVdbeChanges={previewForm.open || vdbeForm.open}
             />
             <div className="infra-separator" />
@@ -93,6 +110,17 @@ function OverallInfraView({
             />
           </Panel>
         </div>
+        <ConfirmDialog
+          open={deletionState.showConfirm}
+          title="Confirm Deletion"
+          onCancel={() =>
+            setDeletionState({ showConfirm: false, deletingVdbe: null })
+          }
+          onConfirm={doDeleteVdbe}
+        >
+          Are you sure you want to delete the VDBE "
+          {deletionState.deletingVdbe?.name}"? This action cannot be undone.
+        </ConfirmDialog>
         <Snackbar
           open={showVdbeChangeSuccess}
           autoHideDuration={3000}

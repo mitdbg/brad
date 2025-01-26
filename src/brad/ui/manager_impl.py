@@ -253,7 +253,7 @@ def update_vdbe(engine: VirtualEngine) -> VirtualEngine:
         raise HTTPException(400, str(ex)) from ex
 
 
-@app.delete("/api/1/delete_vdbe/{engine_id}")
+@app.delete("/api/1/vdbe/{engine_id}")
 def delete_vdbe(engine_id: int) -> None:
     assert manager is not None
     assert manager.vdbe_mgr is not None

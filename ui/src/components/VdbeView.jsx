@@ -90,7 +90,14 @@ function VdbeEndpoint({ endpoint, setShowSnackbar }) {
   );
 }
 
-function VdbeView({ vdbe, onTableClick, editable, onEditClick, hideEndpoint }) {
+function VdbeView({
+  vdbe,
+  onTableClick,
+  editable,
+  onEditClick,
+  onDeleteClick,
+  hideEndpoint,
+}) {
   if (onEditClick == null) {
     onEditClick = () => {};
   }
@@ -119,7 +126,7 @@ function VdbeView({ vdbe, onTableClick, editable, onEditClick, hideEndpoint }) {
           {editable && (
             <EditControls
               onEditClick={() => onEditClick(vdbe)}
-              onDeleteClick={() => {}}
+              onDeleteClick={() => onDeleteClick(vdbe)}
             />
           )}
         </div>

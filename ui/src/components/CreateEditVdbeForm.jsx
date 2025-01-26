@@ -20,7 +20,7 @@ import RadioGroup from "@mui/material/RadioGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import FormLabel from "@mui/material/FormLabel";
 import VdbeView from "./VdbeView";
-import { createVdbe, updateVdbe, deleteVdbe } from "../api";
+import { createVdbe, updateVdbe } from "../api";
 import "./styles/CreateEditVdbeForm.css";
 
 const ITEM_HEIGHT = 47;

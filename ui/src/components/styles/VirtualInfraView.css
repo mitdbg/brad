@@ -2,6 +2,8 @@
   flex-grow: 1;
   display: flex;
   justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 30px 10px;
 }
 
 .infra-controls {
@@ -9,5 +11,5 @@
   justify-content: center;
   align-items: center;
   width: 100%;
-  margin: 20px 0 -20px 0;
+  margin: 40px 0 -30px 0;
 }

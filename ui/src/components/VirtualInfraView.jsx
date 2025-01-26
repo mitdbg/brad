@@ -8,6 +8,7 @@ function VirtualInfraView({
   virtualInfra,
   onAddVdbeClick,
   onEditVdbeClick,
+  onDeleteVdbeClick,
   disableVdbeChanges,
 }) {
   return (
@@ -20,6 +21,7 @@ function VirtualInfraView({
             vdbe={vdbe}
             editable={!disableVdbeChanges}
             onEditClick={onEditVdbeClick}
+            onDeleteClick={onDeleteVdbeClick}
           />
         ))}
       </div>
