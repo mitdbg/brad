@@ -23,6 +23,8 @@ from brad.daemon.messages import (
     VdbeMetricsReport,
     NewBlueprint,
     NewBlueprintAck,
+    ReconcileVirtualInfrastructure,
+    ReconcileVirtualInfrastructureAck,
 )
 from brad.front_end.errors import QueryError
 from brad.front_end.session import SessionManager, SessionId
@@ -392,6 +394,21 @@ class BradVdbeFrontEnd:
                     )
                     logger.info(
                         "Acknowledged update to blueprint version %d", message.version
+                    )
+
+                elif isinstance(message, ReconcileVirtualInfrastructure):
+                    self._vdbe_mgr.update_infra(message.virtual_infra)
+                    num_added, num_removed = await self._endpoint_mgr.reconcile()
+                    self._output_queue.put(
+                        ReconcileVirtualInfrastructureAck(
+                            self.NUMERIC_IDENTIFIER, num_added, num_removed
+                        ),
+                        block=False,
+                    )
+                    logger.info(
+                        "Acknowledged virtual infrastructure update. Added %d and removed %d.",
+                        num_added,
+                        num_removed,
                     )
 
                 else:

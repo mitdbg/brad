@@ -85,6 +85,36 @@ class VdbeEndpointManager:
                 vdbe_id,
             )
 
+    async def reconcile(self) -> Tuple[int, int]:
+        to_add = []
+        to_remove = []
+        seen_ids = set()
+
+        for engine in self._vdbe_mgr.engines():
+            if engine.internal_id not in self._endpoints:
+                to_add.append(engine)
+            seen_ids.add(engine.internal_id)
+
+        for vdbe_id in self._endpoints.keys():
+            if vdbe_id not in seen_ids:
+                to_remove.append(vdbe_id)
+
+        for vdbe in to_add:
+            if vdbe.endpoint is None:
+                logger.warning(
+                    "VDBE %s (ID: %d) has no endpoint. Skipping adding VDBE endpoint.",
+                    vdbe.name,
+                    vdbe.internal_id,
+                )
+                continue
+            port = int(vdbe.endpoint.split(":")[1])
+            await self.add_vdbe_endpoint(port, vdbe.internal_id)
+
+        for vdbe_id in to_remove:
+            await self.remove_vdbe_endpoint(vdbe_id)
+
+        return len(to_add), len(to_remove)
+
 
 class VdbeGrpcInterface(BradInterface):
     def __init__(

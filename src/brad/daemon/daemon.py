@@ -27,6 +27,8 @@ from brad.daemon.messages import (
     InternalCommandResponse,
     NewBlueprint,
     NewBlueprintAck,
+    ReconcileVirtualInfrastructure,
+    ReconcileVirtualInfrastructureAck,
 )
 from brad.daemon.monitor import Monitor
 from brad.daemon.system_event_logger import SystemEventLogger
@@ -70,8 +72,10 @@ from brad.routing.policy import RoutingPolicy
 from brad.routing.tree_based.forest_policy import ForestPolicy
 from brad.row_list import RowList
 from brad.utils.time_periods import period_start, universal_now
+from brad.utils.mailbox import Mailbox
 from brad.ui.manager import UiManager
 from brad.vdbe.manager import VdbeManager
+from brad.vdbe.models import VirtualInfrastructure
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +139,7 @@ class BradDaemon:
             self._vdbe_manager: Optional[VdbeManager] = VdbeManager.load_from(
                 load_vdbe_path,
                 starting_port=9876,
+                apply_infra=self._apply_virtual_infra,
             )
         else:
             self._vdbe_manager = None
@@ -553,6 +558,14 @@ class BradDaemon:
                             self._run_transition_part_two()
                         )
 
+                elif isinstance(message, ReconcileVirtualInfrastructureAck):
+                    logger.info(
+                        "Received reconcile ack from VDBE front end. Added %d, Removed %d",
+                        message.num_added,
+                        message.num_removed,
+                    )
+                    vdbe_process.mailbox.on_new_message(None)
+
                 else:
                     logger.debug(
                         "Received unexpected message from front end %d: %s",
@@ -566,6 +579,14 @@ class BradDaemon:
                         "Unexpected error when handling front end message. Front end: %d",
                         BradVdbeFrontEnd.NUMERIC_IDENTIFIER,
                     )
+
+    async def _apply_virtual_infra(self, virtual_infra: VirtualInfrastructure) -> None:
+        """
+        Used by the VDBE manager to apply a change to the virtual infrastructure
+        on the VDBE front end. This returns after the change is applied.
+        """
+        assert self._vdbe_process is not None
+        return await self._vdbe_process.mailbox.send_recv(virtual_infra)
 
     async def _handle_new_blueprint(
         self, blueprint: Blueprint, score: Score, trigger: Optional[Trigger]
@@ -1127,3 +1148,12 @@ class _VdbeFrontEndProcess:
         self.input_queue = input_queue
         self.output_queue = output_queue
         self.message_reader_task: Optional[asyncio.Task] = None
+        self.mailbox: Mailbox[VirtualInfrastructure, None] = Mailbox(
+            do_send_msg=self._send_message
+        )
+
+    async def _send_message(self, infra: VirtualInfrastructure) -> None:
+        logger.debug("Sending reconcile VDBE IPC message")
+        msg = ReconcileVirtualInfrastructure(BradVdbeFrontEnd.NUMERIC_IDENTIFIER, infra)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self.input_queue.put, msg)

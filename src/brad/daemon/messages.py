@@ -4,6 +4,7 @@ from ddsketch.pb.proto import DDSketchProto, pb as ddspb
 
 from brad.provisioning.directory import Directory
 from brad.row_list import RowList
+from brad.vdbe.models import VirtualInfrastructure
 
 
 class IpcMessage:
@@ -141,6 +142,27 @@ class InternalCommandResponse(IpcMessage):
     def __init__(self, fe_index: int, response: RowList) -> None:
         super().__init__(fe_index)
         self.response = response
+
+
+class ReconcileVirtualInfrastructure(IpcMessage):
+    """
+    Sent from the daemon to the VDBE front end to update its virtual infrastructure.
+    """
+
+    def __init__(self, fe_index: int, virtual_infra: VirtualInfrastructure) -> None:
+        super().__init__(fe_index)
+        self.virtual_infra = virtual_infra
+
+
+class ReconcileVirtualInfrastructureAck(IpcMessage):
+    """
+    Sent from the VDBE front end back to the daemon to acknowledge the virtual infrastructure update.
+    """
+
+    def __init__(self, fe_index: int, num_added: int, num_removed: int) -> None:
+        super().__init__(fe_index)
+        self.num_added = num_added
+        self.num_removed = num_removed
 
 
 class ShutdownFrontEnd(IpcMessage):
