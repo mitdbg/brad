@@ -20,6 +20,7 @@ import RadioGroup from "@mui/material/RadioGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import FormLabel from "@mui/material/FormLabel";
 import VdbeView from "./VdbeView";
+import { createVdbe, updateVdbe } from "../api";
 import "./styles/CreateEditVdbeForm.css";
 
 const ITEM_HEIGHT = 47;
@@ -89,34 +90,11 @@ function TableSelector({ selectedTables, setSelectedTables, allTables }) {
           Click the tables in the preview to toggle their write flags.
         </FormHelperText>
       </FormControl>
-      <FormControl fullWidth style={{ marginTop: "15px" }}>
-        <FormLabel id="map-vdbe-label">Map VDBE To</FormLabel>
-        <RadioGroup row name="position" defaultValue="top">
-          <FormControlLabel
-            value="aurora"
-            control={<Radio />}
-            label="Aurora"
-            labelPlacement="end"
-          />
-          <FormControlLabel
-            value="redshift"
-            control={<Radio style={{ marginLeft: "8px" }} />}
-            label="Redshift"
-            labelPlacement="end"
-          />
-          <FormControlLabel
-            value="athena"
-            control={<Radio style={{ marginLeft: "8px" }} />}
-            label="Athena"
-            labelPlacement="end"
-          />
-        </RadioGroup>
-      </FormControl>
     </div>
   );
 }
 
-function CreateEditFormFields({ vdbe, setVdbe, allTables }) {
+function CreateEditFormFields({ vdbe, setVdbe, allTables, validEngines }) {
   const onStalenessChange = (event) => {
     const maxStalenessMins = parseInt(event.target.value);
     if (isNaN(maxStalenessMins)) {
@@ -142,11 +120,17 @@ function CreateEditFormFields({ vdbe, setVdbe, allTables }) {
       if (existingTable != null) {
         nextTables.push(existingTable);
       } else {
-        nextTables.push({ name: table, writable: false, mapped_to: null });
+        nextTables.push({ name: table, writable: false });
       }
     }
     setVdbe({ ...vdbe, tables: nextTables });
   };
+
+  const onMappedToChange = (event) => {
+    setVdbe({ ...vdbe, mapped_to: event.target.value });
+  };
+
+  const mappedToEngine = vdbe.mapped_to;
 
   return (
     <div className="cev-form-fields">
@@ -209,7 +193,38 @@ function CreateEditFormFields({ vdbe, setVdbe, allTables }) {
           allTables={allTables}
         />
       </FormControl>
-      <FormControl fullWidth></FormControl>
+      <FormControl fullWidth style={{ marginTop: "15px" }}>
+        <FormLabel id="map-vdbe-label">Map VDBE To</FormLabel>
+        <RadioGroup row name="position" defaultValue="top">
+          <FormControlLabel
+            value="aurora"
+            control={<Radio />}
+            label="Aurora"
+            labelPlacement="end"
+            checked={mappedToEngine === "aurora"}
+            onClick={onMappedToChange}
+            disabled={!validEngines.includes("aurora")}
+          />
+          <FormControlLabel
+            value="redshift"
+            control={<Radio style={{ marginLeft: "8px" }} />}
+            label="Redshift"
+            labelPlacement="end"
+            checked={mappedToEngine === "redshift"}
+            onClick={onMappedToChange}
+            disabled={!validEngines.includes("redshift")}
+          />
+          <FormControlLabel
+            value="athena"
+            control={<Radio style={{ marginLeft: "8px" }} />}
+            label="Athena"
+            labelPlacement="end"
+            checked={mappedToEngine === "athena"}
+            onClick={onMappedToChange}
+            disabled={!validEngines.includes("athena")}
+          />
+        </RadioGroup>
+      </FormControl>
     </div>
   );
 }
@@ -224,11 +239,65 @@ function getEmptyVdbe() {
   };
 }
 
-function CreateEditVdbeForm({ currentVdbe, allTables, onCloseClick }) {
+function vdbesEqual(vdbe1, vdbe2) {
+  if (vdbe1 == null || vdbe2 == null) {
+    return false;
+  }
+  if (
+    !(
+      vdbe1.name === vdbe2.name &&
+      vdbe1.max_staleness_ms === vdbe2.max_staleness_ms &&
+      vdbe1.p90_latency_slo_ms === vdbe2.p90_latency_slo_ms &&
+      vdbe1.interface === vdbe2.interface &&
+      vdbe1.tables.length === vdbe2.tables.length &&
+      vdbe1.mapped_to === vdbe2.mapped_to
+    )
+  ) {
+    return false;
+  }
+
+  // Check for table equality without regard to order.
+  return vdbe1.tables.every(({ name, writable }) => {
+    const matching = vdbe2.tables.find(
+      (table2) => table2.name === name && table2.writable === writable,
+    );
+    return matching != null;
+  });
+}
+
+function isValid(vdbe) {
+  return (
+    vdbe.name != null &&
+    vdbe.max_staleness_ms != null &&
+    vdbe.max_staleness_ms >= 0 &&
+    vdbe.p90_latency_slo_ms != null &&
+    vdbe.p90_latency_slo_ms > 0 &&
+    vdbe.interface != null &&
+    vdbe.tables.length > 0 &&
+    vdbe.mapped_to != null
+  );
+}
+
+function validEngines(blueprint) {
+  if (blueprint == null) {
+    return [];
+  }
+  return blueprint.engines.map((engine) => engine.engine);
+}
+
+function CreateEditVdbeForm({
+  currentVdbe,
+  blueprint,
+  allTables,
+  onCloseClick,
+  onVdbeChangeSuccess,
+}) {
   const isEdit = currentVdbe != null;
   const [vdbe, setVdbe] = useState(
     currentVdbe != null ? currentVdbe : getEmptyVdbe(),
   );
+  const [inFlight, setInFlight] = useState(false);
+  const hasChanges = currentVdbe == null || !vdbesEqual(currentVdbe, vdbe);
 
   const onTableClick = (tableName) => {
     const nextTables = [];
@@ -240,6 +309,18 @@ function CreateEditVdbeForm({ currentVdbe, allTables, onCloseClick }) {
       }
     }
     setVdbe({ ...vdbe, tables: nextTables });
+  };
+
+  const onSaveClick = async () => {
+    setInFlight(true);
+    if (isEdit) {
+      await updateVdbe(vdbe);
+    } else {
+      await createVdbe(vdbe);
+    }
+    await onVdbeChangeSuccess();
+    setInFlight(false);
+    onCloseClick();
   };
 
   return (
@@ -257,24 +338,31 @@ function CreateEditVdbeForm({ currentVdbe, allTables, onCloseClick }) {
           vdbe={vdbe}
           setVdbe={setVdbe}
           allTables={allTables}
+          validEngines={validEngines(blueprint)}
         />
         <div className="cev-preview">
-          <h2>Preview</h2>
+          <div className="cev-preview-label">
+            <Chip label="Preview" variant="outlined" />
+          </div>
           <VdbeView
             vdbe={vdbe}
             highlight={{}}
             editable={false}
             onTableClick={onTableClick}
+            hideEndpoint={true}
           />
         </div>
       </div>
       <div className="cev-buttons">
-        <Button variant="outlined" onClick={onCloseClick}>
+        <Button variant="outlined" onClick={onCloseClick} disabled={inFlight}>
           Cancel
         </Button>
         <Button
           variant="contained"
           startIcon={<CheckCircleOutlineRoundedIcon />}
+          disabled={!hasChanges || !isValid(vdbe)}
+          loading={inFlight}
+          onClick={onSaveClick}
         >
           {isEdit ? "Save" : "Create"}
         </Button>

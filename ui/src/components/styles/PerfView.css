@@ -1,6 +1,7 @@
 .perf-view-wrap {
   display: flex;
   flex-direction: column;
+  gap: 30px 0;
 }
 
 .perf-view-heading {

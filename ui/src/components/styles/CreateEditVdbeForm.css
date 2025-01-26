@@ -34,6 +34,12 @@
   position: relative;
 }
 
+.cev-preview-label {
+  position: absolute;
+  top: 0;
+  right: 80px;
+}
+
 .cev-preview h2 {
   position: absolute;
   top: 0;

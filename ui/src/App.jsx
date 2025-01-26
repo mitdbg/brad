@@ -14,6 +14,7 @@ function App() {
     blueprint: null,
     virtual_infra: null,
     next_blueprint: null,
+    all_tables: [],
   });
   const [appState, setAppState] = useState({
     previewForm: {
@@ -71,6 +72,9 @@ function App() {
       ...appState,
       previewForm: { ...previewForm, open: true },
     });
+    setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    }, 0);
   };
   const closePreviewForm = () => {
     if (!previewForm.open) return;
@@ -90,6 +94,9 @@ function App() {
     const { open } = vdbeForm;
     if (open) return;
     setAppState({ ...appState, vdbeForm: { open: true, shownVdbe: vdbe } });
+    setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    }, 0);
   };
   const closeVdbeForm = () => {
     const { open } = vdbeForm;
@@ -112,6 +119,7 @@ function App() {
           openVdbeForm={openVdbeForm}
           closeVdbeForm={closeVdbeForm}
           setPreviewBlueprint={setPreviewBlueprint}
+          refreshData={refreshData}
         />
         <PerfView
           virtualInfra={systemState.virtual_infra}

@@ -1,5 +1,5 @@
 import enum
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 from brad.config.engine import Engine
@@ -24,15 +24,26 @@ class QueryInterface(enum.Enum):
 
 
 class VirtualEngine(BaseModel):
+    internal_id: int
     name: str
     max_staleness_ms: int
     p90_latency_slo_ms: int
     interface: QueryInterface
     tables: List[VirtualTable]
     mapped_to: Engine
+    endpoint: Optional[str] = None
 
 
 class VirtualInfrastructure(BaseModel):
     schema_name: str
     engines: List[VirtualEngine]
     tables: List[SchemaTable]
+
+
+class CreateVirtualEngineArgs(BaseModel):
+    name: str
+    max_staleness_ms: int
+    p90_latency_slo_ms: int
+    interface: QueryInterface
+    tables: List[VirtualTable]
+    mapped_to: Engine

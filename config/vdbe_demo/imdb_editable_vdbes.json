@@ -1,5 +1,5 @@
 {
-  "schema_name": "imdb_extended_100g",
+  "schema_name": "imdb_extended_editable_100g",
   "engines": [
     {
       "internal_id": 1,
@@ -139,7 +139,7 @@
           "writable": false
         }
       ],
-      "mapped_to": "aurora"
+      "mapped_to": "redshift"
     }
   ],
   "tables": [

@@ -43,10 +43,28 @@ async function getPredictedChanges(tMultiplier, aMultiplier) {
   return result.data;
 }
 
+async function createVdbe(vdbe) {
+  const result = await axios.post(`${API_PREFIX}/vdbe`, vdbe);
+  return result.data;
+}
+
+async function updateVdbe(vdbe) {
+  const result = await axios.put(`${API_PREFIX}/vdbe`, vdbe);
+  return result.data;
+}
+
+async function deleteVdbe(vdbeId) {
+  const result = await axios.delete(`${API_PREFIX}/vdbe/${vdbeId}`);
+  return result.data;
+}
+
 export {
   fetchMetrics,
   fetchSystemState,
   fetchWorkloadClients,
   setWorkloadClients,
   getPredictedChanges,
+  createVdbe,
+  updateVdbe,
+  deleteVdbe,
 };

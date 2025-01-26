@@ -14,7 +14,6 @@ from brad.blueprint import Blueprint
 from brad.blueprint.table import Table
 from brad.blueprint.manager import BlueprintManager
 from brad.planner.abstract import BlueprintPlanner
-from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.monitor import Monitor
 from brad.ui.uvicorn_server import PatchedUvicornServer
@@ -30,6 +29,7 @@ from brad.ui.models import (
 from brad.daemon.front_end_metrics import FrontEndMetric
 from brad.daemon.system_event_logger import SystemEventLogger, SystemEventRecord
 from brad.vdbe.manager import VdbeManager
+from brad.vdbe.models import VirtualEngine, CreateVirtualEngineArgs
 
 logger = logging.getLogger(__name__)
 
@@ -133,8 +133,8 @@ def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
             full_routing_policy=blueprint.get_routing_policy(),
         )
 
-    dbp = DisplayableBlueprint.from_blueprint(blueprint)
     virtual_infra = manager.vdbe_mgr.infra()
+    dbp = DisplayableBlueprint.from_blueprint(blueprint, virtual_infra)
     status = _determine_current_status(manager)
     if status is Status.Transitioning:
         next_blueprint = manager.blueprint_mgr.get_transition_metadata().next_blueprint
@@ -142,11 +142,14 @@ def get_system_state(filter_tables_for_demo: bool = False) -> SystemState:
         next_dbp = DisplayableBlueprint.from_blueprint(next_blueprint)
     else:
         next_dbp = None
+    all_tables = [t.name for t in blueprint.tables()]
+    all_tables.sort()
     system_state = SystemState(
         status=status,
         virtual_infra=virtual_infra,
         blueprint=dbp,
         next_blueprint=next_dbp,
+        all_tables=all_tables,
     )
     return system_state
 
@@ -215,31 +218,50 @@ async def get_predicted_changes(args: PredictedChangesArgs) -> DisplayableBluepr
     return DisplayableBlueprint.from_blueprint(blueprint)
 
 
-def _analytics_table_mapper_temp(table_name: str, blueprint: Blueprint) -> List[str]:
-    # TODO: This is a hard-coded heurstic for the mock up only.
-    locations = blueprint.get_table_locations(table_name)
-    names = []
-    if Engine.Redshift in locations:
-        names.append("Redshift")
-    if Engine.Athena in locations:
-        names.append("Athena")
-    return names
+@app.post("/api/1/vdbe")
+def create_vdbe(engine: CreateVirtualEngineArgs) -> VirtualEngine:
+    assert manager is not None
+    assert manager.vdbe_mgr is not None
+
+    # Do some simple validation.
+    if engine.name == "":
+        raise HTTPException(400, "name must be non-empty.")
+    if engine.max_staleness_ms < 0:
+        raise HTTPException(400, "max_staleness_ms must be non-negative.")
+    if engine.p90_latency_slo_ms <= 0:
+        raise HTTPException(400, "p90_latency_slo_ms must be positive.")
+
+    return manager.vdbe_mgr.add_engine(engine)
 
 
-def _add_reverse_mapping_temp(system_state: SystemState) -> None:
-    # TODO: This is a hard-coded heuristic for the mock up only.
-    # This mutates the passed-in object.
-    veng_tables = {}
-    for veng in system_state.virtual_infra.engines:
-        table_names = {table.name for table in veng.tables}
-        veng_tables[veng.name] = table_names
+@app.put("/api/1/vdbe")
+def update_vdbe(engine: VirtualEngine) -> VirtualEngine:
+    assert manager is not None
+    assert manager.vdbe_mgr is not None
 
-    for engine in system_state.blueprint.engines:
-        for table in engine.tables:
-            name = table.name
-            for veng_name, tables in veng_tables.items():
-                if name in tables:
-                    table.mapped_to.append(veng_name)
+    # Do some simple validation.
+    if engine.name == "":
+        raise HTTPException(400, "name must be non-empty.")
+    if engine.max_staleness_ms < 0:
+        raise HTTPException(400, "max_staleness_ms must be non-negative.")
+    if engine.p90_latency_slo_ms <= 0:
+        raise HTTPException(400, "p90_latency_slo_ms must be positive.")
+
+    try:
+        return manager.vdbe_mgr.update_engine(engine)
+    except ValueError as ex:
+        raise HTTPException(400, str(ex)) from ex
+
+
+@app.delete("/api/1/vdbe/{engine_id}")
+def delete_vdbe(engine_id: int) -> None:
+    assert manager is not None
+    assert manager.vdbe_mgr is not None
+
+    try:
+        manager.vdbe_mgr.delete_engine(engine_id)
+    except ValueError as ex:
+        raise HTTPException(400, str(ex)) from ex
 
 
 def _determine_current_status(manager_impl: UiManagerImpl) -> Status:

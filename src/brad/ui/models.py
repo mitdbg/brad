@@ -1,5 +1,5 @@
 import enum
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 from pydantic import BaseModel, AwareDatetime
 
 from brad.blueprint import Blueprint
@@ -18,27 +18,48 @@ class MetricsData(BaseModel):
 
 class DisplayableTable(BaseModel):
     name: str
-    is_writer: bool = False
-    mapped_to: List[str] = []
+    writable: bool = False
 
 
 class DisplayablePhysicalEngine(BaseModel):
     name: str
+    engine: Engine
     provisioning: Optional[str]
     tables: List[DisplayableTable]
+    mapped_vdbes: List[str]
 
 
 class DisplayableBlueprint(BaseModel):
     engines: List[DisplayablePhysicalEngine]
 
     @classmethod
-    def from_blueprint(cls, blueprint: Blueprint) -> "DisplayableBlueprint":
+    def from_blueprint(
+        cls, blueprint: Blueprint, virtual_infra: Optional[VirtualInfrastructure] = None
+    ) -> "DisplayableBlueprint":
+        physical_mapping: Dict[Engine, List[str]] = {}
+        writable: Dict[Engine, Set[str]] = {}
+        if virtual_infra is not None:
+            for vdbe in virtual_infra.engines:
+                try:
+                    physical_mapping[vdbe.mapped_to].append(vdbe.name)
+                except KeyError:
+                    physical_mapping[vdbe.mapped_to] = [vdbe.name]
+
+                for table in vdbe.tables:
+                    if table.writable:
+                        try:
+                            writable[vdbe.mapped_to].add(table.name)
+                        except KeyError:
+                            writable[vdbe.mapped_to] = {table.name}
+
         engines = []
         aurora = blueprint.aurora_provisioning()
         if aurora.num_nodes() > 0:
+            writable_aurora = writable.get(Engine.Aurora, set())
             aurora_tables = [
-                # TODO: Hardcoded Aurora writer. This will change down the road.
-                DisplayableTable(name=table.name, is_writer=False)
+                DisplayableTable(
+                    name=table.name, writable=table.name in writable_aurora
+                )
                 for table, locations in blueprint.tables_with_locations()
                 if Engine.Aurora in locations
             ]
@@ -46,16 +67,20 @@ class DisplayableBlueprint(BaseModel):
             engines.append(
                 DisplayablePhysicalEngine(
                     name="Aurora",
+                    engine=Engine.Aurora,
                     provisioning=str(aurora),
                     tables=aurora_tables,
+                    mapped_vdbes=physical_mapping.get(Engine.Aurora, []),
                 )
             )
 
         redshift = blueprint.redshift_provisioning()
         if redshift.num_nodes() > 0:
+            writable_redshift = writable.get(Engine.Redshift, set())
             redshift_tables = [
-                # TODO: Hardcoded Redshift writer. This will change down the road.
-                DisplayableTable(name=table.name, is_writer=False)
+                DisplayableTable(
+                    name=table.name, writable=table.name in writable_redshift
+                )
                 for table, locations in blueprint.tables_with_locations()
                 if Engine.Redshift in locations
             ]
@@ -63,14 +88,16 @@ class DisplayableBlueprint(BaseModel):
             engines.append(
                 DisplayablePhysicalEngine(
                     name="Redshift",
+                    engine=Engine.Redshift,
                     provisioning=str(redshift),
                     tables=redshift_tables,
+                    mapped_vdbes=physical_mapping.get(Engine.Redshift, []),
                 )
             )
 
+        writable_athena = writable.get(Engine.Athena, set())
         athena_tables = [
-            # TODO: Hardcoded Athena writer. This will change down the road.
-            DisplayableTable(name=table.name, is_writer=False)
+            DisplayableTable(name=table.name, writable=table.name in writable_athena)
             for table, locations in blueprint.tables_with_locations()
             if Engine.Athena in locations
         ]
@@ -78,7 +105,11 @@ class DisplayableBlueprint(BaseModel):
         if len(athena_tables) > 0:
             engines.append(
                 DisplayablePhysicalEngine(
-                    name="Athena", provisioning=None, tables=athena_tables
+                    name="Athena",
+                    engine=Engine.Athena,
+                    provisioning=None,
+                    tables=athena_tables,
+                    mapped_vdbes=physical_mapping.get(Engine.Athena, []),
                 )
             )
 
@@ -96,6 +127,7 @@ class SystemState(BaseModel):
     virtual_infra: VirtualInfrastructure
     blueprint: DisplayableBlueprint
     next_blueprint: Optional[DisplayableBlueprint]
+    all_tables: List[str]
 
 
 class ClientState(BaseModel):
