@@ -85,6 +85,24 @@ class VdbeManager:
         return port
 
 
+class VdbeFrontEndManager:
+    """
+    Used on the front end. Provides a read-only view of the current VDBE state.
+    """
+
+    def __init__(self, initial_infra: VirtualInfrastructure) -> None:
+        self._infra = initial_infra
+
+    def engines(self) -> List[VirtualEngine]:
+        return self._infra.engines
+
+    def engine_by_id(self, engine_id: int) -> Optional[VirtualEngine]:
+        for engine in self._infra.engines:
+            if engine.internal_id == engine_id:
+                return engine
+        return None
+
+
 def _get_hostname() -> str:
     import socket
 

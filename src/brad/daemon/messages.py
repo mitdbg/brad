@@ -1,3 +1,4 @@
+from typing import Tuple, List
 from ddsketch import DDSketch
 from ddsketch.pb.proto import DDSketchProto, pb as ddspb
 
@@ -86,6 +87,40 @@ class MetricsReport(IpcMessage):
         pb_sketch = ddspb.DDSketch()
         pb_sketch.ParseFromString(self.serialized_query_latency_sketch)
         return DDSketchProto.from_proto(pb_sketch)
+
+
+class VdbeMetricsReport(IpcMessage):
+    """
+    Sent from the VDBE front end to the daemon to report BRAD's client-side metrics.
+    """
+
+    @classmethod
+    def from_data(
+        cls,
+        fe_index: int,
+        latency_sketches: List[Tuple[int, DDSketch]],
+    ) -> "VdbeMetricsReport":
+        serialized_sketches = [
+            (vdbe_id, DDSketchProto.to_proto(sketch).SerializeToString())
+            for vdbe_id, sketch in latency_sketches
+        ]
+        return cls(fe_index, latency_sketches=serialized_sketches)
+
+    def __init__(
+        self,
+        fe_index: int,
+        latency_sketches: List[Tuple[int, bytes]],
+    ) -> None:
+        super().__init__(fe_index)
+        self.serialized_latency_sketches = latency_sketches
+
+    def query_latency_sketches(self) -> List[Tuple[int, DDSketch]]:
+        results = []
+        for vdbe_id, serialized_sketch in self.serialized_latency_sketches:
+            pb_sketch = ddspb.DDSketch()
+            pb_sketch.ParseFromString(serialized_sketch)
+            results.append((vdbe_id, DDSketchProto.from_proto(pb_sketch)))
+        return results
 
 
 class InternalCommandRequest(IpcMessage):

@@ -10,7 +10,7 @@ from brad.front_end.grpc import BradGrpc
 from brad.front_end.session import SessionManager, SessionId
 from brad.row_list import RowList
 from brad.utils.json_decimal_encoder import DecimalEncoder
-from brad.vdbe.manager import VdbeManager
+from brad.vdbe.manager import VdbeFrontEndManager
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,11 @@ class VdbeEndpointManager:
     """
 
     def __init__(
-        self, vdbe_mgr: VdbeManager, session_mgr: SessionManager, handler: QueryHandler
+        self,
+        *,
+        vdbe_mgr: VdbeFrontEndManager,
+        session_mgr: SessionManager,
+        handler: QueryHandler,
     ) -> None:
         self._vdbe_mgr = vdbe_mgr
         self._session_mgr = session_mgr
