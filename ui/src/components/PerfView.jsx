@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import Panel from "./Panel";
 import TroubleshootRoundedIcon from "@mui/icons-material/TroubleshootRounded";
 import VdbeMetricsView from "./VdbeMetricsView";
-import { extractMetrics } from "../metrics_utils";
+import { parseMetrics, extractMetrics } from "../metrics_utils";
+import MetricsManager from "../metrics";
+import { fetchMetrics } from "../api";
 import "./styles/PerfView.css";
+
+const REFRESH_INTERVAL_MS = 30 * 1000;
 
 function WindowSelector({ windowSizeMinutes, onWindowSizeChange }) {
   function className(windowSizeOption) {
@@ -44,18 +48,66 @@ function vdbeWithMetrics(virtualInfra, displayMetricsData, showSpecific) {
   });
 }
 
-function PerfView({
-  virtualInfra,
-  showingPreview,
-  displayMetricsData,
-  changeDisplayMetricsWindow,
-  showVdbeSpecificMetrics,
-}) {
+function PerfView({ virtualInfra, showingPreview, showVdbeSpecificMetrics }) {
+  const metricsManagerRef = useRef(null);
+  const getMetricsManager = useCallback(() => {
+    if (metricsManagerRef.current == null) {
+      metricsManagerRef.current = new MetricsManager();
+    }
+    return metricsManagerRef.current;
+  }, [metricsManagerRef]);
+
   const [windowSizeMinutes, setWindowSizeMinutes] = useState(10);
+  const [displayMetricsData, setDisplayMetricsData] = useState({
+    windowSizeMinutes: 10,
+    metrics: {},
+  });
 
   if (displayMetricsData.windowSizeMinutes !== windowSizeMinutes) {
     changeDisplayMetricsWindow(windowSizeMinutes);
   }
+
+  const refreshMetrics = useCallback(async () => {
+    const rawMetrics = await fetchMetrics(60, /*useGenerated=*/ false);
+    const fetchedMetrics = parseMetrics(rawMetrics);
+    const metricsManager = getMetricsManager();
+    const addedNewMetrics = metricsManager.mergeInMetrics(fetchedMetrics);
+    if (addedNewMetrics) {
+      const { windowSizeMinutes } = displayMetricsData;
+      setDisplayMetricsData({
+        windowSizeMinutes,
+        metrics: metricsManager.getMetricsInWindow(
+          windowSizeMinutes,
+          /*extendForward=*/ true,
+        ),
+      });
+    }
+  }, [getMetricsManager, displayMetricsData, setDisplayMetricsData]);
+
+  useEffect(() => {
+    refreshMetrics();
+    const intervalId = setInterval(refreshMetrics, REFRESH_INTERVAL_MS);
+    return () => {
+      if (intervalId === null) {
+        return;
+      }
+      clearInterval(intervalId);
+    };
+  }, [refreshMetrics]);
+
+  const changeDisplayMetricsWindow = useCallback(
+    (windowSizeMinutes) => {
+      const metricsManager = getMetricsManager();
+      setDisplayMetricsData({
+        windowSizeMinutes,
+        metrics: metricsManager.getMetricsInWindow(
+          windowSizeMinutes,
+          /*extendForward=*/ true,
+        ),
+      });
+    },
+    [getMetricsManager, setDisplayMetricsData],
+  );
 
   const columnStyle = {
     flexGrow: 2,
