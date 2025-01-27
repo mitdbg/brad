@@ -116,6 +116,10 @@ class VdbeMetrics(MetricsSourceWithForecasting):
 
     def handle_metric_report(self, report: VdbeMetricsReport) -> None:
         now = universal_now()
+        logger.debug("Handling VDBE metrics report: (ts: %s)", now)
+        for vdbe_id, sketch in report.query_latency_sketches():
+            p90 = sketch.get_quantile_value(0.9)
+            logger.debug("Has sketch for VDBE %d. p90: %f", vdbe_id, p90)
 
         for vdbe_id, sketch in report.query_latency_sketches():
             if vdbe_id not in self._sketch_front_end_metrics:

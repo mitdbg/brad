@@ -123,7 +123,7 @@ function OverallInfraView({
         </ConfirmDialog>
         <Snackbar
           open={showVdbeChangeSuccess}
-          autoHideDuration={3000}
+          autoHideDuration={2000}
           message="VDBE changes successfully saved."
           onClose={handleSnackbarClose}
         />

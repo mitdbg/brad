@@ -465,9 +465,6 @@ class BradDaemon:
                 if isinstance(message, MetricsReport):
                     self._monitor.handle_metric_report(message)
 
-                elif isinstance(message, VdbeMetricsReport):
-                    self._monitor.handle_vdbe_metric_report(message)
-
                 elif isinstance(message, InternalCommandRequest):
                     task = asyncio.create_task(
                         self._run_internal_command_request_response(message)
@@ -574,6 +571,9 @@ class BradDaemon:
                         message.num_removed,
                     )
                     vdbe_process.mailbox.on_new_message((None,))
+
+                elif isinstance(message, VdbeMetricsReport):
+                    self._monitor.handle_vdbe_metric_report(message)
 
                 else:
                     logger.debug(

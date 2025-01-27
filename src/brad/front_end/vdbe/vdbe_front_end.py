@@ -95,7 +95,8 @@ class BradVdbeFrontEnd:
         )
         self._daemon_messages_task: Optional[asyncio.Task[None]] = None
 
-        self._reset_latency_sketches()
+        # Stored per VDBE.
+        self._query_latency_sketches: Dict[int, DDSketch] = {}
         self._brad_metrics_reporting_task: Optional[asyncio.Task[None]] = None
 
         # Used to re-establish engine connections.
@@ -308,11 +309,14 @@ class BradVdbeFrontEnd:
                 # Error when executing the query.
                 raise QueryError.from_exception(ex, is_transient_error)
 
-            # Decide whether to log the query.
+            # Record the run time for later reporting.
             run_time_s = end - start
             run_time_s_float = run_time_s.total_seconds()
-            # TODO: Should be per VDBE.
-            self._query_latency_sketch.add(run_time_s_float)
+            try:
+                self._query_latency_sketches[vdbe_id].add(run_time_s_float)
+            except KeyError:
+                self._query_latency_sketches[vdbe_id] = self._get_empty_sketch()
+                self._query_latency_sketches[vdbe_id].add(run_time_s_float)
 
             # Extract and return the results, if any.
             try:
@@ -440,17 +444,23 @@ class BradVdbeFrontEnd:
                     self._config.front_end_metrics_reporting_period_seconds
                 )
 
+                report_data = []
+                for vdbe_id, sketch in self._query_latency_sketches.items():
+                    report_data.append((vdbe_id, sketch))
+                    query_p90 = sketch.get_quantile_value(0.9)
+                    if query_p90 is not None:
+                        logger.debug(
+                            "VDBE %d Query latency p90 (s): %.4f", vdbe_id, query_p90
+                        )
+                logger.info(
+                    "Sending VDBE metrics report for %d VDBEs", len(report_data)
+                )
+
                 # If the input queue is full, we just drop this message.
                 metrics_report = VdbeMetricsReport.from_data(
-                    self.NUMERIC_IDENTIFIER,
-                    [(0, self._query_latency_sketch)],
+                    self.NUMERIC_IDENTIFIER, report_data
                 )
                 self._output_queue.put_nowait(metrics_report)
-
-                query_p90 = self._query_latency_sketch.get_quantile_value(0.9)
-                if query_p90 is not None:
-                    logger.debug("Query latency p90 (s): %.4f", query_p90)
-
                 self._reset_latency_sketches()
 
         except Exception as ex:
@@ -560,9 +570,11 @@ class BradVdbeFrontEnd:
             self._reestablish_connections_task = None
 
     def _reset_latency_sketches(self) -> None:
-        # TODO: Store per VDBE.
+        self._query_latency_sketches.clear()
+
+    def _get_empty_sketch(self) -> DDSketch:
         sketch_rel_accuracy = 0.01
-        self._query_latency_sketch = DDSketch(relative_accuracy=sketch_rel_accuracy)
+        return DDSketch(relative_accuracy=sketch_rel_accuracy)
 
 
 async def _orchestrate_shutdown(fe: BradVdbeFrontEnd) -> None:
