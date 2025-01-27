@@ -1,5 +1,6 @@
 import enum
-from typing import List, Optional
+from functools import cached_property
+from typing import List, Optional, Set
 from pydantic import BaseModel
 
 from brad.config.engine import Engine
@@ -32,6 +33,10 @@ class VirtualEngine(BaseModel):
     tables: List[VirtualTable]
     mapped_to: Engine
     endpoint: Optional[str] = None
+
+    @cached_property
+    def table_names_set(self) -> Set[str]:
+        return {table.name for table in self.tables}
 
 
 class VirtualInfrastructure(BaseModel):

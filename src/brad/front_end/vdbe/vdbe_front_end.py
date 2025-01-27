@@ -29,15 +29,16 @@ from brad.daemon.messages import (
 from brad.front_end.errors import QueryError
 from brad.front_end.session import SessionManager, SessionId
 from brad.front_end.watchdog import Watchdog
+from brad.front_end.vdbe.vdbe_endpoint_manager import VdbeEndpointManager
 from brad.provisioning.directory import Directory
 from brad.row_list import RowList
 from brad.utils import log_verbose, create_custom_logger
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from brad.utils.run_time_reservoir import RunTimeReservoir
 from brad.utils.time_periods import universal_now
+from brad.query_rep import QueryRep
 from brad.vdbe.manager import VdbeFrontEndManager
 from brad.vdbe.models import VirtualInfrastructure
-from brad.front_end.vdbe.vdbe_endpoint_manager import VdbeEndpointManager
 
 logger = logging.getLogger(__name__)
 
@@ -247,9 +248,17 @@ class BradVdbeFrontEnd:
             # semicolon if it exists.
             # NOTE: BRAD does not yet support having multiple
             # semicolon-separated queries in one request.
-            query = self._clean_query_str(query)
+            query_rep = QueryRep(self._clean_query_str(query))
 
-            # TODO: Validate table accesses.
+            # Verify that the query is not accessing tables that are not part of
+            # the VDBE.
+            for table_name in query_rep.tables():
+                if table_name not in vdbe.table_names_set:
+                    raise QueryError(
+                        f"Table '{table_name}' not found in VDBE '{vdbe.name}'",
+                        is_transient=False,
+                    )
+
             engine_to_use = vdbe.mapped_to
 
             log_verbose(
@@ -268,10 +277,10 @@ class BradVdbeFrontEnd:
                 # HACK: To work around dialect differences between
                 # Athena/Aurora/Redshift for now. This should be replaced by
                 # a more robust translation layer.
-                if engine_to_use == Engine.Athena and "ascii" in query:
-                    translated_query = query.replace("ascii", "codepoint")
+                if engine_to_use == Engine.Athena and "ascii" in query_rep.raw_query:
+                    translated_query = query_rep.raw_query.replace("ascii", "codepoint")
                 else:
-                    translated_query = query
+                    translated_query = query_rep.raw_query
                 start = universal_now()
                 await cursor.execute(translated_query)
                 end = universal_now()
