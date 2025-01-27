@@ -5,11 +5,12 @@ from typing import List, Optional, Tuple
 
 from brad.blueprint.manager import BlueprintManager
 from brad.config.file import ConfigFile
-from brad.daemon.messages import MetricsReport
+from brad.daemon.messages import MetricsReport, VdbeMetricsReport
 from brad.daemon.metrics_source import MetricsSourceWithForecasting
 from brad.daemon.aurora_metrics import AuroraMetrics
 from brad.daemon.front_end_metrics import FrontEndMetrics
 from brad.daemon.redshift_metrics import RedshiftMetrics
+from brad.daemon.vdbe_metrics import VdbeMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class Monitor:
         blueprint_mgr: BlueprintManager,
         forecasting_method: str = "constant",  # {constant, moving_average, linear}
         forecasting_window_size: int = 5,  # (Up to) how many past samples to base the forecast on
+        create_vdbe_metrics: bool = False,
     ) -> None:
         self._config = config
         self._blueprint_mgr = blueprint_mgr
@@ -35,6 +37,12 @@ class Monitor:
         self._front_end_metrics = FrontEndMetrics(
             config, forecasting_method, forecasting_window_size
         )
+        if create_vdbe_metrics:
+            self._vdbe_metrics: Optional[VdbeMetrics] = VdbeMetrics(
+                config, forecasting_method, forecasting_window_size
+            )
+        else:
+            self._vdbe_metrics = None
 
     def set_up_metrics_sources(self) -> None:
         """
@@ -120,12 +128,15 @@ class Monitor:
         """
         logger.debug("Fetching latest metrics...")
         futures = []
-        for source in chain(
+        chain_parts = [
             [self._aurora_writer_metrics],
             self._aurora_reader_metrics,
             [self._redshift_metrics],
             [self._front_end_metrics],
-        ):
+        ]
+        if self._vdbe_metrics is not None:
+            chain_parts.append([self._vdbe_metrics])
+        for source in chain(*chain_parts):  # type: ignore
             if source is None:
                 continue
             futures.append(source.fetch_latest())
@@ -145,6 +156,13 @@ class Monitor:
         Used to pass on front-end metrics to the underlying metrics source.
         """
         self._front_end_metrics.handle_metric_report(report)
+
+    def handle_vdbe_metric_report(self, report: VdbeMetricsReport) -> None:
+        """
+        Used to pass on VDBE metrics to the underlying metrics source.
+        """
+        if self._vdbe_metrics is not None:
+            self._vdbe_metrics.handle_metric_report(report)
 
     def _print_key_metrics(self) -> None:
         # Used for debug purposes.
@@ -190,3 +208,6 @@ class Monitor:
     def front_end_metrics(self) -> MetricsSourceWithForecasting:
         assert self._front_end_metrics is not None
         return self._front_end_metrics
+
+    def vdbe_metrics(self) -> Optional[MetricsSourceWithForecasting]:
+        return self._vdbe_metrics

@@ -23,6 +23,7 @@ from brad.daemon.messages import (
     ShutdownFrontEnd,
     Sentinel,
     MetricsReport,
+    VdbeMetricsReport,
     InternalCommandRequest,
     InternalCommandResponse,
     NewBlueprint,
@@ -458,6 +459,9 @@ class BradDaemon:
 
                 if isinstance(message, MetricsReport):
                     self._monitor.handle_metric_report(message)
+
+                elif isinstance(message, VdbeMetricsReport):
+                    self._monitor.handle_vdbe_metric_report(message)
 
                 elif isinstance(message, InternalCommandRequest):
                     task = asyncio.create_task(
