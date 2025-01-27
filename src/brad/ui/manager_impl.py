@@ -239,13 +239,15 @@ async def get_predicted_changes(args: PredictedChangesArgs) -> DisplayableBluepr
     """
     assert manager is not None
     assert manager.planner is not None
+    assert manager.vdbe_mgr is not None
     result = await manager.planner.run_replan_direct(
         intensity_multipliers=(args.t_multiplier, args.a_multiplier)
     )
     if result is None:
         raise HTTPException(500, "Failed to run a replan.")
     blueprint, _ = result
-    return DisplayableBlueprint.from_blueprint(blueprint)
+    virtual_infra = manager.vdbe_mgr.infra()
+    return DisplayableBlueprint.from_blueprint(blueprint, virtual_infra)
 
 
 @app.post("/api/1/vdbe")
