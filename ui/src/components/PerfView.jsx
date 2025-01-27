@@ -81,7 +81,7 @@ function PerfView({
             {vdbeWithMetrics(
               virtualInfra,
               displayMetricsData,
-              /*showSpecific=*/ false,
+              /*showSpecific=*/ true,
             )?.map(({ vdbe, metrics }) => (
               <VdbeMetricsView
                 key={vdbe.internal_id}

@@ -107,6 +107,23 @@ def get_metrics(num_values: int = 3, use_generated: bool = False) -> MetricsData
         qlat_tm.values = list(qlat_gen)
         tlat_tm.values = list(tlat_gen)
 
+    # When VDBEs are newly created, we have no historical metric data. We fill
+    # in zeros so that the dashboard can display something other than an empty
+    # graph. We use the qlat/tlat metrics to determine the timestamps as our
+    # monitor fills them in with zeros when missing data.
+    known_vdbes = manager.vdbe_mgr.engines()
+    if len(vdbe_latency_dict) != len(known_vdbes):
+        timestamps = list(qlat.index)
+        zeros = [0.0] * len(timestamps)
+        for vdbe in known_vdbes:
+            metric_key = f"vdbe:{vdbe.internal_id}"
+            if metric_key in vdbe_latency_dict:
+                continue
+            vdbe_latency_dict[metric_key] = TimestampedMetrics(
+                timestamps=timestamps,
+                values=zeros,
+            )
+
     return MetricsData(
         named_metrics={
             FrontEndMetric.QueryLatencySecondP90.value: qlat_tm,
