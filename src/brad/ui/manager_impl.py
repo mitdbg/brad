@@ -99,7 +99,7 @@ def get_metrics(num_values: int = 3, use_generated: bool = False) -> MetricsData
             timestamps=list(vdbe_metrics_values.index),
             values=list(vdbe_metrics_values[vdbe_id]),
         )
-        vdbe_latency_dict[vdbe_id] = vdbe_tm
+        vdbe_latency_dict[f"vdbe:{vdbe_id}"] = vdbe_tm
 
     if use_generated:
         qlat_gen = np.random.normal(loc=15.0, scale=5.0, size=len(qlat))

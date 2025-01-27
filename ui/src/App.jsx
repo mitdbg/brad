@@ -1,8 +1,10 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import Header from "./components/Header";
 import PerfView from "./components/PerfView";
 import OverallInfraView from "./components/OverallInfraView";
-import { fetchSystemState } from "./api";
+import { fetchSystemState, fetchMetrics } from "./api";
+import MetricsManager from "./metrics";
+import { parseMetrics, extractMetrics } from "./metrics_utils";
 
 import "./App.css";
 
@@ -26,8 +28,20 @@ function App() {
       shownVdbe: null,
     },
   });
+  const [displayMetricsData, setDisplayMetricsData] = useState({
+    windowSizeMinutes: 10,
+    metrics: {},
+  });
+  const metricsManagerRef = useRef(null);
+  function getMetricsManager() {
+    if (metricsManagerRef.current == null) {
+      metricsManagerRef.current = new MetricsManager();
+    }
+    return metricsManagerRef.current;
+  }
 
-  const refreshData = useCallback(async () => {
+  // Used for system state refresh.
+  const refreshSystemState = useCallback(async () => {
     const newSystemState = await fetchSystemState();
     // Not the best way to check for equality.
     if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
@@ -35,17 +49,44 @@ function App() {
     }
   }, [systemState, setSystemState]);
 
-  // Fetch updated system state periodically.
+  const refreshMetrics = useCallback(async () => {
+    const rawMetrics = await fetchMetrics(60, /*useGenerated=*/ false);
+    const fetchedMetrics = parseMetrics(rawMetrics);
+    const metricsManager = getMetricsManager();
+    const addedNewMetrics = metricsManager.mergeInMetrics(fetchedMetrics);
+    if (addedNewMetrics) {
+      const { windowSizeMinutes } = displayMetricsData;
+      setDisplayMetricsData({
+        windowSizeMinutes,
+        metrics: metricsManager.getMetricsInWindow(
+          windowSizeMinutes,
+          /*extendForward=*/ true,
+        ),
+      });
+    }
+  }, [getMetricsManager, displayMetricsData, setDisplayMetricsData]);
+
+  // Periodically refresh system state and metrics data.
   useEffect(() => {
-    refreshData();
-    const intervalId = setInterval(refreshData, REFRESH_INTERVAL_MS);
+    refreshSystemState();
+    const intervalId = setInterval(refreshSystemState, REFRESH_INTERVAL_MS);
     return () => {
       if (intervalId === null) {
         return;
       }
       clearInterval(intervalId);
     };
-  }, [refreshData]);
+  }, [refreshSystemState]);
+  useEffect(() => {
+    refreshMetrics();
+    const intervalId = setInterval(refreshMetrics, REFRESH_INTERVAL_MS);
+    return () => {
+      if (intervalId === null) {
+        return;
+      }
+      clearInterval(intervalId);
+    };
+  }, [refreshMetrics]);
 
   // Bind keyboard shortcut for internal config menu.
   const handleKeyPress = useCallback((event) => {
@@ -104,6 +145,20 @@ function App() {
     setAppState({ ...appState, vdbeForm: { open: false, shownVdbe: null } });
   };
 
+  const changeDisplayMetricsWindow = useCallback(
+    (windowSizeMinutes) => {
+      const metricsManager = getMetricsManager();
+      setDisplayMetricsData({
+        windowSizeMinutes,
+        metrics: metricsManager.getMetricsInWindow(
+          windowSizeMinutes,
+          /*extendForward=*/ true,
+        ),
+      });
+    },
+    [getMetricsManager, setDisplayMetricsData],
+  );
+
   return (
     <>
       <Header
@@ -119,11 +174,13 @@ function App() {
           openVdbeForm={openVdbeForm}
           closeVdbeForm={closeVdbeForm}
           setPreviewBlueprint={setPreviewBlueprint}
-          refreshData={refreshData}
+          refreshData={refreshSystemState}
         />
         <PerfView
           virtualInfra={systemState.virtual_infra}
           showingPreview={previewForm.shownPreviewBlueprint != null}
+          displayMetricsData={displayMetricsData}
+          changeDisplayMetricsWindow={changeDisplayMetricsWindow}
         />
       </div>
     </>

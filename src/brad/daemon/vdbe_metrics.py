@@ -37,7 +37,7 @@ class VdbeMetrics(MetricsSourceWithForecasting):
         self._sketch_front_end_metrics: Dict[int, StreamingMetric[DDSketch]] = {}
         # All known VDBE IDs.
         self._ordered_metrics: List[int] = []
-        self._values_df = pd.DataFrame.empty
+        self._values_df = pd.DataFrame([])
         self._logger = MetricsLogger.create_from_config(
             self._config, "brad_vdbe_metrics_front_end.log"
         )
