@@ -162,7 +162,7 @@ function VdbeView({
       </div>
       <Snackbar
         open={showSnackbar}
-        autoHideDuration={3000}
+        autoHideDuration={2000}
         message="Endpoint copied to clipboard"
         onClose={handleClose}
       />

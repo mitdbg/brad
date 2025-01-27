@@ -29,15 +29,16 @@ from brad.daemon.messages import (
 from brad.front_end.errors import QueryError
 from brad.front_end.session import SessionManager, SessionId
 from brad.front_end.watchdog import Watchdog
+from brad.front_end.vdbe.vdbe_endpoint_manager import VdbeEndpointManager
 from brad.provisioning.directory import Directory
 from brad.row_list import RowList
 from brad.utils import log_verbose, create_custom_logger
 from brad.utils.rand_exponential_backoff import RandomizedExponentialBackoff
 from brad.utils.run_time_reservoir import RunTimeReservoir
 from brad.utils.time_periods import universal_now
+from brad.query_rep import QueryRep
 from brad.vdbe.manager import VdbeFrontEndManager
 from brad.vdbe.models import VirtualInfrastructure
-from brad.front_end.vdbe.vdbe_endpoint_manager import VdbeEndpointManager
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,8 @@ class BradVdbeFrontEnd:
         )
         self._daemon_messages_task: Optional[asyncio.Task[None]] = None
 
-        self._reset_latency_sketches()
+        # Stored per VDBE.
+        self._query_latency_sketches: Dict[int, DDSketch] = {}
         self._brad_metrics_reporting_task: Optional[asyncio.Task[None]] = None
 
         # Used to re-establish engine connections.
@@ -247,9 +249,17 @@ class BradVdbeFrontEnd:
             # semicolon if it exists.
             # NOTE: BRAD does not yet support having multiple
             # semicolon-separated queries in one request.
-            query = self._clean_query_str(query)
+            query_rep = QueryRep(self._clean_query_str(query))
 
-            # TODO: Validate table accesses.
+            # Verify that the query is not accessing tables that are not part of
+            # the VDBE.
+            for table_name in query_rep.tables():
+                if table_name not in vdbe.table_names_set:
+                    raise QueryError(
+                        f"Table '{table_name}' not found in VDBE '{vdbe.name}'",
+                        is_transient=False,
+                    )
+
             engine_to_use = vdbe.mapped_to
 
             log_verbose(
@@ -268,10 +278,10 @@ class BradVdbeFrontEnd:
                 # HACK: To work around dialect differences between
                 # Athena/Aurora/Redshift for now. This should be replaced by
                 # a more robust translation layer.
-                if engine_to_use == Engine.Athena and "ascii" in query:
-                    translated_query = query.replace("ascii", "codepoint")
+                if engine_to_use == Engine.Athena and "ascii" in query_rep.raw_query:
+                    translated_query = query_rep.raw_query.replace("ascii", "codepoint")
                 else:
-                    translated_query = query
+                    translated_query = query_rep.raw_query
                 start = universal_now()
                 await cursor.execute(translated_query)
                 end = universal_now()
@@ -299,11 +309,14 @@ class BradVdbeFrontEnd:
                 # Error when executing the query.
                 raise QueryError.from_exception(ex, is_transient_error)
 
-            # Decide whether to log the query.
+            # Record the run time for later reporting.
             run_time_s = end - start
             run_time_s_float = run_time_s.total_seconds()
-            # TODO: Should be per VDBE.
-            self._query_latency_sketch.add(run_time_s_float)
+            try:
+                self._query_latency_sketches[vdbe_id].add(run_time_s_float)
+            except KeyError:
+                self._query_latency_sketches[vdbe_id] = self._get_empty_sketch()
+                self._query_latency_sketches[vdbe_id].add(run_time_s_float)
 
             # Extract and return the results, if any.
             try:
@@ -431,17 +444,23 @@ class BradVdbeFrontEnd:
                     self._config.front_end_metrics_reporting_period_seconds
                 )
 
+                report_data = []
+                for vdbe_id, sketch in self._query_latency_sketches.items():
+                    report_data.append((vdbe_id, sketch))
+                    query_p90 = sketch.get_quantile_value(0.9)
+                    if query_p90 is not None:
+                        logger.debug(
+                            "VDBE %d Query latency p90 (s): %.4f", vdbe_id, query_p90
+                        )
+                logger.info(
+                    "Sending VDBE metrics report for %d VDBEs", len(report_data)
+                )
+
                 # If the input queue is full, we just drop this message.
                 metrics_report = VdbeMetricsReport.from_data(
-                    self.NUMERIC_IDENTIFIER,
-                    [(0, self._query_latency_sketch)],
+                    self.NUMERIC_IDENTIFIER, report_data
                 )
                 self._output_queue.put_nowait(metrics_report)
-
-                query_p90 = self._query_latency_sketch.get_quantile_value(0.9)
-                if query_p90 is not None:
-                    logger.debug("Query latency p90 (s): %.4f", query_p90)
-
                 self._reset_latency_sketches()
 
         except Exception as ex:
@@ -551,9 +570,11 @@ class BradVdbeFrontEnd:
             self._reestablish_connections_task = None
 
     def _reset_latency_sketches(self) -> None:
-        # TODO: Store per VDBE.
+        self._query_latency_sketches.clear()
+
+    def _get_empty_sketch(self) -> DDSketch:
         sketch_rel_accuracy = 0.01
-        self._query_latency_sketch = DDSketch(relative_accuracy=sketch_rel_accuracy)
+        return DDSketch(relative_accuracy=sketch_rel_accuracy)
 
 
 async def _orchestrate_shutdown(fe: BradVdbeFrontEnd) -> None:
