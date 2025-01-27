@@ -4,7 +4,7 @@ import PerfView from "./components/PerfView";
 import OverallInfraView from "./components/OverallInfraView";
 import { fetchSystemState, fetchMetrics } from "./api";
 import MetricsManager from "./metrics";
-import { parseMetrics, extractMetrics } from "./metrics_utils";
+import { parseMetrics } from "./metrics_utils";
 
 import "./App.css";
 

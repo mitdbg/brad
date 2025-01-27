@@ -29,6 +29,21 @@ function WindowSelector({ windowSizeMinutes, onWindowSizeChange }) {
   );
 }
 
+function vdbeWithMetrics(virtualInfra, displayMetricsData, showSpecific) {
+  return virtualInfra?.engines?.map((vdbe, idx) => {
+    let metrics;
+    if (showSpecific) {
+      metrics = extractMetrics(displayMetricsData, `vdbe:${vdbe.internal_id}`);
+    } else {
+      metrics = extractMetrics(
+        displayMetricsData,
+        idx === 0 ? "txn_latency_s_p90" : "query_latency_s_p90",
+      );
+    }
+    return { vdbe, metrics };
+  });
+}
+
 function PerfView({
   virtualInfra,
   showingPreview,
@@ -40,12 +55,6 @@ function PerfView({
   if (displayMetricsData.windowSizeMinutes !== windowSizeMinutes) {
     changeDisplayMetricsWindow(windowSizeMinutes);
   }
-
-  const queryLatMetrics = extractMetrics(
-    displayMetricsData,
-    "query_latency_s_p90",
-  );
-  const txnLatMetrics = extractMetrics(displayMetricsData, "txn_latency_s_p90");
 
   const columnStyle = {
     flexGrow: 2,
@@ -69,11 +78,15 @@ function PerfView({
       <div class="column-inner">
         <Panel>
           <div class="perf-view-wrap">
-            {virtualInfra?.engines?.map((vdbe, idx) => (
+            {vdbeWithMetrics(
+              virtualInfra,
+              displayMetricsData,
+              /*showSpecific=*/ false,
+            )?.map(({ vdbe, metrics }) => (
               <VdbeMetricsView
                 key={vdbe.internal_id}
                 vdbe={vdbe}
-                metrics={idx === 0 ? txnLatMetrics : queryLatMetrics}
+                metrics={metrics}
               />
             ))}
           </div>
