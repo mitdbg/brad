@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect, useRef } from "react";
 import Header from "./components/Header";
 import PerfView from "./components/PerfView";
 import OverallInfraView from "./components/OverallInfraView";
+import SystemConfig from "./components/SystemConfig";
 import { fetchSystemState, fetchMetrics } from "./api";
 import MetricsManager from "./metrics";
 import { parseMetrics } from "./metrics_utils";
@@ -28,6 +29,10 @@ function App() {
       shownVdbe: null,
     },
   });
+  const [config, setConfig] = useState({
+    showVdbeSpecificMetrics: true,
+  });
+  const [showConfigModal, setShowConfigModal] = useState(false);
   const [displayMetricsData, setDisplayMetricsData] = useState({
     windowSizeMinutes: 10,
     metrics: {},
@@ -89,13 +94,18 @@ function App() {
   }, [refreshMetrics]);
 
   // Bind keyboard shortcut for internal config menu.
-  const handleKeyPress = useCallback((event) => {
-    if (document.activeElement !== document.body) {
-      // We only want to handle key presses when no input is focused.
-      return;
-    }
-    // Currently a no-op.
-  }, []);
+  const handleKeyPress = useCallback(
+    (event) => {
+      if (document.activeElement !== document.body) {
+        // We only want to handle key presses when no input is focused.
+        return;
+      }
+      if (event.key === "c") {
+        setShowConfigModal(true);
+      }
+    },
+    [setShowConfigModal],
+  );
 
   useEffect(() => {
     document.addEventListener("keyup", handleKeyPress);
@@ -159,6 +169,13 @@ function App() {
     [getMetricsManager, setDisplayMetricsData],
   );
 
+  const changeConfig = useCallback(
+    (changes) => {
+      setConfig({ ...config, ...changes });
+    },
+    [config, setConfig],
+  );
+
   return (
     <>
       <Header
@@ -181,8 +198,15 @@ function App() {
           showingPreview={previewForm.shownPreviewBlueprint != null}
           displayMetricsData={displayMetricsData}
           changeDisplayMetricsWindow={changeDisplayMetricsWindow}
+          showVdbeSpecificMetrics={config.showVdbeSpecificMetrics}
         />
       </div>
+      <SystemConfig
+        open={showConfigModal}
+        onCloseClick={() => setShowConfigModal(false)}
+        config={config}
+        onConfigChange={changeConfig}
+      />
     </>
   );
 }

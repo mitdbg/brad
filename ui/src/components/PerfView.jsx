@@ -49,6 +49,7 @@ function PerfView({
   showingPreview,
   displayMetricsData,
   changeDisplayMetricsWindow,
+  showVdbeSpecificMetrics,
 }) {
   const [windowSizeMinutes, setWindowSizeMinutes] = useState(10);
 
@@ -81,7 +82,7 @@ function PerfView({
             {vdbeWithMetrics(
               virtualInfra,
               displayMetricsData,
-              /*showSpecific=*/ true,
+              showVdbeSpecificMetrics,
             )?.map(({ vdbe, metrics }) => (
               <VdbeMetricsView
                 key={vdbe.internal_id}

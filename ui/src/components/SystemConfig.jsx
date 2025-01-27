@@ -1,11 +1,18 @@
 import TextField from "@mui/material/TextField";
-import Modal from "@mui/material/Modal";
 import Button from "@mui/material/Button";
+import FormGroup from "@mui/material/FormGroup";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Switch from "@mui/material/Switch";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
 import "./styles/SystemConfig.css";
 
+// Currently unused.
 function EndpointInput({ name, host, port, onChange }) {
   return (
-    <div class="endpoint-input">
+    <FormGroup className="endpoint-input">
       <TextField
         variant="outlined"
         label={`${name} Host`}
@@ -18,36 +25,30 @@ function EndpointInput({ name, host, port, onChange }) {
         value={port}
         onChange={(event) => onChange({ host, port: +event.target.value })}
       />
-    </div>
+    </FormGroup>
   );
 }
 
-function SystemConfig({ endpoints, open, onCloseClick, onChange }) {
-  const { workloadRunners } = endpoints;
+function SystemConfig({ open, onCloseClick, config, onConfigChange }) {
+  const { showVdbeSpecificMetrics } = config;
   return (
-    <Modal open={open}>
-      <div class="system-config-modal">
-        <h2>Dashboard Configuration</h2>
-        {workloadRunners.map((endpoint, index) => (
-          <EndpointInput
-            key={index}
-            name={`Runner ${index + 1}`}
-            {...endpoint}
-            onChange={(newEndpoint) =>
-              onChange({
-                field: "workloadRunners",
-                value: workloadRunners.map((innerEndpoint, innerIndex) =>
-                  innerIndex === index ? newEndpoint : innerEndpoint,
-                ),
-              })
+    <Dialog open={open} onClose={onCloseClick}>
+      <DialogTitle>Dashboard Configuration</DialogTitle>
+      <DialogContent>
+        <FormGroup>
+          <FormControlLabel
+            control={<Switch checked={showVdbeSpecificMetrics} />}
+            label="Display VDBE-specific Metrics"
+            onChange={(event) =>
+              onConfigChange({ showVdbeSpecificMetrics: event.target.checked })
             }
           />
-        ))}
-        <Button variant="contained" onClick={onCloseClick}>
-          Close
-        </Button>
-      </div>
-    </Modal>
+        </FormGroup>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onCloseClick}>Close</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
