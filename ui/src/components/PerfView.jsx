@@ -62,10 +62,19 @@ function PerfView({ virtualInfra, showingPreview, showVdbeSpecificMetrics }) {
     windowSizeMinutes: 10,
     metrics: {},
   });
-
-  if (displayMetricsData.windowSizeMinutes !== windowSizeMinutes) {
-    changeDisplayMetricsWindow(windowSizeMinutes);
-  }
+  const changeDisplayMetricsWindow = useCallback(
+    (windowSizeMinutes) => {
+      const metricsManager = getMetricsManager();
+      setDisplayMetricsData({
+        windowSizeMinutes,
+        metrics: metricsManager.getMetricsInWindow(
+          windowSizeMinutes,
+          /*extendForward=*/ true,
+        ),
+      });
+    },
+    [getMetricsManager, setDisplayMetricsData],
+  );
 
   const refreshMetrics = useCallback(async () => {
     const rawMetrics = await fetchMetrics(60, /*useGenerated=*/ false);
@@ -101,19 +110,9 @@ function PerfView({ virtualInfra, showingPreview, showVdbeSpecificMetrics }) {
     };
   }, [refreshMetrics]);
 
-  const changeDisplayMetricsWindow = useCallback(
-    (windowSizeMinutes) => {
-      const metricsManager = getMetricsManager();
-      setDisplayMetricsData({
-        windowSizeMinutes,
-        metrics: metricsManager.getMetricsInWindow(
-          windowSizeMinutes,
-          /*extendForward=*/ true,
-        ),
-      });
-    },
-    [getMetricsManager, setDisplayMetricsData],
-  );
+  if (displayMetricsData.windowSizeMinutes !== windowSizeMinutes) {
+    changeDisplayMetricsWindow(windowSizeMinutes);
+  }
 
   const columnStyle = {
     flexGrow: 2,
