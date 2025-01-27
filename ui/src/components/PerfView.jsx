@@ -84,8 +84,14 @@ function PerfView({ virtualInfra, showingPreview, showVdbeSpecificMetrics }) {
     }
   }, [getMetricsManager, displayMetricsData, setDisplayMetricsData]);
 
+  // Refresh metrics on load and when virtualInfra changes.
   useEffect(() => {
     refreshMetrics();
+  }, [virtualInfra]);
+
+  // Set up an interval to refresh metrics every `REFRESH_INTERVAL_MS`
+  // milliseconds.
+  useEffect(() => {
     const intervalId = setInterval(refreshMetrics, REFRESH_INTERVAL_MS);
     return () => {
       if (intervalId === null) {
