@@ -6,7 +6,7 @@
       "name": "Ticketing",
       "max_staleness_ms": 0,
       "p90_latency_slo_ms": 30,
-      "interface": "postgresql",
+      "interface": "common",
       "tables": [
         {
           "name": "theatres",
@@ -36,7 +36,7 @@
       "name": "Analytics",
       "max_staleness_ms": 3600000,
       "p90_latency_slo_ms": 30000,
-      "interface": "postgresql",
+      "interface": "common",
       "tables": [
         {
           "name": "homes",

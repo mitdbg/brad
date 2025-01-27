@@ -183,9 +183,7 @@ function CreateEditFormFields({ vdbe, setVdbe, allTables, validEngines }) {
             setVdbe({ ...vdbe, interface: event.target.value })
           }
         >
-          <MenuItem value="common">Common SQL</MenuItem>
-          <MenuItem value="postgresql">PostgreSQL SQL</MenuItem>
-          <MenuItem value="athena">Athena SQL</MenuItem>
+          <MenuItem value="common">Common SQL (SQL-99)</MenuItem>
         </Select>
         <TableSelector
           selectedTables={vdbe.tables.map(({ name }) => name)}

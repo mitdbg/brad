@@ -138,7 +138,7 @@ function VdbeView({
         )}
         <div class="vdbe-view-props">
           <ul>
-            <li>🌿: {freshness != null ? freshness : "-----"}</li>
+            <li>🌿: {freshness != null ? `${freshness} (SI)` : "-----"}</li>
             <li>
               ⏱️:{" "}
               {peakLatency != null

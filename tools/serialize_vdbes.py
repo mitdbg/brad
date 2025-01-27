@@ -25,27 +25,40 @@ def to_serialize(schema: Dict[str, Any]) -> VirtualInfrastructure:
         ]
     ]
     a_tables = [VirtualTable(name=name, writable=False) for name in all_table_names]
+    e_tables = [
+        VirtualTable(name=name, writable=False)
+        for name in ["title", "movie_info", "company_name", "aka_title"]
+    ]
     t_engine = VirtualEngine(
         internal_id=1,
-        name="VDBE (T)",
+        name="Ticketing",
         max_staleness_ms=0,
         p90_latency_slo_ms=30,
-        interface=QueryInterface.PostgreSQL,
+        interface=QueryInterface.Common,
         tables=t_tables,
         mapped_to=Engine.Aurora,
     )
     a_engine = VirtualEngine(
         internal_id=2,
-        name="VDBE (A)",
+        name="Analytics",
         max_staleness_ms=60 * 60 * 1000,  # 1 hour
         p90_latency_slo_ms=30 * 1000,
-        interface=QueryInterface.PostgreSQL,
+        interface=QueryInterface.Common,
         tables=a_tables,
         mapped_to=Engine.Redshift,
     )
+    e_engine = VirtualEngine(
+        internal_id=3,
+        name="Explore",
+        max_staleness_ms=60 * 60 * 1000,  # 1 hour
+        p90_latency_slo_ms=30 * 1000,
+        interface=QueryInterface.Common,
+        tables=e_tables,
+        mapped_to=Engine.Athena,
+    )
     return VirtualInfrastructure(
         schema_name=schema["schema_name"],
-        engines=[t_engine, a_engine],
+        engines=[t_engine, a_engine, e_engine],
         tables=[SchemaTable(name=name) for name in all_table_names],
     )
 

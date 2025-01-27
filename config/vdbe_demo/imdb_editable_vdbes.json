@@ -1,12 +1,12 @@
 {
-  "schema_name": "imdb_extended_editable_100g",
+  "schema_name": "imdb_extended",
   "engines": [
     {
       "internal_id": 1,
       "name": "Ticketing",
       "max_staleness_ms": 0,
       "p90_latency_slo_ms": 30,
-      "interface": "postgresql",
+      "interface": "common",
       "tables": [
         {
           "name": "theatres",
@@ -29,14 +29,15 @@
           "writable": true
         }
       ],
-      "mapped_to": "aurora"
+      "mapped_to": "aurora",
+      "endpoint": null
     },
     {
       "internal_id": 2,
       "name": "Analytics",
       "max_staleness_ms": 3600000,
       "p90_latency_slo_ms": 30000,
-      "interface": "postgresql",
+      "interface": "common",
       "tables": [
         {
           "name": "homes",
@@ -139,7 +140,35 @@
           "writable": false
         }
       ],
-      "mapped_to": "redshift"
+      "mapped_to": "redshift",
+      "endpoint": null
+    },
+    {
+      "internal_id": 3,
+      "name": "Explore",
+      "max_staleness_ms": 3600000,
+      "p90_latency_slo_ms": 30000,
+      "interface": "common",
+      "tables": [
+        {
+          "name": "title",
+          "writable": false
+        },
+        {
+          "name": "movie_info",
+          "writable": false
+        },
+        {
+          "name": "company_name",
+          "writable": false
+        },
+        {
+          "name": "aka_title",
+          "writable": false
+        }
+      ],
+      "mapped_to": "athena",
+      "endpoint": null
     }
   ],
   "tables": [
