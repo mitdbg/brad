@@ -1,44 +1,13 @@
-import { useEffect, useState, useRef, useCallback } from "react";
-import { fetchMetrics } from "../api";
-import MetricsManager from "../metrics";
+import { useCallback, useState, useEffect, useRef } from "react";
 import Panel from "./Panel";
 import TroubleshootRoundedIcon from "@mui/icons-material/TroubleshootRounded";
 import VdbeMetricsView from "./VdbeMetricsView";
+import { parseMetrics, extractMetrics } from "../metrics_utils";
+import MetricsManager from "../metrics";
+import { fetchMetrics } from "../api";
 import "./styles/PerfView.css";
 
 const REFRESH_INTERVAL_MS = 30 * 1000;
-
-function extractMetrics({ metrics }, metricName, multiplier) {
-  if (multiplier == null) {
-    multiplier = 1.0;
-  }
-  if (!metrics.hasOwnProperty(metricName)) {
-    return {
-      x: [],
-      y: [],
-    };
-  } else {
-    const innerMetrics = metrics[metricName];
-    return {
-      x: innerMetrics.timestamps.map((val) => val.toLocaleTimeString("en-US")),
-      y: innerMetrics.values.map((val) => val * multiplier),
-    };
-  }
-}
-
-function parseMetrics({ named_metrics }) {
-  const result = {};
-  Object.entries(named_metrics).forEach(([metricName, metricValues]) => {
-    const parsedTs = metricValues.timestamps.map(
-      (timestamp) => new Date(timestamp),
-    );
-    result[metricName] = {
-      timestamps: parsedTs,
-      values: metricValues.values,
-    };
-  });
-  return result;
-}
 
 function WindowSelector({ windowSizeMinutes, onWindowSizeChange }) {
   function className(windowSizeOption) {
@@ -64,28 +33,48 @@ function WindowSelector({ windowSizeMinutes, onWindowSizeChange }) {
   );
 }
 
-function PerfView({ virtualInfra, showingPreview }) {
-  const [windowSizeMinutes, setWindowSizeMinutes] = useState(10);
-  const [metricsData, setMetricsData] = useState({
-    windowSizeMinutes,
-    metrics: {},
+function vdbeWithMetrics(virtualInfra, displayMetricsData, showSpecific) {
+  return virtualInfra?.engines?.map((vdbe, idx) => {
+    let metrics;
+    if (showSpecific) {
+      metrics = extractMetrics(displayMetricsData, `vdbe:${vdbe.internal_id}`);
+    } else {
+      metrics = extractMetrics(
+        displayMetricsData,
+        idx === 0 ? "txn_latency_s_p90" : "query_latency_s_p90",
+      );
+    }
+    return { vdbe, metrics };
   });
+}
 
+function PerfView({ virtualInfra, showingPreview, showVdbeSpecificMetrics }) {
   const metricsManagerRef = useRef(null);
-  function getMetricsManager() {
+  const getMetricsManager = useCallback(() => {
     if (metricsManagerRef.current == null) {
       metricsManagerRef.current = new MetricsManager();
     }
     return metricsManagerRef.current;
+  }, [metricsManagerRef]);
+
+  const [windowSizeMinutes, setWindowSizeMinutes] = useState(10);
+  const [displayMetricsData, setDisplayMetricsData] = useState({
+    windowSizeMinutes: 10,
+    metrics: {},
+  });
+
+  if (displayMetricsData.windowSizeMinutes !== windowSizeMinutes) {
+    changeDisplayMetricsWindow(windowSizeMinutes);
   }
 
-  const refreshData = useCallback(async () => {
+  const refreshMetrics = useCallback(async () => {
     const rawMetrics = await fetchMetrics(60, /*useGenerated=*/ false);
     const fetchedMetrics = parseMetrics(rawMetrics);
     const metricsManager = getMetricsManager();
     const addedNewMetrics = metricsManager.mergeInMetrics(fetchedMetrics);
     if (addedNewMetrics) {
-      setMetricsData({
+      const { windowSizeMinutes } = displayMetricsData;
+      setDisplayMetricsData({
         windowSizeMinutes,
         metrics: metricsManager.getMetricsInWindow(
           windowSizeMinutes,
@@ -93,33 +82,38 @@ function PerfView({ virtualInfra, showingPreview }) {
         ),
       });
     }
-  }, [metricsManagerRef, windowSizeMinutes, setMetricsData]);
+  }, [getMetricsManager, displayMetricsData, setDisplayMetricsData]);
 
+  // Refresh metrics on load and when virtualInfra changes.
   useEffect(() => {
-    // Run first fetch immediately.
-    refreshData();
-    const intervalId = setInterval(refreshData, REFRESH_INTERVAL_MS);
+    refreshMetrics();
+  }, [virtualInfra]);
+
+  // Set up an interval to refresh metrics every `REFRESH_INTERVAL_MS`
+  // milliseconds.
+  useEffect(() => {
+    const intervalId = setInterval(refreshMetrics, REFRESH_INTERVAL_MS);
     return () => {
       if (intervalId === null) {
         return;
       }
       clearInterval(intervalId);
     };
-  }, [refreshData]);
+  }, [refreshMetrics]);
 
-  if (metricsData.windowSizeMinutes !== windowSizeMinutes) {
-    const metricsManager = getMetricsManager();
-    setMetricsData({
-      windowSizeMinutes,
-      metrics: metricsManager.getMetricsInWindow(
+  const changeDisplayMetricsWindow = useCallback(
+    (windowSizeMinutes) => {
+      const metricsManager = getMetricsManager();
+      setDisplayMetricsData({
         windowSizeMinutes,
-        /*extendForward=*/ true,
-      ),
-    });
-  }
-
-  const queryLatMetrics = extractMetrics(metricsData, "query_latency_s_p90");
-  const txnLatMetrics = extractMetrics(metricsData, "txn_latency_s_p90");
+        metrics: metricsManager.getMetricsInWindow(
+          windowSizeMinutes,
+          /*extendForward=*/ true,
+        ),
+      });
+    },
+    [getMetricsManager, setDisplayMetricsData],
+  );
 
   const columnStyle = {
     flexGrow: 2,
@@ -143,11 +137,15 @@ function PerfView({ virtualInfra, showingPreview }) {
       <div class="column-inner">
         <Panel>
           <div class="perf-view-wrap">
-            {virtualInfra?.engines?.map((vdbe, idx) => (
+            {vdbeWithMetrics(
+              virtualInfra,
+              displayMetricsData,
+              showVdbeSpecificMetrics,
+            )?.map(({ vdbe, metrics }) => (
               <VdbeMetricsView
                 key={vdbe.internal_id}
                 vdbe={vdbe}
-                metrics={idx === 0 ? txnLatMetrics : queryLatMetrics}
+                metrics={metrics}
               />
             ))}
           </div>

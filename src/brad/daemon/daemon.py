@@ -23,6 +23,7 @@ from brad.daemon.messages import (
     ShutdownFrontEnd,
     Sentinel,
     MetricsReport,
+    VdbeMetricsReport,
     InternalCommandRequest,
     InternalCommandResponse,
     NewBlueprint,
@@ -117,7 +118,6 @@ class BradDaemon:
         self._blueprint_mgr = BlueprintManager(
             self._config, self._assets, self._schema_name
         )
-        self._monitor = Monitor(self._config, self._blueprint_mgr)
         self._estimator_provider = _EstimatorProvider()
         self._providers: Optional[BlueprintProviders] = None
         self._planner: Optional[BlueprintPlanner] = None
@@ -144,6 +144,12 @@ class BradDaemon:
         else:
             self._vdbe_manager = None
         self._vdbe_process: Optional[_VdbeFrontEndProcess] = None
+
+        self._monitor = Monitor(
+            self._config,
+            self._blueprint_mgr,
+            create_vdbe_metrics=self._vdbe_manager is not None,
+        )
 
         # This is used to hold references to internal command tasks we create.
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
@@ -458,6 +464,9 @@ class BradDaemon:
 
                 if isinstance(message, MetricsReport):
                     self._monitor.handle_metric_report(message)
+
+                elif isinstance(message, VdbeMetricsReport):
+                    self._monitor.handle_vdbe_metric_report(message)
 
                 elif isinstance(message, InternalCommandRequest):
                     task = asyncio.create_task(

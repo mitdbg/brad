@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect } from "react";
 import Header from "./components/Header";
 import PerfView from "./components/PerfView";
 import OverallInfraView from "./components/OverallInfraView";
+import SystemConfig from "./components/SystemConfig";
 import { fetchSystemState } from "./api";
 
 import "./App.css";
@@ -26,8 +27,13 @@ function App() {
       shownVdbe: null,
     },
   });
+  const [config, setConfig] = useState({
+    showVdbeSpecificMetrics: true,
+  });
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
-  const refreshData = useCallback(async () => {
+  // Used for system state refresh.
+  const refreshSystemState = useCallback(async () => {
     const newSystemState = await fetchSystemState();
     // Not the best way to check for equality.
     if (JSON.stringify(systemState) !== JSON.stringify(newSystemState)) {
@@ -35,26 +41,31 @@ function App() {
     }
   }, [systemState, setSystemState]);
 
-  // Fetch updated system state periodically.
+  // Periodically refresh system state.
   useEffect(() => {
-    refreshData();
-    const intervalId = setInterval(refreshData, REFRESH_INTERVAL_MS);
+    refreshSystemState();
+    const intervalId = setInterval(refreshSystemState, REFRESH_INTERVAL_MS);
     return () => {
       if (intervalId === null) {
         return;
       }
       clearInterval(intervalId);
     };
-  }, [refreshData]);
+  }, [refreshSystemState]);
 
   // Bind keyboard shortcut for internal config menu.
-  const handleKeyPress = useCallback((event) => {
-    if (document.activeElement !== document.body) {
-      // We only want to handle key presses when no input is focused.
-      return;
-    }
-    // Currently a no-op.
-  }, []);
+  const handleKeyPress = useCallback(
+    (event) => {
+      if (document.activeElement !== document.body) {
+        // We only want to handle key presses when no input is focused.
+        return;
+      }
+      if (event.key === "c") {
+        setShowConfigModal(true);
+      }
+    },
+    [setShowConfigModal],
+  );
 
   useEffect(() => {
     document.addEventListener("keyup", handleKeyPress);
@@ -104,6 +115,13 @@ function App() {
     setAppState({ ...appState, vdbeForm: { open: false, shownVdbe: null } });
   };
 
+  const changeConfig = useCallback(
+    (changes) => {
+      setConfig({ ...config, ...changes });
+    },
+    [config, setConfig],
+  );
+
   return (
     <>
       <Header
@@ -119,13 +137,20 @@ function App() {
           openVdbeForm={openVdbeForm}
           closeVdbeForm={closeVdbeForm}
           setPreviewBlueprint={setPreviewBlueprint}
-          refreshData={refreshData}
+          refreshData={refreshSystemState}
         />
         <PerfView
           virtualInfra={systemState.virtual_infra}
           showingPreview={previewForm.shownPreviewBlueprint != null}
+          showVdbeSpecificMetrics={config.showVdbeSpecificMetrics}
         />
       </div>
+      <SystemConfig
+        open={showConfigModal}
+        onCloseClick={() => setShowConfigModal(false)}
+        config={config}
+        onConfigChange={changeConfig}
+      />
     </>
   );
 }
