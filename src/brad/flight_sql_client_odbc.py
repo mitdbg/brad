@@ -1,5 +1,6 @@
 import pyodbc
 from typing import Generator, Optional, Self, Tuple, List, Any
+from brad.config.engine import Engine
 
 
 class BradFlightSqlClientOdbc:
@@ -52,3 +53,16 @@ class BradFlightSqlClientOdbc:
     def run_query(self, query: str) -> RowList:
         assert self._cursor
         return self._cursor.execute(query)
+
+    def run_query_json_cli(self, query: str) -> Tuple[RowList, Optional[Engine], bool]:
+        self.run_query(query)
+        assert self._cursor
+        results = self._cursor.fetchall()
+        all_rows = [tuple(row) for row in results]
+        return all_rows, None, False
+
+    def run_prepared(self, query: str, params: Tuple[Any, ...]) -> RowList:
+        assert self._cursor
+        self._cursor.execute(query, params)
+        results = self._cursor.fetchall()
+        return [tuple(row) for row in results]

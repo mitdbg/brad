@@ -8,6 +8,7 @@ from tabulate import tabulate
 import brad
 from brad.config.strings import SHELL_HISTORY_FILE
 from brad.grpc_client import BradGrpcClient, BradClientError
+from brad.flight_sql_client_odbc import BradFlightSqlClientOdbc
 
 
 def register_command(subparsers):
@@ -20,6 +21,9 @@ def register_command(subparsers):
         "--command",
         type=str,
         help="Run a single SQL query (or internal command) and exit.",
+    )
+    parser.add_argument(
+        "--use-odbc", action="store_true", help="Use the ODBC endpoint instead of gRPC."
     )
     parser.add_argument(
         "endpoint",
@@ -39,11 +43,15 @@ def parse_endpoint(endpoint: str) -> Tuple[str, int]:
 
 def run_command(args) -> None:
     host, port = parse_endpoint(args.endpoint)
-    with BradGrpcClient(host, port) as client:
-        run_query(client, args.command)
+    if args.use_odbc:
+        with BradFlightSqlClientOdbc(host, port) as client:
+            run_query(client, args.command)
+    else:
+        with BradGrpcClient(host, port) as client:
+            run_query(client, args.command)
 
 
-def run_query(client: BradGrpcClient, query: str) -> None:
+def run_query(client: BradGrpcClient | BradFlightSqlClientOdbc, query: str) -> None:
     try:
         # Dispatch query and print results. We buffer the whole result
         # set in memory to get a reasonable estimate of the query
@@ -79,7 +87,7 @@ class BradShell(cmd.Cmd):
     MULTILINE_PROMPT = "--> "
     TERM_STR = ";"
 
-    def __init__(self, client: BradGrpcClient) -> None:
+    def __init__(self, client: BradGrpcClient | BradFlightSqlClientOdbc) -> None:
         super().__init__()
         self.prompt = self.READY_PROMPT
         self._client = client
@@ -139,7 +147,7 @@ def main(args) -> None:
     print()
     print("Connecting to BRAD VDBE at {}:{}...".format(host, port))
 
-    with BradGrpcClient(host, port) as client:
+    def run_shell(client: BradGrpcClient | BradFlightSqlClientOdbc) -> None:
         print("Connected!")
         print()
         print("Terminate all SQL queries with a semicolon (;). Hit Ctrl-D to exit.")
@@ -148,3 +156,10 @@ def main(args) -> None:
 
         shell = BradShell(client)
         shell.cmdloop()
+
+    if args.use_odbc:
+        with BradFlightSqlClientOdbc(host, port) as client:
+            run_shell(client)
+    else:
+        with BradGrpcClient(host, port) as client:
+            run_shell(client)

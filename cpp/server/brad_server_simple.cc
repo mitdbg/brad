@@ -176,6 +176,10 @@ void BradFlightSqlServer::InitWrapper(
   auto location = arrow::flight::Location::ForGrpcTcp(host, port).ValueOrDie();
   arrow::flight::FlightServerOptions options(location);
 
+  // NOTE: We bypass authentication for simplicity -- this is not recommended in
+  // a production setting.
+  options.auth_handler = std::make_shared<arrow::flight::NoOpAuthHandler>();
+
   handle_query_ = handle_query;
 
   const auto status = this->Init(options);
