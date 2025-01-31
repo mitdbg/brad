@@ -51,7 +51,7 @@ def serialize_blueprint(blueprint: Blueprint) -> bytes:
 
 
 def _tables_with_locations_to_proto(
-    table_with_locations: Tuple[Table, List[Engine]]
+    table_with_locations: Tuple[Table, List[Engine]],
 ) -> b.Table:
     table, locations = table_with_locations
     return b.Table(

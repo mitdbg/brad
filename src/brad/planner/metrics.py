@@ -766,7 +766,7 @@ def _fill_empty_metrics(to_fill: pd.DataFrame, guide: pd.DataFrame) -> pd.DataFr
 
 
 def _compute_redshift_cpu_stats(
-    redshift_cpu: Dict[str, float]
+    redshift_cpu: Dict[str, float],
 ) -> Tuple[float, npt.NDArray]:
     """
     Returns the aggregated CPU value and list of all CPU values.

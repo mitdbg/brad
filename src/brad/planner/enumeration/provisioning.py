@@ -161,7 +161,7 @@ def _load_instance_resources(file_name: str) -> Dict[str, Dict[str, int | float]
 
 
 def _find_min_instance(
-    instances: Dict[str, Dict[str, int | float]]
+    instances: Dict[str, Dict[str, int | float]],
 ) -> Tuple[str, Dict[str, int | float]]:
     min_type: Optional[str] = None
     min_resources: Optional[Dict[str, int | float]] = None
