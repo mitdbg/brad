@@ -1,21 +1,20 @@
 #pragma once
 
+#include <arrow/flight/sql/server.h>
+#include <arrow/result.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+
 #include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
-#include <arrow/flight/sql/server.h>
 #include "brad_statement.h"
-#include <arrow/result.h>
-
 #include "libcuckoo/cuckoohash_map.hh"
-
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 
 namespace brad {
 
@@ -23,7 +22,9 @@ namespace brad {
 // a string). The function returns the results and a schema object.
 //
 // NOTE: The GIL must be held when invoking this function.
-using PythonRunQueryFn = std::function<std::pair<std::vector<pybind11::tuple>, pybind11::object>(std::string)>;
+using PythonRunQueryFn =
+    std::function<std::pair<std::vector<pybind11::tuple>, pybind11::object>(
+        std::string)>;
 
 class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
  public:
@@ -33,8 +34,7 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
 
   static std::shared_ptr<BradFlightSqlServer> Create();
 
-  void InitWrapper(const std::string &host,
-                   int port,
+  void InitWrapper(const std::string& host, int port,
                    PythonRunQueryFn handle_query);
 
   void ServeWrapper();
@@ -42,20 +42,42 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
   void ShutdownWrapper();
 
   arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>>
-    GetFlightInfoStatement(
-      const arrow::flight::ServerCallContext &context,
-      const arrow::flight::sql::StatementQuery &command,
-      const arrow::flight::FlightDescriptor &descriptor) override;
+  GetFlightInfoStatement(
+      const arrow::flight::ServerCallContext& context,
+      const arrow::flight::sql::StatementQuery& command,
+      const arrow::flight::FlightDescriptor& descriptor) override;
 
   arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>>
-    DoGetStatement(
-      const arrow::flight::ServerCallContext &context,
-      const arrow::flight::sql::StatementQueryTicket &command) override;
+  DoGetStatement(
+      const arrow::flight::ServerCallContext& context,
+      const arrow::flight::sql::StatementQueryTicket& command) override;
+
+  arrow::Result<arrow::flight::sql::ActionCreatePreparedStatementResult>
+  CreatePreparedStatement(
+      const arrow::flight::ServerCallContext& context,
+      const arrow::flight::sql::ActionCreatePreparedStatementRequest& request)
+      override;
+  arrow::Status ClosePreparedStatement(
+      const arrow::flight::ServerCallContext& context,
+      const arrow::flight::sql::ActionClosePreparedStatementRequest& request)
+      override;
+
+  arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>>
+  GetFlightInfoPreparedStatement(
+      const arrow::flight::ServerCallContext& context,
+      const arrow::flight::sql::PreparedStatementQuery& command,
+      const arrow::flight::FlightDescriptor& descriptor) override;
+
+  arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>>
+  DoGetPreparedStatement(
+      const arrow::flight::ServerCallContext& context,
+      const arrow::flight::sql::PreparedStatementQuery& command) override;
 
  private:
   PythonRunQueryFn handle_query_;
 
-  libcuckoo::cuckoohash_map<std::string, std::shared_ptr<BradStatement>> query_data_;
+  libcuckoo::cuckoohash_map<std::string, std::shared_ptr<BradStatement>>
+      query_data_;
 
   std::atomic<uint64_t> autoincrement_id_;
 };

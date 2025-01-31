@@ -1,14 +1,16 @@
 #include "python_utils.h"
 
-#include <vector>
 #include <arrow/type.h>
+
 #include <iostream>
+#include <vector>
 
 namespace py = pybind11;
 
 namespace {
 
-std::shared_ptr<arrow::DataType> ArrowDataTypeFromBradDataType(const pybind11::object& data_type) {
+std::shared_ptr<arrow::DataType> ArrowDataTypeFromBradDataType(
+    const pybind11::object& data_type) {
   // NOTE: If you change values here, make sure to change
   // `brad.connection.schema.DataType` as well.
   const int64_t value = py::cast<int64_t>(data_type.attr("value"));
@@ -45,14 +47,16 @@ std::shared_ptr<arrow::DataType> ArrowDataTypeFromBradDataType(const pybind11::o
 
 namespace brad {
 
-std::shared_ptr<arrow::Schema> ArrowSchemaFromBradSchema(const pybind11::object& schema) {
+std::shared_ptr<arrow::Schema> ArrowSchemaFromBradSchema(
+    const pybind11::object& schema) {
   const size_t num_fields = py::cast<size_t>(schema.attr("num_fields"));
   std::vector<std::shared_ptr<arrow::Field>> fields;
   fields.reserve(num_fields);
 
   for (const auto& brad_field : schema) {
     std::string field_name = py::cast<std::string>(brad_field.attr("name"));
-    std::shared_ptr<arrow::DataType> data_type = ArrowDataTypeFromBradDataType(brad_field.attr("data_type"));
+    std::shared_ptr<arrow::DataType> data_type =
+        ArrowDataTypeFromBradDataType(brad_field.attr("data_type"));
     fields.push_back(arrow::field(std::move(field_name), std::move(data_type)));
   }
 

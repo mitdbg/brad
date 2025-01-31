@@ -1,8 +1,9 @@
 #pragma once
 
-#include <memory>
 #include <arrow/type.h>
 #include <pybind11/pybind11.h>
+
+#include <memory>
 
 namespace brad {
 
@@ -11,6 +12,7 @@ namespace brad {
 // `brad.connection.schema.Schema`.
 //
 // NOTE: The GIL must be held while running this function.
-std::shared_ptr<arrow::Schema> ArrowSchemaFromBradSchema(const pybind11::object& schema);
+std::shared_ptr<arrow::Schema> ArrowSchemaFromBradSchema(
+    const pybind11::object& schema);
 
 }  // namespace brad

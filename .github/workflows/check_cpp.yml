@@ -34,7 +34,7 @@ jobs:
       run: >-
         sudo apt update &&
         sudo apt install libarrow-dev libarrow-flight-dev libarrow-flight-sql-dev sqlite3 libboost-all-dev
-      
+
     - name: Configure Project using CMake
       working-directory: ${{github.workspace}}/cpp
       run: cmake -B ${{github.workspace}}/cpp/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}

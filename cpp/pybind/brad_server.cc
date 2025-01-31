@@ -1,5 +1,5 @@
-#include <pybind11/pybind11.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
 #include <iostream>
@@ -13,12 +13,10 @@ PYBIND11_MODULE(pybind_brad_server, m) {
 
   py::class_<brad::BradFlightSqlServer> brad_server(m, "BradFlightSqlServer");
 
-  brad_server
-    .def(py::init<>())
-    .def("create", &brad::BradFlightSqlServer::Create)
-    .def("init", &brad::BradFlightSqlServer::InitWrapper)
-    .def("serve",
-         &brad::BradFlightSqlServer::ServeWrapper,
-         py::call_guard<py::gil_scoped_release>())
-    .def("shutdown", &brad::BradFlightSqlServer::ShutdownWrapper);
+  brad_server.def(py::init<>())
+      .def("create", &brad::BradFlightSqlServer::Create)
+      .def("init", &brad::BradFlightSqlServer::InitWrapper)
+      .def("serve", &brad::BradFlightSqlServer::ServeWrapper,
+           py::call_guard<py::gil_scoped_release>())
+      .def("shutdown", &brad::BradFlightSqlServer::ShutdownWrapper);
 }

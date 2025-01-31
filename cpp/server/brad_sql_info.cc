@@ -17,17 +17,17 @@ SqlInfoResultMap GetSqlInfoResultMap() {
        SqlInfoResult(std::string("brad"))},
       {SqlInfoOptions::SqlInfo::FLIGHT_SQL_SERVER_ARROW_VERSION,
        SqlInfoResult(std::string(ARROW_VERSION_STRING))},
-      {SqlInfoOptions::SqlInfo::FLIGHT_SQL_SERVER_READ_ONLY, SqlInfoResult(false)},
+      {SqlInfoOptions::SqlInfo::FLIGHT_SQL_SERVER_READ_ONLY,
+       SqlInfoResult(false)},
       {SqlInfoOptions::SqlInfo::FLIGHT_SQL_SERVER_SQL, SqlInfoResult(true)},
-      {SqlInfoOptions::SqlInfo::FLIGHT_SQL_SERVER_SUBSTRAIT, SqlInfoResult(false)},
+      {SqlInfoOptions::SqlInfo::FLIGHT_SQL_SERVER_SUBSTRAIT,
+       SqlInfoResult(false)},
       {SqlInfoOptions::SqlInfo::FLIGHT_SQL_SERVER_TRANSACTION,
        SqlInfoResult(SqlInfoOptions::SqlSupportedTransaction::
                          SQL_SUPPORTED_TRANSACTION_TRANSACTION)},
       {SqlInfoOptions::SqlInfo::FLIGHT_SQL_SERVER_CANCEL, SqlInfoResult(false)},
-      {SqlInfoOptions::SqlInfo::SQL_DDL_CATALOG,
-       SqlInfoResult(false)},
-      {SqlInfoOptions::SqlInfo::SQL_DDL_SCHEMA,
-       SqlInfoResult(false)},
+      {SqlInfoOptions::SqlInfo::SQL_DDL_CATALOG, SqlInfoResult(false)},
+      {SqlInfoOptions::SqlInfo::SQL_DDL_SCHEMA, SqlInfoResult(false)},
       {SqlInfoOptions::SqlInfo::SQL_DDL_TABLE, SqlInfoResult(true)},
       {SqlInfoOptions::SqlInfo::SQL_IDENTIFIER_CASE,
        SqlInfoResult(int64_t(SqlInfoOptions::SqlSupportedCaseSensitivity::
@@ -37,10 +37,11 @@ SqlInfoResultMap GetSqlInfoResultMap() {
       {SqlInfoOptions::SqlInfo::SQL_QUOTED_IDENTIFIER_CASE,
        SqlInfoResult(int64_t(SqlInfoOptions::SqlSupportedCaseSensitivity::
                                  SQL_CASE_SENSITIVITY_CASE_INSENSITIVE))},
-      {SqlInfoOptions::SqlInfo::SQL_ALL_TABLES_ARE_SELECTABLE, SqlInfoResult(true)},
+      {SqlInfoOptions::SqlInfo::SQL_ALL_TABLES_ARE_SELECTABLE,
+       SqlInfoResult(true)},
       {SqlInfoOptions::SqlInfo::SQL_NULL_ORDERING,
-       SqlInfoResult(
-           int64_t(SqlInfoOptions::SqlNullOrdering::SQL_NULLS_SORTED_AT_START))},
+       SqlInfoResult(int64_t(
+           SqlInfoOptions::SqlNullOrdering::SQL_NULLS_SORTED_AT_START))},
       {SqlInfoOptions::SqlInfo::SQL_KEYWORDS,
        SqlInfoResult(std::vector<std::string>({"ABORT",
                                                "ACTION",
@@ -191,19 +192,20 @@ SqlInfoResultMap GetSqlInfoResultMap() {
                                                "WITHOUT"}))},
       {SqlInfoOptions::SqlInfo::SQL_NUMERIC_FUNCTIONS,
        SqlInfoResult(std::vector<std::string>(
-           {"ACOS",    "ACOSH", "ASIN", "ASINH",   "ATAN", "ATAN2", "ATANH", "CEIL",
-            "CEILING", "COS",   "COSH", "DEGREES", "EXP",  "FLOOR", "LN",    "LOG",
-            "LOG",     "LOG10", "LOG2", "MOD",     "PI",   "POW",   "POWER", "RADIANS",
-            "SIN",     "SINH",  "SQRT", "TAN",     "TANH", "TRUNC"}))},
+           {"ACOS",  "ACOSH", "ASIN",    "ASINH", "ATAN",  "ATAN2",
+            "ATANH", "CEIL",  "CEILING", "COS",   "COSH",  "DEGREES",
+            "EXP",   "FLOOR", "LN",      "LOG",   "LOG",   "LOG10",
+            "LOG2",  "MOD",   "PI",      "POW",   "POWER", "RADIANS",
+            "SIN",   "SINH",  "SQRT",    "TAN",   "TANH",  "TRUNC"}))},
       {SqlInfoOptions::SqlInfo::SQL_STRING_FUNCTIONS,
-       SqlInfoResult(
-           std::vector<std::string>({"SUBSTR", "TRIM", "LTRIM", "RTRIM", "LENGTH",
-                                     "REPLACE", "UPPER", "LOWER", "INSTR"}))},
+       SqlInfoResult(std::vector<std::string>({"SUBSTR", "TRIM", "LTRIM",
+                                               "RTRIM", "LENGTH", "REPLACE",
+                                               "UPPER", "LOWER", "INSTR"}))},
       {SqlInfoOptions::SqlInfo::SQL_SUPPORTS_CONVERT,
        SqlInfoResult(std::unordered_map<int32_t, std::vector<int32_t>>(
            {{SqlInfoOptions::SqlSupportsConvert::SQL_CONVERT_BIGINT,
-             std::vector<int32_t>(
-                 {SqlInfoOptions::SqlSupportsConvert::SQL_CONVERT_INTEGER})}}))}};
+             std::vector<int32_t>({SqlInfoOptions::SqlSupportsConvert::
+                                       SQL_CONVERT_INTEGER})}}))}};
 }
 
 }  // namespace brad
