@@ -207,10 +207,120 @@ BradFlightSqlServer::GetFlightInfoStatement(
     const ServerCallContext& context, const StatementQuery& command,
     const FlightDescriptor& descriptor) {
   const std::string& query = command.query;
+  const std::string& transaction_id = command.transaction_id;
+  return GetFlightInfoImpl(query, transaction_id, descriptor);
+}
 
-  const std::string& autoincrement_id = std::to_string(++autoincrement_id_);
-  const std::string& query_ticket =
-      GetQueryTicket(autoincrement_id, command.transaction_id);
+arrow::Result<std::unique_ptr<FlightDataStream>>
+BradFlightSqlServer::DoGetStatement(const ServerCallContext& context,
+                                    const StatementQueryTicket& command) {
+  ARROW_ASSIGN_OR_RAISE(auto pair,
+                        DecodeTransactionQuery(command.statement_handle));
+  const std::string& autoincrement_id = pair.first;
+  const std::string transaction_id = pair.second;
+
+  const std::string& query_ticket = transaction_id + ':' + autoincrement_id;
+
+  std::shared_ptr<BradStatement> result;
+  const bool found = query_data_.erase_fn(query_ticket, [&result](auto& qr) {
+    result = qr;
+    return true;
+  });
+
+  if (!found) {
+    return arrow::Status::Invalid("Invalid ticket.");
+  }
+
+  std::shared_ptr<BradStatementBatchReader> reader;
+  ARROW_ASSIGN_OR_RAISE(reader, BradStatementBatchReader::Create(result));
+
+  return std::make_unique<RecordBatchStream>(reader);
+}
+
+arrow::Result<arrow::flight::sql::ActionCreatePreparedStatementResult>
+BradFlightSqlServer::CreatePreparedStatement(
+    const arrow::flight::ServerCallContext& context,
+    const arrow::flight::sql::ActionCreatePreparedStatementRequest& request) {
+  const auto id = std::to_string(++autoincrement_id_);
+  const PreparedStatementContext statement_context{request.query,
+                                                   request.transaction_id};
+  prepared_statements_.insert(id, statement_context);
+  // std::cerr << "Registered prepared statement " << id << " " << request.query
+  //           << std::endl;
+  return arrow::flight::sql::ActionCreatePreparedStatementResult{nullptr,
+                                                                 nullptr, id};
+}
+
+arrow::Status BradFlightSqlServer::ClosePreparedStatement(
+    const arrow::flight::ServerCallContext& context,
+    const arrow::flight::sql::ActionClosePreparedStatementRequest& request) {
+  // std::cerr << "ClosePreparedStatement called "
+  //           << request.prepared_statement_handle << std::endl;
+  const bool erased =
+      prepared_statements_.erase(request.prepared_statement_handle);
+  if (!erased) {
+    return arrow::Status::Invalid("Invalid prepared statement handle.");
+  }
+  return arrow::Status();
+}
+
+arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>>
+BradFlightSqlServer::GetFlightInfoPreparedStatement(
+    const arrow::flight::ServerCallContext& context,
+    const arrow::flight::sql::PreparedStatementQuery& command,
+    const arrow::flight::FlightDescriptor& descriptor) {
+  // std::cerr << "GetFlightInfoPreparedStatement called "
+  //           << command.prepared_statement_handle << std::endl;
+  const PreparedStatementContext* statement_ctx = nullptr;
+  prepared_statements_.find_fn(
+      command.prepared_statement_handle,
+      [&statement_ctx](const auto& ps_ctx) { statement_ctx = &ps_ctx; });
+  if (statement_ctx == nullptr) {
+    return arrow::Status::Invalid("Invalid prepared statement handle.");
+  }
+
+  const std::string& query = statement_ctx->query;
+  const std::string& transaction_id = statement_ctx->transaction_id;
+  return GetFlightInfoImpl(query, transaction_id, descriptor);
+}
+
+// Currently unimplemented.
+
+arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>>
+BradFlightSqlServer::DoGetPreparedStatement(
+    const arrow::flight::ServerCallContext& context,
+    const arrow::flight::sql::PreparedStatementQuery& command) {
+  std::cerr << "DoGetPreparedStatement called "
+            << command.prepared_statement_handle << std::endl;
+  return arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>>();
+}
+
+arrow::Status BradFlightSqlServer::DoPutPreparedStatementQuery(
+    const arrow::flight::ServerCallContext& context,
+    const arrow::flight::sql::PreparedStatementQuery& command,
+    arrow::flight::FlightMessageReader* reader,
+    arrow::flight::FlightMetadataWriter* writer) {
+  std::cerr << "DoPutPreparedStatementQuery called "
+            << command.prepared_statement_handle << std::endl;
+  return arrow::Status();
+}
+
+arrow::Result<int64_t> BradFlightSqlServer::DoPutPreparedStatementUpdate(
+    const arrow::flight::ServerCallContext& context,
+    const arrow::flight::sql::PreparedStatementUpdate& command,
+    arrow::flight::FlightMessageReader* reader) {
+  std::cerr << "DoPutPreparedStatementUpdate called "
+            << command.prepared_statement_handle << std::endl;
+  return arrow::Result<int64_t>();
+}
+
+arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>>
+BradFlightSqlServer::GetFlightInfoImpl(const std::string& query,
+                                       const std::string& transaction_id,
+                                       const FlightDescriptor& descriptor) {
+  const std::string autoincrement_id = std::to_string(++autoincrement_id_);
+  const std::string query_ticket =
+      GetQueryTicket(autoincrement_id, transaction_id);
   ARROW_ASSIGN_OR_RAISE(auto ticket, EncodeTransactionQuery(query_ticket));
 
   std::shared_ptr<arrow::Schema> result_schema;
@@ -238,32 +348,6 @@ BradFlightSqlServer::GetFlightInfoStatement(
       FlightInfo::Make(*result_schema, descriptor, endpoints, -1, -1, ordered));
 
   return std::make_unique<FlightInfo>(result);
-}
-
-arrow::Result<std::unique_ptr<FlightDataStream>>
-BradFlightSqlServer::DoGetStatement(const ServerCallContext& context,
-                                    const StatementQueryTicket& command) {
-  ARROW_ASSIGN_OR_RAISE(auto pair,
-                        DecodeTransactionQuery(command.statement_handle));
-  const std::string& autoincrement_id = pair.first;
-  const std::string transaction_id = pair.second;
-
-  const std::string& query_ticket = transaction_id + ':' + autoincrement_id;
-
-  std::shared_ptr<BradStatement> result;
-  const bool found = query_data_.erase_fn(query_ticket, [&result](auto& qr) {
-    result = qr;
-    return true;
-  });
-
-  if (!found) {
-    return arrow::Status::Invalid("Invalid ticket.");
-  }
-
-  std::shared_ptr<BradStatementBatchReader> reader;
-  ARROW_ASSIGN_OR_RAISE(reader, BradStatementBatchReader::Create(result));
-
-  return std::make_unique<RecordBatchStream>(reader);
 }
 
 }  // namespace brad

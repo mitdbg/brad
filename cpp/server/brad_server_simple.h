@@ -73,11 +73,37 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
       const arrow::flight::ServerCallContext& context,
       const arrow::flight::sql::PreparedStatementQuery& command) override;
 
+  // Currently unimplemented.
+
+  // Bind params.
+  arrow::Status DoPutPreparedStatementQuery(
+      const arrow::flight::ServerCallContext& context,
+      const arrow::flight::sql::PreparedStatementQuery& command,
+      arrow::flight::FlightMessageReader* reader,
+      arrow::flight::FlightMetadataWriter* writer) override;
+
+  // Update the prepared statement.
+  arrow::Result<int64_t> DoPutPreparedStatementUpdate(
+      const arrow::flight::ServerCallContext& context,
+      const arrow::flight::sql::PreparedStatementUpdate& command,
+      arrow::flight::FlightMessageReader* reader) override;
+
  private:
+  arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>> GetFlightInfoImpl(
+      const std::string& query, const std::string& transaction_id,
+      const arrow::flight::FlightDescriptor& descriptor);
+
+  struct PreparedStatementContext {
+    std::string query;
+    std::string transaction_id;
+  };
+
   PythonRunQueryFn handle_query_;
 
   libcuckoo::cuckoohash_map<std::string, std::shared_ptr<BradStatement>>
       query_data_;
+  libcuckoo::cuckoohash_map<std::string, PreparedStatementContext>
+      prepared_statements_;
 
   std::atomic<uint64_t> autoincrement_id_;
 };
