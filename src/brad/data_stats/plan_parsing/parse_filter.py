@@ -1,5 +1,6 @@
 import re
 import copy
+import sys
 
 from brad.data_stats.plan_parsing.generate_workload import Operator, LogicalOperator
 
@@ -124,7 +125,7 @@ class PredicateNode:
                         elif len(self.children) == 0:
                             pass
                         else:
-                            raise NotImplementedError
+                            continue
 
                         # column and literal are sometimes swapped
                         type_suffixes = ["::bpchar"]
@@ -180,7 +181,12 @@ class PredicateNode:
                             #    f"Could not parse literal {literal} (maybe a join condition? if so, this can be ignored)")
                             literal = None
 
-            assert node_op is not None, f"Could not parse: {self.text}"
+            if node_op is None:
+                print(
+                    "WARNING: Filter parsing error: could not parse",
+                    self.text,
+                    file=sys.stderr,
+                )
 
             self.column = column
             if column is not None:
