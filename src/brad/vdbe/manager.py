@@ -1,10 +1,13 @@
 import pathlib
+import logging
 from typing import List, Optional, Callable, Awaitable
 from brad.vdbe.models import (
     VirtualInfrastructure,
     VirtualEngine,
     CreateVirtualEngineArgs,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class VdbeManager:
@@ -21,7 +24,8 @@ class VdbeManager:
     ) -> "VdbeManager":
         with open(serialized_infra_json, "r", encoding="utf-8") as f:
             infra = VirtualInfrastructure.model_validate_json(f.read())
-        hostname = _get_hostname()
+        hostname = _get_external_ip()
+        logger.info("VDBE Manager using external hostname: %s", hostname)
         return cls(infra, hostname, starting_port, apply_infra)
 
     def __init__(
@@ -127,3 +131,15 @@ def _get_hostname() -> str:
         return s.getsockname()[0]
     finally:
         s.close()
+
+
+def _get_external_ip():
+    import subprocess
+
+    result = subprocess.run(
+        ["dig", "@ns1.google.com", "o-o.myaddr.l.google.com", "TXT", "+short"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip().strip('"')

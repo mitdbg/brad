@@ -11,8 +11,12 @@
 6. To shut down the demo, shut down the workload runner first (Ctrl-C). Wait
    until all runners have exited. Then shut down BRAD (Ctrl-C on the other pane).
 
-Run `./start_brad_editable.sh` to run using the schema designed for demoing the
-editable VDBEs. Make sure to start the Redshift resource as well.
+## Running the editable VDBE demo scenario
+
+- Edit `config/system_config_demo.yml` and switch the `bootstrap_vdbe_path`
+  value to `imdb_editable_vdbes.json`.
+- Run `./start_brad_editable.sh` to run using the schema designed for demoing the
+  editable VDBEs. Make sure to start the Redshift resource as well.
 
 ## Important files
 
