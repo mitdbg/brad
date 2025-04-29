@@ -27,7 +27,7 @@ trap "inner_cancel_experiment" TERM
 # Start with Aurora 2x db.t4g.medium, Redshift off, Athena unused.
 
 # Start with 4 analytical clients.
-start_repeating_olap_runner 4 15 5 $initial_queries "ra_4"
+start_repeating_olap_runner 4 25 5 $initial_queries "ra_4"
 rana_pid=$runner_pid
 sleep 2
 
