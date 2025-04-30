@@ -300,6 +300,12 @@ class ConfigFile:
         except KeyError:
             return None
 
+    def disable_query_logging(self) -> bool:
+        try:
+            return self._raw["disable_query_logging"]
+        except KeyError:
+            return False
+
     def _extract_log_path(self, config_key: str) -> Optional[pathlib.Path]:
         if config_key not in self._raw:
             return None

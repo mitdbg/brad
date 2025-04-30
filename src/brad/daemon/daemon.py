@@ -241,6 +241,9 @@ class BradDaemon:
             self._timed_sync_task = asyncio.create_task(self._run_sync_periodically())
         await self._data_sync_executor.establish_connections()
 
+        if self._config.disable_query_logging():
+            logger.info("Query logging is disabled.")
+
         if self._temp_config is not None:
             # TODO: Actually call into the models. We avoid doing so for now to
             # avoid having to implement model loading, etc.
