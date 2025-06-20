@@ -6,7 +6,7 @@
 # listen on successive ports (e.g., 6584, 6585, etc.).
 front_end_interface: "0.0.0.0"
 front_end_port: 6783
-num_front_ends: 3
+num_front_ends: 2
 
 # If installed and enabled, BRAD will serve its UI from a webserver that listens
 # for connections on this network interface and port.
