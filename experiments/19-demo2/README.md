@@ -1,6 +1,8 @@
 # Operating the BRAD Demo
 
-1. Start a new tmux session; you need 3 tmux panes
+## Scenario 1 (Predictions)
+
+1. Start a new tmux session; you need 2 tmux panes
 2. Activate the virtualenv that has BRAD and its dependencies installed
 3. Run `./start_brad.sh` to start BRAD. The web interface should be accessible
    on port 7583. Make sure to start the Aurora resource.
@@ -11,16 +13,21 @@
 6. To shut down the demo, shut down the workload runner first (Ctrl-C). Wait
    until all runners have exited. Then shut down BRAD (Ctrl-C on the other pane).
 
-## Running the editable VDBE demo scenario
+## Scenario 2 (Editable VDBEs)
 
-- Edit `config/system_config_demo.yml` and switch the `bootstrap_vdbe_path`
-  value to `imdb_editable_vdbes.json`.
-- Run `./start_brad_editable.sh` to run using the schema designed for demoing the
-  editable VDBEs. Make sure to start the Redshift resource as well.
+1. Run `./start_brad_editable.sh` to run using the schema designed for demoing the
+   editable VDBEs. Make sure to start the Redshift resource as well.
+2. The web interface should be accessible on port 7683.
+
+## Scenario 3 (AWS Glue ETLs)
+
+1. Run `./start_brad_etl.sh` to run using the schema designed for demoing the
+   external ETL scenario. Make sure to start Redshift and Aurora.
+2. The web interface should be accessible on port 7783.
 
 ## Important files
 
-- `config/system_config_demo.yml`:
-  - BRAD configs for the demo (checked in)
+- `config/system_config_demo_s{1,2,3}.yml`:
+  - BRAD configs for the demo scenarios (checked in)
 - `config/physical_config_100gb_demo.yml`:
   - Physical configuration values; ensure the cluster IDs refer to actual AWS resources
