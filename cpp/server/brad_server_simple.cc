@@ -92,9 +92,9 @@ arrow::Result<std::shared_ptr<arrow::RecordBatch>> ResultToRecordBatch(
       columns.push_back(values);
 
     } else if (field_type->Equals(
-                   arrow::decimal(/*precision=*/10, /*scale=*/2))) {
+                   arrow::decimal128(/*precision=*/10, /*scale=*/2))) {
       arrow::Decimal128Builder decimalbuilder(
-          arrow::decimal(/*precision=*/10, /*scale=*/2));
+          arrow::decimal128(/*precision=*/10, /*scale=*/2));
       for (int row_ix = 0; row_ix < num_rows; ++row_ix) {
         const std::optional<std::string> val =
             py::cast<std::optional<std::string>>(
@@ -149,6 +149,11 @@ arrow::Result<std::shared_ptr<arrow::RecordBatch>> ResultToRecordBatch(
       std::shared_ptr<arrow::Array> values;
       ARROW_ASSIGN_OR_RAISE(values, nullbuilder.Finish());
       columns.push_back(values);
+    } else {
+      std::cerr << "ERROR: Unsupported field type: " << field_type->ToString()
+                << std::endl;
+      return arrow::Status::NotImplemented("Unsupported field type: ",
+                                           field_type->ToString());
     }
   }
 

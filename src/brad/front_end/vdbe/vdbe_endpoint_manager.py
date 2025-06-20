@@ -16,7 +16,7 @@ from typing import (
 
 import brad.proto_gen.brad_pb2_grpc as brad_grpc
 from brad.config.file import ConfigFile
-from brad.connection.schema import Schema
+from brad.connection.schema import Schema, DataType
 from brad.front_end.brad_interface import BradInterface
 from brad.front_end.grpc import BradGrpc
 from brad.front_end.session import SessionManager, SessionId
@@ -286,4 +286,22 @@ class VdbeFlightSqlServer:
         )
         row_result, schema = future.result()
         assert schema is not None
+
+        # We need to do extra processing for decimal fields since our C++
+        # backend expects them as strings.
+        decimal_fields = []
+        for idx, field in enumerate(schema.fields):
+            if field.data_type == DataType.Decimal:
+                decimal_fields.append(idx)
+
+        if len(decimal_fields) > 0:
+            new_rows = []
+            for row in row_result:
+                new_row = tuple(
+                    str(value) if idx in decimal_fields else value
+                    for idx, value in enumerate(row)
+                )
+                new_rows.append(new_row)
+            row_result = new_rows
+
         return row_result, schema
