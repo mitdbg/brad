@@ -138,7 +138,7 @@ class BradDaemon:
         if load_vdbe_path is not None:
             self._vdbe_manager: Optional[VdbeManager] = VdbeManager.load_from(
                 load_vdbe_path,
-                starting_port=9876,
+                starting_port=self._config.vdbe_start_port(),
                 apply_infra=self._apply_virtual_infra,
             )
         else:

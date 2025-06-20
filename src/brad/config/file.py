@@ -306,6 +306,15 @@ class ConfigFile:
         except KeyError:
             return False
 
+    def vdbe_start_port(self) -> int:
+        """
+        Returns the port on which the first VDBE will be started. The rest of the
+        VDBEs will be started on consecutive ports.
+        """
+        if "vdbe_start_port" not in self._raw:
+            return 9876  # Default
+        return int(self._raw["vdbe_start_port"])
+
     def _extract_log_path(self, config_key: str) -> Optional[pathlib.Path]:
         if config_key not in self._raw:
             return None

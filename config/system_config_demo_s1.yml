@@ -5,13 +5,13 @@
 # and port. If `num_front_ends` is greater than one, subsequent front ends will
 # listen on successive ports (e.g., 6584, 6585, etc.).
 front_end_interface: "0.0.0.0"
-front_end_port: 8583
-num_front_ends: 2
+front_end_port: 6583
+num_front_ends: 8
 
 # If installed and enabled, BRAD will serve its UI from a webserver that listens
 # for connections on this network interface and port.
 ui_interface: "0.0.0.0"
-ui_port: 9583
+ui_port: 7583
 
 # Logging paths. If the value is in ALL_CAPS (with underscores), it is
 # interpreted as an environment variable (BRAD will log to the path stored in
@@ -124,9 +124,9 @@ std_datasets:
   - name: adhoc
     path: workloads/IMDB_100GB/adhoc_test/
 
-# bootstrap_vdbe_path: config/vdbe_demo/imdb_extended_vdbes.json
-bootstrap_vdbe_path: config/vdbe_demo/imdb_editable_vdbes.json
+bootstrap_vdbe_path: config/vdbe_demo/imdb_extended_vdbes.json
 disable_query_logging: true
+vdbe_start_port: 9876
 
 aurora_max_query_factor: 4.0
 aurora_max_query_factor_replace: 10000.0
