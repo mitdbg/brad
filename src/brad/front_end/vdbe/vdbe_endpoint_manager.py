@@ -239,6 +239,7 @@ class VdbeFlightSqlServer:
         handler: QueryHandler,
         session_id: SessionId,
     ) -> None:
+        # pylint: disable-next=import-error,no-name-in-module
         import brad.native.pybind_brad_server as brad_server
 
         # pylint: disable-next=c-extension-no-member
