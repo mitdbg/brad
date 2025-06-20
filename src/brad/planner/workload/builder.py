@@ -191,7 +191,7 @@ class WorkloadBuilder:
 
         txn_queries = []
         analytical_queries = []
-        sampling_prob = 1  # Currently unused.
+        sampling_prob = 1.0  # Currently unused.
 
         range_end: Optional[datetime] = None
         range_start: Optional[datetime] = None
