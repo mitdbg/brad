@@ -315,6 +315,13 @@ class ConfigFile:
             return 9876  # Default
         return int(self._raw["vdbe_start_port"])
 
+    def flight_sql_mode(self) -> Optional[str]:
+        try:
+            return self._raw["flight_sql_mode"]
+        except KeyError:
+            # FlightSQL mode is not set.
+            return None
+
     def _extract_log_path(self, config_key: str) -> Optional[pathlib.Path]:
         if config_key not in self._raw:
             return None
