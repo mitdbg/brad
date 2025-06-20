@@ -160,7 +160,9 @@ class ConnectionFactory:
             return cls.connect_to_stub(config)
 
         # HACK: Schema aliasing for convenience.
-        if schema_name is not None and schema_name == "imdb_editable_100g":
+        if schema_name is not None and (
+            schema_name == "imdb_editable_100g" or schema_name == "imdb_etl_100g"
+        ):
             schema_name = "imdb_extended_100g"
 
         connection_details = config.get_sidecar_db_details()
