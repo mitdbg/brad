@@ -130,6 +130,7 @@ class BradVdbeFrontEnd:
             vdbe_mgr=self._vdbe_mgr,
             session_mgr=self._sessions,
             handler=self._run_query_impl,
+            config=self._config,
         )
         self._shutdown_event = asyncio.Event()
 

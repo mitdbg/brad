@@ -87,7 +87,10 @@ class BradFrontEnd(BradInterface):
         input_queue: mp.Queue,
         output_queue: mp.Queue,
     ):
-        if BradFrontEnd.native_server_is_supported():
+        if (
+            BradFrontEnd.native_server_is_supported()
+            and config.flight_sql_mode() == "front_end"
+        ):
             from brad.front_end.flight_sql_server import BradFlightSqlServer
 
             self._flight_sql_server: Optional[BradFlightSqlServer] = (
@@ -98,8 +101,12 @@ class BradFrontEnd(BradInterface):
                 )
             )
             self._flight_sql_server_session_id: Optional[SessionId] = None
+            logger.info(
+                "FlightSQL server is enabled for the front end. Will listen on port 31337."
+            )
         else:
             self._flight_sql_server = None
+            logger.info("FlightSQL server is disabled for the front end.")
 
         self._main_thread_loop: Optional[asyncio.AbstractEventLoop] = None
 

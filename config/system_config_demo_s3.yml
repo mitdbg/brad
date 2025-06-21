@@ -6,7 +6,7 @@
 # listen on successive ports (e.g., 6584, 6585, etc.).
 front_end_interface: "0.0.0.0"
 front_end_port: 6783
-num_front_ends: 3
+num_front_ends: 2
 
 # If installed and enabled, BRAD will serve its UI from a webserver that listens
 # for connections on this network interface and port.
@@ -127,6 +127,7 @@ std_datasets:
 bootstrap_vdbe_path: config/vdbe_demo/imdb_etl_vdbes.json
 disable_query_logging: true
 vdbe_start_port: 10076
+flight_sql_mode: "vdbe"
 
 aurora_max_query_factor: 4.0
 aurora_max_query_factor_replace: 10000.0

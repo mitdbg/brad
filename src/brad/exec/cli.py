@@ -2,6 +2,7 @@ import cmd
 import pathlib
 import readline
 import time
+import pyodbc
 from typing import List, Tuple
 from tabulate import tabulate
 
@@ -80,6 +81,11 @@ def run_query(client: BradGrpcClient | BradFlightSqlClientOdbc, query: str) -> N
         print("Query resulted in an error:")
         print(ex.message())
         print()
+    except pyodbc.Error as ex:
+        print()
+        print("Query resulted in an error:")
+        print(repr(ex))
+        print()
 
 
 class BradShell(cmd.Cmd):
@@ -145,7 +151,10 @@ def main(args) -> None:
     host, port = parse_endpoint(args.endpoint)
     print("BRAD Interactive Shell v{}".format(brad.__version__))
     print()
-    print("Connecting to BRAD VDBE at {}:{}...".format(host, port))
+    if args.use_odbc:
+        print("Connecting to BRAD VDBE at {}:{} (using ODBC)...".format(host, port))
+    else:
+        print("Connecting to BRAD VDBE at {}:{}...".format(host, port))
 
     def run_shell(client: BradGrpcClient | BradFlightSqlClientOdbc) -> None:
         print("Connected!")
