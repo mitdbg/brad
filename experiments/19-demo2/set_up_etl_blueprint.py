@@ -128,9 +128,9 @@ def main():
     etl_orders_table = Table(
         "ticket_orders_subset",
         columns=[
-            Column("id", "INT"),
-            Column("showing_id", "BIGINT"),
-            Column("quantity", "INT"),
+            Column("id", "INT", is_primary=True),
+            Column("showing_id", "BIGINT", is_primary=False),
+            Column("quantity", "INT", is_primary=False),
         ],
         table_dependencies=[],
         transform_text=None,
@@ -139,8 +139,8 @@ def main():
     etl_agg_table = Table(
         "ticket_orders_agg",
         columns=[
-            Column("showing_id", "BIGINT"),
-            Column("total_quantity", "INT"),
+            Column("showing_id", "BIGINT", is_primary=True),
+            Column("total_quantity", "INT", is_primary=False),
         ],
         table_dependencies=[],
         transform_text=None,
