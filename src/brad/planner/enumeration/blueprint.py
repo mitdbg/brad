@@ -2,6 +2,7 @@ from typing import Dict, List, Optional
 
 from brad.blueprint.blueprint import Blueprint
 from brad.blueprint.provisioning import Provisioning
+from brad.blueprint.table import Table
 from brad.config.engine import Engine
 from brad.routing.abstract_policy import FullRoutingPolicy
 
@@ -50,6 +51,9 @@ class EnumeratedBlueprint(Blueprint):
     ) -> "EnumeratedBlueprint":
         self._current_routing_policy = routing_policy
         return self
+
+    def add_table(self, table: Table) -> None:
+        self._table_schemas.append(table)
 
     def to_blueprint(self, forced_schema_name: Optional[str] = None) -> Blueprint:
         """

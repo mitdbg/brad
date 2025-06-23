@@ -6,6 +6,7 @@ from brad.asset_manager import AssetManager
 from brad.blueprint import Blueprint
 from brad.blueprint.manager import BlueprintManager
 from brad.blueprint.provisioning import Provisioning
+from brad.blueprint.table import Table, Column
 from brad.config.engine import Engine
 from brad.config.file import ConfigFile
 from brad.daemon.transition_orchestrator import TransitionOrchestrator
@@ -124,6 +125,40 @@ def main():
     enum_blueprint.set_aurora_provisioning(Provisioning("db.t4g.medium", 2))
     enum_blueprint.set_redshift_provisioning(Provisioning("dc2.large", 2))
 
+    etl_orders_table = Table(
+        "ticket_orders_subset",
+        columns=[
+            Column("id", "INT"),
+            Column("showing_id", "BIGINT"),
+            Column("quantity", "INT"),
+        ],
+        table_dependencies=[],
+        transform_text=None,
+        secondary_indexed_columns=[],
+    )
+    etl_agg_table = Table(
+        "ticket_orders_agg",
+        columns=[
+            Column("showing_id", "BIGINT"),
+            Column("total_quantity", "INT"),
+        ],
+        table_dependencies=[],
+        transform_text=None,
+        secondary_indexed_columns=[],
+    )
+
+    # 5. Add the ETL tables if they do not already exist.
+    try:
+        enum_blueprint.get_table(etl_orders_table.name)
+    except ValueError:
+        print("Adding", etl_orders_table.name, "to the blueprint.")
+        enum_blueprint.add_table(etl_orders_table)
+    try:
+        enum_blueprint.get_table(etl_agg_table.name)
+    except ValueError:
+        print("Adding", etl_agg_table.name, "to the blueprint.")
+        enum_blueprint.add_table(etl_agg_table)
+
     # 6. Adjust the placement.
     new_placement = {}
     aurora_only = ["theatres", "showings", "ticket_orders"]
@@ -135,6 +170,9 @@ def main():
             new_placement[table.name] = [Engine.Aurora, Engine.Redshift]
         else:
             new_placement[table.name] = [Engine.Redshift]
+
+    new_placement[etl_orders_table.name] = [Engine.Aurora]
+    new_placement[etl_agg_table.name] = [Engine.Redshift]
     enum_blueprint.set_table_locations(new_placement)
 
     # 6. Transition to the new blueprint.
