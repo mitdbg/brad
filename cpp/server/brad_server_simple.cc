@@ -334,6 +334,7 @@ BradFlightSqlServer::GetFlightInfoImpl(const std::string& query,
   {
     py::gil_scoped_acquire guard;
     auto result = handle_query_(query);
+    std::cerr << "Got result for query from Python: " << query << std::endl;
     result_schema = ArrowSchemaFromBradSchema(result.second);
     result_record_batch =
         ResultToRecordBatch(result.first, result_schema).ValueOrDie();
@@ -343,6 +344,7 @@ BradFlightSqlServer::GetFlightInfoImpl(const std::string& query,
       auto statement,
       BradStatement::Create(std::move(result_record_batch), result_schema));
   query_data_.insert(query_ticket, statement);
+  std::cerr << "Stored Arrow result for query: " << query << std::endl;
 
   std::vector<FlightEndpoint> endpoints{
       FlightEndpoint{std::move(ticket), {}, std::nullopt, ""}};
