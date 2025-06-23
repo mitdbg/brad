@@ -25,6 +25,13 @@
    external ETL scenario. Make sure to start Redshift and Aurora.
 2. The web interface should be accessible on port 7783.
 
+Use `set_up_etl_blueprint.py` to transition to the blueprint for this scenario.
+
+#### VDBE JDBC connections
+
+- Connection URL: `jdbc:arrow-flight-sql://{VDBE host and port}/?&useEncryption=false`
+- JDBC driver class name: `org.apache.arrow.driver.jdbc.ArrowFlightJdbcDriver`
+
 ## Important files
 
 - `config/system_config_demo_s{1,2,3}.yml`:
