@@ -27,6 +27,10 @@
         {
           "name": "aka_title",
           "writable": true
+        },
+        {
+          "name": "ticket_orders_subset",
+          "writable": true
         }
       ],
       "mapped_to": "aurora",
@@ -138,6 +142,10 @@
         {
           "name": "person_info",
           "writable": false
+        },
+        {
+          "name": "ticket_orders_agg",
+          "writable": false
         }
       ],
       "mapped_to": "redshift",
@@ -219,6 +227,12 @@
     },
     {
       "name": "person_info"
+    },
+    {
+      "name": "ticket_orders_subset"
+    },
+    {
+      "name": "ticket_orders_agg"
     }
   ]
 }
