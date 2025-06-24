@@ -163,6 +163,20 @@ arrow::Result<std::shared_ptr<arrow::RecordBatch>> ResultToRecordBatch(
   return result_record_batch;
 }
 
+std::shared_ptr<arrow::Schema> SimpleSchema() {
+  std::vector<std::shared_ptr<arrow::Field>> fields;
+  fields.reserve(2);
+
+  std::string field_name1 = "showing_id";
+  std::string field_name2 = "total_quantity";
+  std::shared_ptr<arrow::DataType> data_type1 = arrow::int64();
+  std::shared_ptr<arrow::DataType> data_type2 = arrow::int64();
+  fields.push_back(arrow::field(std::move(field_name1), std::move(data_type1)));
+  fields.push_back(arrow::field(std::move(field_name2), std::move(data_type2)));
+
+  return arrow::schema(std::move(fields));
+}
+
 BradFlightSqlServer::BradFlightSqlServer() : autoincrement_id_(0ULL) {}
 
 BradFlightSqlServer::~BradFlightSqlServer() = default;
@@ -253,7 +267,7 @@ BradFlightSqlServer::CreatePreparedStatement(
   // std::cerr << "Registered prepared statement " << id << " " << request.query
   //           << std::endl;
   return arrow::flight::sql::ActionCreatePreparedStatementResult{nullptr,
-                                                                 nullptr, id};
+                                                                 SimpleSchema(), id};
 }
 
 arrow::Status BradFlightSqlServer::ClosePreparedStatement(
