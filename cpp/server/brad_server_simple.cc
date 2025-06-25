@@ -389,8 +389,8 @@ arrow::Result<int64_t> BradFlightSqlServer::DoPutPreparedStatementUpdate(
     const arrow::flight::ServerCallContext& context,
     const arrow::flight::sql::PreparedStatementUpdate& command,
     arrow::flight::FlightMessageReader* reader) {
-  std::cerr << "DoPutPreparedStatementUpdate called "
-            << command.prepared_statement_handle << std::endl;
+  // std::cerr << "DoPutPreparedStatementUpdate called "
+  //           << command.prepared_statement_handle << std::endl;
   const PreparedStatementContext* statement_ctx = nullptr;
   prepared_statements_.find_fn(
       command.prepared_statement_handle,
@@ -409,9 +409,11 @@ arrow::Result<int64_t> BradFlightSqlServer::DoPutPreparedStatementUpdate(
   try {
     for (auto& batch : record_batches) {
       const auto queries = GenerateSQLWithValues(batch, statement_ctx->query);
-      std::cerr << "Would run queries: " << std::endl;
-      for (const auto& query : queries) {
-        std::cerr << "  " << query << std::endl;
+      {
+        py::gil_scoped_acquire guard;
+        for (const auto& query : queries) {
+          handle_query_(query);
+        }
       }
       num_rows += batch->num_rows();
     }
