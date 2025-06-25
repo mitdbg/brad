@@ -163,7 +163,29 @@ arrow::Result<std::shared_ptr<arrow::RecordBatch>> ResultToRecordBatch(
   return result_record_batch;
 }
 
-std::shared_ptr<arrow::Schema> SimpleSchema() {
+size_t CountSQLPlaceholders(const std::string& query) {
+  bool in_single_quote = false;
+  bool in_double_quote = false;
+  size_t count = 0;
+
+  for (size_t i = 0; i < query.size(); ++i) {
+    char c = query[i];
+
+    if (c == '\'' && !in_double_quote) {
+      in_single_quote = !in_single_quote;
+    } else if (c == '"' && !in_single_quote) {
+      in_double_quote = !in_double_quote;
+    } else if (c == '?' && !in_single_quote && !in_double_quote) {
+      ++count;
+    } else if (c == '\\' && i + 1 < query.size()) {
+      ++i;  // skip escaped characters
+    }
+  }
+
+  return count;
+}
+
+std::shared_ptr<arrow::Schema> HardcodedSchema() {
   std::vector<std::shared_ptr<arrow::Field>> fields;
   fields.reserve(2);
 
@@ -175,6 +197,59 @@ std::shared_ptr<arrow::Schema> SimpleSchema() {
   fields.push_back(arrow::field(std::move(field_name2), std::move(data_type2)));
 
   return arrow::schema(std::move(fields));
+}
+
+std::vector<std::string> GenerateSQLWithValues(
+    const std::shared_ptr<arrow::RecordBatch>& batch,
+    const std::string& sql_template) {
+  if (batch->num_columns() != 2) {
+    throw std::runtime_error("RecordBatch must have exactly 2 columns.");
+  }
+
+  for (int i = 0; i < 2; ++i) {
+    if (batch->column(i)->type_id() != arrow::Type::INT64) {
+      throw std::runtime_error("Both columns must be of type int64.");
+    }
+  }
+
+  // Count placeholders
+  const auto placeholder_count = CountSQLPlaceholders(sql_template);
+  if (placeholder_count != 2) {
+    throw std::runtime_error("SQL string must contain exactly 2 placeholders.");
+  }
+
+  auto col0 = std::static_pointer_cast<arrow::Int64Array>(batch->column(0));
+  auto col1 = std::static_pointer_cast<arrow::Int64Array>(batch->column(1));
+
+  std::vector<std::string> results;
+  for (int64_t row = 0; row < batch->num_rows(); ++row) {
+    if (col0->IsNull(row) || col1->IsNull(row)) {
+      throw std::runtime_error(
+          "Null values are not supported in placeholder substitution.");
+    }
+
+    int64_t val0 = col0->Value(row);
+    int64_t val1 = col1->Value(row);
+
+    // Replace the placeholders one by one
+    std::string result;
+    size_t pos = 0;
+    int replace_count = 0;
+    for (char c : sql_template) {
+      if (c == '?' && replace_count == 0) {
+        result += std::to_string(val0);
+        ++replace_count;
+      } else if (c == '?' && replace_count == 1) {
+        result += std::to_string(val1);
+        ++replace_count;
+      } else {
+        result += c;
+      }
+    }
+
+    results.push_back(result);
+  }
+  return results;
 }
 
 BradFlightSqlServer::BradFlightSqlServer() : autoincrement_id_(0ULL) {}
@@ -264,10 +339,17 @@ BradFlightSqlServer::CreatePreparedStatement(
   const PreparedStatementContext statement_context{request.query,
                                                    request.transaction_id};
   prepared_statements_.insert(id, statement_context);
-  // std::cerr << "Registered prepared statement " << id << " " << request.query
-  //           << std::endl;
-  return arrow::flight::sql::ActionCreatePreparedStatementResult{nullptr,
-                                                                 SimpleSchema(), id};
+  const size_t num_params = CountSQLPlaceholders(request.query);
+  if (num_params == 0) {
+    return arrow::flight::sql::ActionCreatePreparedStatementResult{nullptr,
+                                                                   nullptr, id};
+  } else if (num_params == 2) {
+    return arrow::flight::sql::ActionCreatePreparedStatementResult{
+        nullptr, HardcodedSchema(), id};
+  } else {
+    return arrow::Status::Invalid(
+        "Unsupported number of parameters in prepared statement: ", num_params);
+  }
 }
 
 arrow::Status BradFlightSqlServer::ClosePreparedStatement(
@@ -303,16 +385,44 @@ BradFlightSqlServer::GetFlightInfoPreparedStatement(
   return GetFlightInfoImpl(query, transaction_id, descriptor);
 }
 
-// Currently unimplemented.
-
-arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>>
-BradFlightSqlServer::DoGetPreparedStatement(
+arrow::Result<int64_t> BradFlightSqlServer::DoPutPreparedStatementUpdate(
     const arrow::flight::ServerCallContext& context,
-    const arrow::flight::sql::PreparedStatementQuery& command) {
-  std::cerr << "DoGetPreparedStatement called "
+    const arrow::flight::sql::PreparedStatementUpdate& command,
+    arrow::flight::FlightMessageReader* reader) {
+  std::cerr << "DoPutPreparedStatementUpdate called "
             << command.prepared_statement_handle << std::endl;
-  return arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>>();
+  const PreparedStatementContext* statement_ctx = nullptr;
+  prepared_statements_.find_fn(
+      command.prepared_statement_handle,
+      [&statement_ctx](const auto& ps_ctx) { statement_ctx = &ps_ctx; });
+  if (statement_ctx == nullptr) {
+    return arrow::Status::Invalid("Invalid prepared statement handle.");
+  }
+
+  auto record_batches_result = reader->ToRecordBatches();
+  if (!record_batches_result.ok()) {
+    return record_batches_result.status();
+  }
+
+  int64_t num_rows = 0;
+  auto record_batches = record_batches_result.ValueOrDie();
+  try {
+    for (auto& batch : record_batches) {
+      const auto queries = GenerateSQLWithValues(batch, statement_ctx->query);
+      std::cerr << "Would run queries: " << std::endl;
+      for (const auto& query : queries) {
+        std::cerr << "  " << query << std::endl;
+      }
+      num_rows += batch->num_rows();
+    }
+  } catch (const std::runtime_error& e) {
+    return arrow::Status::Invalid(e.what());
+  }
+
+  return arrow::Result<int64_t>(num_rows);
 }
+
+// Currently unimplemented.
 
 arrow::Status BradFlightSqlServer::DoPutPreparedStatementQuery(
     const arrow::flight::ServerCallContext& context,
@@ -324,13 +434,13 @@ arrow::Status BradFlightSqlServer::DoPutPreparedStatementQuery(
   return arrow::Status();
 }
 
-arrow::Result<int64_t> BradFlightSqlServer::DoPutPreparedStatementUpdate(
+arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>>
+BradFlightSqlServer::DoGetPreparedStatement(
     const arrow::flight::ServerCallContext& context,
-    const arrow::flight::sql::PreparedStatementUpdate& command,
-    arrow::flight::FlightMessageReader* reader) {
-  std::cerr << "DoPutPreparedStatementUpdate called "
+    const arrow::flight::sql::PreparedStatementQuery& command) {
+  std::cerr << "DoGetPreparedStatement called "
             << command.prepared_statement_handle << std::endl;
-  return arrow::Result<int64_t>();
+  return arrow::Result<std::unique_ptr<arrow::flight::FlightDataStream>>();
 }
 
 arrow::Result<std::unique_ptr<arrow::flight::FlightInfo>>
