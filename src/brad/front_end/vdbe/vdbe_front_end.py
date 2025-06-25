@@ -319,6 +319,11 @@ class BradVdbeFrontEnd:
                 self._query_latency_sketches[vdbe_id] = self._get_empty_sketch()
                 self._query_latency_sketches[vdbe_id].add(run_time_s_float)
 
+            # fetchall() may raise an error if the query does not produce output
+            # (e.g., INSERT).
+            if query_rep.is_data_modification_query():
+                return ([], Schema.empty() if retrieve_schema else None)
+
             # Extract and return the results, if any.
             try:
                 result_row_limit = self._config.result_row_limit()
