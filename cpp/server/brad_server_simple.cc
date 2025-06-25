@@ -410,6 +410,11 @@ arrow::Result<int64_t> BradFlightSqlServer::DoPutPreparedStatementUpdate(
     for (auto& batch : record_batches) {
       const auto queries = GenerateSQLWithValues(batch, statement_ctx->query);
       {
+        // NOTE: This is a blocking call to handle_query_. We use a mutex as a
+        // simple way to ensure only one Flight SQL-sourced query runs at a
+        // time. This is because concurrent Flight SQL queries need to run in
+        // different sessions, which requires additional setup.
+        std::unique_lock<std::mutex> lock(mutex_);
         py::gil_scoped_acquire guard;
         for (const auto& query : queries) {
           handle_query_(query);

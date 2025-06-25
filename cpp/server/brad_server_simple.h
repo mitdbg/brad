@@ -12,6 +12,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <mutex>
 
 #include "brad_statement.h"
 #include "libcuckoo/cuckoohash_map.hh"
@@ -106,6 +107,7 @@ class BradFlightSqlServer : public arrow::flight::sql::FlightSqlServerBase {
       prepared_statements_;
 
   std::atomic<uint64_t> autoincrement_id_;
+  std::mutex mutex_;
 };
 
 }  // namespace brad
