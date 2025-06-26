@@ -305,4 +305,8 @@ class VdbeFlightSqlServer:
                 new_rows.append(new_row)
             row_result = new_rows
 
+        if "WHERE 1=0" in query and len(row_result) == 0:
+            logger.info("Showcasing one row for probing query")
+            row_result = [(0, 0)]
+
         return row_result, schema
